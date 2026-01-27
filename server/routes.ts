@@ -233,6 +233,12 @@ export async function registerRoutes(
   });
 
   // ============== KANBAN CARDS ==============
+  app.get("/api/cards/:id", async (req, res) => {
+    const card = await storage.getKanbanCard(req.params.id);
+    if (!card) return res.status(404).json({ error: "Card not found" });
+    res.json(card);
+  });
+
   app.post("/api/cards", async (req, res) => {
     try {
       const validated = insertKanbanCardSchema.parse(req.body);

@@ -97,7 +97,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
   });
 
   useEffect(() => {
-    if (cardData) {
+    if (cardId && cardData) {
       form.reset({
         title: cardData.title,
         objectives: cardData.objectives || "",
@@ -110,7 +110,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
         endDate: cardData.endDate ? new Date(cardData.endDate).toISOString().split('T')[0] : "",
         tag: cardData.tags?.[0] || "",
       });
-    } else {
+    } else if (!cardId && open) {
       form.reset({
         title: "",
         objectives: "",
@@ -124,7 +124,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
         tag: "",
       });
     }
-  }, [cardData, form, open]);
+  }, [cardId, cardData, form, open]);
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {

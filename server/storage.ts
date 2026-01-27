@@ -47,6 +47,7 @@ export interface IStorage {
   deleteKanbanColumn(id: string): Promise<boolean>;
 
   // Kanban Cards
+  getKanbanCard(id: string): Promise<KanbanCard | undefined>;
   getKanbanCards(projectId: string): Promise<KanbanCard[]>;
   createKanbanCard(card: InsertKanbanCard): Promise<KanbanCard>;
   updateKanbanCard(id: string, data: Partial<KanbanCard>): Promise<KanbanCard | undefined>;
@@ -421,14 +422,6 @@ export class MemStorage implements IStorage {
     return updated;
   }
 
-  async updateKanbanColumn(id: string, data: Partial<KanbanColumn>): Promise<KanbanColumn | undefined> {
-    const column = this.kanbanColumns.get(id);
-    if (!column) return undefined;
-    const updated = { ...column, ...data };
-    this.kanbanColumns.set(id, updated);
-    return updated;
-  }
-
   async deleteKanbanColumn(id: string): Promise<boolean> {
     // Delete related cards
     Array.from(this.kanbanCards.values())
@@ -438,6 +431,10 @@ export class MemStorage implements IStorage {
   }
 
   // Kanban Cards
+  async getKanbanCard(id: string): Promise<KanbanCard | undefined> {
+    return this.kanbanCards.get(id);
+  }
+
   async getKanbanCards(projectId: string): Promise<KanbanCard[]> {
     return Array.from(this.kanbanCards.values())
       .filter(c => c.projectId === projectId)

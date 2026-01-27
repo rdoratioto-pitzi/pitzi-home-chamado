@@ -6,24 +6,26 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, FolderKanban, Calendar, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import type { Project } from "@shared/schema";
+import type { Project, User } from "@shared/schema";
 import { ProjectDialog } from "./project-dialog";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const statusColors: Record<string, string> = {
   active: "bg-green-500/10 text-green-600 dark:text-green-400",
+  sprint_active: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   planning: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   on_hold: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
-  completed: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  completed: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
   archived: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
 };
 
 const statusLabels: Record<string, string> = {
   active: "Ativo",
+  sprint_active: "Em Andamento",
   planning: "Planejamento",
   on_hold: "Pausado",
-  completed: "Concluído",
+  completed: "Sprint Finalizada",
   archived: "Arquivado",
 };
 

@@ -81,6 +81,7 @@ export default function KanbanPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       toast({ 
         title: "Sprint atualizada", 
         description: "O status da sprint foi atualizado com sucesso." 
