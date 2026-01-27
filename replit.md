@@ -165,6 +165,13 @@ O workflow "Start application" executa `npm run dev` que inicia:
 - Servidor Express na porta 5000
 - Vite dev server para o frontend
 
+## Seed Automático
+
+Na inicialização, o servidor executa `server/seed.ts` que:
+- Cria usuário admin (admin@renov.com.br / admin123) se não existir
+- Cria áreas de tarefas padrão (TI, RH, Operações) se não existirem
+- Funciona tanto em desenvolvimento quanto em produção
+
 ## Funcionalidades Recentes
 
 ### Chamados (Tickets)
