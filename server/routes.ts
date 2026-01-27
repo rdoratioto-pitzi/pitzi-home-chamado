@@ -350,16 +350,25 @@ export async function registerRoutes(
     }
   });
 
-  // ============== OBJECTIVES ==============
+  // ============== OKRs ==============
   app.get("/api/objectives", async (req, res) => {
-    const objectives = await storage.getObjectives();
-    res.json(objectives);
+    try {
+      const objectives = await storage.getObjectives();
+      res.json(objectives);
+    } catch (error) {
+      console.error("Error fetching objectives:", error);
+      res.status(500).json({ error: "Failed to fetch objectives" });
+    }
   });
 
   app.get("/api/objectives/:id", async (req, res) => {
-    const objective = await storage.getObjective(req.params.id);
-    if (!objective) return res.status(404).json({ error: "Objective not found" });
-    res.json(objective);
+    try {
+      const objective = await storage.getObjective(req.params.id);
+      if (!objective) return res.status(404).json({ error: "Objective not found" });
+      res.json(objective);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch objective" });
+    }
   });
 
   app.post("/api/objectives", async (req, res) => {
