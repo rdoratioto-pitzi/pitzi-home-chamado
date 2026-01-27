@@ -44,6 +44,7 @@ export interface IStorage {
   getKanbanColumns(projectId: string): Promise<KanbanColumn[]>;
   createKanbanColumn(column: InsertKanbanColumn): Promise<KanbanColumn>;
   updateKanbanColumn(id: string, data: Partial<KanbanColumn>): Promise<KanbanColumn | undefined>;
+  updateKanbanColumn(id: string, data: Partial<KanbanColumn>): Promise<KanbanColumn | undefined>;
   deleteKanbanColumn(id: string): Promise<boolean>;
 
   // Kanban Cards
@@ -411,6 +412,14 @@ export class MemStorage implements IStorage {
     const column: KanbanColumn = { ...insertColumn, id };
     this.kanbanColumns.set(id, column);
     return column;
+  }
+
+  async updateKanbanColumn(id: string, data: Partial<KanbanColumn>): Promise<KanbanColumn | undefined> {
+    const column = this.kanbanColumns.get(id);
+    if (!column) return undefined;
+    const updated = { ...column, ...data };
+    this.kanbanColumns.set(id, updated);
+    return updated;
   }
 
   async updateKanbanColumn(id: string, data: Partial<KanbanColumn>): Promise<KanbanColumn | undefined> {

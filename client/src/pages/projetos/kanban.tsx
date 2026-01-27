@@ -88,8 +88,49 @@ export default function KanbanPage() {
     },
   });
 
+  const moveColumnMutation = useMutation({
+    mutationFn: async ({ columnId, order }: { columnId: string; order: number }) => {
+      return apiRequest("PATCH", `/api/columns/${columnId}`, { order });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "columns"] });
+    },
+  });
+
+  const [draggedColumnId, setDraggedColumnId] = useState<string | null>(null);
+
   const handleDragStart = (card: KanbanCard) => {
     setDraggedCard(card);
+  };
+
+  const handleColumnDragStart = (columnId: string) => {
+    setDraggedColumnId(columnId);
+  };
+
+  const handleColumnDrop = (targetColumnId: string) => {
+    if (draggedColumnId && draggedColumnId !== targetColumnId) {
+      const draggedCol = columns.find(c => c.id === draggedColumnId);
+      const targetCol = columns.find(c => c.id === targetColumnId);
+      if (draggedCol && targetCol) {
+        const newOrder = targetCol.order;
+        moveColumnMutation.mutate({ columnId: draggedColumnId, order: newOrder });
+        // Update other columns orders
+        columns.forEach(col => {
+          if (col.id !== draggedColumnId) {
+            if (draggedCol.order < targetCol.order) {
+              if (col.order <= targetCol.order && col.order > draggedCol.order) {
+                moveColumnMutation.mutate({ columnId: col.id, order: col.order - 1 });
+              }
+            } else {
+              if (col.order >= targetCol.order && col.order < draggedCol.order) {
+                moveColumnMutation.mutate({ columnId: col.id, order: col.order + 1 });
+              }
+            }
+          }
+        });
+      }
+    }
+    setDraggedColumnId(null);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -237,8 +278,16 @@ export default function KanbanPage() {
                 <div 
                   key={column.id}
                   className="flex-shrink-0 w-80"
+                  draggable
+                  onDragStart={() => handleColumnDragStart(column.id)}
                   onDragOver={handleDragOver}
-                  onDrop={() => handleDrop(column.id)}
+                  onDrop={(e) => {
+                    if (draggedColumnId) {
+                      handleColumnDrop(column.id);
+                    } else {
+                      handleDrop(column.id);
+                    }
+                  }}
                 >
                   <Card className="h-full flex flex-col bg-muted/30 border-none shadow-none">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 pt-3">

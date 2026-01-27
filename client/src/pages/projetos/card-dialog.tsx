@@ -129,8 +129,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId }: 
         columnId,
         code: cardData?.code || `REN-${Math.floor(Math.random() * 1000)}`,
         tags: data.tag ? [data.tag] : [],
-        startDate: data.startDate ? new Date(data.startDate) : null,
-        endDate: data.endDate ? new Date(data.endDate) : null,
+        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
+        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
         order: cardData?.order || 0,
       };
 

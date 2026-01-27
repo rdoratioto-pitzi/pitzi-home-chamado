@@ -216,6 +216,16 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/columns/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateKanbanColumn(req.params.id, req.body);
+      if (!updated) return res.status(404).json({ error: "Column not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update column" });
+    }
+  });
+
   app.delete("/api/columns/:id", async (req, res) => {
     const deleted = await storage.deleteKanbanColumn(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Column not found" });

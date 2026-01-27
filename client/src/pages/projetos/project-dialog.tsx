@@ -62,12 +62,13 @@ export function ProjectDialog({ open, onOpenChange }: ProjectDialogProps) {
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      return apiRequest("POST", "/api/projects", {
+      const payload = {
         ...data,
-        startDate: data.startDate ? new Date(data.startDate) : null,
-        endDate: data.endDate ? new Date(data.endDate) : null,
+        startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
+        endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
         status: "active",
-      });
+      };
+      return apiRequest("POST", "/api/projects", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
