@@ -1,14 +1,25 @@
 interface RenovLogoProps {
-  variant?: "light" | "dark";
+  variant?: "light" | "dark" | "white";
+  size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }
 
-export function RenovLogo({ variant = "light", className = "" }: RenovLogoProps) {
-  const textColor = variant === "dark" ? "#FFFFFF" : "#000000";
+const sizeMap = {
+  sm: { width: 90, height: 25 },
+  md: { width: 120, height: 34 },
+  lg: { width: 150, height: 42 },
+  xl: { width: 180, height: 50 },
+};
+
+export function RenovLogo({ variant = "light", size = "md", className = "" }: RenovLogoProps) {
+  const textColor = variant === "dark" || variant === "white" ? "#FFFFFF" : "#000000";
+  const { width, height } = sizeMap[size];
   
   return (
     <svg 
       viewBox="0 0 180 50" 
+      width={width}
+      height={height}
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
@@ -29,13 +40,13 @@ export function RenovLogo({ variant = "light", className = "" }: RenovLogoProps)
           cy="17"
           r="10"
           fill="none"
-          stroke="#00A137"
+          stroke={variant === "white" ? "#FFFFFF" : "#00A137"}
           strokeWidth="4"
         />
         <path
           d="M12 7 L12 2 L17 7"
           fill="none"
-          stroke="#00A137"
+          stroke={variant === "white" ? "#FFFFFF" : "#00A137"}
           strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"

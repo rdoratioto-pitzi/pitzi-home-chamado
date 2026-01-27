@@ -714,9 +714,15 @@ export class MemStorage implements IStorage {
 
   async createTicket(insertTicket: InsertTicket): Promise<Ticket> {
     const id = randomUUID();
+    // Generate automatic ticket code: CHM-XXXX (alphanumeric)
+    const ticketCount = this.tickets.size + 1;
+    const code = insertTicket.code || `CHM-${ticketCount.toString().padStart(4, '0')}`;
     const ticket: Ticket = { 
       ...insertTicket, 
-      id, 
+      id,
+      code,
+      type: insertTicket.type || "bug",
+      location: insertTicket.location || "outros",
       createdAt: new Date(), 
       updatedAt: new Date() 
     };

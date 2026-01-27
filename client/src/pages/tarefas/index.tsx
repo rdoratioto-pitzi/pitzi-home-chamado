@@ -22,7 +22,9 @@ import {
   Archive,
   FileText,
   Trash2,
-  Edit
+  Edit,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import {
   Dialog,
@@ -47,6 +49,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import type { TaskArea, Task } from "@shared/schema";
+import { TaskKanban } from "./task-kanban";
 
 const statusConfig = {
   todo: { label: "A Fazer", icon: Circle, color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
@@ -76,7 +79,7 @@ export default function TarefasPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "kanban">("grid");
 
   const [newArea, setNewArea] = useState({
     name: "",
@@ -447,7 +450,7 @@ export default function TarefasPage() {
               <Button
                 variant={viewMode === "grid" ? "secondary" : "ghost"}
                 size="sm"
-                className="h-8 w-8 p-0"
+                className="h-8 px-2"
                 onClick={() => setViewMode("grid")}
                 data-testid="button-view-grid"
               >
@@ -456,11 +459,20 @@ export default function TarefasPage() {
               <Button
                 variant={viewMode === "list" ? "secondary" : "ghost"}
                 size="sm"
-                className="h-8 w-8 p-0"
+                className="h-8 px-2"
                 onClick={() => setViewMode("list")}
                 data-testid="button-view-list"
               >
-                <Filter className="h-4 w-4" />
+                <List className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "kanban" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 px-2"
+                onClick={() => setViewMode("kanban")}
+                data-testid="button-view-kanban"
+              >
+                <LayoutGrid className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -483,6 +495,8 @@ export default function TarefasPage() {
                 </Button>
               )}
             </Card>
+          ) : viewMode === "kanban" ? (
+            <TaskKanban tasks={filteredTasks} areas={areas} />
           ) : (
             <div className={viewMode === "grid" ? "space-y-2" : "border rounded-md divide-y"}>
               {filteredTasks.map((task) => {

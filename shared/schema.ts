@@ -53,11 +53,14 @@ export type ModulePermissions = {
 export const tickets = pgTable("tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),
+  code: text("code").notNull(), // CHM-001, CHM-002, etc.
   title: text("title").notNull(),
   description: text("description").notNull(),
   category: text("category").notNull(),
+  type: text("type").notNull().default("bug"), // bug, melhoria, negocio
+  location: text("location").notNull().default("outros"), // RS, RG, Dash, One, Home, Omie, Outros
   priority: text("priority").notNull().default("medium"),
-  status: text("status").notNull().default("open"),
+  status: text("status").notNull().default("open"), // open, in_progress, blocked, resolved, closed
   requesterId: varchar("requester_id").notNull(),
   assigneeId: varchar("assignee_id"),
   createdAt: timestamp("created_at").defaultNow(),

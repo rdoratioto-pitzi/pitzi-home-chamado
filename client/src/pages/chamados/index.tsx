@@ -19,11 +19,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Filter, Clock, AlertCircle, CheckCircle2, ArrowUpDown } from "lucide-react";
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Clock, 
+  AlertCircle, 
+  CheckCircle2, 
+  ArrowUpDown, 
+  LayoutGrid, 
+  List,
+  Download,
+  Ban
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Ticket, User } from "@shared/schema";
 import { TicketDialog } from "./ticket-dialog";
 import { TicketDetailSheet } from "./ticket-detail-sheet";
+import { TicketKanban } from "./ticket-kanban";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const priorityColors: Record<string, string> = {
@@ -36,6 +49,7 @@ const priorityColors: Record<string, string> = {
 const statusColors: Record<string, string> = {
   open: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   in_progress: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+  blocked: "bg-red-500/10 text-red-600 dark:text-red-400",
   resolved: "bg-green-500/10 text-green-600 dark:text-green-400",
   closed: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
 };
@@ -43,6 +57,7 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   open: "Aberto",
   in_progress: "Em Andamento",
+  blocked: "Bloqueado",
   resolved: "Resolvido",
   closed: "Fechado",
 };
@@ -54,13 +69,27 @@ const priorityLabels: Record<string, string> = {
   critical: "Crítica",
 };
 
+const typeLabels: Record<string, string> = {
+  bug: "Bug",
+  melhoria: "Melhoria",
+  negocio: "Negócio",
+};
+
+const typeColors: Record<string, string> = {
+  bug: "bg-red-500/10 text-red-600 dark:text-red-400",
+  melhoria: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  negocio: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+};
+
 export default function ChamadosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [dateSortAsc, setDateSortAsc] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
 
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
     queryKey: ["/api/tickets"],
@@ -73,10 +102,12 @@ export default function ChamadosPage() {
   const filteredTickets = tickets
     .filter((ticket) => {
       const matchesSearch = ticket.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ticket.description.toLowerCase().includes(searchQuery.toLowerCase());
+        ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.code?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
       const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
-      return matchesSearch && matchesStatus && matchesPriority;
+      const matchesType = typeFilter === "all" || ticket.type === typeFilter;
+      return matchesSearch && matchesStatus && matchesPriority && matchesType;
     })
     .sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -90,7 +121,56 @@ export default function ChamadosPage() {
     total: tickets.length,
     open: tickets.filter(t => t.status === "open").length,
     inProgress: tickets.filter(t => t.status === "in_progress").length,
+    blocked: tickets.filter(t => t.status === "blocked").length,
     resolved: tickets.filter(t => t.status === "resolved").length,
+  };
+
+  const exportToExcel = () => {
+    const headers = [
+      "Código",
+      "Título",
+      "Descrição",
+      "Categoria",
+      "Tipo",
+      "Local",
+      "Prioridade",
+      "Status",
+      "Solicitante",
+      "Responsável",
+      "Data de Criação",
+    ];
+
+    const rows = filteredTickets.map((ticket) => {
+      const requester = getUser(ticket.requesterId);
+      const assignee = getUser(ticket.assigneeId || null);
+      return [
+        ticket.code || "",
+        ticket.title,
+        ticket.description,
+        ticket.category,
+        typeLabels[ticket.type || "bug"] || ticket.type,
+        ticket.location || "",
+        priorityLabels[ticket.priority],
+        statusLabels[ticket.status],
+        requester?.name || "",
+        assignee?.name || "",
+        ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "",
+      ];
+    });
+
+    const csvContent = [
+      headers.join(";"),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(";")),
+    ].join("\n");
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `chamados_${new Date().toISOString().split("T")[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -107,9 +187,9 @@ export default function ChamadosPage() {
       />
 
       <main className="flex-1 p-6 space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-5">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -119,17 +199,17 @@ export default function ChamadosPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Abertos</CardTitle>
               <AlertCircle className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600" data-testid="text-open-tickets">{stats.open}</div>
-              <p className="text-xs text-muted-foreground">aguardando atendimento</p>
+              <p className="text-xs text-muted-foreground">aguardando</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Em Andamento</CardTitle>
               <Clock className="h-4 w-4 text-yellow-500" />
             </CardHeader>
@@ -139,13 +219,23 @@ export default function ChamadosPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-sm font-medium">Bloqueados</CardTitle>
+              <Ban className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600" data-testid="text-blocked-tickets">{stats.blocked}</div>
+              <p className="text-xs text-muted-foreground">impedidos</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Resolvidos</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600" data-testid="text-resolved-tickets">{stats.resolved}</div>
-              <p className="text-xs text-muted-foreground">concluídos com sucesso</p>
+              <p className="text-xs text-muted-foreground">concluídos</p>
             </CardContent>
           </Card>
         </div>
@@ -174,12 +264,13 @@ export default function ChamadosPage() {
                     <SelectItem value="all">Todos</SelectItem>
                     <SelectItem value="open">Abertos</SelectItem>
                     <SelectItem value="in_progress">Em Andamento</SelectItem>
+                    <SelectItem value="blocked">Bloqueados</SelectItem>
                     <SelectItem value="resolved">Resolvidos</SelectItem>
                     <SelectItem value="closed">Fechados</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-priority-filter">
+                  <SelectTrigger className="w-[130px]" data-testid="select-priority-filter">
                     <SelectValue placeholder="Prioridade" />
                   </SelectTrigger>
                   <SelectContent>
@@ -190,6 +281,47 @@ export default function ChamadosPage() {
                     <SelectItem value="critical">Crítica</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-[120px]" data-testid="select-type-filter">
+                    <SelectValue placeholder="Tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="bug">Bug</SelectItem>
+                    <SelectItem value="melhoria">Melhoria</SelectItem>
+                    <SelectItem value="negocio">Negócio</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <div className="flex items-center border rounded-md p-1 bg-muted/50">
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 px-2"
+                    onClick={() => setViewMode("list")}
+                    data-testid="button-view-list"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "kanban" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-8 px-2"
+                    onClick={() => setViewMode("kanban")}
+                    data-testid="button-view-kanban"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <Button 
+                  variant="outline" 
+                  onClick={exportToExcel}
+                  data-testid="button-export-excel"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -210,14 +342,21 @@ export default function ChamadosPage() {
                     : "Tente ajustar os filtros de busca"}
                 </p>
               </div>
+            ) : viewMode === "kanban" ? (
+              <TicketKanban 
+                tickets={filteredTickets} 
+                users={users}
+                onTicketClick={setSelectedTicket}
+              />
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Código</TableHead>
                     <TableHead>Título</TableHead>
                     <TableHead>Categoria</TableHead>
-                    <TableHead>Relator</TableHead>
-                    <TableHead>Responsável</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Local</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Prioridade</TableHead>
                     <TableHead>
@@ -231,7 +370,7 @@ export default function ChamadosPage() {
                         }}
                         data-testid="button-sort-date"
                       >
-                        Data de Criação
+                        Data
                         <ArrowUpDown className="h-3 w-3" />
                       </Button>
                     </TableHead>
@@ -239,8 +378,6 @@ export default function ChamadosPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredTickets.map((ticket) => {
-                    const requester = getUser(ticket.requesterId);
-                    const assignee = getUser(ticket.assigneeId || null);
                     return (
                       <TableRow 
                         key={ticket.id} 
@@ -248,13 +385,22 @@ export default function ChamadosPage() {
                         onClick={() => setSelectedTicket(ticket)}
                         data-testid={`row-ticket-${ticket.id}`}
                       >
-                        <TableCell className="font-medium">{ticket.title}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="font-mono">
+                            {ticket.code}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-medium max-w-[200px] truncate">
+                          {ticket.title}
+                        </TableCell>
                         <TableCell>{ticket.category}</TableCell>
                         <TableCell>
-                          <span className="text-sm">{requester?.name || "-"}</span>
+                          <Badge variant="outline" className={typeColors[ticket.type || "bug"]}>
+                            {typeLabels[ticket.type || "bug"]}
+                          </Badge>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm">{assignee?.name || "-"}</span>
+                          <Badge variant="secondary">{ticket.location}</Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={statusColors[ticket.status]}>
