@@ -88,9 +88,13 @@ export default function KanbanPage() {
     },
   });
 
-  const moveColumnMutation = useMutation({
-    mutationFn: async ({ columnId, order }: { columnId: string; order: number }) => {
-      return apiRequest("PATCH", `/api/columns/${columnId}`, { order });
+  const reorderColumnsMutation = useMutation({
+    mutationFn: async (reorders: { columnId: string; order: number }[]) => {
+      await Promise.all(
+        reorders.map(({ columnId, order }) => 
+          apiRequest("PATCH", `/api/columns/${columnId}`, { order })
+        )
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "columns"] });
@@ -103,33 +107,35 @@ export default function KanbanPage() {
     setDraggedCard(card);
   };
 
-  const handleColumnDragStart = (columnId: string) => {
+  const handleColumnDragStart = (e: React.DragEvent, columnId: string) => {
+    e.dataTransfer.setData("columnId", columnId);
     setDraggedColumnId(columnId);
   };
 
   const handleColumnDrop = (targetColumnId: string) => {
-    if (draggedColumnId && draggedColumnId !== targetColumnId) {
-      const draggedCol = columns.find(c => c.id === draggedColumnId);
-      const targetCol = columns.find(c => c.id === targetColumnId);
-      if (draggedCol && targetCol) {
-        const newOrder = targetCol.order;
-        moveColumnMutation.mutate({ columnId: draggedColumnId, order: newOrder });
-        // Update other columns orders
-        columns.forEach(col => {
-          if (col.id !== draggedColumnId) {
-            if (draggedCol.order < targetCol.order) {
-              if (col.order <= targetCol.order && col.order > draggedCol.order) {
-                moveColumnMutation.mutate({ columnId: col.id, order: col.order - 1 });
-              }
-            } else {
-              if (col.order >= targetCol.order && col.order < draggedCol.order) {
-                moveColumnMutation.mutate({ columnId: col.id, order: col.order + 1 });
-              }
-            }
-          }
-        });
-      }
+    if (!draggedColumnId || draggedColumnId === targetColumnId) {
+      setDraggedColumnId(null);
+      return;
     }
+
+    const sorted = [...columns].sort((a, b) => a.order - b.order);
+    const draggedIdx = sorted.findIndex(c => c.id === draggedColumnId);
+    const targetIdx = sorted.findIndex(c => c.id === targetColumnId);
+
+    if (draggedIdx === -1 || targetIdx === -1) {
+      setDraggedColumnId(null);
+      return;
+    }
+
+    const [removed] = sorted.splice(draggedIdx, 1);
+    sorted.splice(targetIdx, 0, removed);
+
+    const reorders = sorted.map((col, idx) => ({
+      columnId: col.id,
+      order: idx,
+    }));
+
+    reorderColumnsMutation.mutate(reorders);
     setDraggedColumnId(null);
   };
 
@@ -277,17 +283,19 @@ export default function KanbanPage() {
               return (
                 <div 
                   key={column.id}
-                  className="flex-shrink-0 w-80"
+                  className={`flex-shrink-0 w-80 transition-opacity ${draggedColumnId === column.id ? 'opacity-50' : ''}`}
                   draggable
-                  onDragStart={() => handleColumnDragStart(column.id)}
+                  onDragStart={(e) => handleColumnDragStart(e, column.id)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => {
+                    e.preventDefault();
                     if (draggedColumnId) {
                       handleColumnDrop(column.id);
                     } else {
                       handleDrop(column.id);
                     }
                   }}
+                  onDragEnd={() => setDraggedColumnId(null)}
                 >
                   <Card className="h-full flex flex-col bg-muted/30 border-none shadow-none">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 pt-3">

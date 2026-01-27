@@ -44,7 +44,6 @@ export interface IStorage {
   getKanbanColumns(projectId: string): Promise<KanbanColumn[]>;
   createKanbanColumn(column: InsertKanbanColumn): Promise<KanbanColumn>;
   updateKanbanColumn(id: string, data: Partial<KanbanColumn>): Promise<KanbanColumn | undefined>;
-  updateKanbanColumn(id: string, data: Partial<KanbanColumn>): Promise<KanbanColumn | undefined>;
   deleteKanbanColumn(id: string): Promise<boolean>;
 
   // Kanban Cards

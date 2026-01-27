@@ -65,7 +65,15 @@ export const projects = pgTable("projects", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
+const baseInsertProjectSchema = createInsertSchema(projects).omit({ id: true, createdAt: true });
+export const insertProjectSchema = baseInsertProjectSchema.extend({
+  startDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ),
+  endDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ),
+});
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 
@@ -104,7 +112,18 @@ export const kanbanCards = pgTable("kanban_cards", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertKanbanCardSchema = createInsertSchema(kanbanCards).omit({ id: true, createdAt: true });
+const baseInsertKanbanCardSchema = createInsertSchema(kanbanCards).omit({ id: true, createdAt: true });
+export const insertKanbanCardSchema = baseInsertKanbanCardSchema.extend({
+  startDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ),
+  endDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ),
+  dueDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ),
+});
 export type InsertKanbanCard = z.infer<typeof insertKanbanCardSchema>;
 export type KanbanCard = typeof kanbanCards.$inferSelect;
 
