@@ -358,7 +358,7 @@ export default function ChamadosPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Código</TableHead>
+                    <TableHead className="w-[100px] text-[12px] font-bold uppercase tracking-wider">Código</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Título</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Categoria</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tipo</TableHead>

@@ -277,6 +277,25 @@ export function FieldsSettings() {
           />
         </TabsContent>
       </Tabs>
+
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold mb-1">Áreas de Tarefas</h2>
+        <p className="text-sm text-muted-foreground">
+          Gerencie as áreas disponíveis no módulo de tarefas
+        </p>
+      </div>
+
+      <FieldManager 
+        settingKey="task_areas_config"
+        title="Áreas de Tarefas"
+        description="Configure as áreas que aparecem no gerenciamento de tarefas"
+        icon={FolderOpen}
+        defaultItems={[
+          { value: "ti", label: "TI" },
+          { value: "rh", label: "RH" },
+          { value: "operacoes", label: "Operações" },
+        ]}
+      />
     </div>
   );
 }

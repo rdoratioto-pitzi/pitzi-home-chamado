@@ -125,7 +125,23 @@ export default function TarefasPage() {
     },
   });
 
-  const createAreaMutation = useMutation({
+  // Ensure areaId is set when opening task dialog
+  const handleOpenTaskDialog = (type: "task" | "meeting_note" = "task") => {
+    setNewTask({
+      ...newTask,
+      type,
+      areaId: selectedAreaId || (areas.length > 0 ? areas[0].id : ""),
+      meetingData: {
+        date: "",
+        time: "",
+        location: "",
+        participants: [] as string[],
+        agenda: [] as string[],
+        actions: [] as { description: string; responsible: string; deadline: string }[],
+      }
+    });
+    setShowTaskDialog(true);
+  };
     mutationFn: async (data: typeof newArea) => {
       return apiRequest("POST", "/api/task-areas", data);
     },
@@ -776,7 +792,7 @@ export default function TarefasPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Área</label>
               <Select 
-                value={newTask.areaId || selectedAreaId || ""} 
+                value={newTask.areaId} 
                 onValueChange={(v) => setNewTask({ ...newTask, areaId: v })}
               >
                 <SelectTrigger data-testid="select-task-area">
