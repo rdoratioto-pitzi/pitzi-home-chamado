@@ -123,8 +123,9 @@ export default function TarefasPage() {
       setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin" });
       toast({ title: "Área criada com sucesso!" });
     },
-    onError: () => {
-      toast({ title: "Erro ao criar área", variant: "destructive" });
+    onError: (error: Error) => {
+      console.error("Area creation error:", error);
+      toast({ title: "Erro ao criar área", description: error.message, variant: "destructive" });
     },
   });
 
@@ -154,15 +155,22 @@ export default function TarefasPage() {
   const createTaskMutation = useMutation({
     mutationFn: async (data: typeof newTask) => {
       const payload = {
-        ...data,
-        areaId: data.areaId || selectedAreaId,
+        title: data.title,
+        description: data.description || undefined,
+        type: data.type,
+        status: data.status,
+        priority: data.priority,
+        areaId: data.areaId || selectedAreaId || "",
+        createdBy: data.createdBy,
         dueDate: data.dueDate || null,
-        assigneeId: data.assigneeId || null,
+        assigneeId: data.assigneeId || undefined,
       };
       return apiRequest("POST", "/api/tasks", payload);
     },
     onSuccess: () => {
+      // Invalidate both the general list and the area-specific list
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedAreaId] });
       setShowTaskDialog(false);
       setNewTask({
         title: "",
@@ -177,8 +185,9 @@ export default function TarefasPage() {
       });
       toast({ title: "Tarefa criada com sucesso!" });
     },
-    onError: () => {
-      toast({ title: "Erro ao criar tarefa", variant: "destructive" });
+    onError: (error: Error) => {
+      console.error("Task creation error:", error);
+      toast({ title: "Erro ao criar tarefa", description: error.message, variant: "destructive" });
     },
   });
 
@@ -188,6 +197,7 @@ export default function TarefasPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedAreaId] });
       toast({ title: "Tarefa atualizada!" });
     },
   });
@@ -198,6 +208,7 @@ export default function TarefasPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedAreaId] });
       toast({ title: "Tarefa excluída!" });
     },
   });
