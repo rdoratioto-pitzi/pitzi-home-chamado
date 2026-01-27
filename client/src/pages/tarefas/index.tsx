@@ -76,6 +76,7 @@ export default function TarefasPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const [newArea, setNewArea] = useState({
     name: "",
@@ -253,13 +254,17 @@ export default function TarefasPage() {
     }
   };
 
-  const handleOpenTaskDialog = () => {
+  const handleOpenTaskDialog = (type: "task" | "meeting_note" = "task") => {
     setNewTask({
       ...newTask,
+      type,
       areaId: selectedAreaId || (areas[0]?.id || ""),
     });
     setShowTaskDialog(true);
   };
+
+  const handleOpenMeetingDialog = () => handleOpenTaskDialog("meeting_note");
+  const handleOpenNormalTaskDialog = () => handleOpenTaskDialog("task");
 
   return (
     <div className="flex h-full">
@@ -364,10 +369,16 @@ export default function TarefasPage() {
         <PageHeader
           title={selectedArea ? selectedArea.name : "Todas as Tarefas"}
           actions={
-            <Button onClick={handleOpenTaskDialog} data-testid="button-new-task">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Tarefa
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={handleOpenMeetingDialog} data-testid="button-new-meeting">
+                <FileText className="h-4 w-4 mr-2" />
+                Nova Reunião
+              </Button>
+              <Button onClick={handleOpenNormalTaskDialog} data-testid="button-new-task">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Tarefa
+              </Button>
+            </div>
           }
         />
 
@@ -406,6 +417,27 @@ export default function TarefasPage() {
                 <SelectItem value="meeting_note">Reuniões</SelectItem>
               </SelectContent>
             </Select>
+
+            <div className="flex items-center border rounded-md p-1 bg-muted/50">
+              <Button
+                variant={viewMode === "grid" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setViewMode("grid")}
+                data-testid="button-view-grid"
+              >
+                <Folder className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={() => setViewMode("list")}
+                data-testid="button-view-list"
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           {tasksLoading ? (
@@ -427,7 +459,7 @@ export default function TarefasPage() {
               )}
             </Card>
           ) : (
-            <div className="space-y-2">
+            <div className={viewMode === "grid" ? "space-y-2" : "border rounded-md divide-y"}>
               {filteredTasks.map((task) => {
                 const status = statusConfig[task.status as keyof typeof statusConfig];
                 const priority = priorityConfig[task.priority as keyof typeof priorityConfig];
@@ -435,6 +467,74 @@ export default function TarefasPage() {
                 const taskArea = areas.find(a => a.id === task.areaId);
                 const StatusIcon = status?.icon || Circle;
                 const TypeIcon = taskType?.icon || CheckCircle2;
+
+                if (viewMode === "list") {
+                  return (
+                    <div
+                      key={task.id}
+                      className="flex items-center gap-4 p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => navigate(`/tarefas/${task.id}`)}
+                      data-testid={`list-item-task-${task.id}`}
+                    >
+                      <button
+                        className="flex-shrink-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const nextStatus = task.status === "todo" ? "doing" : task.status === "doing" ? "done" : "todo";
+                          updateTaskMutation.mutate({ id: task.id, data: { status: nextStatus } });
+                        }}
+                      >
+                        <StatusIcon className={`h-5 w-5 ${
+                          task.status === "done" ? "text-green-500" : 
+                          task.status === "doing" ? "text-blue-500" : "text-gray-400"
+                        }`} />
+                      </button>
+                      <div className="flex-1 min-w-0 flex items-center gap-3">
+                        <span className={`font-medium truncate ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+                          {task.title}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] h-4 px-1 flex-shrink-0">
+                          <TypeIcon className="h-2 w-2 mr-1" />
+                          {taskType?.label}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        {taskArea && (
+                          <div className="flex items-center gap-1.5">
+                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: taskArea.color || "#00A137" }} />
+                            <span className="text-xs text-muted-foreground">{taskArea.name}</span>
+                          </div>
+                        )}
+                        <Badge className={`text-[10px] h-4 px-1 ${priority?.color}`}>
+                          {priority?.label}
+                        </Badge>
+                        {task.dueDate && (
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Calendar className="h-3 w-3" />
+                            <span>{new Date(task.dueDate).toLocaleDateString("pt-BR")}</span>
+                          </div>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => navigate(`/tarefas/${task.id}`)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => deleteTaskMutation.mutate(task.id)}>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
                   <Card 
@@ -619,7 +719,7 @@ export default function TarefasPage() {
       <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nova Tarefa</DialogTitle>
+            <DialogTitle>{newTask.type === "meeting_note" ? "Nova Reunião" : "Nova Tarefa"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -627,35 +727,24 @@ export default function TarefasPage() {
               <Input
                 value={newTask.title}
                 onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                placeholder="Título da tarefa"
+                placeholder={newTask.type === "meeting_note" ? "Título da reunião" : "Título da tarefa"}
                 data-testid="input-task-title"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Tipo</label>
-              <Select 
-                value={newTask.type} 
-                onValueChange={(v) => setNewTask({ ...newTask, type: v as "task" | "meeting_note" })}
-              >
-                <SelectTrigger data-testid="select-task-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="task">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Tarefa
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="meeting_note">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Agenda de Reunião
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            
+            {newTask.type === "task" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Descrição</label>
+                <Textarea
+                  value={newTask.description}
+                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                  placeholder="Detalhes da tarefa..."
+                  rows={3}
+                  data-testid="input-task-description"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-sm font-medium">Área</label>
               <Select 
@@ -707,16 +796,6 @@ export default function TarefasPage() {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Descrição</label>
-              <Textarea
-                value={newTask.description}
-                onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                placeholder="Descreva a tarefa..."
-                rows={3}
-                data-testid="input-task-description"
-              />
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTaskDialog(false)}>
@@ -727,7 +806,7 @@ export default function TarefasPage() {
               disabled={!newTask.title || !newTask.areaId || createTaskMutation.isPending}
               data-testid="button-save-task"
             >
-              Criar Tarefa
+              {newTask.type === "meeting_note" ? "Criar Reunião" : "Criar Tarefa"}
             </Button>
           </DialogFooter>
         </DialogContent>

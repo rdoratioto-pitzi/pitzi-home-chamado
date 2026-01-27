@@ -448,7 +448,7 @@ export default function TaskDetailPage() {
                         agenda: e.target.value.split("\n").filter(Boolean)
                       })}
                       placeholder="Um item por linha"
-                      rows={3}
+                      rows={10}
                       data-testid="input-meeting-agenda"
                     />
                   ) : (
@@ -456,43 +456,6 @@ export default function TaskDetailPage() {
                       {editedMeetingData.agenda?.map((item, i) => (
                         <li key={i}>{item}</li>
                       )) || <li className="text-muted-foreground">Nenhum item</li>}
-                    </ul>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Discussões Principais</label>
-                  {isEditing ? (
-                    <Textarea
-                      value={editedMeetingData.discussions || ""}
-                      onChange={(e) => setEditedMeetingData({ ...editedMeetingData, discussions: e.target.value })}
-                      placeholder="Resumo das discussões..."
-                      rows={3}
-                      data-testid="input-meeting-discussions"
-                    />
-                  ) : (
-                    <p className="mt-1 whitespace-pre-wrap">{editedMeetingData.discussions || "-"}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Decisões</label>
-                  {isEditing ? (
-                    <Textarea
-                      value={editedMeetingData.decisions?.join("\n") || ""}
-                      onChange={(e) => setEditedMeetingData({ 
-                        ...editedMeetingData, 
-                        decisions: e.target.value.split("\n").filter(Boolean)
-                      })}
-                      placeholder="Uma decisão por linha"
-                      rows={3}
-                      data-testid="input-meeting-decisions"
-                    />
-                  ) : (
-                    <ul className="mt-1 list-disc list-inside">
-                      {editedMeetingData.decisions?.map((item, i) => (
-                        <li key={i}>{item}</li>
-                      )) || <li className="text-muted-foreground">Nenhuma decisão</li>}
                     </ul>
                   )}
                 </div>
