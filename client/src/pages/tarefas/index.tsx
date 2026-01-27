@@ -125,23 +125,7 @@ export default function TarefasPage() {
     },
   });
 
-  // Ensure areaId is set when opening task dialog
-  const handleOpenTaskDialog = (type: "task" | "meeting_note" = "task") => {
-    setNewTask({
-      ...newTask,
-      type,
-      areaId: selectedAreaId || (areas.length > 0 ? areas[0].id : ""),
-      meetingData: {
-        date: "",
-        time: "",
-        location: "",
-        participants: [] as string[],
-        agenda: [] as string[],
-        actions: [] as { description: string; responsible: string; deadline: string }[],
-      }
-    });
-    setShowTaskDialog(true);
-  };
+  const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
       return apiRequest("POST", "/api/task-areas", data);
     },
