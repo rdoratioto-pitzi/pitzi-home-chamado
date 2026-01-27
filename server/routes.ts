@@ -8,6 +8,7 @@ import {
   insertProjectSchema,
   insertKanbanColumnSchema,
   insertKanbanCardSchema,
+  insertKanbanCommentSchema,
   insertObjectiveSchema,
   insertKeyResultSchema,
   insertShipmentSchema,
@@ -254,6 +255,28 @@ export async function registerRoutes(
     const deleted = await storage.deleteKanbanCard(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Card not found" });
     res.status(204).send();
+  });
+
+  // Kanban Comments
+  app.get("/api/cards/:id/comments", async (req, res) => {
+    const comments = await storage.getKanbanComments(req.params.id);
+    res.json(comments);
+  });
+
+  app.post("/api/cards/:id/comments", async (req, res) => {
+    try {
+      const validated = insertKanbanCommentSchema.parse({
+        ...req.body,
+        cardId: req.params.id,
+      });
+      const comment = await storage.createKanbanComment(validated);
+      res.status(201).json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create comment" });
+    }
   });
 
   // ============== OBJECTIVES ==============

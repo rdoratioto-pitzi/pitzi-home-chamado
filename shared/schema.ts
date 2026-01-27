@@ -84,13 +84,21 @@ export type KanbanColumn = typeof kanbanColumns.$inferSelect;
 // ============== KANBAN CARDS (Tasks) ==============
 export const kanbanCards = pgTable("kanban_cards", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull(), // Alphanumeric code (e.g., REN-01)
   columnId: varchar("column_id").notNull(),
   projectId: varchar("project_id").notNull(),
   title: text("title").notNull(),
-  description: text("description"),
+  objectives: text("objectives"), // Renamed from description
+  development: text("development"), // New descriptive field
   assigneeId: varchar("assignee_id"),
+  reporterId: varchar("reporter_id"), // Relator
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
   dueDate: timestamp("due_date"),
   tags: text("tags").array(),
+  priority: text("priority").notNull().default("normal"), // "muito_urgente", "urgente", "normal"
+  estimation: integer("estimation"), // Hours
+  attachments: text("attachments").array(),
   order: integer("order").notNull().default(0),
   ticketId: varchar("ticket_id"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -99,6 +107,19 @@ export const kanbanCards = pgTable("kanban_cards", {
 export const insertKanbanCardSchema = createInsertSchema(kanbanCards).omit({ id: true, createdAt: true });
 export type InsertKanbanCard = z.infer<typeof insertKanbanCardSchema>;
 export type KanbanCard = typeof kanbanCards.$inferSelect;
+
+// ============== KANBAN COMMENTS ==============
+export const kanbanComments = pgTable("kanban_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cardId: varchar("card_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKanbanCommentSchema = createInsertSchema(kanbanComments).omit({ id: true, createdAt: true });
+export type InsertKanbanComment = z.infer<typeof insertKanbanCommentSchema>;
+export type KanbanComment = typeof kanbanComments.$inferSelect;
 
 // ============== OKRs ==============
 export const objectives = pgTable("objectives", {

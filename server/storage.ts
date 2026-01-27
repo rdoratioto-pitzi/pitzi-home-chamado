@@ -5,6 +5,7 @@ import {
   type Project, type InsertProject,
   type KanbanColumn, type InsertKanbanColumn,
   type KanbanCard, type InsertKanbanCard,
+  type KanbanComment, type InsertKanbanComment,
   type Objective, type InsertObjective,
   type KeyResult, type InsertKeyResult,
   type Shipment, type InsertShipment,
@@ -51,6 +52,10 @@ export interface IStorage {
   updateKanbanCard(id: string, data: Partial<KanbanCard>): Promise<KanbanCard | undefined>;
   deleteKanbanCard(id: string): Promise<boolean>;
 
+  // Kanban Comments
+  getKanbanComments(cardId: string): Promise<KanbanComment[]>;
+  createKanbanComment(comment: InsertKanbanComment): Promise<KanbanComment>;
+
   // Objectives
   getObjective(id: string): Promise<Objective | undefined>;
   getObjectives(): Promise<Objective[]>;
@@ -89,6 +94,7 @@ export class MemStorage implements IStorage {
   private projects: Map<string, Project>;
   private kanbanColumns: Map<string, KanbanColumn>;
   private kanbanCards: Map<string, KanbanCard>;
+  private kanbanComments: Map<string, KanbanComment>;
   private objectives: Map<string, Objective>;
   private keyResults: Map<string, KeyResult>;
   private shipments: Map<string, Shipment>;
@@ -102,6 +108,7 @@ export class MemStorage implements IStorage {
     this.projects = new Map();
     this.kanbanColumns = new Map();
     this.kanbanCards = new Map();
+    this.kanbanComments = new Map();
     this.objectives = new Map();
     this.keyResults = new Map();
     this.shipments = new Map();
@@ -445,7 +452,25 @@ export class MemStorage implements IStorage {
   }
 
   async deleteKanbanCard(id: string): Promise<boolean> {
+    // Delete related comments
+    Array.from(this.kanbanComments.values())
+      .filter(c => c.cardId === id)
+      .forEach(c => this.kanbanComments.delete(c.id));
     return this.kanbanCards.delete(id);
+  }
+
+  // Kanban Comments
+  async getKanbanComments(cardId: string): Promise<KanbanComment[]> {
+    return Array.from(this.kanbanComments.values())
+      .filter(c => c.cardId === cardId)
+      .sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
+  }
+
+  async createKanbanComment(insertComment: InsertKanbanComment): Promise<KanbanComment> {
+    const id = randomUUID();
+    const comment: KanbanComment = { ...insertComment, id, createdAt: new Date() };
+    this.kanbanComments.set(id, comment);
+    return comment;
   }
 
   // Objectives
