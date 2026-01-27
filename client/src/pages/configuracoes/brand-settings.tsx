@@ -11,11 +11,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export function BrandSettings() {
   const { toast } = useToast();
-  const { theme } = useTheme();
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoPreviewLight, setLogoPreviewLight] = useState<string | null>(null);
+  const [logoPreviewDark, setLogoPreviewDark] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'light' | 'dark') => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.includes("image/png") && !file.type.includes("image/svg") && !file.type.includes("image/jpeg")) {
@@ -29,28 +29,28 @@ export function BrandSettings() {
 
       const reader = new FileReader();
       reader.onload = () => {
-        setLogoPreview(reader.result as string);
+        if (type === 'light') setLogoPreviewLight(reader.result as string);
+        else setLogoPreviewDark(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSave = async () => {
-    if (!logoPreview) return;
+  const handleSave = async (type: 'light' | 'dark') => {
+    const value = type === 'light' ? logoPreviewLight : logoPreviewDark;
+    if (!value) return;
     
     setIsSaving(true);
+    const key = type === 'light' ? "logo_url_light" : "logo_url_dark";
     try {
-      await apiRequest("POST", "/api/settings", {
-        key: "logo_url",
-        value: logoPreview
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo_url"] });
-      
+      await apiRequest("POST", "/api/settings", { key, value });
+      queryClient.invalidateQueries({ queryKey: [`/api/settings/${key}`] });
       toast({
         title: "Logo atualizado",
-        description: "O logo foi atualizado e espelhado em todo o sistema.",
+        description: `O logo do tema ${type === 'light' ? 'claro' : 'escuro'} foi atualizado.`,
       });
+      if (type === 'light') setLogoPreviewLight(null);
+      else setLogoPreviewDark(null);
     } catch (error) {
       toast({
         title: "Erro ao salvar",
@@ -68,83 +68,77 @@ export function BrandSettings() {
         <CardHeader>
           <CardTitle>Logo Renov Home</CardTitle>
           <CardDescription>
-            Faça upload de um novo logo para exibir na sidebar e no cabeçalho
+            Clique nos quadros abaixo para fazer upload dos logos específicos para cada tema.
+            Recomendado: 180x50px, até 5MB.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <Label>Logo Atual</Label>
-            <div className="flex gap-6">
-              <div className="p-6 rounded-lg bg-background border">
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Logo Preview" className="h-12 w-auto" />
-                ) : (
-                  <RenovLogo variant="light" className="h-12 w-auto" />
-                )}
-                <p className="text-xs text-muted-foreground mt-2 text-center">Tema Claro</p>
-              </div>
-              <div className="p-6 rounded-lg bg-slate-900">
-                {logoPreview ? (
-                  <img src={logoPreview} alt="Logo Preview" className="h-12 w-auto" />
-                ) : (
-                  <RenovLogo variant="dark" className="h-12 w-auto" />
-                )}
-                <p className="text-xs text-slate-400 mt-2 text-center">Tema Escuro</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Fazer Upload</Label>
-            <div className="border-2 border-dashed rounded-lg p-8 text-center">
-              <Input 
-                type="file" 
-                accept=".png,.svg"
-                className="hidden"
-                id="logo-upload"
-                onChange={handleFileChange}
-                data-testid="input-logo-upload"
-              />
-              <label 
-                htmlFor="logo-upload"
-                className="cursor-pointer flex flex-col items-center gap-2"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Light Theme Logo */}
+            <div className="space-y-4">
+              <Label>Tema Claro</Label>
+              <div 
+                className="relative group cursor-pointer p-8 rounded-lg bg-white border-2 border-dashed border-muted-foreground/20 hover:border-primary/50 transition-colors flex flex-col items-center justify-center min-h-[160px]"
+                onClick={() => document.getElementById('logo-upload-light')?.click()}
               >
-                <div className="p-3 rounded-full bg-muted">
-                  <Upload className="h-6 w-6 text-muted-foreground" />
+                <input 
+                  type="file" 
+                  id="logo-upload-light"
+                  className="hidden"
+                  onChange={(e) => handleFileChange(e, 'light')}
+                  accept=".png,.svg,.jpg,.jpeg"
+                />
+                {logoPreviewLight ? (
+                  <img src={logoPreviewLight} alt="Preview Claro" className="h-12 w-auto object-contain" />
+                ) : (
+                  <RenovLogo variant="light" size="lg" className="h-12 w-auto" />
+                )}
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                  <Upload className="h-6 w-6 text-primary" />
                 </div>
-                <div>
-                  <p className="font-medium">Clique para fazer upload</p>
-                  <p className="text-sm text-muted-foreground">
-                    PNG ou SVG, máximo 5MB
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1 italic">
-                    Medida ideal: 180x50px (proporção 3.6:1)
-                  </p>
+              </div>
+              {logoPreviewLight && (
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => handleSave('light')} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar Claro"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setLogoPreviewLight(null)}>Cancelar</Button>
                 </div>
-              </label>
-            </div>
-          </div>
-
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleSave} 
-              disabled={isSaving || !logoPreview}
-              data-testid="button-save-logo"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Salvando...
-                </>
-              ) : (
-                "Salvar Logo"
               )}
-            </Button>
-            {logoPreview && !isSaving && (
-              <Button variant="outline" onClick={() => setLogoPreview(null)}>
-                Cancelar Alteração
-              </Button>
-            )}
+            </div>
+
+            {/* Dark Theme Logo */}
+            <div className="space-y-4">
+              <Label>Tema Escuro</Label>
+              <div 
+                className="relative group cursor-pointer p-8 rounded-lg bg-slate-900 border-2 border-dashed border-white/10 hover:border-primary/50 transition-colors flex flex-col items-center justify-center min-h-[160px]"
+                onClick={() => document.getElementById('logo-upload-dark')?.click()}
+              >
+                <input 
+                  type="file" 
+                  id="logo-upload-dark"
+                  className="hidden"
+                  onChange={(e) => handleFileChange(e, 'dark')}
+                  accept=".png,.svg,.jpg,.jpeg"
+                />
+                {logoPreviewDark ? (
+                  <img src={logoPreviewDark} alt="Preview Escuro" className="h-12 w-auto object-contain" />
+                ) : (
+                  <RenovLogo variant="dark" size="lg" className="h-12 w-auto" />
+                )}
+                <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                  <Upload className="h-6 w-6 text-white" />
+                </div>
+              </div>
+              {logoPreviewDark && (
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => handleSave('dark')} disabled={isSaving}>
+                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar Escuro"}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="text-white hover:text-white/80" onClick={() => setLogoPreviewDark(null)}>Cancelar</Button>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

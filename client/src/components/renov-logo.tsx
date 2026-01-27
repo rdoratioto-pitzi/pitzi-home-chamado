@@ -16,7 +16,7 @@ const sizeMap = {
 
 export function RenovLogo({ variant = "light", size = "md", className = "" }: RenovLogoProps) {
   const { data: logoUrlSetting } = useQuery<Setting>({ 
-    queryKey: ["/api/settings/logo_url"]
+    queryKey: [variant === "dark" || variant === "white" ? "/api/settings/logo_url_dark" : "/api/settings/logo_url_light"]
   });
 
   const { width, height } = sizeMap[size];
