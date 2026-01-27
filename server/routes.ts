@@ -1,3 +1,4 @@
+import nodemailer from "nodemailer";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -48,16 +49,14 @@ export async function registerRoutes(
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
       
-      // Note: In production, use bcrypt.compare(validated.password, user.password)
       if (user.password !== validated.password) {
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
       
       if (user.status !== "active") {
-        return res.status(401).json({ success: false, message: "Usuário inativo" });
+        return res.status(401).json({ success: false, message: "Sua conta está inativa. Entre em contato com o administrador." });
       }
       
-      // Note: In production, generate JWT token and set HttpOnly cookie
       res.json({ 
         success: true, 
         user: {
@@ -122,6 +121,45 @@ export async function registerRoutes(
     try {
       const validated = insertUserSchema.parse(req.body);
       const user = await storage.createUser(validated);
+
+      // Enviar e-mail de convite
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || "smtp.gmail.com",
+          port: parseInt(process.env.SMTP_PORT || "587"),
+          secure: false,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
+
+        const info = await transporter.sendMail({
+          from: `"Renov Home" <${process.env.SMTP_USER}>`,
+          to: user.email,
+          subject: "Bem-vindo ao Renov Home - Acesso ao Sistema",
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+              <h2 style="color: #00A137;">Bem-vindo ao Renov Home</h2>
+              <p>Olá <strong>${user.name}</strong>,</p>
+              <p>Você foi cadastrado na plataforma interna de gestão da Renov.</p>
+              <p>Abaixo estão suas informações de acesso:</p>
+              <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                <p style="margin: 0;"><strong>Link:</strong> <a href="https://home.renovsmart.com.br" style="color: #00A137;">home.renovsmart.com.br</a></p>
+                <p style="margin: 5px 0 0 0;"><strong>E-mail:</strong> ${user.email}</p>
+                <p style="margin: 5px 0 0 0;"><strong>Senha inicial:</strong> ${validated.password}</p>
+              </div>
+              <p>Recomendamos que você altere sua senha após o primeiro acesso.</p>
+              <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+              <p style="font-size: 12px; color: #777;">Este é um e-mail automático, por favor não responda.</p>
+            </div>
+          `,
+        });
+        console.log("Email de convite enviado: %s", info.messageId);
+      } catch (emailError) {
+        console.error("Erro ao enviar email de convite:", emailError);
+      }
+
       res.status(201).json(user);
     } catch (error) {
       if (error instanceof z.ZodError) {

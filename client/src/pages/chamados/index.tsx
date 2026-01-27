@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx";
 import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -153,51 +154,28 @@ export default function ChamadosPage() {
   };
 
   const exportToExcel = () => {
-    const headers = [
-      "Código",
-      "Título",
-      "Descrição",
-      "Categoria",
-      "Tipo",
-      "Local",
-      "Prioridade",
-      "Status",
-      "Solicitante",
-      "Responsável",
-      "Data de Criação",
-    ];
-
-    const rows = filteredTickets.map((ticket) => {
+    const data = filteredTickets.map((ticket) => {
       const requester = getUser(ticket.requesterId);
       const assignee = getUser(ticket.assigneeId || null);
-      return [
-        ticket.code || "",
-        ticket.title,
-        ticket.description,
-        ticket.category,
-        typeLabels[ticket.type || "bug"] || ticket.type,
-        ticket.location || "",
-        priorityLabels[ticket.priority],
-        statusLabels[ticket.status],
-        requester?.name || "",
-        assignee?.name || "",
-        ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "",
-      ];
+      return {
+        "Código": ticket.code || "",
+        "Título": ticket.title,
+        "Descrição": ticket.description,
+        "Categoria": ticket.category,
+        "Tipo": typeLabels[ticket.type || "bug"] || ticket.type,
+        "Local": ticket.location || "",
+        "Prioridade": priorityLabels[ticket.priority],
+        "Status": statusLabels[ticket.status],
+        "Solicitante": requester?.name || "",
+        "Responsável": assignee?.name || "",
+        "Data de Criação": ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "",
+      };
     });
 
-    const csvContent = [
-      headers.join(";"),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(";")),
-    ].join("\n");
-
-    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `chamados_${new Date().toISOString().split("T")[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Chamados");
+    XLSX.writeFile(workbook, `chamados_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
   return (
@@ -280,7 +258,7 @@ export default function ChamadosPage() {
                   data-testid="button-export-excel"
                 >
                   <Download className="h-3.5 w-3.5 mr-2" />
-                  Exportar CSV
+                  Exportar Excel
                 </Button>
                 <div className="flex items-center border rounded-lg p-1 bg-muted/50">
                   <Button
