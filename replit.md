@@ -1,6 +1,6 @@
 # Renov Home
 
-Plataforma interna de gestão da Renov para gerenciamento de chamados, projetos, OKRs e logística.
+Plataforma interna de gestão da Renov para gerenciamento de chamados, projetos, OKRs, tarefas e logística.
 
 ## Visão Geral
 
@@ -8,9 +8,11 @@ O Renov Home é uma aplicação web interna que oferece:
 
 - **Gestão de Chamados**: Sistema de suporte interno para TI, RH, operações, etc.
 - **Projetos**: Gerenciamento de projetos com quadros Kanban
+- **Tarefas**: Gerenciamento de tarefas por áreas com comentários e reações
 - **OKRs**: Objetivos e resultados-chave por trimestre
-- **Logística**: Rastreamento e gerenciamento de envios
-- **Configurações**: Gerenciamento de usuários, autenticação e marca
+- **Logística**: Rastreamento, simulação de frete e logística reversa
+- **APIs Log**: Documentação de integrações (Correios, APIs internas, operadores)
+- **Configurações**: Gerenciamento de usuários com permissões por módulo
 
 ## Identidade Visual
 
@@ -35,6 +37,13 @@ Seguindo as diretrizes de marca da Renov:
 - Armazenamento em memória (MemStorage)
 - API REST em `/api/...`
 
+## Arquitetura Multi-tenant
+
+O sistema está preparado para multi-tenant com:
+- Campo `tenantId` em todas as tabelas
+- Isolamento de dados por tenant
+- Preparação para N organizações
+
 ## Estrutura do Projeto
 
 ```
@@ -51,8 +60,12 @@ client/
 │   └── pages/         # Páginas por módulo
 │       ├── chamados/
 │       ├── projetos/
+│       ├── tarefas/
 │       ├── okrs/
 │       ├── logistica/
+│       │   ├── simular-frete.tsx
+│       │   └── logistica-reversa.tsx
+│       ├── apis/
 │       └── configuracoes/
 server/
 ├── routes.ts          # Rotas da API
@@ -63,6 +76,9 @@ shared/
 ```
 
 ## APIs Disponíveis
+
+### Autenticação
+- `POST /api/auth/login` - Login com email/senha
 
 ### Chamados
 - `GET /api/tickets` - Listar chamados
@@ -80,6 +96,13 @@ shared/
 - `POST /api/cards` - Criar card
 - `PATCH /api/cards/:id` - Mover/atualizar card
 
+### Tarefas
+- `GET /api/task-areas` - Listar áreas
+- `POST /api/task-areas` - Criar área
+- `GET /api/tasks` - Listar tarefas
+- `POST /api/tasks` - Criar tarefa
+- `PATCH /api/tasks/:id` - Atualizar tarefa
+
 ### OKRs
 - `GET /api/objectives` - Listar objetivos
 - `POST /api/objectives` - Criar objetivo
@@ -88,20 +111,53 @@ shared/
 - `PATCH /api/key-results/:id` - Atualizar progresso
 
 ### Logística
-- `GET /api/shipments` - Listar envios
-- `POST /api/shipments` - Registrar envio
-- `PATCH /api/shipments/:id` - Atualizar status
-- `GET /api/shipments/:id/events` - Histórico de eventos
+- `GET /api/logistics/dashboard` - Estatísticas do dashboard
+- `GET /api/logistics/operators` - Listar operadores
+- `POST /api/logistics/requests` - Criar solicitação de frete
+- `GET /api/logistics/logistica-reversa` - Listar pedidos de logística reversa
+- `POST /api/logistics/logistica-reversa/solicitar` - Solicitar coleta reversa
 
 ### Usuários
 - `GET /api/users` - Listar usuários
-- `POST /api/users` - Criar usuário
+- `POST /api/users` - Criar usuário (com permissões por módulo)
 - `PATCH /api/users/:id` - Atualizar usuário
 
 ### Configurações
 - `GET /api/settings` - Listar configurações
 - `GET /api/settings/:key` - Obter configuração específica
 - `POST /api/settings` - Salvar configuração (key/value)
+
+## Módulos de Permissões
+
+Os usuários têm permissões granulares por módulo:
+- Chamados
+- Projetos
+- Tarefas
+- OKRs
+- Logística
+- APIs Log
+- Configurações
+
+## Funcionalidades de Logística
+
+### Simular Frete
+- Comparação de preços entre operadores (Correios, Jadlog, Azul Cargo)
+- Cálculo de prazos de entrega
+- Seleção da melhor opção
+
+### Logística Reversa
+- **Solicitar Coleta**: Formulário completo com dados do remetente, itens a coletar (com IMEI), embalagem, adicional ANAC
+- **Coleta em Massa**: Importação de arquivo para múltiplas coletas
+- **Acompanhamento**: Visualização e filtros de pedidos
+- **Consultas**: Rastreamento de etiquetas e pedidos
+
+## Notas de Segurança (MVP)
+
+> **IMPORTANTE**: A autenticação atual é simplificada para MVP. Em produção, implementar:
+> - Hash de senhas com bcrypt/argon2
+> - JWT com HttpOnly cookies
+> - Middleware de autenticação no backend
+> - Rate limiting e proteção contra brute force
 
 ## Executando o Projeto
 

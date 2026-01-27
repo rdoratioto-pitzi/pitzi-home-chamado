@@ -1,18 +1,36 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// ============== TENANTS (Multi-tenant) ==============
+export const tenants = pgTable("tenants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  cnpj: text("cnpj"),
+  logo: text("logo"),
+  primaryColor: text("primary_color").default("#00A137"),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
+export type InsertTenant = z.infer<typeof insertTenantSchema>;
+export type Tenant = typeof tenants.$inferSelect;
 
 // ============== USERS ==============
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   password: text("password"),
-  role: text("role").notNull().default("user"),
   status: text("status").notNull().default("active"),
   authMethod: text("auth_method").notNull().default("email"),
   avatarUrl: text("avatar_url"),
+  // Module permissions as JSON
+  modulePermissions: text("module_permissions"), // JSON: { chamados: true, projetos: false, ... }
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -20,9 +38,21 @@ export const insertUserSchema = createInsertSchema(users).omit({ id: true, creat
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// Module permissions type
+export type ModulePermissions = {
+  chamados: boolean;
+  projetos: boolean;
+  tarefas: boolean;
+  okrs: boolean;
+  logistica: boolean;
+  apis: boolean;
+  configuracoes: boolean;
+};
+
 // ============== TICKETS (Chamados) ==============
 export const tickets = pgTable("tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   title: text("title").notNull(),
   description: text("description").notNull(),
   category: text("category").notNull(),
@@ -42,6 +72,7 @@ export type Ticket = typeof tickets.$inferSelect;
 // ============== TICKET COMMENTS ==============
 export const ticketComments = pgTable("ticket_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   ticketId: varchar("ticket_id").notNull(),
   userId: varchar("user_id").notNull(),
   content: text("content").notNull(),
@@ -56,6 +87,7 @@ export type TicketComment = typeof ticketComments.$inferSelect;
 // ============== PROJECTS ==============
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("active"),
@@ -80,6 +112,7 @@ export type Project = typeof projects.$inferSelect;
 // ============== KANBAN COLUMNS ==============
 export const kanbanColumns = pgTable("kanban_columns", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   projectId: varchar("project_id").notNull(),
   name: text("name").notNull(),
   order: integer("order").notNull().default(0),
@@ -92,20 +125,21 @@ export type KanbanColumn = typeof kanbanColumns.$inferSelect;
 // ============== KANBAN CARDS (Tasks) ==============
 export const kanbanCards = pgTable("kanban_cards", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  code: text("code").notNull(), // Alphanumeric code (e.g., REN-01)
+  tenantId: varchar("tenant_id"),
+  code: text("code").notNull(),
   columnId: varchar("column_id").notNull(),
   projectId: varchar("project_id").notNull(),
   title: text("title").notNull(),
-  objectives: text("objectives"), // Renamed from description
-  development: text("development"), // New descriptive field
+  objectives: text("objectives"),
+  development: text("development"),
   assigneeId: varchar("assignee_id"),
-  reporterId: varchar("reporter_id"), // Relator
+  reporterId: varchar("reporter_id"),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   dueDate: timestamp("due_date"),
   tags: text("tags").array(),
-  priority: text("priority").notNull().default("normal"), // "muito_urgente", "urgente", "normal"
-  estimation: integer("estimation"), // Hours
+  priority: text("priority").notNull().default("normal"),
+  estimation: integer("estimation"),
   attachments: text("attachments").array(),
   order: integer("order").notNull().default(0),
   ticketId: varchar("ticket_id"),
@@ -130,6 +164,7 @@ export type KanbanCard = typeof kanbanCards.$inferSelect;
 // ============== KANBAN COMMENTS ==============
 export const kanbanComments = pgTable("kanban_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   cardId: varchar("card_id").notNull(),
   userId: varchar("user_id").notNull(),
   content: text("content").notNull(),
@@ -143,6 +178,7 @@ export type KanbanComment = typeof kanbanComments.$inferSelect;
 // ============== OKRs ==============
 export const objectives = pgTable("objectives", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   title: text("title").notNull(),
   description: text("description"),
   ownerId: varchar("owner_id").notNull(),
@@ -158,6 +194,7 @@ export type Objective = typeof objectives.$inferSelect;
 
 export const keyResults = pgTable("key_results", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   objectiveId: varchar("objective_id").notNull(),
   title: text("title").notNull(),
   targetValue: integer("target_value").notNull(),
@@ -173,6 +210,7 @@ export type KeyResult = typeof keyResults.$inferSelect;
 // ============== LOGISTICS ==============
 export const shipments = pgTable("shipments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   trackingCode: text("tracking_code").notNull().unique(),
   origin: text("origin").notNull(),
   destination: text("destination").notNull(),
@@ -193,6 +231,7 @@ export type Shipment = typeof shipments.$inferSelect;
 
 export const shipmentEvents = pgTable("shipment_events", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   shipmentId: varchar("shipment_id").notNull(),
   status: text("status").notNull(),
   location: text("location"),
@@ -207,6 +246,7 @@ export type ShipmentEvent = typeof shipmentEvents.$inferSelect;
 // ============== SETTINGS ==============
 export const settings = pgTable("settings", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   key: text("key").notNull().unique(),
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -219,10 +259,11 @@ export type Setting = typeof settings.$inferSelect;
 // ============== TAREFAS MODULE - AREAS ==============
 export const taskAreas = pgTable("task_areas", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   name: text("name").notNull(),
   description: text("description"),
   ownerId: varchar("owner_id").notNull(),
-  visibility: text("visibility").notNull().default("private"), // private | shared
+  visibility: text("visibility").notNull().default("private"),
   color: text("color").default("#00A137"),
   icon: text("icon").default("folder"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -236,9 +277,10 @@ export type TaskArea = typeof taskAreas.$inferSelect;
 // ============== TAREFAS MODULE - AREA MEMBERS ==============
 export const taskAreaMembers = pgTable("task_area_members", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   areaId: varchar("area_id").notNull(),
   userId: varchar("user_id").notNull(),
-  role: text("role").notNull().default("viewer"), // owner | editor | viewer
+  role: text("role").notNull().default("viewer"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -249,16 +291,17 @@ export type TaskAreaMember = typeof taskAreaMembers.$inferSelect;
 // ============== TAREFAS MODULE - TASKS ==============
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   areaId: varchar("area_id").notNull(),
   title: text("title").notNull(),
-  description: text("description"), // Rich text / markdown
-  type: text("type").notNull().default("task"), // task | meeting_note
-  status: text("status").notNull().default("todo"), // todo | doing | done | archived
-  priority: text("priority").notNull().default("medium"), // low | medium | high
+  description: text("description"),
+  type: text("type").notNull().default("task"),
+  status: text("status").notNull().default("todo"),
+  priority: text("priority").notNull().default("medium"),
   assigneeId: varchar("assignee_id"),
   dueDate: timestamp("due_date"),
   createdBy: varchar("created_by").notNull(),
-  meetingData: text("meeting_data"), // JSON for meeting notes (date, time, participants, agenda, decisions, actions)
+  meetingData: text("meeting_data"),
   order: integer("order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -276,10 +319,11 @@ export type Task = typeof tasks.$inferSelect;
 // ============== TAREFAS MODULE - TASK COMMENTS ==============
 export const taskComments = pgTable("task_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   taskId: varchar("task_id").notNull(),
   authorId: varchar("author_id").notNull(),
   content: text("content").notNull(),
-  parentCommentId: varchar("parent_comment_id"), // For threads
+  parentCommentId: varchar("parent_comment_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -291,6 +335,7 @@ export type TaskComment = typeof taskComments.$inferSelect;
 // ============== TAREFAS MODULE - TASK REACTIONS ==============
 export const taskReactions = pgTable("task_reactions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   commentId: varchar("comment_id").notNull(),
   userId: varchar("user_id").notNull(),
   emoji: text("emoji").notNull(),
@@ -304,6 +349,7 @@ export type TaskReaction = typeof taskReactions.$inferSelect;
 // ============== TAREFAS MODULE - TASK ATTACHMENTS ==============
 export const taskAttachments = pgTable("task_attachments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   taskId: varchar("task_id").notNull(),
   uploadedBy: varchar("uploaded_by").notNull(),
   fileName: text("file_name").notNull(),
@@ -320,9 +366,10 @@ export type TaskAttachment = typeof taskAttachments.$inferSelect;
 // ============== TAREFAS MODULE - TEMPLATES ==============
 export const taskTemplates = pgTable("task_templates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   name: text("name").notNull(),
-  type: text("type").notNull(), // meeting_agenda, etc
-  structure: text("structure").notNull(), // JSON structure
+  type: text("type").notNull(),
+  structure: text("structure").notNull(),
   isDefault: boolean("is_default").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -334,6 +381,7 @@ export type TaskTemplate = typeof taskTemplates.$inferSelect;
 // ============== LOGISTIC OPERATORS ==============
 export const logisticOperators = pgTable("logistic_operators", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   razaoSocial: text("razao_social").notNull(),
   cnpj: text("cnpj").notNull(),
   contato: text("contato"),
@@ -350,11 +398,12 @@ export type LogisticOperator = typeof logisticOperators.$inferSelect;
 // ============== COLLECTION REQUESTS ==============
 export const collectionRequests = pgTable("collection_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   origem: text("origem").notNull(),
   destino: text("destino").notNull(),
   peso: text("peso").notNull(),
   cubagem: text("cubagem").notNull(),
-  status: text("status").notNull().default("pending"), // pending, quoted, approved, collected, delivered, cancelled
+  status: text("status").notNull().default("pending"),
   operatorId: varchar("operator_id"),
   valorEstimado: text("valor_estimado"),
   prazoEstimado: integer("prazo_estimado"),
@@ -370,6 +419,7 @@ export type CollectionRequest = typeof collectionRequests.$inferSelect;
 // ============== LOGISTICA REVERSA - PEDIDOS ==============
 export const logisticaReversaPedidos = pgTable("logistica_reversa_pedidos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   numeroPedido: text("numero_pedido"),
   numeroEtiqueta: text("numero_etiqueta"),
   tipo: text("tipo").notNull(), // A = Autorização, C = Coleta, CA = Coleta Simultânea
@@ -384,12 +434,19 @@ export const logisticaReversaPedidos = pgTable("logistica_reversa_pedidos", {
   remetenteUf: text("remetente_uf"),
   remetenteEmail: text("remetente_email"),
   remetenteTelefone: text("remetente_telefone"),
+  remetenteDdd: text("remetente_ddd"),
   destinatarioNome: text("destinatario_nome"),
   destinatarioCep: text("destinatario_cep"),
   destinatarioEndereco: text("destinatario_endereco"),
   destinatarioCidade: text("destinatario_cidade"),
   destinatarioUf: text("destinatario_uf"),
   observacao: text("observacao"),
+  // Itens a coletar (JSON array)
+  itensColeta: text("itens_coleta"), // JSON array: [{descricao, quantidade, valorUnitario, imei}]
+  tipoEmbalagem: text("tipo_embalagem"),
+  valorDeclarado: text("valor_declarado"),
+  adicionalAnac: boolean("adicional_anac").default(false),
+  custoEstimado: text("custo_estimado"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -401,6 +458,7 @@ export type LogisticaReversaPedido = typeof logisticaReversaPedidos.$inferSelect
 // ============== LOGISTICA REVERSA - EVENTOS ==============
 export const logisticaReversaEventos = pgTable("logistica_reversa_eventos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
   pedidoId: varchar("pedido_id").notNull(),
   status: text("status").notNull(),
   descricao: text("descricao"),
@@ -411,6 +469,42 @@ export const logisticaReversaEventos = pgTable("logistica_reversa_eventos", {
 export const insertLogisticaReversaEventoSchema = createInsertSchema(logisticaReversaEventos).omit({ id: true, createdAt: true, dataEvento: true });
 export type InsertLogisticaReversaEvento = z.infer<typeof insertLogisticaReversaEventoSchema>;
 export type LogisticaReversaEvento = typeof logisticaReversaEventos.$inferSelect;
+
+// ============== API INTEGRATIONS ==============
+export const apiIntegrations = pgTable("api_integrations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // correios, internal, operators
+  description: text("description"),
+  baseUrl: text("base_url"),
+  status: text("status").notNull().default("aguardando_credenciais"), // ativo, inativo, aguardando_credenciais, em_desenvolvimento
+  documentation: text("documentation"), // Markdown documentation
+  endpoints: text("endpoints"), // JSON array of endpoints
+  credentialsConfigured: boolean("credentials_configured").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertApiIntegrationSchema = createInsertSchema(apiIntegrations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertApiIntegration = z.infer<typeof insertApiIntegrationSchema>;
+export type ApiIntegration = typeof apiIntegrations.$inferSelect;
+
+// ============== FREIGHT SIMULATIONS ==============
+export const freightSimulations = pgTable("freight_simulations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  cidadeOrigem: text("cidade_origem").notNull(),
+  cidadeDestino: text("cidade_destino").notNull(),
+  peso: text("peso").notNull(),
+  volume: text("volume").notNull(),
+  resultados: text("resultados"), // JSON array of quotes
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFreightSimulationSchema = createInsertSchema(freightSimulations).omit({ id: true, createdAt: true });
+export type InsertFreightSimulation = z.infer<typeof insertFreightSimulationSchema>;
+export type FreightSimulation = typeof freightSimulations.$inferSelect;
 
 // ============== HELPER TYPES ==============
 export type LogisticaReversaPedidoWithEventos = LogisticaReversaPedido & {
@@ -424,4 +518,24 @@ export type LogisticsDashboardStats = {
   savings: number;
   pendingRequests: number;
   deliveredRequests: number;
+};
+
+export type ItemColeta = {
+  descricao: string;
+  quantidade: number;
+  valorUnitario: number;
+  imei?: string;
+};
+
+export type FreightQuote = {
+  operador: string;
+  servico: string;
+  prazo: string;
+  valor: number;
+};
+
+export type ApiEndpoint = {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  description: string;
 };

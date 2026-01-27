@@ -32,6 +32,50 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  // ============== AUTH ==============
+  const loginSchema = z.object({
+    email: z.string().email("Email inválido"),
+    password: z.string().min(1, "Senha é obrigatória"),
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const validated = loginSchema.parse(req.body);
+      const users = await storage.getUsers();
+      const user = users.find(u => u.email === validated.email);
+      
+      if (!user) {
+        return res.status(401).json({ success: false, message: "Credenciais inválidas" });
+      }
+      
+      // Note: In production, use bcrypt.compare(validated.password, user.password)
+      if (user.password !== validated.password) {
+        return res.status(401).json({ success: false, message: "Credenciais inválidas" });
+      }
+      
+      if (user.status !== "active") {
+        return res.status(401).json({ success: false, message: "Usuário inativo" });
+      }
+      
+      // Note: In production, generate JWT token and set HttpOnly cookie
+      res.json({ 
+        success: true, 
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          modulePermissions: user.modulePermissions,
+          status: user.status,
+        }
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ success: false, message: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ success: false, message: "Erro interno" });
+    }
+  });
+
   // ============== USERS ==============
   app.get("/api/users", async (req, res) => {
     const users = await storage.getUsers();

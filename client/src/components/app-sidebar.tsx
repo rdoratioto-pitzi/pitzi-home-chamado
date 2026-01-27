@@ -12,7 +12,9 @@ import {
   LayoutDashboard,
   Users,
   Package,
-  RotateCcw
+  RotateCcw,
+  Calculator,
+  Code2
 } from "lucide-react";
 import {
   Sidebar,
@@ -65,6 +67,7 @@ const menuItems = [
 
 const logisticaSubItems = [
   { title: "Visão Geral", url: "/logistica/dashboard", icon: LayoutDashboard },
+  { title: "Simular Frete", url: "/logistica/simular-frete", icon: Calculator },
   { title: "Operadores", url: "/logistica/operadores", icon: Users },
   { title: "Solicitações", url: "/logistica/solicitacoes", icon: Package },
   { title: "Logística Reversa", url: "/logistica/reversa", icon: RotateCcw },
@@ -149,6 +152,19 @@ export function AppSidebar() {
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild
+                  isActive={location === "/apis" || location.startsWith("/apis/")}
+                  className="mx-2"
+                >
+                  <Link href="/apis" data-testid="link-apis">
+                    <Code2 className="h-5 w-5" />
+                    <span className="font-medium">APIs Log</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
               <SidebarMenuItem>
                 <SidebarMenuButton 

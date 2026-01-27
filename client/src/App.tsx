@@ -19,6 +19,9 @@ import LogisticsDashboard from "@/pages/logistica/dashboard";
 import OperadoresPage from "@/pages/logistica/operadores";
 import SolicitacoesPage from "@/pages/logistica/solicitacoes";
 import LogisticaReversaPage from "@/pages/logistica/logistica-reversa";
+import SimularFretePage from "@/pages/logistica/simular-frete";
+import ApisPage from "@/pages/apis/index";
+import LoginPage from "@/pages/login";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
 
 function Router() {
@@ -33,9 +36,12 @@ function Router() {
       <Route path="/okrs" component={OKRsPage} />
       <Route path="/logistica" component={LogisticaPage} />
       <Route path="/logistica/dashboard" component={LogisticsDashboard} />
+      <Route path="/logistica/simular-frete" component={SimularFretePage} />
       <Route path="/logistica/operadores" component={OperadoresPage} />
       <Route path="/logistica/solicitacoes" component={SolicitacoesPage} />
       <Route path="/logistica/reversa" component={LogisticaReversaPage} />
+      <Route path="/apis" component={ApisPage} />
+      <Route path="/login" component={LoginPage} />
       <Route path="/configuracoes" component={ConfiguracoesPage} />
       <Route component={NotFound} />
     </Switch>
