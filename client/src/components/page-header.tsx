@@ -28,7 +28,7 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
           <div className="flex flex-col">
             {breadcrumbs && breadcrumbs.length > 0 ? (
               <Breadcrumb>
-                <BreadcrumbList className="text-[12px]">
+                <BreadcrumbList className="text-[13px]">
                   {breadcrumbs.map((crumb, index) => (
                     <span key={index} className="contents">
                       {index > 0 && <BreadcrumbSeparator className="opacity-40" />}
@@ -36,7 +36,7 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
                         {crumb.href ? (
                           <BreadcrumbLink href={crumb.href} className="hover:text-primary transition-colors">{crumb.label}</BreadcrumbLink>
                         ) : (
-                          <BreadcrumbPage className="font-semibold text-foreground">{crumb.label}</BreadcrumbPage>
+                          <BreadcrumbPage className="font-bold text-foreground text-[18px]">{crumb.label}</BreadcrumbPage>
                         )}
                       </BreadcrumbItem>
                     </span>
@@ -44,7 +44,7 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
                 </BreadcrumbList>
               </Breadcrumb>
             ) : (
-              <h1 className="text-[17px] font-bold tracking-tight text-foreground leading-tight">{title}</h1>
+              <h1 className="text-[20px] font-bold tracking-tight text-foreground leading-tight">{title}</h1>
             )}
             {description && !breadcrumbs && (
               <p className="text-[12px] text-muted-foreground leading-none mt-1">{description}</p>

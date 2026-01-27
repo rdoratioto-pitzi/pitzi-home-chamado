@@ -105,11 +105,11 @@ export function AppSidebar() {
       
       <SidebarContent className="px-3 py-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[11px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 mb-2">
+          <SidebarGroupLabel className="text-[12px] font-bold text-muted-foreground/70 uppercase tracking-widest px-3 mb-3">
             Módulos Principais
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+            <SidebarMenu className="gap-1.5">
               {menuItems.map((item) => {
                 const isActive = location === item.url || location.startsWith(item.url + "/");
                 return (
@@ -117,11 +117,11 @@ export function AppSidebar() {
                     <SidebarMenuButton 
                       asChild
                       isActive={isActive}
-                      className={`h-10 px-3 transition-all duration-200 rounded-lg ${isActive ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted'}`}
+                      className={`h-11 px-3 transition-all duration-200 rounded-lg ${isActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                     >
                       <Link href={item.url} data-testid={`link-${item.url.slice(1)}`}>
-                        <item.icon className={`h-[18px] w-[18px] ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[13px]">{item.title}</span>
+                        <item.icon className={`h-[20px] w-[20px] ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -132,29 +132,29 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton 
-                      className={`h-10 px-3 transition-all duration-200 rounded-lg ${isLogisticaActive ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted'}`}
+                      className={`h-11 px-3 transition-all duration-200 rounded-lg ${isLogisticaActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                       isActive={isLogisticaActive}
                       data-testid="link-logistica"
                     >
-                      <Truck className={`h-[18px] w-[18px] ${isLogisticaActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                      <span className="text-[13px]">Logística</span>
+                      <Truck className={`h-[20px] w-[20px] ${isLogisticaActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <span className="text-[14px]">Logística</span>
                       {logisticaOpen ? (
-                        <ChevronDown className="ml-auto h-3.5 w-3.5 opacity-50" />
+                        <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                       ) : (
-                        <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-50" />
+                        <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
                       )}
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <SidebarMenuSub className="ml-4 mt-1 border-l border-sidebar-border/50 pl-2 gap-1">
+                    <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
                       {logisticaSubItems.map((subItem) => {
                         const isSubActive = location === subItem.url;
                         return (
                           <SidebarMenuSubItem key={subItem.url}>
-                            <SidebarMenuSubButton asChild isActive={isSubActive} className="h-9 px-3 rounded-md">
+                            <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                               <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
-                                <subItem.icon className="h-3.5 w-3.5 mr-2" />
-                                <span className="text-[12.5px]">{subItem.title}</span>
+                                <subItem.icon className="h-4 w-4 mr-2" />
+                                <span className="text-[13.5px]">{subItem.title}</span>
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
@@ -169,11 +169,11 @@ export function AppSidebar() {
                 <SidebarMenuButton 
                   asChild
                   isActive={location === "/apis" || location.startsWith("/apis/")}
-                  className={`h-10 px-3 transition-all duration-200 rounded-lg ${location.startsWith("/apis") ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted'}`}
+                  className={`h-11 px-3 transition-all duration-200 rounded-lg ${location.startsWith("/apis") ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                 >
                   <Link href="/apis" data-testid="link-apis">
-                    <Code2 className={`h-[18px] w-[18px] ${location.startsWith("/apis") ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-[13px]">APIs Log</span>
+                    <Code2 className={`h-[20px] w-[20px] ${location.startsWith("/apis") ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-[14px]">APIs Log</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -182,11 +182,11 @@ export function AppSidebar() {
                 <SidebarMenuButton 
                   asChild
                   isActive={location === "/configuracoes" || location.startsWith("/configuracoes/")}
-                  className={`h-10 px-3 transition-all duration-200 rounded-lg ${location.startsWith("/configuracoes") ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted'}`}
+                  className={`h-11 px-3 transition-all duration-200 rounded-lg ${location.startsWith("/configuracoes") ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                 >
                   <Link href="/configuracoes" data-testid="link-configuracoes">
-                    <Settings className={`h-[18px] w-[18px] ${location.startsWith("/configuracoes") ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-[13px]">Configurações</span>
+                    <Settings className={`h-[20px] w-[20px] ${location.startsWith("/configuracoes") ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-[14px]">Configurações</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
