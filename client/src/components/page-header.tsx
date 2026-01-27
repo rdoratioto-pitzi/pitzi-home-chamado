@@ -19,45 +19,45 @@ export interface PageHeaderProps {
 
 export function PageHeader({ title, description, breadcrumbs, actions }: PageHeaderProps) {
   return (
-    <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-      <div className="flex items-center justify-between h-14 px-4">
-        <div className="flex items-center gap-3">
-          <SidebarTrigger data-testid="button-sidebar-toggle" />
-          <Separator orientation="vertical" className="h-6" />
+    <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
+      <div className="flex items-center justify-between h-16 px-6">
+        <div className="flex items-center gap-4">
+          <SidebarTrigger data-testid="button-sidebar-toggle" className="h-9 w-9 rounded-lg hover:bg-muted" />
+          <div className="h-6 w-px bg-border/60 mx-1" />
           
-          {breadcrumbs && breadcrumbs.length > 0 ? (
-            <Breadcrumb>
-              <BreadcrumbList>
-                {breadcrumbs.map((crumb, index) => (
-                  <span key={index} className="contents">
-                    {index > 0 && <BreadcrumbSeparator />}
-                    <BreadcrumbItem>
-                      {crumb.href ? (
-                        <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink>
-                      ) : (
-                        <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
-                      )}
-                    </BreadcrumbItem>
-                  </span>
-                ))}
-              </BreadcrumbList>
-            </Breadcrumb>
-          ) : (
-            <h1 className="text-lg font-semibold">{title}</h1>
-          )}
+          <div className="flex flex-col">
+            {breadcrumbs && breadcrumbs.length > 0 ? (
+              <Breadcrumb>
+                <BreadcrumbList className="text-[12px]">
+                  {breadcrumbs.map((crumb, index) => (
+                    <span key={index} className="contents">
+                      {index > 0 && <BreadcrumbSeparator className="opacity-40" />}
+                      <BreadcrumbItem>
+                        {crumb.href ? (
+                          <BreadcrumbLink href={crumb.href} className="hover:text-primary transition-colors">{crumb.label}</BreadcrumbLink>
+                        ) : (
+                          <BreadcrumbPage className="font-semibold text-foreground">{crumb.label}</BreadcrumbPage>
+                        )}
+                      </BreadcrumbItem>
+                    </span>
+                  ))}
+                </BreadcrumbList>
+              </Breadcrumb>
+            ) : (
+              <h1 className="text-[15px] font-bold tracking-tight text-foreground">{title}</h1>
+            )}
+            {description && !breadcrumbs && (
+              <p className="text-[11px] text-muted-foreground leading-none mt-0.5">{description}</p>
+            )}
+          </div>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {actions}
+          <div className="h-8 w-px bg-border/40 mx-1" />
           <ThemeToggle />
         </div>
       </div>
-      {description && (
-        <div className="px-4 pb-4">
-          <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-          <p className="text-muted-foreground mt-1">{description}</p>
-        </div>
-      )}
     </header>
   );
 }
