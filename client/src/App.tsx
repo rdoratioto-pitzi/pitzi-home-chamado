@@ -15,6 +15,10 @@ import TarefasPage from "@/pages/tarefas/index";
 import TaskDetailPage from "@/pages/tarefas/detail";
 import OKRsPage from "@/pages/okrs/index";
 import LogisticaPage from "@/pages/logistica/index";
+import LogisticsDashboard from "@/pages/logistica/dashboard";
+import OperadoresPage from "@/pages/logistica/operadores";
+import SolicitacoesPage from "@/pages/logistica/solicitacoes";
+import LogisticaReversaPage from "@/pages/logistica/logistica-reversa";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
 
 function Router() {
@@ -28,6 +32,10 @@ function Router() {
       <Route path="/tarefas/:id" component={TaskDetailPage} />
       <Route path="/okrs" component={OKRsPage} />
       <Route path="/logistica" component={LogisticaPage} />
+      <Route path="/logistica/dashboard" component={LogisticsDashboard} />
+      <Route path="/logistica/operadores" component={OperadoresPage} />
+      <Route path="/logistica/solicitacoes" component={SolicitacoesPage} />
+      <Route path="/logistica/reversa" component={LogisticaReversaPage} />
       <Route path="/configuracoes" component={ConfiguracoesPage} />
       <Route component={NotFound} />
     </Switch>

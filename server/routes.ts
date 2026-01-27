@@ -20,6 +20,10 @@ import {
   insertTaskReactionSchema,
   insertTaskAttachmentSchema,
   insertTaskTemplateSchema,
+  insertLogisticOperatorSchema,
+  insertCollectionRequestSchema,
+  insertLogisticaReversaPedidoSchema,
+  insertLogisticaReversaEventoSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -744,6 +748,257 @@ export async function registerRoutes(
   app.get("/api/task-areas/:id/tasks", async (req, res) => {
     const tasks = await storage.getTasks({ areaId: req.params.id });
     res.json(tasks);
+  });
+
+  // ============== LOGISTICS DASHBOARD ==============
+  app.get("/api/logistics/dashboard", async (req, res) => {
+    const stats = await storage.getLogisticsDashboardStats();
+    res.json(stats);
+  });
+
+  // ============== LOGISTIC OPERATORS ==============
+  app.get("/api/logistic-operators", async (req, res) => {
+    const operators = await storage.getLogisticOperators();
+    res.json(operators);
+  });
+
+  app.get("/api/logistic-operators/:id", async (req, res) => {
+    const operator = await storage.getLogisticOperator(req.params.id);
+    if (!operator) return res.status(404).json({ error: "Operator not found" });
+    res.json(operator);
+  });
+
+  app.post("/api/logistic-operators", async (req, res) => {
+    try {
+      const validated = insertLogisticOperatorSchema.parse(req.body);
+      const operator = await storage.createLogisticOperator(validated);
+      res.status(201).json(operator);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create operator" });
+    }
+  });
+
+  app.patch("/api/logistic-operators/:id", async (req, res) => {
+    try {
+      const partialSchema = insertLogisticOperatorSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const operator = await storage.updateLogisticOperator(req.params.id, validated);
+      if (!operator) return res.status(404).json({ error: "Operator not found" });
+      res.json(operator);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update operator" });
+    }
+  });
+
+  app.delete("/api/logistic-operators/:id", async (req, res) => {
+    const deleted = await storage.deleteLogisticOperator(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Operator not found" });
+    res.status(204).send();
+  });
+
+  // ============== COLLECTION REQUESTS ==============
+  app.get("/api/collection-requests", async (req, res) => {
+    const requests = await storage.getCollectionRequests();
+    res.json(requests);
+  });
+
+  app.get("/api/collection-requests/:id", async (req, res) => {
+    const request = await storage.getCollectionRequest(req.params.id);
+    if (!request) return res.status(404).json({ error: "Request not found" });
+    res.json(request);
+  });
+
+  app.post("/api/collection-requests", async (req, res) => {
+    try {
+      const validated = insertCollectionRequestSchema.parse(req.body);
+      const request = await storage.createCollectionRequest(validated);
+      res.status(201).json(request);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create request" });
+    }
+  });
+
+  app.patch("/api/collection-requests/:id", async (req, res) => {
+    try {
+      const partialSchema = insertCollectionRequestSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const request = await storage.updateCollectionRequest(req.params.id, validated);
+      if (!request) return res.status(404).json({ error: "Request not found" });
+      res.json(request);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update request" });
+    }
+  });
+
+  app.delete("/api/collection-requests/:id", async (req, res) => {
+    const deleted = await storage.deleteCollectionRequest(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Request not found" });
+    res.status(204).send();
+  });
+
+  // ============== LOGISTICA REVERSA ==============
+  app.get("/api/logistica-reversa/pedidos", async (req, res) => {
+    const pedidos = await storage.getLogisticaReversaPedidos();
+    res.json(pedidos);
+  });
+
+  app.get("/api/logistica-reversa/pedidos/:id", async (req, res) => {
+    const pedido = await storage.getLogisticaReversaPedido(req.params.id);
+    if (!pedido) return res.status(404).json({ error: "Pedido not found" });
+    res.json(pedido);
+  });
+
+  app.post("/api/logistica-reversa/solicitar", async (req, res) => {
+    try {
+      const { tipo, codigoServico, remetente, destinatario, observacao } = req.body;
+      
+      const numeroPedido = `LR${Date.now()}`;
+      const numeroEtiqueta = `SV${Math.random().toString(36).substring(2, 11).toUpperCase()}BR`;
+      
+      const pedidoData = {
+        numeroPedido,
+        numeroEtiqueta,
+        tipo,
+        codigoServico,
+        status: "solicitado",
+        idCliente: null,
+        prazo: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        remetenteNome: remetente?.nome || null,
+        remetenteCep: remetente?.cep || null,
+        remetenteEndereco: remetente?.logradouro ? `${remetente.logradouro}, ${remetente.numero}` : null,
+        remetenteCidade: remetente?.cidade || null,
+        remetenteUf: remetente?.uf || null,
+        remetenteEmail: remetente?.email || null,
+        remetenteTelefone: remetente?.telefone || null,
+        destinatarioNome: destinatario?.nome || null,
+        destinatarioCep: destinatario?.cep || null,
+        destinatarioEndereco: destinatario?.logradouro ? `${destinatario.logradouro}, ${destinatario.numero}` : null,
+        destinatarioCidade: destinatario?.cidade || null,
+        destinatarioUf: destinatario?.uf || null,
+        observacao: observacao || null,
+      };
+
+      const pedido = await storage.createLogisticaReversaPedido(pedidoData);
+      
+      // Create initial event
+      await storage.createLogisticaReversaEvento({
+        pedidoId: pedido.id,
+        status: "solicitado",
+        descricao: "Pedido de logística reversa criado com sucesso",
+      });
+
+      res.status(201).json({ pedido, success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create reverse logistics request" });
+    }
+  });
+
+  app.patch("/api/logistica-reversa/pedidos/:id", async (req, res) => {
+    try {
+      const partialSchema = insertLogisticaReversaPedidoSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const pedido = await storage.updateLogisticaReversaPedido(req.params.id, validated);
+      if (!pedido) return res.status(404).json({ error: "Pedido not found" });
+      res.json(pedido);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update pedido" });
+    }
+  });
+
+  app.post("/api/logistica-reversa/cancelar/:id", async (req, res) => {
+    try {
+      const pedido = await storage.updateLogisticaReversaPedido(req.params.id, { status: "cancelado" });
+      if (!pedido) return res.status(404).json({ error: "Pedido not found" });
+      
+      await storage.createLogisticaReversaEvento({
+        pedidoId: pedido.id,
+        status: "cancelado",
+        descricao: "Pedido cancelado pelo usuário",
+      });
+      
+      res.json({ pedido, success: true });
+    } catch (error) {
+      res.status(400).json({ error: "Failed to cancel pedido" });
+    }
+  });
+
+  app.get("/api/logistica-reversa/pedidos/:id/eventos", async (req, res) => {
+    const eventos = await storage.getLogisticaReversaEventos(req.params.id);
+    res.json(eventos);
+  });
+
+  app.get("/api/logistica-reversa/stats", async (req, res) => {
+    const pedidos = await storage.getLogisticaReversaPedidos();
+    const stats = {
+      total: pedidos.length,
+      pendentes: pedidos.filter(p => p.status === "solicitado" || p.status === "aguardando_postagem").length,
+      concluidos: pedidos.filter(p => p.status === "entregue").length,
+      cancelados: pedidos.filter(p => p.status === "cancelado").length,
+    };
+    res.json(stats);
+  });
+
+  app.get("/api/logistica-reversa/servicos", async (req, res) => {
+    res.json({
+      servicos: [
+        { codigo: "41076", nome: "PAC Reversa" },
+        { codigo: "40010", nome: "SEDEX Reversa" },
+        { codigo: "40215", nome: "SEDEX 10 Reversa" },
+        { codigo: "40290", nome: "SEDEX 12 Reversa" },
+      ],
+      tipos: [
+        { codigo: "A", nome: "Autorização de Postagem" },
+        { codigo: "C", nome: "Coleta Domiciliar" },
+        { codigo: "CA", nome: "Coleta Simultânea" },
+      ],
+      embalagens: [
+        { codigo: "P", nome: "Pequena", dimensoes: "20x15x10cm", peso: 0.2 },
+        { codigo: "M", nome: "Média", dimensoes: "30x25x15cm", peso: 0.4 },
+        { codigo: "G", nome: "Grande", dimensoes: "40x30x20cm", peso: 0.6 },
+      ],
+    });
+  });
+
+  // ============== CEP LOOKUP ==============
+  app.get("/api/cep/:cep", async (req, res) => {
+    try {
+      const cep = req.params.cep.replace(/\D/g, "");
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await response.json();
+      
+      if (data.erro) {
+        return res.status(404).json({ error: "CEP not found" });
+      }
+      
+      res.json({
+        cep: data.cep,
+        logradouro: data.logradouro,
+        bairro: data.bairro,
+        cidade: data.localidade,
+        uf: data.uf,
+        ddd: data.ddd,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to lookup CEP" });
+    }
   });
 
   return httpServer;

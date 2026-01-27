@@ -330,3 +330,98 @@ export const taskTemplates = pgTable("task_templates", {
 export const insertTaskTemplateSchema = createInsertSchema(taskTemplates).omit({ id: true, createdAt: true });
 export type InsertTaskTemplate = z.infer<typeof insertTaskTemplateSchema>;
 export type TaskTemplate = typeof taskTemplates.$inferSelect;
+
+// ============== LOGISTIC OPERATORS ==============
+export const logisticOperators = pgTable("logistic_operators", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  razaoSocial: text("razao_social").notNull(),
+  cnpj: text("cnpj").notNull(),
+  contato: text("contato"),
+  email: text("email").notNull(),
+  telefone: text("telefone"),
+  ativo: boolean("ativo").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLogisticOperatorSchema = createInsertSchema(logisticOperators).omit({ id: true, createdAt: true });
+export type InsertLogisticOperator = z.infer<typeof insertLogisticOperatorSchema>;
+export type LogisticOperator = typeof logisticOperators.$inferSelect;
+
+// ============== COLLECTION REQUESTS ==============
+export const collectionRequests = pgTable("collection_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  origem: text("origem").notNull(),
+  destino: text("destino").notNull(),
+  peso: text("peso").notNull(),
+  cubagem: text("cubagem").notNull(),
+  status: text("status").notNull().default("pending"), // pending, quoted, approved, collected, delivered, cancelled
+  operatorId: varchar("operator_id"),
+  valorEstimado: text("valor_estimado"),
+  prazoEstimado: integer("prazo_estimado"),
+  observacao: text("observacao"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCollectionRequestSchema = createInsertSchema(collectionRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCollectionRequest = z.infer<typeof insertCollectionRequestSchema>;
+export type CollectionRequest = typeof collectionRequests.$inferSelect;
+
+// ============== LOGISTICA REVERSA - PEDIDOS ==============
+export const logisticaReversaPedidos = pgTable("logistica_reversa_pedidos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  numeroPedido: text("numero_pedido"),
+  numeroEtiqueta: text("numero_etiqueta"),
+  tipo: text("tipo").notNull(), // A = Autorização, C = Coleta, CA = Coleta Simultânea
+  codigoServico: text("codigo_servico").notNull(),
+  status: text("status").notNull().default("solicitado"),
+  idCliente: text("id_cliente"),
+  prazo: text("prazo"),
+  remetenteNome: text("remetente_nome"),
+  remetenteCep: text("remetente_cep"),
+  remetenteEndereco: text("remetente_endereco"),
+  remetenteCidade: text("remetente_cidade"),
+  remetenteUf: text("remetente_uf"),
+  remetenteEmail: text("remetente_email"),
+  remetenteTelefone: text("remetente_telefone"),
+  destinatarioNome: text("destinatario_nome"),
+  destinatarioCep: text("destinatario_cep"),
+  destinatarioEndereco: text("destinatario_endereco"),
+  destinatarioCidade: text("destinatario_cidade"),
+  destinatarioUf: text("destinatario_uf"),
+  observacao: text("observacao"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLogisticaReversaPedidoSchema = createInsertSchema(logisticaReversaPedidos).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertLogisticaReversaPedido = z.infer<typeof insertLogisticaReversaPedidoSchema>;
+export type LogisticaReversaPedido = typeof logisticaReversaPedidos.$inferSelect;
+
+// ============== LOGISTICA REVERSA - EVENTOS ==============
+export const logisticaReversaEventos = pgTable("logistica_reversa_eventos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pedidoId: varchar("pedido_id").notNull(),
+  status: text("status").notNull(),
+  descricao: text("descricao"),
+  dataEvento: timestamp("data_evento").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLogisticaReversaEventoSchema = createInsertSchema(logisticaReversaEventos).omit({ id: true, createdAt: true, dataEvento: true });
+export type InsertLogisticaReversaEvento = z.infer<typeof insertLogisticaReversaEventoSchema>;
+export type LogisticaReversaEvento = typeof logisticaReversaEventos.$inferSelect;
+
+// ============== HELPER TYPES ==============
+export type LogisticaReversaPedidoWithEventos = LogisticaReversaPedido & {
+  eventos?: LogisticaReversaEvento[];
+};
+
+export type LogisticsDashboardStats = {
+  totalRequests: number;
+  totalValue: number;
+  onTimeRate: number;
+  savings: number;
+  pendingRequests: number;
+  deliveredRequests: number;
+};

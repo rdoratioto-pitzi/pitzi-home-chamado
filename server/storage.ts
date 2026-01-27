@@ -18,6 +18,11 @@ import {
   type TaskReaction, type InsertTaskReaction,
   type TaskAttachment, type InsertTaskAttachment,
   type TaskTemplate, type InsertTaskTemplate,
+  type LogisticOperator, type InsertLogisticOperator,
+  type CollectionRequest, type InsertCollectionRequest,
+  type LogisticaReversaPedido, type InsertLogisticaReversaPedido,
+  type LogisticaReversaEvento, type InsertLogisticaReversaEvento,
+  type LogisticsDashboardStats,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -135,6 +140,34 @@ export interface IStorage {
   getTaskTemplates(type?: string): Promise<TaskTemplate[]>;
   getTaskTemplate(id: string): Promise<TaskTemplate | undefined>;
   createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate>;
+
+  // Logistic Operators
+  getLogisticOperator(id: string): Promise<LogisticOperator | undefined>;
+  getLogisticOperators(): Promise<LogisticOperator[]>;
+  createLogisticOperator(operator: InsertLogisticOperator): Promise<LogisticOperator>;
+  updateLogisticOperator(id: string, data: Partial<LogisticOperator>): Promise<LogisticOperator | undefined>;
+  deleteLogisticOperator(id: string): Promise<boolean>;
+
+  // Collection Requests
+  getCollectionRequest(id: string): Promise<CollectionRequest | undefined>;
+  getCollectionRequests(): Promise<CollectionRequest[]>;
+  createCollectionRequest(request: InsertCollectionRequest): Promise<CollectionRequest>;
+  updateCollectionRequest(id: string, data: Partial<CollectionRequest>): Promise<CollectionRequest | undefined>;
+  deleteCollectionRequest(id: string): Promise<boolean>;
+
+  // Logistica Reversa Pedidos
+  getLogisticaReversaPedido(id: string): Promise<LogisticaReversaPedido | undefined>;
+  getLogisticaReversaPedidos(): Promise<LogisticaReversaPedido[]>;
+  createLogisticaReversaPedido(pedido: InsertLogisticaReversaPedido): Promise<LogisticaReversaPedido>;
+  updateLogisticaReversaPedido(id: string, data: Partial<LogisticaReversaPedido>): Promise<LogisticaReversaPedido | undefined>;
+  deleteLogisticaReversaPedido(id: string): Promise<boolean>;
+
+  // Logistica Reversa Eventos
+  getLogisticaReversaEventos(pedidoId: string): Promise<LogisticaReversaEvento[]>;
+  createLogisticaReversaEvento(evento: InsertLogisticaReversaEvento): Promise<LogisticaReversaEvento>;
+
+  // Dashboard Stats
+  getLogisticsDashboardStats(): Promise<LogisticsDashboardStats>;
 }
 
 export class MemStorage implements IStorage {
@@ -157,6 +190,10 @@ export class MemStorage implements IStorage {
   private taskReactions: Map<string, TaskReaction>;
   private taskAttachments: Map<string, TaskAttachment>;
   private taskTemplates: Map<string, TaskTemplate>;
+  private logisticOperators: Map<string, LogisticOperator>;
+  private collectionRequests: Map<string, CollectionRequest>;
+  private logisticaReversaPedidos: Map<string, LogisticaReversaPedido>;
+  private logisticaReversaEventos: Map<string, LogisticaReversaEvento>;
 
   constructor() {
     this.users = new Map();
@@ -178,6 +215,10 @@ export class MemStorage implements IStorage {
     this.taskReactions = new Map();
     this.taskAttachments = new Map();
     this.taskTemplates = new Map();
+    this.logisticOperators = new Map();
+    this.collectionRequests = new Map();
+    this.logisticaReversaPedidos = new Map();
+    this.logisticaReversaEventos = new Map();
 
     this.seedData();
   }
@@ -469,6 +510,167 @@ export class MemStorage implements IStorage {
       },
     ];
     sampleTasks.forEach(t => this.tasks.set(t.id, t));
+
+    // Seed logistic operators
+    const sampleOperators: LogisticOperator[] = [
+      {
+        id: randomUUID(),
+        razaoSocial: "RapidCargo Logística LTDA",
+        cnpj: "12.345.678/0001-90",
+        contato: "Carlos Silva",
+        email: "contato@rapidcargo.com.br",
+        telefone: "(11) 3456-7890",
+        ativo: true,
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        razaoSocial: "TransNacional Transportes S.A.",
+        cnpj: "98.765.432/0001-10",
+        contato: "Ana Santos",
+        email: "comercial@transnacional.com.br",
+        telefone: "(21) 2345-6789",
+        ativo: true,
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        razaoSocial: "ExpressBR Entregas",
+        cnpj: "11.222.333/0001-44",
+        contato: "Ricardo Oliveira",
+        email: "atendimento@expressbr.com.br",
+        telefone: "(31) 3333-4444",
+        ativo: true,
+        createdAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        razaoSocial: "LogiFast Soluções Logísticas",
+        cnpj: "55.666.777/0001-88",
+        contato: "Marina Costa",
+        email: "comercial@logifast.com.br",
+        telefone: "(41) 4444-5555",
+        ativo: false,
+        createdAt: new Date(),
+      },
+    ];
+    sampleOperators.forEach(o => this.logisticOperators.set(o.id, o));
+
+    // Seed collection requests
+    const sampleRequests: CollectionRequest[] = [
+      {
+        id: randomUUID(),
+        origem: "São Paulo, SP",
+        destino: "Rio de Janeiro, RJ",
+        peso: "15.5",
+        cubagem: "0.25",
+        status: "pending",
+        operatorId: sampleOperators[0].id,
+        valorEstimado: "150.00",
+        prazoEstimado: 3,
+        observacao: null,
+        createdAt: new Date(Date.now() - 86400000),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        origem: "Belo Horizonte, MG",
+        destino: "Curitiba, PR",
+        peso: "8.2",
+        cubagem: "0.12",
+        status: "quoted",
+        operatorId: sampleOperators[1].id,
+        valorEstimado: "220.00",
+        prazoEstimado: 5,
+        observacao: "Produtos frágeis",
+        createdAt: new Date(Date.now() - 172800000),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        origem: "Porto Alegre, RS",
+        destino: "Salvador, BA",
+        peso: "25.0",
+        cubagem: "0.45",
+        status: "collected",
+        operatorId: sampleOperators[2].id,
+        valorEstimado: "380.00",
+        prazoEstimado: 7,
+        observacao: null,
+        createdAt: new Date(Date.now() - 259200000),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        origem: "Fortaleza, CE",
+        destino: "Recife, PE",
+        peso: "5.0",
+        cubagem: "0.08",
+        status: "delivered",
+        operatorId: sampleOperators[0].id,
+        valorEstimado: "95.00",
+        prazoEstimado: 2,
+        observacao: "Entrega expressa",
+        createdAt: new Date(Date.now() - 345600000),
+        updatedAt: new Date(),
+      },
+    ];
+    sampleRequests.forEach(r => this.collectionRequests.set(r.id, r));
+
+    // Seed logistica reversa pedidos
+    const sampleLRPedidos: LogisticaReversaPedido[] = [
+      {
+        id: randomUUID(),
+        numeroPedido: "LR2025001234",
+        numeroEtiqueta: "SV123456789BR",
+        tipo: "C",
+        codigoServico: "41076",
+        status: "solicitado",
+        idCliente: "CLI001",
+        prazo: "2025-02-15",
+        remetenteNome: "Loja TIM Centro",
+        remetenteCep: "01310-100",
+        remetenteEndereco: "Avenida Paulista, 1000",
+        remetenteCidade: "São Paulo",
+        remetenteUf: "SP",
+        remetenteEmail: "loja.centro@tim.com.br",
+        remetenteTelefone: "(11) 3456-7890",
+        destinatarioNome: "Renov Soluções LTDA",
+        destinatarioCep: "04575-020",
+        destinatarioEndereco: "R Luigi Galvani, 200 - Conj 11",
+        destinatarioCidade: "São Paulo",
+        destinatarioUf: "SP",
+        observacao: "Dispositivos para recondicionamento",
+        createdAt: new Date(Date.now() - 86400000),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        numeroPedido: "LR2025001235",
+        numeroEtiqueta: "SV987654321BR",
+        tipo: "A",
+        codigoServico: "40010",
+        status: "coletado",
+        idCliente: "CLI002",
+        prazo: "2025-02-10",
+        remetenteNome: "Loja Claro Shopping",
+        remetenteCep: "22041-080",
+        remetenteEndereco: "Av. Nossa Senhora de Copacabana, 500",
+        remetenteCidade: "Rio de Janeiro",
+        remetenteUf: "RJ",
+        remetenteEmail: "loja.shopping@claro.com.br",
+        remetenteTelefone: "(21) 2345-6789",
+        destinatarioNome: "Renov Soluções LTDA",
+        destinatarioCep: "04575-020",
+        destinatarioEndereco: "R Luigi Galvani, 200 - Conj 11",
+        destinatarioCidade: "São Paulo",
+        destinatarioUf: "SP",
+        observacao: null,
+        createdAt: new Date(Date.now() - 259200000),
+        updatedAt: new Date(),
+      },
+    ];
+    sampleLRPedidos.forEach(p => this.logisticaReversaPedidos.set(p.id, p));
   }
 
   // Users
@@ -1075,6 +1277,138 @@ export class MemStorage implements IStorage {
     const template: TaskTemplate = { ...insertTemplate, id, createdAt: new Date() };
     this.taskTemplates.set(id, template);
     return template;
+  }
+
+  // Logistic Operators
+  async getLogisticOperator(id: string): Promise<LogisticOperator | undefined> {
+    return this.logisticOperators.get(id);
+  }
+
+  async getLogisticOperators(): Promise<LogisticOperator[]> {
+    return Array.from(this.logisticOperators.values()).sort((a, b) =>
+      (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)
+    );
+  }
+
+  async createLogisticOperator(insertOperator: InsertLogisticOperator): Promise<LogisticOperator> {
+    const id = randomUUID();
+    const operator: LogisticOperator = { ...insertOperator, id, createdAt: new Date() };
+    this.logisticOperators.set(id, operator);
+    return operator;
+  }
+
+  async updateLogisticOperator(id: string, data: Partial<LogisticOperator>): Promise<LogisticOperator | undefined> {
+    const operator = this.logisticOperators.get(id);
+    if (!operator) return undefined;
+    const updated = { ...operator, ...data };
+    this.logisticOperators.set(id, updated);
+    return updated;
+  }
+
+  async deleteLogisticOperator(id: string): Promise<boolean> {
+    return this.logisticOperators.delete(id);
+  }
+
+  // Collection Requests
+  async getCollectionRequest(id: string): Promise<CollectionRequest | undefined> {
+    return this.collectionRequests.get(id);
+  }
+
+  async getCollectionRequests(): Promise<CollectionRequest[]> {
+    return Array.from(this.collectionRequests.values()).sort((a, b) =>
+      (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)
+    );
+  }
+
+  async createCollectionRequest(insertRequest: InsertCollectionRequest): Promise<CollectionRequest> {
+    const id = randomUUID();
+    const request: CollectionRequest = { ...insertRequest, id, createdAt: new Date(), updatedAt: new Date() };
+    this.collectionRequests.set(id, request);
+    return request;
+  }
+
+  async updateCollectionRequest(id: string, data: Partial<CollectionRequest>): Promise<CollectionRequest | undefined> {
+    const request = this.collectionRequests.get(id);
+    if (!request) return undefined;
+    const updated = { ...request, ...data, updatedAt: new Date() };
+    this.collectionRequests.set(id, updated);
+    return updated;
+  }
+
+  async deleteCollectionRequest(id: string): Promise<boolean> {
+    return this.collectionRequests.delete(id);
+  }
+
+  // Logistica Reversa Pedidos
+  async getLogisticaReversaPedido(id: string): Promise<LogisticaReversaPedido | undefined> {
+    return this.logisticaReversaPedidos.get(id);
+  }
+
+  async getLogisticaReversaPedidos(): Promise<LogisticaReversaPedido[]> {
+    return Array.from(this.logisticaReversaPedidos.values()).sort((a, b) =>
+      (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0)
+    );
+  }
+
+  async createLogisticaReversaPedido(insertPedido: InsertLogisticaReversaPedido): Promise<LogisticaReversaPedido> {
+    const id = randomUUID();
+    const pedido: LogisticaReversaPedido = { ...insertPedido, id, createdAt: new Date(), updatedAt: new Date() };
+    this.logisticaReversaPedidos.set(id, pedido);
+    return pedido;
+  }
+
+  async updateLogisticaReversaPedido(id: string, data: Partial<LogisticaReversaPedido>): Promise<LogisticaReversaPedido | undefined> {
+    const pedido = this.logisticaReversaPedidos.get(id);
+    if (!pedido) return undefined;
+    const updated = { ...pedido, ...data, updatedAt: new Date() };
+    this.logisticaReversaPedidos.set(id, updated);
+    return updated;
+  }
+
+  async deleteLogisticaReversaPedido(id: string): Promise<boolean> {
+    // Delete related events
+    Array.from(this.logisticaReversaEventos.values())
+      .filter(e => e.pedidoId === id)
+      .forEach(e => this.logisticaReversaEventos.delete(e.id));
+    return this.logisticaReversaPedidos.delete(id);
+  }
+
+  // Logistica Reversa Eventos
+  async getLogisticaReversaEventos(pedidoId: string): Promise<LogisticaReversaEvento[]> {
+    return Array.from(this.logisticaReversaEventos.values())
+      .filter(e => e.pedidoId === pedidoId)
+      .sort((a, b) => (b.dataEvento?.getTime() || 0) - (a.dataEvento?.getTime() || 0));
+  }
+
+  async createLogisticaReversaEvento(insertEvento: InsertLogisticaReversaEvento): Promise<LogisticaReversaEvento> {
+    const id = randomUUID();
+    const evento: LogisticaReversaEvento = { ...insertEvento, id, dataEvento: new Date(), createdAt: new Date() };
+    this.logisticaReversaEventos.set(id, evento);
+    return evento;
+  }
+
+  // Dashboard Stats
+  async getLogisticsDashboardStats(): Promise<LogisticsDashboardStats> {
+    const requests = Array.from(this.collectionRequests.values());
+    const totalRequests = requests.length;
+    const deliveredRequests = requests.filter(r => r.status === "delivered").length;
+    const pendingRequests = requests.filter(r => r.status === "pending" || r.status === "quoted").length;
+    
+    const totalValue = requests.reduce((sum, r) => {
+      return sum + (r.valorEstimado ? parseFloat(r.valorEstimado) : 0);
+    }, 0);
+
+    const onTimeRate = totalRequests > 0 ? Math.round((deliveredRequests / totalRequests) * 100) : 0;
+    const savings = totalValue * 0.12; // 12% estimated savings
+
+    return {
+      totalRequests,
+      totalValue,
+      onTimeRate,
+      savings,
+      pendingRequests,
+      deliveredRequests,
+    };
   }
 }
 

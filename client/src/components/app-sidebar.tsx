@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter";
+import { useState } from "react";
 import { 
   Ticket, 
   FolderKanban, 
@@ -6,7 +7,12 @@ import {
   Truck, 
   Settings,
   ChevronDown,
-  CheckSquare
+  ChevronRight,
+  CheckSquare,
+  LayoutDashboard,
+  Users,
+  Package,
+  RotateCcw
 } from "lucide-react";
 import {
   Sidebar,
@@ -17,6 +23,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
@@ -28,6 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useTheme } from "@/hooks/use-theme";
 
 const menuItems = [
@@ -51,21 +61,21 @@ const menuItems = [
     url: "/okrs",
     icon: Target,
   },
-  {
-    title: "Logística",
-    url: "/logistica",
-    icon: Truck,
-  },
-  {
-    title: "Configurações",
-    url: "/configuracoes",
-    icon: Settings,
-  },
+];
+
+const logisticaSubItems = [
+  { title: "Visão Geral", url: "/logistica/dashboard", icon: LayoutDashboard },
+  { title: "Operadores", url: "/logistica/operadores", icon: Users },
+  { title: "Solicitações", url: "/logistica/solicitacoes", icon: Package },
+  { title: "Logística Reversa", url: "/logistica/reversa", icon: RotateCcw },
 ];
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { theme } = useTheme();
+  const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
+  
+  const isLogisticaActive = location.startsWith("/logistica");
 
   return (
     <Sidebar>
@@ -102,6 +112,56 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+              
+              <Collapsible open={logisticaOpen} onOpenChange={setLogisticaOpen}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton 
+                      className="mx-2"
+                      isActive={isLogisticaActive}
+                      data-testid="link-logistica"
+                    >
+                      <Truck className="h-5 w-5" />
+                      <span className="font-medium">Logística</span>
+                      {logisticaOpen ? (
+                        <ChevronDown className="ml-auto h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="ml-auto h-4 w-4" />
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {logisticaSubItems.map((subItem) => {
+                        const isSubActive = location === subItem.url;
+                        return (
+                          <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubButton asChild isActive={isSubActive}>
+                              <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
+                                <subItem.icon className="h-4 w-4" />
+                                <span>{subItem.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild
+                  isActive={location === "/configuracoes" || location.startsWith("/configuracoes/")}
+                  className="mx-2"
+                >
+                  <Link href="/configuracoes" data-testid="link-configuracoes">
+                    <Settings className="h-5 w-5" />
+                    <span className="font-medium">Configurações</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
