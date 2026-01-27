@@ -5,7 +5,7 @@ import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare } from "lu
 
 const modules = [
   {
-    title: "Gestão de Chamados",
+    title: "Chamados",
     description: "Gerencie tickets de suporte interno, acompanhe status e prioridades",
     icon: Ticket,
     href: "/chamados",

@@ -96,6 +96,14 @@ export default function TarefasPage() {
     createdBy: "admin",
     assigneeId: "",
     dueDate: "",
+    meetingData: {
+      date: "",
+      time: "",
+      location: "",
+      participants: [] as string[],
+      agenda: [] as string[],
+      actions: [] as { description: string; responsible: string; deadline: string }[],
+    }
   });
 
   const { data: areas = [], isLoading: areasLoading } = useQuery<TaskArea[]>({
@@ -165,6 +173,7 @@ export default function TarefasPage() {
         createdBy: data.createdBy,
         dueDate: data.dueDate || null,
         assigneeId: data.assigneeId || undefined,
+        meetingData: data.type === "meeting_note" ? data.meetingData : undefined,
       };
       return apiRequest("POST", "/api/tasks", payload);
     },
@@ -183,6 +192,14 @@ export default function TarefasPage() {
         createdBy: "admin",
         assigneeId: "",
         dueDate: "",
+        meetingData: {
+          date: "",
+          time: "",
+          location: "",
+          participants: [],
+          agenda: [],
+          actions: [],
+        }
       });
       toast({ title: "Tarefa criada com sucesso!" });
     },
@@ -717,7 +734,7 @@ export default function TarefasPage() {
       </Dialog>
 
       <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{newTask.type === "meeting_note" ? "Nova Reunião" : "Nova Tarefa"}</DialogTitle>
           </DialogHeader>
@@ -732,19 +749,6 @@ export default function TarefasPage() {
               />
             </div>
             
-            {newTask.type === "task" && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Descrição</label>
-                <Textarea
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  placeholder="Detalhes da tarefa..."
-                  rows={3}
-                  data-testid="input-task-description"
-                />
-              </div>
-            )}
-
             <div className="space-y-2">
               <label className="text-sm font-medium">Área</label>
               <Select 
@@ -769,33 +773,115 @@ export default function TarefasPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Prioridade</label>
-                <Select 
-                  value={newTask.priority} 
-                  onValueChange={(v) => setNewTask({ ...newTask, priority: v })}
-                >
-                  <SelectTrigger data-testid="select-task-priority">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baixa</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                  </SelectContent>
-                </Select>
+
+            {newTask.type === "task" ? (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Descrição</label>
+                  <Textarea
+                    value={newTask.description}
+                    onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                    placeholder="Detalhes da tarefa..."
+                    rows={3}
+                    data-testid="input-task-description"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Prioridade</label>
+                    <Select 
+                      value={newTask.priority} 
+                      onValueChange={(v) => setNewTask({ ...newTask, priority: v })}
+                    >
+                      <SelectTrigger data-testid="select-task-priority">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Baixa</SelectItem>
+                        <SelectItem value="medium">Média</SelectItem>
+                        <SelectItem value="high">Alta</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Data de Entrega</label>
+                    <Input
+                      type="date"
+                      value={newTask.dueDate}
+                      onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
+                      data-testid="input-task-due-date"
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-4 border-t pt-4 mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Data</label>
+                    <Input
+                      type="date"
+                      value={newTask.meetingData.date}
+                      onChange={(e) => setNewTask({ 
+                        ...newTask, 
+                        meetingData: { ...newTask.meetingData, date: e.target.value } 
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Horário</label>
+                    <Input
+                      type="time"
+                      value={newTask.meetingData.time}
+                      onChange={(e) => setNewTask({ 
+                        ...newTask, 
+                        meetingData: { ...newTask.meetingData, time: e.target.value } 
+                      })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Local</label>
+                  <Input
+                    value={newTask.meetingData.location}
+                    onChange={(e) => setNewTask({ 
+                      ...newTask, 
+                      meetingData: { ...newTask.meetingData, location: e.target.value } 
+                    })}
+                    placeholder="Local da reunião"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Participantes</label>
+                  <Input
+                    value={newTask.meetingData.participants.join(", ")}
+                    onChange={(e) => setNewTask({ 
+                      ...newTask, 
+                      meetingData: { 
+                        ...newTask.meetingData, 
+                        participants: e.target.value.split(",").map(p => p.trim()).filter(Boolean) 
+                      } 
+                    })}
+                    placeholder="Participantes (separados por vírgula)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Pauta</label>
+                  <Textarea
+                    value={newTask.meetingData.agenda.join("\n")}
+                    onChange={(e) => setNewTask({ 
+                      ...newTask, 
+                      meetingData: { 
+                        ...newTask.meetingData, 
+                        agenda: e.target.value.split("\n").filter(Boolean) 
+                      } 
+                    })}
+                    placeholder="Itens da pauta (um por linha)"
+                    rows={6}
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Data de Entrega</label>
-                <Input
-                  type="date"
-                  value={newTask.dueDate}
-                  onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                  data-testid="input-task-due-date"
-                />
-              </div>
-            </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTaskDialog(false)}>

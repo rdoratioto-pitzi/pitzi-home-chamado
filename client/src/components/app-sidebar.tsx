@@ -32,7 +32,7 @@ import { useTheme } from "@/hooks/use-theme";
 
 const menuItems = [
   {
-    title: "Gestão de Chamados",
+    title: "Chamados",
     url: "/chamados",
     icon: Ticket,
   },
