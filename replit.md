@@ -165,6 +165,32 @@ O workflow "Start application" executa `npm run dev` que inicia:
 - Servidor Express na porta 5000
 - Vite dev server para o frontend
 
+## Funcionalidades Recentes
+
+### Chamados (Tickets)
+- **Código automático**: Cada chamado recebe um código único (CHM-0001, CHM-0002, etc.)
+- **Campos de classificação**: Tipo (Bug, Melhoria, Negócio) e Local (RS, RG, Dash, One, Home, Omie, Outros)
+- **Status bloqueado**: Novo status para tickets que estão aguardando terceiros
+- **Visualização Kanban**: Toggle entre Grid/Lista/Kanban com drag-and-drop
+- **Exportar Excel**: Download de todos os chamados em formato CSV
+
+### Tarefas
+- **Visualização Kanban**: Colunas A Fazer, Em Andamento, Concluído, Arquivado
+- **Drag-and-drop**: Arraste tarefas entre colunas para atualizar status
+
+### Login
+- **Layout Metronic Classic**: Tela dividida com branding à esquerda e formulário à direita
+- **Credenciais de teste**: admin@renov.com.br / admin123
+
+### Configurações
+- **Gerenciamento de Campos**: Configurar Categorias, Tipos e Locais dinâmicos
+
+## Componentes Reutilizáveis
+
+### RenovLogo
+- **Props**: `variant` (light/dark/white), `size` (sm/md/lg/xl)
+- **Uso**: `<RenovLogo size="lg" variant="white" />`
+
 ## Preferências do Usuário
 
 - Interface em português brasileiro

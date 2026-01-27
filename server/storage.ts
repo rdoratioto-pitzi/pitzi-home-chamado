@@ -228,8 +228,8 @@ export class MemStorage implements IStorage {
     const adminUser: User = {
       id: "admin",
       name: "Administrador",
-      email: "admin@renov.com",
-      password: null,
+      email: "admin@renov.com.br",
+      password: "admin123",
       role: "admin",
       status: "active",
       authMethod: "email",
