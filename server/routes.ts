@@ -13,6 +13,13 @@ import {
   insertKeyResultSchema,
   insertShipmentSchema,
   insertShipmentEventSchema,
+  insertTaskAreaSchema,
+  insertTaskAreaMemberSchema,
+  insertTaskSchema,
+  insertTaskCommentSchema,
+  insertTaskReactionSchema,
+  insertTaskAttachmentSchema,
+  insertTaskTemplateSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -476,6 +483,267 @@ export async function registerRoutes(
       }
       res.status(400).json({ error: "Failed to save setting" });
     }
+  });
+
+  // ============== TASK AREAS ==============
+  app.get("/api/task-areas", async (req, res) => {
+    const userId = req.query.userId as string || "admin";
+    const areas = await storage.getTaskAreas(userId);
+    res.json(areas);
+  });
+
+  app.get("/api/task-areas/:id", async (req, res) => {
+    const area = await storage.getTaskArea(req.params.id);
+    if (!area) return res.status(404).json({ error: "Area not found" });
+    res.json(area);
+  });
+
+  app.post("/api/task-areas", async (req, res) => {
+    try {
+      const validated = insertTaskAreaSchema.parse(req.body);
+      const area = await storage.createTaskArea(validated);
+      res.status(201).json(area);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create area" });
+    }
+  });
+
+  app.put("/api/task-areas/:id", async (req, res) => {
+    try {
+      const partialSchema = insertTaskAreaSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const area = await storage.updateTaskArea(req.params.id, validated);
+      if (!area) return res.status(404).json({ error: "Area not found" });
+      res.json(area);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update area" });
+    }
+  });
+
+  app.delete("/api/task-areas/:id", async (req, res) => {
+    const deleted = await storage.deleteTaskArea(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Area not found" });
+    res.status(204).send();
+  });
+
+  // Task Area Members
+  app.get("/api/task-areas/:id/members", async (req, res) => {
+    const members = await storage.getTaskAreaMembers(req.params.id);
+    res.json(members);
+  });
+
+  app.post("/api/task-areas/:id/members", async (req, res) => {
+    try {
+      const data = { ...req.body, areaId: req.params.id };
+      const validated = insertTaskAreaMemberSchema.parse(data);
+      const member = await storage.addTaskAreaMember(validated);
+      res.status(201).json(member);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to add member" });
+    }
+  });
+
+  app.patch("/api/task-area-members/:id", async (req, res) => {
+    try {
+      const partialSchema = insertTaskAreaMemberSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const member = await storage.updateTaskAreaMember(req.params.id, validated);
+      if (!member) return res.status(404).json({ error: "Member not found" });
+      res.json(member);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update member" });
+    }
+  });
+
+  app.delete("/api/task-area-members/:id", async (req, res) => {
+    const deleted = await storage.removeTaskAreaMember(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Member not found" });
+    res.status(204).send();
+  });
+
+  // ============== TASKS ==============
+  app.get("/api/tasks", async (req, res) => {
+    const filters = {
+      areaId: req.query.area_id as string | undefined,
+      status: req.query.status as string | undefined,
+      assigneeId: req.query.assignee_id as string | undefined,
+      createdBy: req.query.created_by as string | undefined,
+      type: req.query.type as string | undefined,
+    };
+    const tasks = await storage.getTasks(filters);
+    res.json(tasks);
+  });
+
+  app.get("/api/tasks/:id", async (req, res) => {
+    const task = await storage.getTask(req.params.id);
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    res.json(task);
+  });
+
+  app.post("/api/tasks", async (req, res) => {
+    try {
+      const validated = insertTaskSchema.parse(req.body);
+      const task = await storage.createTask(validated);
+      res.status(201).json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create task" });
+    }
+  });
+
+  app.put("/api/tasks/:id", async (req, res) => {
+    try {
+      const partialSchema = insertTaskSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const task = await storage.updateTask(req.params.id, validated);
+      if (!task) return res.status(404).json({ error: "Task not found" });
+      res.json(task);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update task" });
+    }
+  });
+
+  app.delete("/api/tasks/:id", async (req, res) => {
+    const deleted = await storage.deleteTask(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Task not found" });
+    res.status(204).send();
+  });
+
+  // ============== TASK COMMENTS ==============
+  app.get("/api/tasks/:id/comments", async (req, res) => {
+    const comments = await storage.getTaskComments(req.params.id);
+    res.json(comments);
+  });
+
+  app.post("/api/tasks/:id/comments", async (req, res) => {
+    try {
+      const data = { ...req.body, taskId: req.params.id };
+      const validated = insertTaskCommentSchema.parse(data);
+      const comment = await storage.createTaskComment(validated);
+      res.status(201).json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create comment" });
+    }
+  });
+
+  app.patch("/api/task-comments/:id", async (req, res) => {
+    try {
+      const comment = await storage.updateTaskComment(req.params.id, { content: req.body.content });
+      if (!comment) return res.status(404).json({ error: "Comment not found" });
+      res.json(comment);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to update comment" });
+    }
+  });
+
+  app.delete("/api/task-comments/:id", async (req, res) => {
+    const deleted = await storage.deleteTaskComment(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Comment not found" });
+    res.status(204).send();
+  });
+
+  // ============== TASK REACTIONS ==============
+  app.get("/api/task-comments/:id/reactions", async (req, res) => {
+    const reactions = await storage.getTaskReactions(req.params.id);
+    res.json(reactions);
+  });
+
+  app.post("/api/task-comments/:id/reactions", async (req, res) => {
+    try {
+      const data = { ...req.body, commentId: req.params.id };
+      const validated = insertTaskReactionSchema.parse(data);
+      const reaction = await storage.addTaskReaction(validated);
+      res.status(201).json(reaction);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to add reaction" });
+    }
+  });
+
+  app.delete("/api/task-reactions/:id", async (req, res) => {
+    const deleted = await storage.removeTaskReaction(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Reaction not found" });
+    res.status(204).send();
+  });
+
+  // ============== TASK ATTACHMENTS ==============
+  app.get("/api/tasks/:id/attachments", async (req, res) => {
+    const attachments = await storage.getTaskAttachments(req.params.id);
+    res.json(attachments);
+  });
+
+  app.post("/api/tasks/:id/attachments", async (req, res) => {
+    try {
+      const data = { ...req.body, taskId: req.params.id };
+      const validated = insertTaskAttachmentSchema.parse(data);
+      const attachment = await storage.addTaskAttachment(validated);
+      res.status(201).json(attachment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to add attachment" });
+    }
+  });
+
+  app.delete("/api/task-attachments/:id", async (req, res) => {
+    const deleted = await storage.removeTaskAttachment(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Attachment not found" });
+    res.status(204).send();
+  });
+
+  // ============== TASK TEMPLATES ==============
+  app.get("/api/task-templates", async (req, res) => {
+    const type = req.query.type as string | undefined;
+    const templates = await storage.getTaskTemplates(type);
+    res.json(templates);
+  });
+
+  app.get("/api/task-templates/:id", async (req, res) => {
+    const template = await storage.getTaskTemplate(req.params.id);
+    if (!template) return res.status(404).json({ error: "Template not found" });
+    res.json(template);
+  });
+
+  app.post("/api/task-templates", async (req, res) => {
+    try {
+      const validated = insertTaskTemplateSchema.parse(req.body);
+      const template = await storage.createTaskTemplate(validated);
+      res.status(201).json(template);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create template" });
+    }
+  });
+
+  // ============== AREA TASKS (convenient endpoint) ==============
+  app.get("/api/task-areas/:id/tasks", async (req, res) => {
+    const tasks = await storage.getTasks({ areaId: req.params.id });
+    res.json(tasks);
   });
 
   return httpServer;
