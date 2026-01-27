@@ -35,6 +35,10 @@ export default function ProjetosPage() {
     queryKey: ["/api/projects"],
   });
 
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     project.description?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -95,44 +99,49 @@ export default function ProjetosPage() {
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects.map((project) => (
-              <Link key={project.id} href={`/projetos/${project.id}`}>
-                <Card 
-                  className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 h-full"
-                  data-testid={`card-project-${project.id}`}
-                >
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg">{project.name}</CardTitle>
-                        <CardDescription className="mt-1 line-clamp-2">
-                          {project.description || "Sem descrição"}
-                        </CardDescription>
+            {filteredProjects.map((project) => {
+              const owner = users.find(u => u.id === project.ownerId);
+              return (
+                <Link key={project.id} href={`/projetos/${project.id}`}>
+                  <Card 
+                    className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 h-full"
+                    data-testid={`card-project-${project.id}`}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg">{project.name}</CardTitle>
+                          <CardDescription className="mt-1 line-clamp-2">
+                            {project.description || "Sem descrição"}
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline" className={statusColors[project.status]}>
+                          {statusLabels[project.status]}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className={statusColors[project.status]}>
-                        {statusLabels[project.status]}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>
-                          {project.startDate 
-                            ? new Date(project.startDate).toLocaleDateString("pt-BR") 
-                            : "Sem data"}
-                        </span>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>
+                              {project.startDate 
+                                ? new Date(project.startDate).toLocaleDateString("pt-BR") 
+                                : "Sem data"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Users className="h-4 w-4" />
+                            <span>{owner?.name || "1 membro"}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        <span>1 membro</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         )}
       </main>
