@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { Ticket, FolderKanban, Target, Truck, ArrowRight } from "lucide-react";
+import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare } from "lucide-react";
 
 const modules = [
   {
@@ -19,6 +19,14 @@ const modules = [
     href: "/projetos",
     stats: { label: "Projetos ativos", value: "5" },
     color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+  },
+  {
+    title: "Tarefas",
+    description: "Gerencie tarefas individuais e notas de reunião",
+    icon: CheckSquare,
+    href: "/tarefas",
+    stats: { label: "Tarefas pendentes", value: "18" },
+    color: "bg-green-500/10 text-green-600 dark:text-green-400",
   },
   {
     title: "OKRs",
@@ -52,7 +60,7 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {modules.map((module) => (
               <Link key={module.href} href={module.href}>
                 <Card 
