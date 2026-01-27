@@ -30,7 +30,8 @@ import {
   LayoutGrid, 
   List,
   Download,
-  Ban
+  Ban,
+  Trello
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Ticket, User } from "@shared/schema";
@@ -89,7 +90,7 @@ export default function ChamadosPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [dateSortAsc, setDateSortAsc] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid">("list");
 
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
     queryKey: ["/api/tickets"],
@@ -190,73 +191,109 @@ export default function ChamadosPage() {
         <div className="grid gap-4 md:grid-cols-5">
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Total</CardTitle>
+              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Total</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-tickets">{stats.total}</div>
-              <p className="text-xs text-muted-foreground">chamados registrados</p>
+              <p className="text-[11px] text-muted-foreground mt-1">chamados registrados</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Abertos</CardTitle>
+              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Abertos</CardTitle>
               <AlertCircle className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600" data-testid="text-open-tickets">{stats.open}</div>
-              <p className="text-xs text-muted-foreground">aguardando</p>
+              <p className="text-[11px] text-muted-foreground mt-1">aguardando</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Em Andamento</CardTitle>
+              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Em Andamento</CardTitle>
               <Clock className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-yellow-600" data-testid="text-progress-tickets">{stats.inProgress}</div>
-              <p className="text-xs text-muted-foreground">sendo resolvidos</p>
+              <p className="text-[11px] text-muted-foreground mt-1">sendo resolvidos</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Bloqueados</CardTitle>
+              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Bloqueados</CardTitle>
               <Ban className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600" data-testid="text-blocked-tickets">{stats.blocked}</div>
-              <p className="text-xs text-muted-foreground">impedidos</p>
+              <p className="text-[11px] text-muted-foreground mt-1">impedidos</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-sm font-medium">Resolvidos</CardTitle>
+              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Resolvidos</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600" data-testid="text-resolved-tickets">{stats.resolved}</div>
-              <p className="text-xs text-muted-foreground">concluídos</p>
+              <p className="text-[11px] text-muted-foreground mt-1">concluídos</p>
             </CardContent>
           </Card>
         </div>
 
         <Card className="shadow-sm border-border/60">
-          <CardHeader className="pb-4">
+          <CardHeader className="pb-4 px-6 pt-6 border-b border-border/50">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <CardTitle className="text-[18px] font-bold">Chamados</CardTitle>
-              <div className="flex flex-wrap gap-2 items-center">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar chamados..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 w-[200px]"
-                    data-testid="input-search-tickets"
-                  />
+              <CardTitle className="text-[18px] font-bold tracking-tight">Chamados</CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-9 px-3 text-[12px] font-bold"
+                  onClick={exportToExcel}
+                  data-testid="button-export-excel"
+                >
+                  <Download className="h-3.5 w-3.5 mr-2" />
+                  Exportar CSV
+                </Button>
+                <div className="flex items-center border rounded-lg p-1 bg-muted/50">
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => setViewMode("list")}
+                    data-testid="button-view-list"
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "kanban" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => setViewMode("kanban")}
+                    data-testid="button-view-kanban"
+                  >
+                    <Trello className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row gap-4 items-center mb-6">
+              <div className="relative flex-1 w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar chamados..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-10 text-[13px]"
+                  data-testid="input-search-tickets"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+                  <SelectTrigger className="w-full sm:w-[140px] h-10 text-[13px]" data-testid="select-status-filter">
                     <Filter className="h-4 w-4 mr-2" />
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -270,7 +307,7 @@ export default function ChamadosPage() {
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-[130px]" data-testid="select-priority-filter">
+                  <SelectTrigger className="w-full sm:w-[130px] h-10 text-[13px]" data-testid="select-priority-filter">
                     <SelectValue placeholder="Prioridade" />
                   </SelectTrigger>
                   <SelectContent>
@@ -282,7 +319,7 @@ export default function ChamadosPage() {
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-[120px]" data-testid="select-type-filter">
+                  <SelectTrigger className="w-full sm:w-[120px] h-10 text-[13px]" data-testid="select-type-filter">
                     <SelectValue placeholder="Tipo" />
                   </SelectTrigger>
                   <SelectContent>
@@ -292,40 +329,9 @@ export default function ChamadosPage() {
                     <SelectItem value="negocio">Negócio</SelectItem>
                   </SelectContent>
                 </Select>
-
-                <div className="flex items-center border rounded-md p-1 bg-muted/50">
-                  <Button
-                    variant={viewMode === "list" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-8 px-2"
-                    onClick={() => setViewMode("list")}
-                    data-testid="button-view-list"
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === "kanban" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-8 px-2"
-                    onClick={() => setViewMode("kanban")}
-                    data-testid="button-view-kanban"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                <Button 
-                  variant="outline" 
-                  onClick={exportToExcel}
-                  data-testid="button-export-excel"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar
-                </Button>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
+
             {isLoading ? (
               <div className="space-y-3">
                 {[...Array(5)].map((_, i) => (
@@ -352,18 +358,18 @@ export default function ChamadosPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Título</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Local</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Prioridade</TableHead>
-                    <TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Código</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Título</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Categoria</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tipo</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Local</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Status</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Prioridade</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 -ml-3 flex items-center gap-1"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDateSortAsc(!dateSortAsc);
@@ -381,38 +387,38 @@ export default function ChamadosPage() {
                     return (
                       <TableRow 
                         key={ticket.id} 
-                        className="cursor-pointer hover-elevate"
+                        className="cursor-pointer hover:bg-muted/30 transition-colors"
                         onClick={() => setSelectedTicket(ticket)}
                         data-testid={`row-ticket-${ticket.id}`}
                       >
                         <TableCell>
-                          <Badge variant="outline" className="font-mono">
+                          <Badge variant="outline" className="font-mono text-[11px] font-bold">
                             {ticket.code}
                           </Badge>
                         </TableCell>
-                        <TableCell className="font-medium max-w-[200px] truncate">
+                        <TableCell className="font-bold text-[13px] max-w-[200px] truncate">
                           {ticket.title}
                         </TableCell>
-                        <TableCell>{ticket.category}</TableCell>
+                        <TableCell className="text-[13px] text-muted-foreground">{ticket.category}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={typeColors[ticket.type || "bug"]}>
+                          <Badge variant="outline" className={`${typeColors[ticket.type || "bug"]} text-[10px] font-bold uppercase tracking-wider`}>
                             {typeLabels[ticket.type || "bug"]}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{ticket.location}</Badge>
+                          <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-wider">{ticket.location}</Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={statusColors[ticket.status]}>
+                          <Badge variant="outline" className={`${statusColors[ticket.status]} text-[10px] font-bold uppercase tracking-wider`}>
                             {statusLabels[ticket.status]}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={priorityColors[ticket.priority]}>
+                          <Badge variant="outline" className={`${priorityColors[ticket.priority]} text-[10px] font-bold uppercase tracking-wider`}>
                             {priorityLabels[ticket.priority]}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
+                        <TableCell className="text-[12px] text-muted-foreground">
                           {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "-"}
                         </TableCell>
                       </TableRow>

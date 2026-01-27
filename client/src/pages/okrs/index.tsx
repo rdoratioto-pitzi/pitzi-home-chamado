@@ -110,14 +110,14 @@ export default function OKRsPage() {
       <main className="flex-1 p-6 space-y-6">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold">Objetivos e Resultados-Chave</h2>
-            <p className="text-muted-foreground">
+            <h2 className="text-[20px] font-bold tracking-tight">Objetivos e Resultados-Chave</h2>
+            <p className="text-[14px] text-muted-foreground mt-1">
               Acompanhe o progresso dos objetivos da empresa
             </p>
           </div>
-          <div className="flex gap-2">
+          <Card className="shadow-sm border-border/60 p-1 flex gap-2">
             <Select value={cycleFilter} onValueChange={setCycleFilter}>
-              <SelectTrigger className="w-[130px]" data-testid="select-cycle-filter">
+              <SelectTrigger className="w-[140px] border-0 h-9 bg-transparent" data-testid="select-cycle-filter">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -126,35 +126,38 @@ export default function OKRsPage() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="w-px h-4 bg-border/60 self-center" />
             <Select value={levelFilter} onValueChange={setLevelFilter}>
-              <SelectTrigger className="w-[130px]" data-testid="select-level-filter">
+              <SelectTrigger className="w-[140px] border-0 h-9 bg-transparent" data-testid="select-level-filter">
                 <SelectValue placeholder="Nível" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="all">Todos Níveis</SelectItem>
                 <SelectItem value="company">Empresa</SelectItem>
                 <SelectItem value="team">Time</SelectItem>
                 <SelectItem value="area">Área</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Card>
         </div>
 
         {objectivesLoading ? (
           <div className="space-y-4">
             {[...Array(3)].map((_, i) => (
-              <Skeleton key={i} className="h-40" />
+              <Skeleton key={i} className="h-40 rounded-xl" />
             ))}
           </div>
         ) : filteredObjectives.length === 0 ? (
-          <Card className="text-center py-12">
+          <Card className="shadow-sm border-border/60 text-center py-16">
             <CardContent>
-              <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium">Nenhum OKR encontrado</h3>
-              <p className="text-muted-foreground mt-1">
+              <div className="h-16 w-16 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Target className="h-8 w-8 text-muted-foreground/50" />
+              </div>
+              <h3 className="text-[18px] font-bold">Nenhum OKR encontrado</h3>
+              <p className="text-[14px] text-muted-foreground mt-2 max-w-xs mx-auto">
                 {objectives.length === 0 
-                  ? "Crie seu primeiro objetivo clicando no botão acima"
-                  : "Tente ajustar os filtros"}
+                  ? "Crie seu primeiro objetivo estratégico clicando no botão 'Novo Objetivo' acima"
+                  : "Tente ajustar os filtros de ciclo ou nível para encontrar o que procura"}
               </p>
             </CardContent>
           </Card>
@@ -169,72 +172,82 @@ export default function OKRsPage() {
                 <AccordionItem 
                   key={objective.id} 
                   value={objective.id}
-                  className="border rounded-lg"
+                  className="border-0"
                 >
-                  <Card className="border-0">
-                    <AccordionTrigger className="px-6 py-4 hover:no-underline">
-                      <div className="flex items-start gap-4 flex-1 text-left">
-                        <div className={`p-2 rounded-lg ${statusColors[objective.status]}`}>
-                          <StatusIcon className="h-5 w-5" />
+                  <Card className="shadow-sm border-border/60 overflow-hidden hover:border-primary/20 transition-all duration-200">
+                    <AccordionTrigger className="px-6 py-5 hover:no-underline">
+                      <div className="flex items-start gap-5 flex-1 text-left">
+                        <div className={`h-11 w-11 shrink-0 rounded-xl flex items-center justify-center ${statusColors[objective.status]}`}>
+                          <StatusIcon className="h-6 w-6" />
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold">{objective.title}</h3>
-                            <Badge variant="outline" className={statusColors[objective.status]}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <h3 className="text-[16px] font-bold text-foreground leading-tight truncate">{objective.title}</h3>
+                            <Badge variant="outline" className={`font-bold text-[10px] uppercase tracking-wider ${statusColors[objective.status]}`}>
                               {statusLabels[objective.status]}
                             </Badge>
-                            <Badge variant="secondary">
+                            <Badge variant="secondary" className="font-bold text-[10px] uppercase tracking-wider bg-muted/50">
                               {levelLabels[objective.level]}
                             </Badge>
                           </div>
                           {objective.description && (
-                            <p className="text-sm text-muted-foreground mt-1">
+                            <p className="text-[13px] text-muted-foreground mt-1.5 leading-relaxed line-clamp-1">
                               {objective.description}
                             </p>
                           )}
-                          <div className="mt-3 flex items-center gap-3">
-                            <Progress value={progress} className="flex-1 h-2" />
-                            <span className="text-sm font-medium">{progress}%</span>
+                          <div className="mt-4 flex items-center gap-4">
+                            <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                              <div 
+                                className="bg-primary h-full transition-all duration-500 rounded-full" 
+                                style={{ width: `${progress}%` }} 
+                              />
+                            </div>
+                            <span className="text-[13px] font-bold text-primary min-w-[35px]">{progress}%</span>
                           </div>
                         </div>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
-                      <div className="px-6 pb-4 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium">Resultados-Chave ({krs.length})</h4>
+                      <div className="px-6 pb-6 pt-2 space-y-4 border-t border-border/40 bg-muted/5">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">Resultados-Chave ({krs.length})</h4>
                           <Button 
-                            variant="outline" 
+                            variant="ghost" 
                             size="sm"
+                            className="h-8 px-3 text-primary font-bold hover:bg-primary/10"
                             onClick={() => openKRDialog(objective.id)}
                             data-testid={`button-add-kr-${objective.id}`}
                           >
-                            <Plus className="h-3 w-3 mr-1" />
-                            Adicionar KR
+                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                            Novo KR
                           </Button>
                         </div>
                         
                         {krs.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-4">
-                            Nenhum resultado-chave cadastrado
-                          </p>
+                          <div className="text-center py-8 rounded-lg border border-dashed border-border/60">
+                            <p className="text-[13px] text-muted-foreground">Nenhum resultado-chave cadastrado para este objetivo.</p>
+                          </div>
                         ) : (
-                          <div className="space-y-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {krs.map((kr) => {
                               const krProgress = Math.min(100, Math.round((kr.currentValue / kr.targetValue) * 100));
                               return (
-                                <Card key={kr.id} className="p-3" data-testid={`card-kr-${kr.id}`}>
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex-1">
-                                      <p className="text-sm font-medium">{kr.title}</p>
-                                      <div className="flex items-center gap-2 mt-1">
-                                        <Progress value={krProgress} className="flex-1 h-1.5" />
-                                        <span className="text-xs text-muted-foreground">
-                                          {kr.currentValue}/{kr.targetValue} {kr.unit || ""}
+                                <Card key={kr.id} className="p-4 shadow-none border-border/40 bg-background" data-testid={`card-kr-${kr.id}`}>
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[14px] font-bold text-foreground leading-snug truncate">{kr.title}</p>
+                                      <div className="flex items-center justify-between mt-2.5">
+                                        <div className="flex-1 bg-muted rounded-full h-1.5 mr-3">
+                                          <div className="bg-primary h-full rounded-full" style={{ width: `${krProgress}%` }} />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-muted-foreground whitespace-nowrap">
+                                          {kr.currentValue} / {kr.targetValue} {kr.unit || ""}
                                         </span>
                                       </div>
                                     </div>
-                                    <span className="text-sm font-semibold">{krProgress}%</span>
+                                    <div className="h-10 w-10 shrink-0 rounded-full border-2 border-primary/20 flex items-center justify-center">
+                                      <span className="text-[12px] font-bold text-primary">{krProgress}%</span>
+                                    </div>
                                   </div>
                                 </Card>
                               );

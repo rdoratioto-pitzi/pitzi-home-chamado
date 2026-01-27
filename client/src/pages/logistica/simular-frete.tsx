@@ -7,8 +7,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, Truck, Package, Clock, DollarSign } from "lucide-react";
+import { Loader2, Truck, Package, Clock, Calculator } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 const freightFormSchema = z.object({
   cidadeOrigem: z.string().min(2, "Cidade de origem é obrigatória"),
@@ -45,38 +46,15 @@ export default function SimularFretePage() {
   const onSubmit = async (data: FreightFormData) => {
     setIsLoading(true);
     try {
-      // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      // Mock quotes based on weight
       const peso = parseFloat(data.peso);
       const basePrice = peso * 5;
       
       const mockQuotes: FreightQuote[] = [
-        {
-          operador: "Correios",
-          servico: "PAC",
-          prazo: "8 a 12 dias úteis",
-          valor: basePrice * 0.8,
-        },
-        {
-          operador: "Correios",
-          servico: "SEDEX",
-          prazo: "3 a 5 dias úteis",
-          valor: basePrice * 1.5,
-        },
-        {
-          operador: "Jadlog",
-          servico: "Package",
-          prazo: "5 a 8 dias úteis",
-          valor: basePrice * 1.1,
-        },
-        {
-          operador: "Azul Cargo",
-          servico: "Amanhã",
-          prazo: "1 dia útil",
-          valor: basePrice * 3,
-        },
+        { operador: "Correios", servico: "PAC", prazo: "8 a 12 dias úteis", valor: basePrice * 0.8 },
+        { operador: "Correios", servico: "SEDEX", prazo: "3 a 5 dias úteis", valor: basePrice * 1.5 },
+        { operador: "Jadlog", servico: "Package", prazo: "5 a 8 dias úteis", valor: basePrice * 1.1 },
+        { operador: "Azul Cargo", servico: "Amanhã", prazo: "1 dia útil", valor: basePrice * 3 },
       ];
 
       setQuotes(mockQuotes.sort((a, b) => a.valor - b.valor));
@@ -101,30 +79,25 @@ export default function SimularFretePage() {
 
       <main className="flex-1 p-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {/* Form */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
+          <Card className="shadow-sm border-border/60">
+            <CardHeader className="pb-6">
+              <CardTitle className="text-[18px] font-bold flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
                 Dados da Carga
               </CardTitle>
-              <CardDescription>Preencha para cotar</CardDescription>
+              <CardDescription className="text-[13px]">Preencha as informações para realizar a cotação</CardDescription>
             </CardHeader>
             <CardContent>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                   <FormField
                     control={form.control}
                     name="cidadeOrigem"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Cidade Origem</FormLabel>
+                        <FormLabel className="text-[13px] font-bold text-muted-foreground/80">Cidade Origem</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="São Paulo"
-                            {...field}
-                            data-testid="input-cidade-origem"
-                          />
+                          <Input placeholder="Ex: São Paulo, SP" className="h-11" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -136,13 +109,9 @@ export default function SimularFretePage() {
                     name="cidadeDestino"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Cidade Destino</FormLabel>
+                        <FormLabel className="text-[13px] font-bold text-muted-foreground/80">Cidade Destino</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="Rio de Janeiro"
-                            {...field}
-                            data-testid="input-cidade-destino"
-                          />
+                          <Input placeholder="Ex: Rio de Janeiro, RJ" className="h-11" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -155,35 +124,22 @@ export default function SimularFretePage() {
                       name="peso"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Peso (kg)</FormLabel>
+                          <FormLabel className="text-[13px] font-bold text-muted-foreground/80">Peso (kg)</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="number"
-                              step="0.1"
-                              placeholder="10"
-                              {...field}
-                              data-testid="input-peso"
-                            />
+                            <Input type="number" step="0.1" placeholder="10" className="h-11" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                    
                     <FormField
                       control={form.control}
                       name="volume"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Volume (m³)</FormLabel>
+                          <FormLabel className="text-[13px] font-bold text-muted-foreground/80">Volume (m³)</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="number"
-                              step="0.01"
-                              placeholder="0,5"
-                              {...field}
-                              data-testid="input-volume"
-                            />
+                            <Input type="number" step="0.01" placeholder="0,5" className="h-11" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -191,69 +147,62 @@ export default function SimularFretePage() {
                     />
                   </div>
 
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={isLoading}
-                    data-testid="button-cotar"
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Truck className="h-4 w-4 mr-2" />
-                    )}
-                    Cotar Agora
+                  <Button type="submit" className="w-full h-11 font-bold text-sm mt-2" disabled={isLoading}>
+                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Calculator className="h-4 w-4 mr-2" />}
+                    Simular Frete
                   </Button>
                 </form>
               </Form>
             </CardContent>
           </Card>
 
-          {/* Results */}
           <div className="space-y-4">
             {quotes.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-center text-muted-foreground p-8 border-2 border-dashed rounded-lg">
+              <div className="h-full min-h-[400px] flex items-center justify-center text-center p-8 border-2 border-dashed border-border/60 rounded-xl bg-muted/5">
                 <div>
-                  <Package className="h-12 w-12 mx-auto mb-4 opacity-30" />
-                  <p>Preencha os dados ao lado para ver as cotações</p>
+                  <div className="h-16 w-16 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Truck className="h-8 w-8 text-muted-foreground/30" />
+                  </div>
+                  <h3 className="text-[16px] font-bold text-muted-foreground">Aguardando dados</h3>
+                  <p className="text-[13px] text-muted-foreground/60 mt-2 max-w-[200px] mx-auto">Preencha o formulário para visualizar as melhores opções de frete</p>
                 </div>
               </div>
             ) : (
               <>
-                <h3 className="font-medium text-lg">Cotações Disponíveis</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[18px] font-bold tracking-tight">Cotações Disponíveis</h3>
+                  <Badge variant="secondary" className="font-bold text-[10px] uppercase tracking-wider">{quotes.length} Opções</Badge>
+                </div>
                 {quotes.map((quote, index) => (
                   <Card 
                     key={index} 
-                    className={index === 0 ? "ring-2 ring-primary" : ""}
-                    data-testid={`quote-${index}`}
+                    className={`shadow-sm transition-all duration-200 hover:shadow-md ${index === 0 ? "border-primary/50 ring-1 ring-primary/20 bg-primary/5" : "border-border/60"}`}
                   >
-                    <CardContent className="pt-6">
-                      <div className="flex items-center justify-between">
+                    <CardContent className="p-5">
+                      <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center">
-                            <Truck className="h-6 w-6 text-muted-foreground" />
+                          <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${index === 0 ? "bg-primary/20 text-primary" : "bg-muted/50 text-muted-foreground"}`}>
+                            <Truck className="h-6 w-6" />
                           </div>
                           <div>
-                            <p className="font-semibold" data-testid={`quote-operador-${index}`}>{quote.operador}</p>
-                            <p className="text-sm text-muted-foreground" data-testid={`quote-servico-${index}`}>{quote.servico}</p>
+                            <p className="text-[15px] font-bold leading-tight">{quote.operador}</p>
+                            <p className="text-[12px] text-muted-foreground mt-1">{quote.servico}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-2xl font-bold text-primary" data-testid={`quote-valor-${index}`}>
+                          <p className="text-[20px] font-bold text-primary leading-tight">
                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(quote.valor)}
                           </p>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <div className="flex items-center justify-end gap-1.5 text-[11px] text-muted-foreground mt-1 font-medium">
                             <Clock className="h-3 w-3" />
-                            <span data-testid={`quote-prazo-${index}`}>{quote.prazo}</span>
+                            <span>{quote.prazo}</span>
                           </div>
                         </div>
                       </div>
                       {index === 0 && (
-                        <div className="mt-4 pt-4 border-t">
-                          <Button className="w-full" data-testid="button-select-quote">
-                            Selecionar Esta Opção
-                          </Button>
-                        </div>
+                        <Button className="w-full h-9 mt-4 font-bold text-xs">
+                          Selecionar Melhor Opção
+                        </Button>
                       )}
                     </CardContent>
                   </Card>
