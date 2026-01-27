@@ -276,6 +276,14 @@ export default function TarefasPage() {
       ...newTask,
       type,
       areaId: selectedAreaId || (areas[0]?.id || ""),
+      meetingData: {
+        date: "",
+        time: "",
+        location: "",
+        participants: [] as string[],
+        agenda: [] as string[],
+        actions: [] as { description: string; responsible: string; deadline: string }[],
+      }
     });
     setShowTaskDialog(true);
   };
