@@ -31,9 +31,20 @@ import {
   List,
   Download,
   Ban,
-  Trello
+  Trello,
+  MoreHorizontal,
+  Edit,
+  Trash2
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 import type { Ticket, User } from "@shared/schema";
 import { TicketDialog } from "./ticket-dialog";
 import { TicketDetailSheet } from "./ticket-detail-sheet";
@@ -98,6 +109,21 @@ export default function ChamadosPage() {
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
+  });
+
+  const { toast } = useToast();
+
+  const deleteTicketMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/tickets/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
+      toast({ title: "Chamado excluído com sucesso!" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao excluir chamado", variant: "destructive" });
+    },
   });
 
   const filteredTickets = tickets
@@ -380,6 +406,7 @@ export default function ChamadosPage() {
                         <ArrowUpDown className="h-3 w-3" />
                       </Button>
                     </TableHead>
+                    <TableHead className="w-[60px] text-[12px] font-bold uppercase tracking-wider">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -420,6 +447,40 @@ export default function ChamadosPage() {
                         </TableCell>
                         <TableCell className="text-[12px] text-muted-foreground">
                           {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-7 w-7" 
+                                onClick={(e) => e.stopPropagation()}
+                                data-testid={`button-ticket-menu-${ticket.id}`}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedTicket(ticket);
+                              }}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteTicketMutation.mutate(ticket.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );
