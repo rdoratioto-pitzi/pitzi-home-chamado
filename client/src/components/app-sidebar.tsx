@@ -5,7 +5,8 @@ import {
   Target, 
   Truck, 
   Settings,
-  ChevronDown
+  ChevronDown,
+  CheckSquare
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,6 +40,11 @@ const menuItems = [
     title: "Projetos",
     url: "/projetos",
     icon: FolderKanban,
+  },
+  {
+    title: "Tarefas",
+    url: "/tarefas",
+    icon: CheckSquare,
   },
   {
     title: "OKRs",

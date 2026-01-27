@@ -11,6 +11,8 @@ import Home from "@/pages/home";
 import ChamadosPage from "@/pages/chamados/index";
 import ProjetosPage from "@/pages/projetos/index";
 import KanbanPage from "@/pages/projetos/kanban";
+import TarefasPage from "@/pages/tarefas/index";
+import TaskDetailPage from "@/pages/tarefas/detail";
 import OKRsPage from "@/pages/okrs/index";
 import LogisticaPage from "@/pages/logistica/index";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
@@ -22,6 +24,8 @@ function Router() {
       <Route path="/chamados" component={ChamadosPage} />
       <Route path="/projetos" component={ProjetosPage} />
       <Route path="/projetos/:id" component={KanbanPage} />
+      <Route path="/tarefas" component={TarefasPage} />
+      <Route path="/tarefas/:id" component={TaskDetailPage} />
       <Route path="/okrs" component={OKRsPage} />
       <Route path="/logistica" component={LogisticaPage} />
       <Route path="/configuracoes" component={ConfiguracoesPage} />
