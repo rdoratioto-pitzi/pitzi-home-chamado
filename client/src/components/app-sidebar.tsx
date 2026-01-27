@@ -47,6 +47,11 @@ import { useToast } from "@/hooks/use-toast";
 
 const menuItems = [
   {
+    title: "Início",
+    url: "/",
+    icon: LayoutDashboard,
+  },
+  {
     title: "Chamados",
     url: "/chamados",
     icon: Ticket,

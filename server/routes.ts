@@ -76,6 +76,36 @@ export async function registerRoutes(
     }
   });
 
+  // ============== DASHBOARD STATS ==============
+  app.get("/api/dashboard/stats", async (req, res) => {
+    try {
+      const [tickets, projects, tasks, objectives, shipments] = await Promise.all([
+        storage.getTickets(),
+        storage.getProjects(),
+        storage.getTasks({}),
+        storage.getObjectives(),
+        storage.getShipments(),
+      ]);
+
+      const openTickets = tickets.filter(t => t.status !== "closed").length;
+      const activeProjects = projects.length;
+      const pendingTasks = tasks.filter(t => t.status !== "completed" && t.status !== "archived").length;
+      const activeObjectives = objectives.length;
+      const inTransitShipments = shipments.filter(s => s.status === "in_transit").length;
+
+      res.json({
+        tickets: openTickets,
+        projects: activeProjects,
+        tasks: pendingTasks,
+        objectives: activeObjectives,
+        logistica: inTransitShipments,
+      });
+    } catch (error) {
+      console.error("Error fetching dashboard stats:", error);
+      res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
   // ============== USERS ==============
   app.get("/api/users", async (req, res) => {
     const users = await storage.getUsers();
