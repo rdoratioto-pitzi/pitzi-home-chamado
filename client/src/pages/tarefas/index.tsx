@@ -491,7 +491,7 @@ export default function TarefasPage() {
                   : "Crie sua primeira tarefa para começar"}
               </p>
               {!searchQuery && statusFilter === "all" && typeFilter === "all" && (
-                <Button onClick={handleOpenTaskDialog}>
+                <Button onClick={handleOpenNormalTaskDialog}>
                   <Plus className="h-4 w-4 mr-2" />
                   Nova Tarefa
                 </Button>

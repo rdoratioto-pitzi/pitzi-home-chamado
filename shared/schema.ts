@@ -91,6 +91,7 @@ export type TicketComment = typeof ticketComments.$inferSelect;
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),
+  code: text("code").notNull().default(""), // PRO-0001, PRO-0002, etc.
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("active"),

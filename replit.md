@@ -168,7 +168,7 @@ O workflow "Start application" executa `npm run dev` que inicia:
 ## Funcionalidades Recentes
 
 ### Chamados (Tickets)
-- **Código automático**: Cada chamado recebe um código único (CHM-0001, CHM-0002, etc.)
+- **Código automático sequencial**: Cada chamado recebe um código único no formato CHA-0001, CHA-0002, etc.
 - **Campos de classificação**: Tipo (Bug, Melhoria, Negócio) e Local (RS, RG, Dash, One, Home, Omie, Outros)
 - **Status bloqueado**: Novo status para tickets que estão aguardando terceiros
 - **Visualização Kanban**: Toggle entre Grid/Lista/Kanban com drag-and-drop

@@ -206,7 +206,12 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(tickets);
   }
   async createTicket(insertTicket: InsertTicket): Promise<Ticket> {
-    const [ticket] = await db.insert(tickets).values(insertTicket).returning();
+    // Generate sequential code like CHA-0001
+    const allTickets = await db.select().from(tickets);
+    const nextNumber = allTickets.length + 1;
+    const code = `CHA-${String(nextNumber).padStart(4, '0')}`;
+    
+    const [ticket] = await db.insert(tickets).values({ ...insertTicket, code }).returning();
     return ticket;
   }
   async updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined> {
@@ -236,7 +241,12 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(projects);
   }
   async createProject(insertProject: InsertProject): Promise<Project> {
-    const [project] = await db.insert(projects).values(insertProject).returning();
+    // Generate sequential code like PRO-0001
+    const allProjects = await db.select().from(projects);
+    const nextNumber = allProjects.length + 1;
+    const code = `PRO-${String(nextNumber).padStart(4, '0')}`;
+    
+    const [project] = await db.insert(projects).values({ ...insertProject, code }).returning();
     return project;
   }
   async updateProject(id: string, data: Partial<Project>): Promise<Project | undefined> {

@@ -109,7 +109,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
         <SheetHeader>
           <SheetTitle className="text-left">{ticket.title}</SheetTitle>
           <SheetDescription className="text-left">
-            Chamado #{ticket.id.slice(0, 8)}
+            Chamado {ticket.code || `#${ticket.id.slice(0, 8)}`}
           </SheetDescription>
         </SheetHeader>
 
