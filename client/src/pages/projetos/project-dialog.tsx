@@ -24,6 +24,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import type { User } from "@shared/schema";
 
 const formSchema = z.object({
@@ -152,11 +157,31 @@ export function ProjectDialog({ open, onOpenChange }: ProjectDialogProps) {
                 control={form.control}
                 name="startDate"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Data de Início</FormLabel>
-                    <FormControl>
-                      <Input type="date" data-testid="input-project-start-date" {...field} />
-                    </FormControl>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={`w-full justify-start text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
+                            data-testid="input-project-start-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(new Date(field.value), "dd/MM/yyyy", { locale: ptBR }) : "Selecionar data"}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? new Date(field.value) : undefined}
+                          onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                          locale={ptBR}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -165,11 +190,31 @@ export function ProjectDialog({ open, onOpenChange }: ProjectDialogProps) {
                 control={form.control}
                 name="endDate"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="flex flex-col">
                     <FormLabel>Data Fim</FormLabel>
-                    <FormControl>
-                      <Input type="date" data-testid="input-project-end-date" {...field} />
-                    </FormControl>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={`w-full justify-start text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
+                            data-testid="input-project-end-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(new Date(field.value), "dd/MM/yyyy", { locale: ptBR }) : "Selecionar data"}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? new Date(field.value) : undefined}
+                          onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                          locale={ptBR}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}

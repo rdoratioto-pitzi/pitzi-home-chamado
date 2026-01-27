@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Plus, MoreHorizontal, Calendar, GripVertical, Play, Square, User as UserIcon, Tag as TagIcon, Hash, Search } from "lucide-react";
+import { Plus, MoreHorizontal, Calendar, GripVertical, Play, Square, User as UserIcon, Tag as TagIcon, Hash, Search, CheckCircle, Lock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Project, KanbanColumn, KanbanCard, User } from "@shared/schema";
 import { CardDialog } from "./card-dialog";
@@ -208,29 +208,39 @@ export default function KanbanPage() {
           { label: project?.name || "Projeto" }
         ]}
         actions={
-          <div className="flex items-center gap-2">
-            <Button 
-              onClick={() => sprintMutation.mutate("sprint_active")} 
-              variant="outline" 
-              className="text-green-600 border-green-200 hover:bg-green-50"
-              data-testid="button-start-sprint"
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Iniciar Sprint
-            </Button>
-            <Button 
-              onClick={() => sprintMutation.mutate("active")} 
-              variant="outline" 
-              className="text-red-600 border-red-200 hover:bg-red-50"
-              data-testid="button-finish-sprint"
-            >
-              <Square className="h-4 w-4 mr-2" />
-              Finalizar Sprint
-            </Button>
-            <Button onClick={() => setIsColumnDialogOpen(true)} variant="outline" data-testid="button-add-column">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Coluna
-            </Button>
+          <div className="flex items-center gap-3">
+            {project?.status === "completed" ? (
+              <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Sprint Finalizada (Somente Visualização)
+              </Badge>
+            ) : project?.status === "sprint_active" ? (
+              <Button 
+                onClick={() => sprintMutation.mutate("completed")} 
+                variant="outline" 
+                className="text-red-600 border-red-200 hover:bg-red-50"
+                data-testid="button-finish-sprint"
+              >
+                <Square className="h-4 w-4 mr-2" />
+                Finalizar Sprint
+              </Button>
+            ) : (
+              <Button 
+                onClick={() => sprintMutation.mutate("sprint_active")} 
+                variant="outline" 
+                className="text-green-600 border-green-200 hover:bg-green-50"
+                data-testid="button-start-sprint"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Iniciar Sprint
+              </Button>
+            )}
+            {project?.status !== "completed" && (
+              <Button onClick={() => setIsColumnDialogOpen(true)} variant="outline" data-testid="button-add-column">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Coluna
+              </Button>
+            )}
           </div>
         }
       />
@@ -284,8 +294,6 @@ export default function KanbanPage() {
                 <div 
                   key={column.id}
                   className={`flex-shrink-0 w-80 transition-opacity ${draggedColumnId === column.id ? 'opacity-50' : ''}`}
-                  draggable
-                  onDragStart={(e) => handleColumnDragStart(e, column.id)}
                   onDragOver={handleDragOver}
                   onDrop={(e) => {
                     e.preventDefault();
@@ -295,11 +303,22 @@ export default function KanbanPage() {
                       handleDrop(column.id);
                     }
                   }}
-                  onDragEnd={() => setDraggedColumnId(null)}
                 >
                   <Card className="h-full flex flex-col bg-muted/30 border-none shadow-none">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 pt-3">
                       <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <div
+                          draggable
+                          onDragStart={(e) => {
+                            e.stopPropagation();
+                            handleColumnDragStart(e, column.id);
+                          }}
+                          onDragEnd={() => setDraggedColumnId(null)}
+                          className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded"
+                          data-testid={`drag-handle-column-${column.id}`}
+                        >
+                          <GripVertical className="h-4 w-4 text-muted-foreground" />
+                        </div>
                         {column.name}
                         <Badge variant="secondary" className="text-xs bg-muted/50">
                           {columnCards.length}
@@ -312,28 +331,39 @@ export default function KanbanPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openNewCardDialog(column.id)}>
-                            Adicionar Card
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-destructive"
-                            onClick={() => deleteColumnMutation.mutate(column.id)}
-                          >
-                            Excluir Coluna
-                          </DropdownMenuItem>
+                          {project?.status !== "completed" && (
+                            <>
+                              <DropdownMenuItem onClick={() => openNewCardDialog(column.id)}>
+                                Adicionar Card
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => deleteColumnMutation.mutate(column.id)}
+                              >
+                                Excluir Coluna
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {project?.status === "completed" && (
+                            <DropdownMenuItem disabled className="text-muted-foreground">
+                              <Lock className="h-3 w-3 mr-2" />
+                              Sprint Finalizada
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </CardHeader>
                     <CardContent className="flex-1 p-2 space-y-3 overflow-auto">
                       {columnCards.map((card) => {
                         const assignee = users.find(u => u.id === card.assigneeId);
+                        const isReadOnly = project?.status === "completed";
                         return (
                           <Card 
                             key={card.id}
-                            draggable
-                            onDragStart={() => handleDragStart(card)}
+                            draggable={!isReadOnly}
+                            onDragStart={() => !isReadOnly && handleDragStart(card)}
                             onClick={() => openEditCardDialog(card)}
-                            className="cursor-pointer active:cursor-grabbing hover:shadow-md transition-all duration-200 border-l-4 border-l-transparent hover:border-l-primary/50 group"
+                            className={`cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 border-l-transparent hover:border-l-primary/50 group ${isReadOnly ? 'opacity-80' : 'active:cursor-grabbing'}`}
                             data-testid={`card-kanban-${card.id}`}
                           >
                             <CardContent className="p-3">
@@ -392,15 +422,17 @@ export default function KanbanPage() {
                         );
                       })}
                       
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start text-muted-foreground h-10 hover:bg-muted/50"
-                        onClick={() => openNewCardDialog(column.id)}
-                        data-testid={`button-add-card-${column.id}`}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Novo Card
-                      </Button>
+                      {project?.status !== "completed" && (
+                        <Button 
+                          variant="ghost" 
+                          className="w-full justify-start text-muted-foreground h-10 hover:bg-muted/50"
+                          onClick={() => openNewCardDialog(column.id)}
+                          data-testid={`button-add-card-${column.id}`}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Novo Card
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
@@ -417,6 +449,7 @@ export default function KanbanPage() {
         projectId={projectId || ""}
         columnId={selectedColumnId || ""}
         cardId={selectedCardId || undefined}
+        readOnly={project?.status === "completed"}
       />
       <ColumnDialog 
         open={isColumnDialogOpen} 

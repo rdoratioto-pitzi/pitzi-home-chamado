@@ -19,9 +19,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, Filter, Clock, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Filter, Clock, AlertCircle, CheckCircle2, ArrowUpDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import type { Ticket } from "@shared/schema";
+import type { Ticket, User } from "@shared/schema";
 import { TicketDialog } from "./ticket-dialog";
 import { TicketDetailSheet } from "./ticket-detail-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -60,18 +60,31 @@ export default function ChamadosPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [dateSortAsc, setDateSortAsc] = useState(false);
 
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
     queryKey: ["/api/tickets"],
   });
 
-  const filteredTickets = tickets.filter((ticket) => {
-    const matchesSearch = ticket.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
-    const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
-    return matchesSearch && matchesStatus && matchesPriority;
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
   });
+
+  const filteredTickets = tickets
+    .filter((ticket) => {
+      const matchesSearch = ticket.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
+      const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
+      return matchesSearch && matchesStatus && matchesPriority;
+    })
+    .sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateSortAsc ? dateA - dateB : dateB - dateA;
+    });
+
+  const getUser = (userId: string | null) => users.find(u => u.id === userId);
 
   const stats = {
     total: tickets.length,
@@ -203,36 +216,62 @@ export default function ChamadosPage() {
                   <TableRow>
                     <TableHead>Título</TableHead>
                     <TableHead>Categoria</TableHead>
+                    <TableHead>Relator</TableHead>
+                    <TableHead>Responsável</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Prioridade</TableHead>
-                    <TableHead>Data</TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 -ml-3 flex items-center gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDateSortAsc(!dateSortAsc);
+                        }}
+                        data-testid="button-sort-date"
+                      >
+                        Data de Criação
+                        <ArrowUpDown className="h-3 w-3" />
+                      </Button>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTickets.map((ticket) => (
-                    <TableRow 
-                      key={ticket.id} 
-                      className="cursor-pointer hover-elevate"
-                      onClick={() => setSelectedTicket(ticket)}
-                      data-testid={`row-ticket-${ticket.id}`}
-                    >
-                      <TableCell className="font-medium">{ticket.title}</TableCell>
-                      <TableCell>{ticket.category}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={statusColors[ticket.status]}>
-                          {statusLabels[ticket.status]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={priorityColors[ticket.priority]}>
-                          {priorityLabels[ticket.priority]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredTickets.map((ticket) => {
+                    const requester = getUser(ticket.requesterId);
+                    const assignee = getUser(ticket.assigneeId || null);
+                    return (
+                      <TableRow 
+                        key={ticket.id} 
+                        className="cursor-pointer hover-elevate"
+                        onClick={() => setSelectedTicket(ticket)}
+                        data-testid={`row-ticket-${ticket.id}`}
+                      >
+                        <TableCell className="font-medium">{ticket.title}</TableCell>
+                        <TableCell>{ticket.category}</TableCell>
+                        <TableCell>
+                          <span className="text-sm">{requester?.name || "-"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{assignee?.name || "-"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={statusColors[ticket.status]}>
+                            {statusLabels[ticket.status]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={priorityColors[ticket.priority]}>
+                            {priorityLabels[ticket.priority]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "-"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             )}
