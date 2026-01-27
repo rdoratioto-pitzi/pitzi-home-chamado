@@ -115,7 +115,10 @@ export function BrandSettings() {
                 <div>
                   <p className="font-medium">Clique para fazer upload</p>
                   <p className="text-sm text-muted-foreground">
-                    PNG ou SVG, máximo 2MB
+                    PNG ou SVG, máximo 5MB
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 italic">
+                    Medida ideal: 180x50px (proporção 3.6:1)
                   </p>
                 </div>
               </label>
