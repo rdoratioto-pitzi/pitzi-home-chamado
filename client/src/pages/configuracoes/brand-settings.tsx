@@ -3,23 +3,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Upload, Image } from "lucide-react";
+import { Upload, Image, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { RenovLogo } from "@/components/renov-logo";
 import { useTheme } from "@/hooks/use-theme";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export function BrandSettings() {
   const { toast } = useToast();
   const { theme } = useTheme();
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.includes("image/png") && !file.type.includes("image/svg")) {
+      if (!file.type.includes("image/png") && !file.type.includes("image/svg") && !file.type.includes("image/jpeg")) {
         toast({
           title: "Formato inválido",
-          description: "Por favor, envie um arquivo PNG ou SVG.",
+          description: "Por favor, envie um arquivo PNG, JPG ou SVG.",
           variant: "destructive",
         });
         return;
@@ -33,11 +35,31 @@ export function BrandSettings() {
     }
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Logo atualizado",
-      description: "O logo foi atualizado com sucesso.",
-    });
+  const handleSave = async () => {
+    if (!logoPreview) return;
+    
+    setIsSaving(true);
+    try {
+      await apiRequest("POST", "/api/settings", {
+        key: "logo_url",
+        value: logoPreview
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo_url"] });
+      
+      toast({
+        title: "Logo atualizado",
+        description: "O logo foi atualizado e espelhado em todo o sistema.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro ao salvar",
+        description: "Não foi possível salvar o novo logo.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -101,12 +123,23 @@ export function BrandSettings() {
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={handleSave} data-testid="button-save-logo">
-              Salvar Logo
+            <Button 
+              onClick={handleSave} 
+              disabled={isSaving || !logoPreview}
+              data-testid="button-save-logo"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Salvar Logo"
+              )}
             </Button>
-            {logoPreview && (
+            {logoPreview && !isSaving && (
               <Button variant="outline" onClick={() => setLogoPreview(null)}>
-                Restaurar Original
+                Cancelar Alteração
               </Button>
             )}
           </div>

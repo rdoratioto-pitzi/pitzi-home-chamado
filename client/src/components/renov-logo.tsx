@@ -1,3 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
+import { type Setting } from "@shared/schema";
+
 interface RenovLogoProps {
   variant?: "light" | "dark" | "white";
   size?: "sm" | "md" | "lg" | "xl";
@@ -12,8 +15,24 @@ const sizeMap = {
 };
 
 export function RenovLogo({ variant = "light", size = "md", className = "" }: RenovLogoProps) {
-  const textColor = variant === "dark" || variant === "white" ? "#FFFFFF" : "#000000";
+  const { data: logoUrlSetting } = useQuery<Setting>({ 
+    queryKey: ["/api/settings/logo_url"]
+  });
+
   const { width, height } = sizeMap[size];
+
+  if (logoUrlSetting?.value) {
+    return (
+      <img 
+        src={logoUrlSetting.value} 
+        alt="Renov Logo" 
+        style={{ width, height, objectFit: 'contain' }}
+        className={className}
+      />
+    );
+  }
+
+  const textColor = variant === "dark" || variant === "white" ? "#FFFFFF" : "#000000";
   
   return (
     <svg 
