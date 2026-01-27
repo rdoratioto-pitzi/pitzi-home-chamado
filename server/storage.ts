@@ -11,6 +11,13 @@ import {
   type Shipment, type InsertShipment,
   type ShipmentEvent, type InsertShipmentEvent,
   type Setting, type InsertSetting,
+  type TaskArea, type InsertTaskArea,
+  type TaskAreaMember, type InsertTaskAreaMember,
+  type Task, type InsertTask,
+  type TaskComment, type InsertTaskComment,
+  type TaskReaction, type InsertTaskReaction,
+  type TaskAttachment, type InsertTaskAttachment,
+  type TaskTemplate, type InsertTaskTemplate,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -86,6 +93,48 @@ export interface IStorage {
   getSetting(key: string): Promise<Setting | undefined>;
   getSettings(): Promise<Setting[]>;
   setSetting(key: string, value: string): Promise<Setting>;
+
+  // Task Areas
+  getTaskArea(id: string): Promise<TaskArea | undefined>;
+  getTaskAreas(userId: string): Promise<TaskArea[]>;
+  createTaskArea(area: InsertTaskArea): Promise<TaskArea>;
+  updateTaskArea(id: string, data: Partial<TaskArea>): Promise<TaskArea | undefined>;
+  deleteTaskArea(id: string): Promise<boolean>;
+
+  // Task Area Members
+  getTaskAreaMembers(areaId: string): Promise<TaskAreaMember[]>;
+  addTaskAreaMember(member: InsertTaskAreaMember): Promise<TaskAreaMember>;
+  updateTaskAreaMember(id: string, data: Partial<TaskAreaMember>): Promise<TaskAreaMember | undefined>;
+  removeTaskAreaMember(id: string): Promise<boolean>;
+
+  // Tasks
+  getTask(id: string): Promise<Task | undefined>;
+  getTasks(filters?: { areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string }): Promise<Task[]>;
+  createTask(task: InsertTask): Promise<Task>;
+  updateTask(id: string, data: Partial<Task>): Promise<Task | undefined>;
+  deleteTask(id: string): Promise<boolean>;
+
+  // Task Comments
+  getTaskComments(taskId: string): Promise<TaskComment[]>;
+  getTaskComment(id: string): Promise<TaskComment | undefined>;
+  createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
+  updateTaskComment(id: string, data: Partial<TaskComment>): Promise<TaskComment | undefined>;
+  deleteTaskComment(id: string): Promise<boolean>;
+
+  // Task Reactions
+  getTaskReactions(commentId: string): Promise<TaskReaction[]>;
+  addTaskReaction(reaction: InsertTaskReaction): Promise<TaskReaction>;
+  removeTaskReaction(id: string): Promise<boolean>;
+
+  // Task Attachments
+  getTaskAttachments(taskId: string): Promise<TaskAttachment[]>;
+  addTaskAttachment(attachment: InsertTaskAttachment): Promise<TaskAttachment>;
+  removeTaskAttachment(id: string): Promise<boolean>;
+
+  // Task Templates
+  getTaskTemplates(type?: string): Promise<TaskTemplate[]>;
+  getTaskTemplate(id: string): Promise<TaskTemplate | undefined>;
+  createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate>;
 }
 
 export class MemStorage implements IStorage {
@@ -101,6 +150,13 @@ export class MemStorage implements IStorage {
   private shipments: Map<string, Shipment>;
   private shipmentEvents: Map<string, ShipmentEvent>;
   private settings: Map<string, Setting>;
+  private taskAreas: Map<string, TaskArea>;
+  private taskAreaMembers: Map<string, TaskAreaMember>;
+  private tasks: Map<string, Task>;
+  private taskComments: Map<string, TaskComment>;
+  private taskReactions: Map<string, TaskReaction>;
+  private taskAttachments: Map<string, TaskAttachment>;
+  private taskTemplates: Map<string, TaskTemplate>;
 
   constructor() {
     this.users = new Map();
@@ -115,6 +171,13 @@ export class MemStorage implements IStorage {
     this.shipments = new Map();
     this.shipmentEvents = new Map();
     this.settings = new Map();
+    this.taskAreas = new Map();
+    this.taskAreaMembers = new Map();
+    this.tasks = new Map();
+    this.taskComments = new Map();
+    this.taskReactions = new Map();
+    this.taskAttachments = new Map();
+    this.taskTemplates = new Map();
 
     this.seedData();
   }
@@ -276,6 +339,136 @@ export class MemStorage implements IStorage {
       },
     ];
     sampleShipments.forEach(s => this.shipments.set(s.id, s));
+
+    // Seed task templates
+    const meetingTemplate: TaskTemplate = {
+      id: randomUUID(),
+      name: "Agenda de Reunião",
+      type: "meeting_agenda",
+      structure: JSON.stringify({
+        sections: [
+          { id: "info", title: "Informações da Reunião", fields: ["date", "time", "location", "participants"] },
+          { id: "agenda", title: "Pauta", type: "list" },
+          { id: "discussions", title: "Discussões Principais", type: "text" },
+          { id: "decisions", title: "Decisões", type: "list" },
+          { id: "actions", title: "Ações", type: "action_list", fields: ["description", "responsible", "deadline"] }
+        ]
+      }),
+      isDefault: true,
+      createdAt: new Date(),
+    };
+    this.taskTemplates.set(meetingTemplate.id, meetingTemplate);
+
+    // Seed sample task areas
+    const personalArea: TaskArea = {
+      id: randomUUID(),
+      name: "Pessoal",
+      description: "Tarefas pessoais e notas particulares",
+      ownerId: "admin",
+      visibility: "private",
+      color: "#00A137",
+      icon: "user",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.taskAreas.set(personalArea.id, personalArea);
+
+    const teamArea: TaskArea = {
+      id: randomUUID(),
+      name: "Time Comercial",
+      description: "Tarefas e projetos do time comercial",
+      ownerId: "admin",
+      visibility: "shared",
+      color: "#3B82F6",
+      icon: "users",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.taskAreas.set(teamArea.id, teamArea);
+
+    // Add owner as member of areas
+    const personalMember: TaskAreaMember = {
+      id: randomUUID(),
+      areaId: personalArea.id,
+      userId: "admin",
+      role: "owner",
+      createdAt: new Date(),
+    };
+    this.taskAreaMembers.set(personalMember.id, personalMember);
+
+    const teamMember: TaskAreaMember = {
+      id: randomUUID(),
+      areaId: teamArea.id,
+      userId: "admin",
+      role: "owner",
+      createdAt: new Date(),
+    };
+    this.taskAreaMembers.set(teamMember.id, teamMember);
+
+    // Seed sample tasks
+    const sampleTasks: Task[] = [
+      {
+        id: randomUUID(),
+        areaId: personalArea.id,
+        title: "Revisar documentação do projeto",
+        description: "Revisar toda a documentação técnica do novo módulo antes do lançamento.",
+        type: "task",
+        status: "todo",
+        priority: "high",
+        assigneeId: "admin",
+        dueDate: new Date(Date.now() + 7 * 86400000),
+        createdBy: "admin",
+        meetingData: null,
+        order: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        areaId: personalArea.id,
+        title: "Preparar apresentação trimestral",
+        description: "Criar slides para a apresentação de resultados do Q1.",
+        type: "task",
+        status: "doing",
+        priority: "medium",
+        assigneeId: "admin",
+        dueDate: new Date(Date.now() + 3 * 86400000),
+        createdBy: "admin",
+        meetingData: null,
+        order: 1,
+        createdAt: new Date(Date.now() - 86400000),
+        updatedAt: new Date(),
+      },
+      {
+        id: randomUUID(),
+        areaId: teamArea.id,
+        title: "Reunião de Planejamento Semanal",
+        description: "Reunião semanal do time comercial para alinhamento de metas.",
+        type: "meeting_note",
+        status: "done",
+        priority: "medium",
+        assigneeId: null,
+        dueDate: new Date(Date.now() - 86400000),
+        createdBy: "admin",
+        meetingData: JSON.stringify({
+          date: new Date().toISOString().split('T')[0],
+          time: "10:00",
+          location: "Sala de Reuniões 1",
+          participants: ["João", "Maria", "Pedro"],
+          agenda: ["Revisão de metas", "Pipeline de vendas", "Próximos passos"],
+          discussions: "Discussão sobre novas estratégias de captação de clientes.",
+          decisions: ["Aumentar investimento em marketing digital", "Contratar mais um vendedor"],
+          actions: [
+            { description: "Preparar proposta de orçamento", responsible: "João", deadline: "2025-02-01" },
+            { description: "Entrevistar candidatos", responsible: "Maria", deadline: "2025-02-05" }
+          ]
+        }),
+        order: 0,
+        createdAt: new Date(Date.now() - 172800000),
+        updatedAt: new Date(),
+      },
+    ];
+    sampleTasks.forEach(t => this.tasks.set(t.id, t));
   }
 
   // Users
@@ -628,6 +821,260 @@ export class MemStorage implements IStorage {
     const setting: Setting = { id, key, value, updatedAt: new Date() };
     this.settings.set(id, setting);
     return setting;
+  }
+
+  // Task Areas
+  async getTaskArea(id: string): Promise<TaskArea | undefined> {
+    return this.taskAreas.get(id);
+  }
+
+  async getTaskAreas(userId: string): Promise<TaskArea[]> {
+    const areas = Array.from(this.taskAreas.values());
+    const memberAreas = Array.from(this.taskAreaMembers.values())
+      .filter(m => m.userId === userId)
+      .map(m => m.areaId);
+    
+    return areas.filter(area => 
+      area.ownerId === userId || 
+      area.visibility === 'shared' ||
+      memberAreas.includes(area.id)
+    );
+  }
+
+  async createTaskArea(insertArea: InsertTaskArea): Promise<TaskArea> {
+    const id = randomUUID();
+    const area: TaskArea = {
+      ...insertArea,
+      id,
+      color: insertArea.color || "#00A137",
+      icon: insertArea.icon || "folder",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.taskAreas.set(id, area);
+    
+    // Add owner as member
+    const memberId = randomUUID();
+    const ownerMember: TaskAreaMember = {
+      id: memberId,
+      areaId: id,
+      userId: insertArea.ownerId,
+      role: 'owner',
+      createdAt: new Date(),
+    };
+    this.taskAreaMembers.set(memberId, ownerMember);
+    
+    return area;
+  }
+
+  async updateTaskArea(id: string, data: Partial<TaskArea>): Promise<TaskArea | undefined> {
+    const area = this.taskAreas.get(id);
+    if (!area) return undefined;
+    const updated = { ...area, ...data, updatedAt: new Date() };
+    this.taskAreas.set(id, updated);
+    return updated;
+  }
+
+  async deleteTaskArea(id: string): Promise<boolean> {
+    // Delete related tasks, members, etc.
+    Array.from(this.tasks.values())
+      .filter(t => t.areaId === id)
+      .forEach(t => this.deleteTask(t.id));
+    Array.from(this.taskAreaMembers.values())
+      .filter(m => m.areaId === id)
+      .forEach(m => this.taskAreaMembers.delete(m.id));
+    return this.taskAreas.delete(id);
+  }
+
+  // Task Area Members
+  async getTaskAreaMembers(areaId: string): Promise<TaskAreaMember[]> {
+    return Array.from(this.taskAreaMembers.values())
+      .filter(m => m.areaId === areaId);
+  }
+
+  async addTaskAreaMember(insertMember: InsertTaskAreaMember): Promise<TaskAreaMember> {
+    const id = randomUUID();
+    const member: TaskAreaMember = { ...insertMember, id, createdAt: new Date() };
+    this.taskAreaMembers.set(id, member);
+    return member;
+  }
+
+  async updateTaskAreaMember(id: string, data: Partial<TaskAreaMember>): Promise<TaskAreaMember | undefined> {
+    const member = this.taskAreaMembers.get(id);
+    if (!member) return undefined;
+    const updated = { ...member, ...data };
+    this.taskAreaMembers.set(id, updated);
+    return updated;
+  }
+
+  async removeTaskAreaMember(id: string): Promise<boolean> {
+    return this.taskAreaMembers.delete(id);
+  }
+
+  // Tasks
+  async getTask(id: string): Promise<Task | undefined> {
+    return this.tasks.get(id);
+  }
+
+  async getTasks(filters?: { areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string }): Promise<Task[]> {
+    let result = Array.from(this.tasks.values());
+    
+    if (filters?.areaId) {
+      result = result.filter(t => t.areaId === filters.areaId);
+    }
+    if (filters?.status) {
+      result = result.filter(t => t.status === filters.status);
+    }
+    if (filters?.assigneeId) {
+      result = result.filter(t => t.assigneeId === filters.assigneeId);
+    }
+    if (filters?.createdBy) {
+      result = result.filter(t => t.createdBy === filters.createdBy);
+    }
+    if (filters?.type) {
+      result = result.filter(t => t.type === filters.type);
+    }
+    
+    return result.sort((a, b) => a.order - b.order);
+  }
+
+  async createTask(insertTask: InsertTask): Promise<Task> {
+    const id = randomUUID();
+    const existingTasks = await this.getTasks({ areaId: insertTask.areaId });
+    const task: Task = {
+      ...insertTask,
+      id,
+      order: insertTask.order ?? existingTasks.length,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.tasks.set(id, task);
+    return task;
+  }
+
+  async updateTask(id: string, data: Partial<Task>): Promise<Task | undefined> {
+    const task = this.tasks.get(id);
+    if (!task) return undefined;
+    const updated = { ...task, ...data, updatedAt: new Date() };
+    this.tasks.set(id, updated);
+    return updated;
+  }
+
+  async deleteTask(id: string): Promise<boolean> {
+    // Delete related comments, reactions, attachments
+    Array.from(this.taskComments.values())
+      .filter(c => c.taskId === id)
+      .forEach(c => {
+        Array.from(this.taskReactions.values())
+          .filter(r => r.commentId === c.id)
+          .forEach(r => this.taskReactions.delete(r.id));
+        this.taskComments.delete(c.id);
+      });
+    Array.from(this.taskAttachments.values())
+      .filter(a => a.taskId === id)
+      .forEach(a => this.taskAttachments.delete(a.id));
+    return this.tasks.delete(id);
+  }
+
+  // Task Comments
+  async getTaskComments(taskId: string): Promise<TaskComment[]> {
+    return Array.from(this.taskComments.values())
+      .filter(c => c.taskId === taskId)
+      .sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
+  }
+
+  async getTaskComment(id: string): Promise<TaskComment | undefined> {
+    return this.taskComments.get(id);
+  }
+
+  async createTaskComment(insertComment: InsertTaskComment): Promise<TaskComment> {
+    const id = randomUUID();
+    const comment: TaskComment = {
+      ...insertComment,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.taskComments.set(id, comment);
+    return comment;
+  }
+
+  async updateTaskComment(id: string, data: Partial<TaskComment>): Promise<TaskComment | undefined> {
+    const comment = this.taskComments.get(id);
+    if (!comment) return undefined;
+    const updated = { ...comment, ...data, updatedAt: new Date() };
+    this.taskComments.set(id, updated);
+    return updated;
+  }
+
+  async deleteTaskComment(id: string): Promise<boolean> {
+    // Delete related reactions
+    Array.from(this.taskReactions.values())
+      .filter(r => r.commentId === id)
+      .forEach(r => this.taskReactions.delete(r.id));
+    return this.taskComments.delete(id);
+  }
+
+  // Task Reactions
+  async getTaskReactions(commentId: string): Promise<TaskReaction[]> {
+    return Array.from(this.taskReactions.values())
+      .filter(r => r.commentId === commentId);
+  }
+
+  async addTaskReaction(insertReaction: InsertTaskReaction): Promise<TaskReaction> {
+    // Check if user already reacted with same emoji
+    const existing = Array.from(this.taskReactions.values())
+      .find(r => r.commentId === insertReaction.commentId && 
+                 r.userId === insertReaction.userId && 
+                 r.emoji === insertReaction.emoji);
+    if (existing) return existing;
+    
+    const id = randomUUID();
+    const reaction: TaskReaction = { ...insertReaction, id, createdAt: new Date() };
+    this.taskReactions.set(id, reaction);
+    return reaction;
+  }
+
+  async removeTaskReaction(id: string): Promise<boolean> {
+    return this.taskReactions.delete(id);
+  }
+
+  // Task Attachments
+  async getTaskAttachments(taskId: string): Promise<TaskAttachment[]> {
+    return Array.from(this.taskAttachments.values())
+      .filter(a => a.taskId === taskId)
+      .sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
+  }
+
+  async addTaskAttachment(insertAttachment: InsertTaskAttachment): Promise<TaskAttachment> {
+    const id = randomUUID();
+    const attachment: TaskAttachment = { ...insertAttachment, id, createdAt: new Date() };
+    this.taskAttachments.set(id, attachment);
+    return attachment;
+  }
+
+  async removeTaskAttachment(id: string): Promise<boolean> {
+    return this.taskAttachments.delete(id);
+  }
+
+  // Task Templates
+  async getTaskTemplates(type?: string): Promise<TaskTemplate[]> {
+    let templates = Array.from(this.taskTemplates.values());
+    if (type) {
+      templates = templates.filter(t => t.type === type);
+    }
+    return templates;
+  }
+
+  async getTaskTemplate(id: string): Promise<TaskTemplate | undefined> {
+    return this.taskTemplates.get(id);
+  }
+
+  async createTaskTemplate(insertTemplate: InsertTaskTemplate): Promise<TaskTemplate> {
+    const id = randomUUID();
+    const template: TaskTemplate = { ...insertTemplate, id, createdAt: new Date() };
+    this.taskTemplates.set(id, template);
+    return template;
   }
 }
 
