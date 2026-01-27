@@ -215,3 +215,118 @@ export const settings = pgTable("settings", {
 export const insertSettingSchema = createInsertSchema(settings).omit({ id: true, updatedAt: true });
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
+
+// ============== TAREFAS MODULE - AREAS ==============
+export const taskAreas = pgTable("task_areas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  ownerId: varchar("owner_id").notNull(),
+  visibility: text("visibility").notNull().default("private"), // private | shared
+  color: text("color").default("#00A137"),
+  icon: text("icon").default("folder"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTaskAreaSchema = createInsertSchema(taskAreas).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTaskArea = z.infer<typeof insertTaskAreaSchema>;
+export type TaskArea = typeof taskAreas.$inferSelect;
+
+// ============== TAREFAS MODULE - AREA MEMBERS ==============
+export const taskAreaMembers = pgTable("task_area_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  areaId: varchar("area_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  role: text("role").notNull().default("viewer"), // owner | editor | viewer
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTaskAreaMemberSchema = createInsertSchema(taskAreaMembers).omit({ id: true, createdAt: true });
+export type InsertTaskAreaMember = z.infer<typeof insertTaskAreaMemberSchema>;
+export type TaskAreaMember = typeof taskAreaMembers.$inferSelect;
+
+// ============== TAREFAS MODULE - TASKS ==============
+export const tasks = pgTable("tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  areaId: varchar("area_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"), // Rich text / markdown
+  type: text("type").notNull().default("task"), // task | meeting_note
+  status: text("status").notNull().default("todo"), // todo | doing | done | archived
+  priority: text("priority").notNull().default("medium"), // low | medium | high
+  assigneeId: varchar("assignee_id"),
+  dueDate: timestamp("due_date"),
+  createdBy: varchar("created_by").notNull(),
+  meetingData: text("meeting_data"), // JSON for meeting notes (date, time, participants, agenda, decisions, actions)
+  order: integer("order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+const baseInsertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTaskSchema = baseInsertTaskSchema.extend({
+  dueDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ),
+});
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;
+
+// ============== TAREFAS MODULE - TASK COMMENTS ==============
+export const taskComments = pgTable("task_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull(),
+  authorId: varchar("author_id").notNull(),
+  content: text("content").notNull(),
+  parentCommentId: varchar("parent_comment_id"), // For threads
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
+export type TaskComment = typeof taskComments.$inferSelect;
+
+// ============== TAREFAS MODULE - TASK REACTIONS ==============
+export const taskReactions = pgTable("task_reactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  commentId: varchar("comment_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  emoji: text("emoji").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTaskReactionSchema = createInsertSchema(taskReactions).omit({ id: true, createdAt: true });
+export type InsertTaskReaction = z.infer<typeof insertTaskReactionSchema>;
+export type TaskReaction = typeof taskReactions.$inferSelect;
+
+// ============== TAREFAS MODULE - TASK ATTACHMENTS ==============
+export const taskAttachments = pgTable("task_attachments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id").notNull(),
+  uploadedBy: varchar("uploaded_by").notNull(),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  fileType: text("file_type"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTaskAttachmentSchema = createInsertSchema(taskAttachments).omit({ id: true, createdAt: true });
+export type InsertTaskAttachment = z.infer<typeof insertTaskAttachmentSchema>;
+export type TaskAttachment = typeof taskAttachments.$inferSelect;
+
+// ============== TAREFAS MODULE - TEMPLATES ==============
+export const taskTemplates = pgTable("task_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // meeting_agenda, etc
+  structure: text("structure").notNull(), // JSON structure
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTaskTemplateSchema = createInsertSchema(taskTemplates).omit({ id: true, createdAt: true });
+export type InsertTaskTemplate = z.infer<typeof insertTaskTemplateSchema>;
+export type TaskTemplate = typeof taskTemplates.$inferSelect;
