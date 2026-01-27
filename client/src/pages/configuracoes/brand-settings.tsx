@@ -64,10 +64,10 @@ export function BrandSettings() {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Logo Renov Home</CardTitle>
-          <CardDescription>
+      <Card className="shadow-sm border-border/60">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-[18px] font-bold">Logo Renov Home</CardTitle>
+          <CardDescription className="text-[13px]">
             Clique nos quadros abaixo para fazer upload dos logos específicos para cada tema.
             Recomendado: 180x50px, até 5MB.
           </CardDescription>
@@ -143,10 +143,10 @@ export function BrandSettings() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Cores da Marca</CardTitle>
-          <CardDescription>
+      <Card className="shadow-sm border-border/60">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-[18px] font-bold">Cores da Marca</CardTitle>
+          <CardDescription className="text-[13px]">
             As cores oficiais da Renov são aplicadas automaticamente
           </CardDescription>
         </CardHeader>
@@ -177,10 +177,10 @@ export function BrandSettings() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Tipografia</CardTitle>
-          <CardDescription>
+      <Card className="shadow-sm border-border/60">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-[18px] font-bold">Tipografia</CardTitle>
+          <CardDescription className="text-[13px]">
             A família tipográfica Montserrat é utilizada em toda a interface
           </CardDescription>
         </CardHeader>

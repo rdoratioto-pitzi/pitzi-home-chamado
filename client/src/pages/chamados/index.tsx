@@ -188,7 +188,7 @@ export default function ChamadosPage() {
 
       <main className="flex-1 p-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-5">
-          <Card>
+          <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Total</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
@@ -198,7 +198,7 @@ export default function ChamadosPage() {
               <p className="text-xs text-muted-foreground">chamados registrados</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Abertos</CardTitle>
               <AlertCircle className="h-4 w-4 text-blue-500" />
@@ -208,7 +208,7 @@ export default function ChamadosPage() {
               <p className="text-xs text-muted-foreground">aguardando</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Em Andamento</CardTitle>
               <Clock className="h-4 w-4 text-yellow-500" />
@@ -218,7 +218,7 @@ export default function ChamadosPage() {
               <p className="text-xs text-muted-foreground">sendo resolvidos</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Bloqueados</CardTitle>
               <Ban className="h-4 w-4 text-red-500" />
@@ -228,7 +228,7 @@ export default function ChamadosPage() {
               <p className="text-xs text-muted-foreground">impedidos</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-sm font-medium">Resolvidos</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -240,10 +240,10 @@ export default function ChamadosPage() {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
+        <Card className="shadow-sm border-border/60">
+          <CardHeader className="pb-4">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <CardTitle>Chamados</CardTitle>
+              <CardTitle className="text-[18px] font-bold">Chamados</CardTitle>
               <div className="flex flex-wrap gap-2 items-center">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -106,14 +106,14 @@ export default function ProjetosPage() {
               return (
                 <Link key={project.id} href={`/projetos/${project.id}`}>
                   <Card 
-                    className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 h-full"
+                    className="shadow-sm border-border/60 cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 h-full"
                     data-testid={`card-project-${project.id}`}
                   >
-                    <CardHeader>
+                    <CardHeader className="pb-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
-                          <CardTitle className="text-lg">{project.name}</CardTitle>
-                          <CardDescription className="mt-1 line-clamp-2">
+                          <CardTitle className="text-[18px] font-bold">{project.name}</CardTitle>
+                          <CardDescription className="text-[13px] mt-1 line-clamp-2">
                             {project.description || "Sem descrição"}
                           </CardDescription>
                         </div>

@@ -54,8 +54,8 @@ export default function Home() {
       <main className="flex-1 p-6">
         <div className="max-w-6xl mx-auto space-y-8">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">Bem-vindo ao Renov Home</h2>
-            <p className="text-muted-foreground mt-1">
+            <h2 className="text-[28px] font-bold tracking-tight">Bem-vindo ao Renov Home</h2>
+            <p className="text-[16px] text-muted-foreground mt-1">
               Plataforma interna de gestão da Renov
             </p>
           </div>
@@ -64,19 +64,19 @@ export default function Home() {
             {modules.map((module) => (
               <Link key={module.href} href={module.href}>
                 <Card 
-                  className="group cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30"
+                  className="group cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 shadow-sm border-border/60"
                   data-testid={`card-module-${module.href.slice(1)}`}
                 >
-                  <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-2">
+                  <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-4">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${module.color}`}>
                         <module.icon className="h-5 w-5" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg font-semibold">
+                        <CardTitle className="text-[18px] font-bold leading-tight">
                           {module.title}
                         </CardTitle>
-                        <CardDescription className="mt-1">
+                        <CardDescription className="text-[13px] mt-1.5 leading-relaxed">
                           {module.description}
                         </CardDescription>
                       </div>

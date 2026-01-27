@@ -44,10 +44,10 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
                 </BreadcrumbList>
               </Breadcrumb>
             ) : (
-              <h1 className="text-[15px] font-bold tracking-tight text-foreground">{title}</h1>
+              <h1 className="text-[17px] font-bold tracking-tight text-foreground leading-tight">{title}</h1>
             )}
             {description && !breadcrumbs && (
-              <p className="text-[11px] text-muted-foreground leading-none mt-0.5">{description}</p>
+              <p className="text-[12px] text-muted-foreground leading-none mt-1">{description}</p>
             )}
           </div>
         </div>

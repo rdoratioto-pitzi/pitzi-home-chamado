@@ -94,11 +94,11 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r border-sidebar-border">
-      <SidebarHeader className="h-16 flex items-center px-6 border-b border-sidebar-border">
-        <Link href="/" data-testid="link-home">
+      <SidebarHeader className="h-16 flex items-center justify-center border-b border-sidebar-border">
+        <Link href="/" data-testid="link-home" className="flex items-center justify-center w-full px-6">
           <RenovLogo 
             variant={theme === "dark" ? "dark" : "light"} 
-            className="h-8 w-auto" 
+            className="h-8 w-auto mx-auto" 
           />
         </Link>
       </SidebarHeader>
