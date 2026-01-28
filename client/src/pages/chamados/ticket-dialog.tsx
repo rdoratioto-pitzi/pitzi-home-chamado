@@ -124,17 +124,17 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
     },
   });
 
-  const categories: FieldItem[] = categoriesSetting?.value 
+  const categories: FieldItem[] = (categoriesSetting?.value 
     ? JSON.parse(categoriesSetting.value) 
-    : defaultCategories;
+    : defaultCategories).filter((item: FieldItem) => item.value && item.value.trim() !== "");
 
-  const types: FieldItem[] = typesSetting?.value 
+  const types: FieldItem[] = (typesSetting?.value 
     ? JSON.parse(typesSetting.value) 
-    : defaultTypes;
+    : defaultTypes).filter((item: FieldItem) => item.value && item.value.trim() !== "");
 
-  const locations: FieldItem[] = locationsSetting?.value 
+  const locations: FieldItem[] = (locationsSetting?.value 
     ? JSON.parse(locationsSetting.value) 
-    : defaultLocations;
+    : defaultLocations).filter((item: FieldItem) => item.value && item.value.trim() !== "");
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
