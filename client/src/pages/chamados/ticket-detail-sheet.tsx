@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Send, Clock } from "lucide-react";
+import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle } from "lucide-react";
 import type { Ticket, TicketComment } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -48,6 +48,73 @@ const priorityLabels: Record<string, string> = {
   medium: "Média",
   high: "Alta",
   critical: "Crítica",
+};
+
+const impactLabels: Record<string, string> = {
+  baixo: "Baixo",
+  medio: "Médio",
+  alto: "Alto",
+  critico: "Crítico",
+};
+
+// Helper function to format datetime in Brazilian format
+const formatDateTime = (date: Date | string | null): string => {
+  if (!date) return "-";
+  const d = new Date(date);
+  return d.toLocaleDateString("pt-BR") + " às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+};
+
+// Helper function to calculate time difference
+const calculateTimeDiff = (start: Date | string | null, end: Date | string | null): string => {
+  if (!start || !end) return "";
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  const diffMs = endDate.getTime() - startDate.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (diffHours >= 24) {
+    const days = Math.floor(diffHours / 24);
+    const hours = diffHours % 24;
+    return `(${days}d ${hours}h ${diffMinutes}min)`;
+  } else if (diffHours > 0) {
+    return `(${diffHours}h ${diffMinutes}min)`;
+  } else {
+    return `(${diffMinutes} minutos)`;
+  }
+};
+
+// Helper function to calculate time open with color
+const getTimeOpenInfo = (createdAt: Date | string | null): { text: string; colorClass: string } => {
+  if (!createdAt) return { text: "-", colorClass: "text-muted-foreground" };
+  
+  const created = new Date(createdAt);
+  const now = new Date();
+  const diffMs = now.getTime() - created.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+  const remainingHours = diffHours % 24;
+  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  let text: string;
+  if (diffDays > 0) {
+    text = `${diffDays}d ${remainingHours}h ${diffMinutes}m`;
+  } else if (diffHours > 0) {
+    text = `${diffHours}h ${diffMinutes}m`;
+  } else {
+    text = `${diffMinutes}m`;
+  }
+  
+  let colorClass: string;
+  if (diffHours < 24) {
+    colorClass = "text-green-600 dark:text-green-400";
+  } else if (diffHours < 72) {
+    colorClass = "text-yellow-600 dark:text-yellow-400";
+  } else {
+    colorClass = "text-red-600 dark:text-red-400";
+  }
+  
+  return { text, colorClass };
 };
 
 export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
@@ -122,7 +189,16 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
               Prioridade: {priorityLabels[ticket.priority]}
             </Badge>
             <Badge variant="outline">
+              Impacto: {impactLabels[ticket.impact || "medio"]}
+            </Badge>
+            <Badge variant="outline">
               {ticket.category}
+            </Badge>
+            <Badge variant="outline">
+              {ticket.type || "Bug"}
+            </Badge>
+            <Badge variant="outline">
+              {ticket.location || "-"}
             </Badge>
           </div>
 
@@ -133,12 +209,68 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             </p>
           </div>
 
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              <span>
-                Aberto em {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "-"}
-              </span>
+          {/* Timeline Section */}
+          <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Timeline do Chamado
+            </h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                <span className="text-muted-foreground">Aberto em:</span>
+                <span className="font-medium">{formatDateTime(ticket.dataAbertura || ticket.createdAt)}</span>
+              </div>
+              
+              {ticket.dataPrimeiraResposta && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                  <span className="text-muted-foreground">Primeira resposta em:</span>
+                  <span className="font-medium">
+                    {formatDateTime(ticket.dataPrimeiraResposta)}
+                    <span className="text-muted-foreground ml-1">
+                      {calculateTimeDiff(ticket.dataAbertura || ticket.createdAt, ticket.dataPrimeiraResposta)}
+                    </span>
+                  </span>
+                </div>
+              )}
+              
+              {ticket.dataResolucao && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                  <span className="text-muted-foreground">Resolvido em:</span>
+                  <span className="font-medium">
+                    {formatDateTime(ticket.dataResolucao)}
+                    <span className="text-muted-foreground ml-1">
+                      {calculateTimeDiff(ticket.dataAbertura || ticket.createdAt, ticket.dataResolucao)}
+                    </span>
+                  </span>
+                </div>
+              )}
+              
+              {ticket.dataFechamento && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-slate-500"></div>
+                  <span className="text-muted-foreground">Fechado em:</span>
+                  <span className="font-medium">{formatDateTime(ticket.dataFechamento)}</span>
+                </div>
+              )}
+              
+              {/* Time open indicator */}
+              {!ticket.dataResolucao && !ticket.dataFechamento && (
+                <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Tempo aberto:</span>
+                  {(() => {
+                    const timeInfo = getTimeOpenInfo(ticket.dataAbertura || ticket.createdAt);
+                    return (
+                      <span className={`font-bold ${timeInfo.colorClass}`}>
+                        {timeInfo.text}
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           </div>
 

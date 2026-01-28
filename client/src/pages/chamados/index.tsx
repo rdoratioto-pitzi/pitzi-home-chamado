@@ -94,6 +94,49 @@ const typeColors: Record<string, string> = {
   negocio: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
 };
 
+// Helper function to get type color based on type value
+const getTypeColor = (type: string): string => {
+  const lowerType = type?.toLowerCase() || "";
+  if (lowerType.includes("bug")) return "bg-red-500/10 text-red-600 dark:text-red-400";
+  if (lowerType.includes("melhoria")) return "bg-blue-500/10 text-blue-600 dark:text-blue-400";
+  if (lowerType.includes("negócio") || lowerType.includes("negocio")) return "bg-purple-500/10 text-purple-600 dark:text-purple-400";
+  return "bg-slate-500/10 text-slate-600 dark:text-slate-400";
+};
+
+// Helper function to calculate time open
+const calculateTimeOpen = (createdAt: Date | string | null): { text: string; colorClass: string } => {
+  if (!createdAt) return { text: "-", colorClass: "text-muted-foreground" };
+  
+  const created = new Date(createdAt);
+  const now = new Date();
+  const diffMs = now.getTime() - created.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+  const remainingHours = diffHours % 24;
+  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  let text: string;
+  if (diffDays > 0) {
+    text = `${diffDays}d ${remainingHours}h`;
+  } else if (diffHours > 0) {
+    text = `${diffHours}h ${diffMinutes}m`;
+  } else {
+    text = `${diffMinutes}m`;
+  }
+  
+  // Color indicators: green (<24h), yellow (24-72h), red (>72h)
+  let colorClass: string;
+  if (diffHours < 24) {
+    colorClass = "text-green-600 dark:text-green-400";
+  } else if (diffHours < 72) {
+    colorClass = "text-yellow-600 dark:text-yellow-400";
+  } else {
+    colorClass = "text-red-600 dark:text-red-400";
+  }
+  
+  return { text, colorClass };
+};
+
 export default function ChamadosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -157,18 +200,20 @@ export default function ChamadosPage() {
     const data = filteredTickets.map((ticket) => {
       const requester = getUser(ticket.requesterId);
       const assignee = getUser(ticket.assigneeId || null);
+      const timeOpen = calculateTimeOpen(ticket.createdAt);
       return {
         "Código": ticket.code || "",
         "Título": ticket.title,
         "Descrição": ticket.description,
         "Categoria": ticket.category,
-        "Tipo": typeLabels[ticket.type || "bug"] || ticket.type,
+        "Tipo": ticket.type || "Bug",
         "Local": ticket.location || "",
         "Prioridade": priorityLabels[ticket.priority],
         "Status": statusLabels[ticket.status],
         "Solicitante": requester?.name || "",
         "Responsável": assignee?.name || "",
-        "Data de Criação": ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "",
+        "Abertura": ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "",
+        "Tempo Aberto": timeOpen.text,
       };
     });
 
@@ -380,10 +425,11 @@ export default function ChamadosPage() {
                         }}
                         data-testid="button-sort-date"
                       >
-                        Data
+                        Abertura
                         <ArrowUpDown className="h-3 w-3" />
                       </Button>
                     </TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tempo Aberto</TableHead>
                     <TableHead className="w-[60px] text-[12px] font-bold uppercase tracking-wider">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -406,8 +452,8 @@ export default function ChamadosPage() {
                         </TableCell>
                         <TableCell className="text-[13px] text-muted-foreground">{ticket.category}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={`${typeColors[ticket.type || "bug"]} text-[10px] font-bold uppercase tracking-wider`}>
-                            {typeLabels[ticket.type || "bug"]}
+                          <Badge variant="outline" className={`${getTypeColor(ticket.type || "bug")} text-[10px] font-bold uppercase tracking-wider`}>
+                            {ticket.type || "Bug"}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-[13px]">
@@ -431,6 +477,16 @@ export default function ChamadosPage() {
                         </TableCell>
                         <TableCell className="text-[12px] text-muted-foreground">
                           {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const timeOpen = calculateTimeOpen(ticket.createdAt);
+                            return (
+                              <span className={`text-[12px] font-medium ${timeOpen.colorClass}`}>
+                                {timeOpen.text}
+                              </span>
+                            );
+                          })()}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>

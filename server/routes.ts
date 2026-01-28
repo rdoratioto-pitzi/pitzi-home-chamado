@@ -243,7 +243,18 @@ export async function registerRoutes(
       const oldTicket = await storage.getTicket(req.params.id);
       if (!oldTicket) return res.status(404).json({ error: "Ticket not found" });
       
-      const ticket = await storage.updateTicket(req.params.id, validated);
+      // Auto-fill timestamp fields based on status changes
+      const updateData: any = { ...validated };
+      if (validated.status && validated.status !== oldTicket.status) {
+        if (validated.status === "resolved" && !oldTicket.dataResolucao) {
+          updateData.dataResolucao = new Date();
+        }
+        if (validated.status === "closed" && !oldTicket.dataFechamento) {
+          updateData.dataFechamento = new Date();
+        }
+      }
+      
+      const ticket = await storage.updateTicket(req.params.id, updateData);
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
       
       if (validated.status && validated.status !== oldTicket.status) {
@@ -292,6 +303,11 @@ export async function registerRoutes(
       
       const ticket = await storage.getTicket(req.params.id);
       if (ticket) {
+        // Set first response timestamp if assignee comments and it's not set yet
+        if (ticket.assigneeId && comment.userId === ticket.assigneeId && !ticket.dataPrimeiraResposta) {
+          await storage.updateTicket(ticket.id, { dataPrimeiraResposta: new Date() });
+        }
+        
         const commenter = await storage.getUser(comment.userId);
         const requester = await storage.getUser(ticket.requesterId);
         const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;

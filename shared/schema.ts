@@ -67,6 +67,11 @@ export const tickets = pgTable("tickets", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   dueDate: timestamp("due_date"),
+  // Timestamp metrics
+  dataAbertura: timestamp("data_abertura").defaultNow(),
+  dataPrimeiraResposta: timestamp("data_primeira_resposta"),
+  dataResolucao: timestamp("data_resolucao"),
+  dataFechamento: timestamp("data_fechamento"),
 });
 
 export const insertTicketSchema = createInsertSchema(tickets).omit({ id: true, createdAt: true, updatedAt: true });
