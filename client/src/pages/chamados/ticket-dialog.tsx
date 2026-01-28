@@ -91,7 +91,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
       type: "bug",
       location: "Outros",
       priority: "medium",
-      assigneeId: "",
+      assigneeId: "auto",
     },
   });
 
@@ -103,7 +103,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
         status: "open",
         code: "",
       };
-      if (!data.assigneeId) {
+      if (!data.assigneeId || data.assigneeId === "auto") {
         delete payload.assigneeId;
       }
       return apiRequest("POST", "/api/tickets", payload);
@@ -295,7 +295,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Atribuição automática</SelectItem>
+                      <SelectItem value="auto">Atribuição automática</SelectItem>
                       {users.filter(u => u.status === "active").map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.name}
