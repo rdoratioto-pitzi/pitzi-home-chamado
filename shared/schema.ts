@@ -60,6 +60,7 @@ export const tickets = pgTable("tickets", {
   type: text("type").notNull().default("bug"), // bug, melhoria, negocio
   location: text("location").notNull().default("outros"), // RS, RG, Dash, One, Home, Omie, Outros
   priority: text("priority").notNull().default("medium"),
+  impact: text("impact").notNull().default("medio"), // baixo, medio, alto, critico
   status: text("status").notNull().default("open"), // open, in_progress, blocked, resolved, closed
   requesterId: varchar("requester_id").notNull(),
   assigneeId: varchar("assignee_id"),
