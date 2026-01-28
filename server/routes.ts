@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import nodemailer from "nodemailer";
 import { storage } from "./storage";
 import { 
   sendTicketCreatedEmail, 
@@ -7,6 +8,7 @@ import {
   sendTicketStatusChangedEmail, 
   sendTicketCommentEmail 
 } from "./email-service";
+import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
   insertUserSchema, 
   insertTicketSchema, 
@@ -1246,6 +1248,9 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to lookup CEP" });
     }
   });
+
+  // Register object storage routes for file uploads
+  registerObjectStorageRoutes(app);
 
   return httpServer;
 }

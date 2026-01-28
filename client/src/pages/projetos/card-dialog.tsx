@@ -27,13 +27,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Calendar as CalendarIcon, Tag, User as UserIcon, Clock, Paperclip, MessageSquare, Plus, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Tag, User as UserIcon, Clock, Paperclip, MessageSquare, Plus, Trash2, X, FileIcon, Image, Loader2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { User, KanbanCard, KanbanComment } from "@shared/schema";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useUpload } from "@/hooks/use-upload";
 
 const formSchema = z.object({
   title: z.string().min(1, "Título é obrigatório"),
@@ -59,12 +60,35 @@ interface CardDialogProps {
   readOnly?: boolean;
 }
 
+interface Attachment {
+  name: string;
+  path: string;
+  size?: number;
+  type?: string;
+}
+
 export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, readOnly = false }: CardDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState("");
   const [availableTags, setAvailableTags] = useState(["Tech", "Design", "Bug", "Feature"]);
   const [newTag, setNewTag] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadFile, isUploading } = useUpload({
+    onSuccess: (response) => {
+      setAttachments(prev => [...prev, {
+        name: response.metadata.name,
+        path: response.objectPath,
+        size: response.metadata.size,
+        type: response.metadata.contentType,
+      }]);
+      toast({ title: "Arquivo anexado com sucesso!" });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao anexar arquivo", description: error.message, variant: "destructive" });
+    },
+  });
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -110,6 +134,14 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
         endDate: cardData.endDate ? new Date(cardData.endDate).toISOString().split('T')[0] : "",
         tag: cardData.tags?.[0] || "",
       });
+      if (cardData.attachments && cardData.attachments.length > 0) {
+        setAttachments(cardData.attachments.map((path: string) => ({
+          name: path.split("/").pop() || "Arquivo",
+          path,
+        })));
+      } else {
+        setAttachments([]);
+      }
     } else if (!cardId && open) {
       form.reset({
         title: "",
@@ -123,6 +155,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
         endDate: "",
         tag: "",
       });
+      setAttachments([]);
     }
   }, [cardId, cardData, form, open]);
 
@@ -137,6 +170,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
         startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
         endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
         order: cardData?.order || 0,
+        attachments: attachments.map(a => a.path),
       };
 
       if (cardId) {
@@ -548,10 +582,66 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                     )}
                   />
 
-                  <div className="pt-4">
-                    <Button type="button" variant="outline" className="w-full justify-start gap-2 h-9">
-                      <Paperclip className="h-4 w-4" /> Anexar arquivos
+                  <div className="pt-4 space-y-3">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          uploadFile(file);
+                          e.target.value = "";
+                        }
+                      }}
+                      disabled={readOnly || isUploading}
+                      data-testid="input-file-upload"
+                    />
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full justify-start gap-2 h-9"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={readOnly || isUploading}
+                      data-testid="button-attach-file"
+                    >
+                      {isUploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Paperclip className="h-4 w-4" />
+                      )}
+                      {isUploading ? "Enviando..." : "Anexar arquivos"}
                     </Button>
+                    
+                    {attachments.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Anexos ({attachments.length})</p>
+                        <div className="space-y-1">
+                          {attachments.map((att, idx) => (
+                            <div key={idx} className="flex items-center gap-2 p-2 bg-muted/50 rounded-md text-xs">
+                              {att.type?.startsWith("image/") ? (
+                                <Image className="h-3 w-3 text-blue-500" />
+                              ) : (
+                                <FileIcon className="h-3 w-3 text-gray-500" />
+                              )}
+                              <span className="flex-1 truncate">{att.name}</span>
+                              {!readOnly && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-5 w-5"
+                                  onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
+                                  data-testid={`button-remove-attachment-${idx}`}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
