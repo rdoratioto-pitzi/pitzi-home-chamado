@@ -29,6 +29,7 @@ export const users = pgTable("users", {
   status: text("status").notNull().default("active"),
   authMethod: text("auth_method").notNull().default("email"),
   avatarUrl: text("avatar_url"),
+  isAdmin: boolean("is_admin").default(false),
   // Module permissions as JSON
   modulePermissions: text("module_permissions"), // JSON: { chamados: true, projetos: false, ... }
   createdAt: timestamp("created_at").defaultNow(),

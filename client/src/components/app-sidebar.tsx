@@ -102,6 +102,17 @@ function getCurrentUser() {
 function getUserPermissions(): ModulePermissions {
   try {
     const user = getCurrentUser();
+    if (user?.isAdmin) {
+      return {
+        chamados: true,
+        projetos: true,
+        tarefas: true,
+        okrs: true,
+        logistica: true,
+        apis: true,
+        configuracoes: true,
+      };
+    }
     if (user?.modulePermissions) {
       const perms = typeof user.modulePermissions === "string" 
         ? JSON.parse(user.modulePermissions) 

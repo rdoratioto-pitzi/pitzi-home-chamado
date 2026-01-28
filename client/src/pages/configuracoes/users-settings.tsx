@@ -60,7 +60,8 @@ const MODULES = [
 const formSchema = z.object({
   name: z.string().min(2, "Nome deve ter no mínimo 2 caracteres"),
   email: z.string().email("Email inválido"),
-  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+  password: z.string().optional(),
+  isAdmin: z.boolean().default(false),
   modulePermissions: z.object({
     chamados: z.boolean(),
     projetos: z.boolean(),
@@ -76,6 +77,7 @@ type FormData = z.infer<typeof formSchema>;
 
 export function UsersSettings() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -90,6 +92,7 @@ export function UsersSettings() {
       name: "",
       email: "",
       password: "",
+      isAdmin: false,
       modulePermissions: {
         chamados: true,
         projetos: true,
@@ -102,27 +105,87 @@ export function UsersSettings() {
     },
   });
 
-  const createMutation = useMutation({
+  const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      return apiRequest("POST", "/api/users", {
+      const payload = {
         name: data.name,
         email: data.email,
-        password: data.password,
-        status: "active",
-        authMethod: "email",
+        ...(data.password ? { password: data.password } : {}),
+        isAdmin: data.isAdmin,
+        status: editingUser?.status || "active",
+        authMethod: editingUser?.authMethod || "email",
         modulePermissions: JSON.stringify(data.modulePermissions),
-      });
+      };
+
+      if (editingUser) {
+        return apiRequest("PATCH", `/api/users/${editingUser.id}`, payload);
+      }
+      return apiRequest("POST", "/api/users", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      toast({ title: "Usuário criado", description: "O usuário foi criado com sucesso." });
+      toast({ 
+        title: editingUser ? "Usuário atualizado" : "Usuário criado", 
+        description: editingUser ? "O usuário foi atualizado com sucesso." : "O usuário foi criado com sucesso." 
+      });
       form.reset();
+      setEditingUser(null);
       setIsDialogOpen(false);
     },
     onError: () => {
-      toast({ title: "Erro", description: "Não foi possível criar o usuário.", variant: "destructive" });
+      toast({ title: "Erro", description: "Não foi possível salvar o usuário.", variant: "destructive" });
     },
   });
+
+  const handleEdit = (user: User) => {
+    setEditingUser(user);
+    let perms = {
+      chamados: true,
+      projetos: true,
+      tarefas: true,
+      okrs: true,
+      logistica: true,
+      apis: false,
+      configuracoes: false,
+    };
+
+    try {
+      if (user.modulePermissions) {
+        perms = JSON.parse(user.modulePermissions);
+      }
+    } catch (e) {
+      console.error("Error parsing permissions", e);
+    }
+
+    form.reset({
+      name: user.name,
+      email: user.email,
+      password: "",
+      isAdmin: user.isAdmin || false,
+      modulePermissions: perms,
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleNewUser = () => {
+    setEditingUser(null);
+    form.reset({
+      name: "",
+      email: "",
+      password: "",
+      isAdmin: false,
+      modulePermissions: {
+        chamados: true,
+        projetos: true,
+        tarefas: true,
+        okrs: true,
+        logistica: true,
+        apis: false,
+        configuracoes: false,
+      },
+    });
+    setIsDialogOpen(true);
+  };
 
   const toggleStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -161,7 +224,7 @@ export function UsersSettings() {
             Gerencie os usuários que têm acesso ao sistema
           </CardDescription>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)} data-testid="button-new-user">
+        <Button onClick={handleNewUser} data-testid="button-new-user">
           <Plus className="h-4 w-4 mr-2" />
           Novo Usuário
         </Button>
@@ -205,8 +268,8 @@ export function UsersSettings() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary">
-                      {getModuleCount(user)} módulos
+                    <Badge variant={user.isAdmin ? "default" : "secondary"} className={user.isAdmin ? "bg-primary text-white" : ""}>
+                      {user.isAdmin ? "Administrador" : `${getModuleCount(user)} módulos`}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground capitalize">
@@ -227,6 +290,12 @@ export function UsersSettings() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem 
+                          onClick={() => handleEdit(user)}
+                          data-testid={`menu-edit-${user.id}`}
+                        >
+                          Editar / Acessos
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
                           onClick={() => toggleStatusMutation.mutate({ 
                             id: user.id, 
                             status: user.status === "active" ? "inactive" : "active" 
@@ -245,17 +314,20 @@ export function UsersSettings() {
         )}
       </CardContent>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        setIsDialogOpen(open);
+        if (!open) setEditingUser(null);
+      }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Novo Usuário</DialogTitle>
+            <DialogTitle>{editingUser ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
             <DialogDescription>
-              Adicione um novo usuário ao sistema.
+              {editingUser ? "Atualize as informações e permissões do usuário." : "Adicione um novo usuário ao sistema."}
             </DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
               <FormField
                 control={form.control}
                 name="name"
@@ -289,12 +361,12 @@ export function UsersSettings() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Senha</FormLabel>
+                    <FormLabel>Senha {editingUser && "(deixe em branco para manter a atual)"}</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Input 
                           type={showPassword ? "text" : "password"} 
-                          placeholder="Mínimo 6 caracteres" 
+                          placeholder={editingUser ? "Nova senha" : "Mínimo 6 caracteres"} 
                           data-testid="input-user-password" 
                           {...field} 
                         />
@@ -311,6 +383,28 @@ export function UsersSettings() {
                       </div>
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="isAdmin"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-muted/20">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="checkbox-is-admin"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel className="cursor-pointer">Administrador</FormLabel>
+                      <FormDescription>
+                        Administradores têm acesso total a todos os módulos e configurações.
+                      </FormDescription>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -346,8 +440,8 @@ export function UsersSettings() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} data-testid="button-cancel-user">
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit-user">
-                  {createMutation.isPending ? "Criando..." : "Criar Usuário"}
+                <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-user">
+                  {mutation.isPending ? "Salvando..." : (editingUser ? "Salvar Alterações" : "Criar Usuário")}
                 </Button>
               </DialogFooter>
             </form>
