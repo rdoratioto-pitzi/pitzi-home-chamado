@@ -1,6 +1,7 @@
 import { 
   type User, type InsertUser,
   type Ticket, type InsertTicket,
+  type TicketResponsavel, type InsertTicketResponsavel,
   type TicketComment, type InsertTicketComment,
   type Project, type InsertProject,
   type KanbanColumn, type InsertKanbanColumn,
@@ -23,7 +24,7 @@ import {
   type LogisticaReversaPedido, type InsertLogisticaReversaPedido,
   type LogisticaReversaEvento, type InsertLogisticaReversaEvento,
   type LogisticsDashboardStats,
-  users, tickets, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
+  users, tickets, ticketResponsaveis, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
   collectionRequests, logisticaReversaPedidos, logisticaReversaEventos
@@ -45,6 +46,15 @@ export interface IStorage {
   createTicket(ticket: InsertTicket): Promise<Ticket>;
   updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined>;
   deleteTicket(id: string): Promise<boolean>;
+
+  // Ticket Responsaveis (Assignment Rules)
+  getTicketResponsaveis(): Promise<TicketResponsavel[]>;
+  getTicketResponsavel(id: string): Promise<TicketResponsavel | undefined>;
+  getTicketResponsavelByRule(categoria: string, tipo: string): Promise<TicketResponsavel[]>;
+  createTicketResponsavel(data: InsertTicketResponsavel): Promise<TicketResponsavel>;
+  updateTicketResponsavel(id: string, data: Partial<TicketResponsavel>): Promise<TicketResponsavel | undefined>;
+  deleteTicketResponsavel(id: string): Promise<boolean>;
+  findResponsavelForTicket(categoria: string, tipo: string): Promise<string | null>;
 
   // Ticket Comments
   getTicketComments(ticketId: string): Promise<TicketComment[]>;
@@ -221,6 +231,69 @@ export class DatabaseStorage implements IStorage {
   async deleteTicket(id: string): Promise<boolean> {
     const result = await db.delete(tickets).where(eq(tickets.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Ticket Responsaveis (Assignment Rules)
+  async getTicketResponsaveis(): Promise<TicketResponsavel[]> {
+    return await db.select().from(ticketResponsaveis);
+  }
+  async getTicketResponsavel(id: string): Promise<TicketResponsavel | undefined> {
+    const [resp] = await db.select().from(ticketResponsaveis).where(eq(ticketResponsaveis.id, id));
+    return resp;
+  }
+  async getTicketResponsavelByRule(categoria: string, tipo: string): Promise<TicketResponsavel[]> {
+    return await db.select().from(ticketResponsaveis).where(
+      and(
+        eq(ticketResponsaveis.categoria, categoria),
+        eq(ticketResponsaveis.tipo, tipo),
+        eq(ticketResponsaveis.ativo, true)
+      )
+    );
+  }
+  async createTicketResponsavel(data: InsertTicketResponsavel): Promise<TicketResponsavel> {
+    const [resp] = await db.insert(ticketResponsaveis).values(data).returning();
+    return resp;
+  }
+  async updateTicketResponsavel(id: string, data: Partial<TicketResponsavel>): Promise<TicketResponsavel | undefined> {
+    const [resp] = await db.update(ticketResponsaveis).set(data).where(eq(ticketResponsaveis.id, id)).returning();
+    return resp;
+  }
+  async deleteTicketResponsavel(id: string): Promise<boolean> {
+    const result = await db.delete(ticketResponsaveis).where(eq(ticketResponsaveis.id, id)).returning();
+    return result.length > 0;
+  }
+  async findResponsavelForTicket(categoria: string, tipo: string): Promise<string | null> {
+    const rules = await this.getTicketResponsavelByRule(categoria, tipo);
+    if (rules.length === 0) return null;
+    
+    if (rules.length === 1) {
+      return rules[0].usuarioResponsavelId;
+    }
+    
+    const allTickets = await this.getTickets();
+    const openTicketCounts = new Map<string, number>();
+    
+    for (const rule of rules) {
+      const count = allTickets.filter(t => 
+        t.assigneeId === rule.usuarioResponsavelId && 
+        t.status !== 'closed' && t.status !== 'resolved'
+      ).length;
+      openTicketCounts.set(rule.usuarioResponsavelId, count);
+    }
+    
+    let minCount = Infinity;
+    let selectedResponsavel = rules[0].usuarioResponsavelId;
+    const entries = Array.from(openTicketCounts.entries());
+    for (const entry of entries) {
+      const userId = entry[0];
+      const count = entry[1];
+      if (count < minCount) {
+        minCount = count;
+        selectedResponsavel = userId;
+      }
+    }
+    
+    return selectedResponsavel;
   }
 
   // Ticket Comments

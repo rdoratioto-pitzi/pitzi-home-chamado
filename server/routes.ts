@@ -1,10 +1,16 @@
-import nodemailer from "nodemailer";
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
+  sendTicketCreatedEmail, 
+  sendTicketAssignedEmail, 
+  sendTicketStatusChangedEmail, 
+  sendTicketCommentEmail 
+} from "./email-service";
+import { 
   insertUserSchema, 
   insertTicketSchema, 
+  insertTicketResponsavelSchema,
   insertTicketCommentSchema,
   insertProjectSchema,
   insertKanbanColumnSchema,
@@ -199,7 +205,27 @@ export async function registerRoutes(
   app.post("/api/tickets", async (req, res) => {
     try {
       const validated = insertTicketSchema.parse(req.body);
+      
+      if (!validated.assigneeId) {
+        const autoAssignee = await storage.findResponsavelForTicket(validated.category, validated.type);
+        if (autoAssignee) {
+          validated.assigneeId = autoAssignee;
+        }
+      }
+      
       const ticket = await storage.createTicket(validated);
+      
+      const requester = await storage.getUser(ticket.requesterId);
+      const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
+      
+      if (requester) {
+        sendTicketCreatedEmail(ticket, requester, assignee || null).catch(console.error);
+      }
+      
+      if (assignee && assignee.id !== ticket.requesterId) {
+        sendTicketAssignedEmail(ticket, assignee).catch(console.error);
+      }
+      
       res.status(201).json(ticket);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -213,8 +239,28 @@ export async function registerRoutes(
     try {
       const partialSchema = insertTicketSchema.partial();
       const validated = partialSchema.parse(req.body);
+      
+      const oldTicket = await storage.getTicket(req.params.id);
+      if (!oldTicket) return res.status(404).json({ error: "Ticket not found" });
+      
       const ticket = await storage.updateTicket(req.params.id, validated);
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+      
+      if (validated.status && validated.status !== oldTicket.status) {
+        const requester = await storage.getUser(ticket.requesterId);
+        const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
+        if (requester) {
+          sendTicketStatusChangedEmail(ticket, oldTicket.status, validated.status, requester, assignee || null).catch(console.error);
+        }
+      }
+      
+      if (validated.assigneeId && validated.assigneeId !== oldTicket.assigneeId) {
+        const assignee = await storage.getUser(validated.assigneeId);
+        if (assignee) {
+          sendTicketAssignedEmail(ticket, assignee).catch(console.error);
+        }
+      }
+      
       res.json(ticket);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -243,6 +289,18 @@ export async function registerRoutes(
         ticketId: req.params.id,
       });
       const comment = await storage.createTicketComment(validated);
+      
+      const ticket = await storage.getTicket(req.params.id);
+      if (ticket) {
+        const commenter = await storage.getUser(comment.userId);
+        const requester = await storage.getUser(ticket.requesterId);
+        const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
+        
+        if (commenter && requester) {
+          sendTicketCommentEmail(ticket, comment, commenter, requester, assignee || null).catch(console.error);
+        }
+      }
+      
       res.status(201).json(comment);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -250,6 +308,57 @@ export async function registerRoutes(
       }
       res.status(400).json({ error: "Failed to create comment" });
     }
+  });
+
+  // ============== TICKET RESPONSAVEIS (Assignment Rules) ==============
+  app.get("/api/ticket-responsaveis", async (req, res) => {
+    const responsaveis = await storage.getTicketResponsaveis();
+    res.json(responsaveis);
+  });
+
+  app.get("/api/ticket-responsaveis/:id", async (req, res) => {
+    const responsavel = await storage.getTicketResponsavel(req.params.id);
+    if (!responsavel) return res.status(404).json({ error: "Responsavel not found" });
+    res.json(responsavel);
+  });
+
+  app.post("/api/ticket-responsaveis", async (req, res) => {
+    try {
+      const validated = insertTicketResponsavelSchema.parse(req.body);
+      const responsavel = await storage.createTicketResponsavel(validated);
+      res.status(201).json(responsavel);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create responsavel" });
+    }
+  });
+
+  app.patch("/api/ticket-responsaveis/:id", async (req, res) => {
+    try {
+      const partialSchema = insertTicketResponsavelSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const responsavel = await storage.updateTicketResponsavel(req.params.id, validated);
+      if (!responsavel) return res.status(404).json({ error: "Responsavel not found" });
+      res.json(responsavel);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update responsavel" });
+    }
+  });
+
+  app.delete("/api/ticket-responsaveis/:id", async (req, res) => {
+    const deleted = await storage.deleteTicketResponsavel(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Responsavel not found" });
+    res.status(204).send();
+  });
+
+  app.get("/api/ticket-responsaveis/find/:categoria/:tipo", async (req, res) => {
+    const responsavelId = await storage.findResponsavelForTicket(req.params.categoria, req.params.tipo);
+    res.json({ responsavelId });
   });
 
   // ============== PROJECTS ==============

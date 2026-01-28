@@ -72,6 +72,22 @@ export const insertTicketSchema = createInsertSchema(tickets).omit({ id: true, c
 export type InsertTicket = z.infer<typeof insertTicketSchema>;
 export type Ticket = typeof tickets.$inferSelect;
 
+// ============== TICKET RESPONSAVEIS (Assignment Rules) ==============
+export const ticketResponsaveis = pgTable("ticket_responsaveis", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  categoria: text("categoria").notNull(),
+  tipo: text("tipo").notNull(),
+  usuarioResponsavelId: varchar("usuario_responsavel_id").notNull(),
+  ativo: boolean("ativo").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTicketResponsavelSchema = createInsertSchema(ticketResponsaveis).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTicketResponsavel = z.infer<typeof insertTicketResponsavelSchema>;
+export type TicketResponsavel = typeof ticketResponsaveis.$inferSelect;
+
 // ============== TICKET COMMENTS ==============
 export const ticketComments = pgTable("ticket_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
