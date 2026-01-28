@@ -366,7 +366,7 @@ export default function ChamadosPage() {
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Título</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Categoria</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tipo</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Local</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Responsável</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Status</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Prioridade</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">
@@ -410,8 +410,14 @@ export default function ChamadosPage() {
                             {typeLabels[ticket.type || "bug"]}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-wider">{ticket.location}</Badge>
+                        <TableCell className="text-[13px]">
+                          {ticket.assigneeId ? (
+                            <span className="font-medium">
+                              {users.find(u => u.id === ticket.assigneeId)?.name || "—"}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Não atribuído</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline" className={`${statusColors[ticket.status]} text-[10px] font-bold uppercase tracking-wider`}>
