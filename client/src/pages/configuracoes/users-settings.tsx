@@ -122,8 +122,26 @@ export function UsersSettings() {
       }
       return apiRequest("POST", "/api/users", payload);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      
+      // Se o usuário editado for o próprio usuário logado, atualiza o sessionStorage
+      const currentUser = JSON.parse(sessionStorage.getItem("user") || "{}");
+      if (editingUser && editingUser.id === currentUser.id) {
+        // O backend retorna o usuário atualizado
+        const updatedUser = { 
+          ...currentUser, 
+          ...data,
+          // Garante que modulePermissions seja tratado corretamente
+          modulePermissions: typeof data.modulePermissions === 'string' 
+            ? data.modulePermissions 
+            : JSON.stringify(data.modulePermissions)
+        };
+        sessionStorage.setItem("user", JSON.stringify(updatedUser));
+        // Dispara evento para o sidebar atualizar
+        window.dispatchEvent(new Event("storage"));
+      }
+
       toast({ 
         title: editingUser ? "Usuário atualizado" : "Usuário criado", 
         description: editingUser ? "O usuário foi atualizado com sucesso." : "O usuário foi criado com sucesso." 

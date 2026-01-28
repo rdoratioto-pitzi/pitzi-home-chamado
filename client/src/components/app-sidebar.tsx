@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { 
   Ticket, 
   FolderKanban, 
@@ -99,50 +99,62 @@ function getCurrentUser() {
   return null;
 }
 
-function getUserPermissions(): ModulePermissions {
-  try {
-    const user = getCurrentUser();
-    if (user?.isAdmin) {
-      return {
-        chamados: true,
-        projetos: true,
-        tarefas: true,
-        okrs: true,
-        logistica: true,
-        apis: true,
-        configuracoes: true,
-      };
-    }
-    if (user?.modulePermissions) {
-      const perms = typeof user.modulePermissions === "string" 
-        ? JSON.parse(user.modulePermissions) 
-        : user.modulePermissions;
-      return perms;
-    }
-  } catch (e) {
-    console.error("Error parsing permissions:", e);
-  }
-  return {
-    chamados: false,
-    projetos: false,
-    tarefas: false,
-    okrs: false,
-    logistica: false,
-    apis: false,
-    configuracoes: false,
-  };
-}
-
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { theme } = useTheme();
   const { toast } = useToast();
+  
+  // State to force re-render when user data changes
+  const [currentUser, setCurrentUser] = useState(getCurrentUser());
+  
+  useEffect(() => {
+    const handleStorageChange = () => {
+      setCurrentUser(getCurrentUser());
+    };
+    window.addEventListener("storage", handleStorageChange);
+    // Poll to catch updates within the same tab since sessionStorage doesn't trigger 'storage' event across tabs
+    const interval = setInterval(handleStorageChange, 1000);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
   
   const isLogisticaActive = location.startsWith("/logistica");
   
-  const currentUser = useMemo(() => getCurrentUser(), []);
-  const permissions = useMemo(() => getUserPermissions(), []);
+  const permissions = useMemo(() => {
+    try {
+      if (currentUser?.isAdmin === true || currentUser?.isAdmin === "true") {
+        return {
+          chamados: true,
+          projetos: true,
+          tarefas: true,
+          okrs: true,
+          logistica: true,
+          apis: true,
+          configuracoes: true,
+        };
+      }
+      if (currentUser?.modulePermissions) {
+        return typeof currentUser.modulePermissions === "string" 
+          ? JSON.parse(currentUser.modulePermissions) 
+          : currentUser.modulePermissions;
+      }
+    } catch (e) {
+      console.error("Error parsing permissions:", e);
+    }
+    return {
+      chamados: false,
+      projetos: false,
+      tarefas: false,
+      okrs: false,
+      logistica: false,
+      apis: false,
+      configuracoes: false,
+    };
+  }, [currentUser]);
   
   const menuItems = useMemo(() => {
     return allMenuItems.filter(item => {
