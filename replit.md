@@ -183,6 +183,10 @@ Na inicialização, o servidor executa `server/seed.ts` que:
 - **Atribuição automática**: Sistema de atribuição baseado em categoria+tipo com balanceamento round-robin
 - **Coluna Responsável**: Exibição do responsável na listagem de chamados
 - **Seleção manual de responsável**: Campo opcional no formulário de criação
+- **Timestamp tracking**: Campos dataAbertura, dataPrimeiraResposta, dataResolucao, dataFechamento
+- **Timeline do Chamado**: Visualização completa do ciclo de vida com cálculo de duração
+- **Coluna TEMPO ABERTO**: Indicador colorido (verde <24h, amarelo 24-72h, vermelho >72h)
+- **Auto-preenchimento de timestamps**: Resolução/fechamento preenchidos ao mudar status, primeira resposta ao comentar
 
 ### Notificações por Email
 - **Novo chamado criado**: Email enviado ao solicitante com detalhes do ticket
