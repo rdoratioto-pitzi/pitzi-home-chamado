@@ -179,7 +179,17 @@ Na inicialização, o servidor executa `server/seed.ts` que:
 - **Campos de classificação**: Tipo (Bug, Melhoria, Negócio) e Local (RS, RG, Dash, One, Home, Omie, Outros)
 - **Status bloqueado**: Novo status para tickets que estão aguardando terceiros
 - **Visualização Kanban**: Toggle entre Grid/Lista/Kanban com drag-and-drop
-- **Exportar Excel**: Download de todos os chamados em formato CSV
+- **Exportar Excel**: Download de todos os chamados em formato XLSX
+- **Atribuição automática**: Sistema de atribuição baseado em categoria+tipo com balanceamento round-robin
+- **Coluna Responsável**: Exibição do responsável na listagem de chamados
+- **Seleção manual de responsável**: Campo opcional no formulário de criação
+
+### Notificações por Email
+- **Novo chamado criado**: Email enviado ao solicitante com detalhes do ticket
+- **Chamado atribuído**: Email enviado ao responsável quando um ticket é atribuído
+- **Status alterado**: Email enviado ao solicitante quando o status muda
+- **Comentário adicionado**: Email enviado aos envolvidos quando há novo comentário
+- **Templates HTML profissionais**: Design responsivo com identidade visual Renov
 
 ### Tarefas
 - **Visualização Kanban**: Colunas A Fazer, Em Andamento, Concluído, Arquivado
@@ -191,6 +201,8 @@ Na inicialização, o servidor executa `server/seed.ts` que:
 
 ### Configurações
 - **Gerenciamento de Campos**: Configurar Categorias, Tipos e Locais dinâmicos
+- **Responsáveis por Chamados**: Definir regras de atribuição automática por categoria+tipo
+- **Gerenciamento de Usuários**: Convidar usuários com email automático de boas-vindas
 
 ## Componentes Reutilizáveis
 
