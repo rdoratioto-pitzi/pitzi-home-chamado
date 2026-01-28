@@ -216,7 +216,7 @@ export function UsersSettings() {
   });
 
   const onSubmit = (data: FormData) => {
-    createMutation.mutate(data);
+    mutation.mutate(data);
   };
 
   const getInitials = (name: string) => {
