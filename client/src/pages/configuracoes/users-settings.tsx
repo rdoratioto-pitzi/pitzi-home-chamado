@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
+import { getCurrentUser, isAdmin as checkIsAdmin } from "@/lib/permissions";
 import {
   Table,
   TableBody,
@@ -79,8 +80,18 @@ export function UsersSettings() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const checkAdminStatus = () => {
+      setCurrentUserIsAdmin(checkIsAdmin());
+    };
+    checkAdminStatus();
+    const interval = setInterval(checkAdminStatus, 500);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -242,10 +253,12 @@ export function UsersSettings() {
             Gerencie os usuários que têm acesso ao sistema
           </CardDescription>
         </div>
-        <Button onClick={handleNewUser} data-testid="button-new-user">
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Usuário
-        </Button>
+        {currentUserIsAdmin && (
+          <Button onClick={handleNewUser} data-testid="button-new-user">
+            <Plus className="h-4 w-4 mr-2" />
+            Novo Usuário
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -300,30 +313,32 @@ export function UsersSettings() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" data-testid={`button-menu-${user.id}`}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                          onClick={() => handleEdit(user)}
-                          data-testid={`menu-edit-${user.id}`}
-                        >
-                          Editar / Acessos
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          onClick={() => toggleStatusMutation.mutate({ 
-                            id: user.id, 
-                            status: user.status === "active" ? "inactive" : "active" 
-                          })}
-                          data-testid={`menu-toggle-${user.id}`}
-                        >
-                          {user.status === "active" ? "Desativar" : "Ativar"}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {currentUserIsAdmin && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" data-testid={`button-menu-${user.id}`}>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem 
+                            onClick={() => handleEdit(user)}
+                            data-testid={`menu-edit-${user.id}`}
+                          >
+                            Editar / Acessos
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => toggleStatusMutation.mutate({ 
+                              id: user.id, 
+                              status: user.status === "active" ? "inactive" : "active" 
+                            })}
+                            data-testid={`menu-toggle-${user.id}`}
+                          >
+                            {user.status === "active" ? "Desativar" : "Ativar"}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

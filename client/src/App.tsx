@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ProtectedRoute } from "@/components/protected-route";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import ChamadosPage from "@/pages/chamados/index";
@@ -28,21 +29,77 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/chamados" component={ChamadosPage} />
-      <Route path="/projetos" component={ProjetosPage} />
-      <Route path="/projetos/:id" component={KanbanPage} />
-      <Route path="/tarefas" component={TarefasPage} />
-      <Route path="/tarefas/:id" component={TaskDetailPage} />
-      <Route path="/okrs" component={OKRsPage} />
-      <Route path="/logistica" component={LogisticaPage} />
-      <Route path="/logistica/dashboard" component={LogisticsDashboard} />
-      <Route path="/logistica/simular-frete" component={SimularFretePage} />
-      <Route path="/logistica/operadores" component={OperadoresPage} />
-      <Route path="/logistica/solicitacoes" component={SolicitacoesPage} />
-      <Route path="/logistica/reversa" component={LogisticaReversaPage} />
-      <Route path="/apis" component={ApisPage} />
+      <Route path="/chamados">
+        <ProtectedRoute requiredPermission="chamados">
+          <ChamadosPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/projetos">
+        <ProtectedRoute requiredPermission="projetos">
+          <ProjetosPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/projetos/:id">
+        <ProtectedRoute requiredPermission="projetos">
+          <KanbanPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/tarefas">
+        <ProtectedRoute requiredPermission="tarefas">
+          <TarefasPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/tarefas/:id">
+        <ProtectedRoute requiredPermission="tarefas">
+          <TaskDetailPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/okrs">
+        <ProtectedRoute requiredPermission="okrs">
+          <OKRsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica">
+        <ProtectedRoute requiredPermission="logistica">
+          <LogisticaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/dashboard">
+        <ProtectedRoute requiredPermission="logistica">
+          <LogisticsDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/simular-frete">
+        <ProtectedRoute requiredPermission="logistica">
+          <SimularFretePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/operadores">
+        <ProtectedRoute requiredPermission="logistica">
+          <OperadoresPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/solicitacoes">
+        <ProtectedRoute requiredPermission="logistica">
+          <SolicitacoesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/reversa">
+        <ProtectedRoute requiredPermission="logistica">
+          <LogisticaReversaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/apis">
+        <ProtectedRoute requiredPermission="apis">
+          <ApisPage />
+        </ProtectedRoute>
+      </Route>
       <Route path="/login" component={LoginPage} />
-      <Route path="/configuracoes" component={ConfiguracoesPage} />
+      <Route path="/configuracoes">
+        <ProtectedRoute requiredPermission="configuracoes">
+          <ConfiguracoesPage />
+        </ProtectedRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

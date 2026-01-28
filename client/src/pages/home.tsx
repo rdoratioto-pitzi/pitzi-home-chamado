@@ -3,8 +3,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Link } from "wouter";
 import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { getCurrentUser, getUserPermissions, type UserPermissions } from "@/lib/permissions";
+import { useState, useEffect } from "react";
 
 export default function Home() {
+  const [permissions, setPermissions] = useState<UserPermissions | null>(null);
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+
+  useEffect(() => {
+    const updatePermissions = () => {
+      const user = getCurrentUser();
+      if (user) {
+        setPermissions(getUserPermissions(user));
+        setIsUserAdmin(user.isAdmin === true);
+      }
+    };
+    updatePermissions();
+    const interval = setInterval(updatePermissions, 500);
+    return () => clearInterval(interval);
+  }, []);
+
   const { data: stats, isLoading } = useQuery<{
     tickets: number;
     projects: number;
@@ -15,7 +33,7 @@ export default function Home() {
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const modules = [
+  const allModules = [
     {
       title: "Chamados",
       description: "Gerencie tickets de suporte interno, acompanhe status e prioridades",
@@ -23,6 +41,7 @@ export default function Home() {
       href: "/chamados",
       stats: { label: "Chamados abertos", value: stats?.tickets ?? 0 },
       color: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+      permissionKey: "chamados" as keyof UserPermissions,
     },
     {
       title: "Projetos",
@@ -31,6 +50,7 @@ export default function Home() {
       href: "/projetos",
       stats: { label: "Projetos ativos", value: stats?.projects ?? 0 },
       color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+      permissionKey: "projetos" as keyof UserPermissions,
     },
     {
       title: "Tarefas",
@@ -39,6 +59,7 @@ export default function Home() {
       href: "/tarefas",
       stats: { label: "Tarefas pendentes", value: stats?.tasks ?? 0 },
       color: "bg-green-500/10 text-green-600 dark:text-green-400",
+      permissionKey: "tarefas" as keyof UserPermissions,
     },
     {
       title: "OKRs",
@@ -47,6 +68,7 @@ export default function Home() {
       href: "/okrs",
       stats: { label: "Objetivos ativos", value: stats?.objectives ?? 0 },
       color: "bg-primary/10 text-primary",
+      permissionKey: "okrs" as keyof UserPermissions,
     },
     {
       title: "Logística",
@@ -55,8 +77,15 @@ export default function Home() {
       href: "/logistica",
       stats: { label: "Em trânsito", value: stats?.logistica ?? 0 },
       color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+      permissionKey: "logistica" as keyof UserPermissions,
     },
   ];
+
+  const modules = allModules.filter(module => {
+    if (isUserAdmin) return true;
+    if (!permissions) return false;
+    return permissions[module.permissionKey];
+  });
 
   return (
     <div className="flex flex-col min-h-full">
