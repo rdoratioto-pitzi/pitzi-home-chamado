@@ -73,7 +73,6 @@ const priorityConfig = {
 
 const typeConfig = {
   task: { label: "Tarefa", icon: CheckCircle2 },
-  meeting_note: { label: "Reunião", icon: FileText },
 };
 
 export default function TarefasPage() {
@@ -290,8 +289,13 @@ export default function TarefasPage() {
 
   const priorityOrder = { high: 0, medium: 1, low: 2 };
 
+  // Filter out meetings - they are now in a separate module
+  const tasksOnly = useMemo(() => {
+    return tasks.filter(task => task.type !== "meeting_note");
+  }, [tasks]);
+
   const filteredTasks = useMemo(() => {
-    let result = tasks.filter(task => {
+    let result = tasksOnly.filter(task => {
       if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
@@ -332,7 +336,7 @@ export default function TarefasPage() {
     }
 
     return result;
-  }, [tasks, searchQuery, statusFilter, typeFilter, sortBy]);
+  }, [tasksOnly, searchQuery, statusFilter, typeFilter, sortBy]);
 
   const selectedArea = areas.find(a => a.id === selectedAreaId);
 
@@ -411,7 +415,6 @@ export default function TarefasPage() {
     setShowTaskDialog(true);
   };
 
-  const handleOpenMeetingDialog = () => handleOpenTaskDialog("meeting_note");
   const handleOpenNormalTaskDialog = () => handleOpenTaskDialog("task");
 
   return (
@@ -447,7 +450,7 @@ export default function TarefasPage() {
             <Folder className="h-4 w-4" />
             <span>Todas as Tarefas</span>
             <Badge variant="secondary" className="ml-auto text-xs">
-              {tasks.length}
+              {tasksOnly.length}
             </Badge>
           </button>
 
@@ -456,7 +459,7 @@ export default function TarefasPage() {
               <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
             ) : (
               areas.map((area) => {
-                const areaTaskCount = tasks.filter(t => t.areaId === area.id).length;
+                const areaTaskCount = tasksOnly.filter(t => t.areaId === area.id).length;
                 return (
                   <div 
                     key={area.id}
@@ -517,16 +520,10 @@ export default function TarefasPage() {
         <PageHeader
           title={selectedArea ? selectedArea.name : "Todas as Tarefas"}
           actions={
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={handleOpenMeetingDialog} data-testid="button-new-meeting">
-                <FileText className="h-4 w-4 mr-2" />
-                Nova Reunião
-              </Button>
-              <Button onClick={handleOpenNormalTaskDialog} data-testid="button-new-task">
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Tarefa
-              </Button>
-            </div>
+            <Button onClick={handleOpenNormalTaskDialog} data-testid="button-new-task">
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Tarefa
+            </Button>
           }
         />
 
@@ -563,8 +560,7 @@ export default function TarefasPage() {
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="task">Tarefas</SelectItem>
-                  <SelectItem value="meeting_note">Reuniões</SelectItem>
-                </SelectContent>
+                                  </SelectContent>
               </Select>
 
               <Select value={sortBy} onValueChange={(v) => setSortBy(v as "priority" | "date" | "custom")}>
