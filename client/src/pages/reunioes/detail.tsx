@@ -47,7 +47,9 @@ import {
   Dialog,
   DialogContent,
   DialogTrigger,
+  DialogTitle,
 } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   Popover,
   PopoverContent,
@@ -722,11 +724,11 @@ export default function MeetingDetailPage() {
                             <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                               {comment.content}
                             </p>
-                            {comment.attachments && (
+                            {(comment as any).attachments && (
                               <div className="grid grid-cols-2 gap-2 mt-2">
                                 {(() => {
                                   try {
-                                    const attachments = JSON.parse(comment.attachments);
+                                    const attachments = JSON.parse((comment as any).attachments);
                                     if (Array.isArray(attachments)) {
                                       return attachments.map((url: string, i: number) => (
                                         <Dialog key={i}>
@@ -738,8 +740,15 @@ export default function MeetingDetailPage() {
                                               </div>
                                             </div>
                                           </DialogTrigger>
-                                          <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none">
-                                            <img src={url} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain mx-auto" />
+                                          <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                                            <VisuallyHidden>
+                                              <DialogTitle>Visualização de Imagem</DialogTitle>
+                                            </VisuallyHidden>
+                                            <img 
+                                              src={url} 
+                                              alt="Preview" 
+                                              className="max-w-full max-h-full object-contain" 
+                                            />
                                           </DialogContent>
                                         </Dialog>
                                       ));

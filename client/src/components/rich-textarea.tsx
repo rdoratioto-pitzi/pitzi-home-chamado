@@ -7,7 +7,9 @@ import {
   Dialog,
   DialogContent,
   DialogTrigger,
+  DialogTitle,
 } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 interface RichTextareaProps {
   value: string;
@@ -55,45 +57,19 @@ export function RichTextarea({
       return null;
     }
 
-    try {
-      const requestRes = await fetch("/api/uploads/request-url", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: file.name || "pasted-image.png",
-          size: file.size,
-          contentType: file.type
-        })
-      });
-
-      if (!requestRes.ok) {
-        throw new Error("Failed to get upload URL");
-      }
-
-      const { uploadURL, objectPath } = await requestRes.json();
-
-      const uploadRes = await fetch(uploadURL, {
-        method: "PUT",
-        body: file,
-        headers: {
-          "Content-Type": file.type
-        }
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("Failed to upload file");
-      }
-
-      return `/objects${objectPath}`;
-    } catch (error) {
-      console.error("Upload error:", error);
-      toast({
-        title: "Erro no upload",
-        description: "Não foi possível fazer o upload da imagem.",
-        variant: "destructive",
-      });
-      return null;
-    }
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => {
+        toast({
+          title: "Erro na leitura",
+          description: "Não foi possível ler o arquivo de imagem.",
+          variant: "destructive",
+        });
+        resolve(null);
+      };
+      reader.readAsDataURL(file);
+    });
   }, [toast]);
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,9 +113,6 @@ export function RichTextarea({
 
     if (files.length === 0) return;
 
-    // Se houver imagens, prevenimos o comportamento padrão de colar texto se houver apenas imagens
-    // Mas se o usuário estiver colando texto e imagens, o ideal é processar ambos.
-    // Para simplificar e garantir que a imagem seja processada:
     setIsUploading(true);
     const uploadedUrls: string[] = [];
 
@@ -235,8 +208,15 @@ export function RichTextarea({
                       <Maximize2 className="h-4 w-4" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none">
-                    <img src={url} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain mx-auto" />
+                  <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                    <VisuallyHidden>
+                      <DialogTitle>Visualização de Imagem</DialogTitle>
+                    </VisuallyHidden>
+                    <img 
+                      src={url} 
+                      alt="Preview" 
+                      className="max-w-full max-h-full object-contain" 
+                    />
                   </DialogContent>
                 </Dialog>
                 <Button

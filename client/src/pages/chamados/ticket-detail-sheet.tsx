@@ -27,7 +27,9 @@ import {
   Dialog,
   DialogContent,
   DialogTrigger,
+  DialogTitle,
 } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 interface TicketDetailSheetProps {
   ticket: Ticket | null;
@@ -238,9 +240,16 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                               </div>
                             </div>
                           </DialogTrigger>
-                          <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none">
-                            <img src={url} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain mx-auto" />
-                          </DialogContent>
+                                      <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                                        <VisuallyHidden>
+                                          <DialogTitle>Visualização de Imagem</DialogTitle>
+                                        </VisuallyHidden>
+                                        <img 
+                                          src={url} 
+                                          alt="Preview" 
+                                          className="max-w-full max-h-full object-contain" 
+                                        />
+                                      </DialogContent>
                         </Dialog>
                       ));
                     }
@@ -377,9 +386,16 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                                         </div>
                                       </div>
                                     </DialogTrigger>
-                                    <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none">
-                                      <img src={url} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain mx-auto" />
-                                    </DialogContent>
+                                  <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                                    <VisuallyHidden>
+                                      <DialogTitle>Visualização de Imagem</DialogTitle>
+                                    </VisuallyHidden>
+                                    <img 
+                                      src={url} 
+                                      alt="Preview" 
+                                      className="max-w-full max-h-full object-contain" 
+                                    />
+                                  </DialogContent>
                                   </Dialog>
                                 ));
                               }
