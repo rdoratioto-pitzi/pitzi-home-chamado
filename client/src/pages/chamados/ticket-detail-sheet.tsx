@@ -204,7 +204,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
 
           <div>
             <h4 className="text-sm font-medium mb-2">Descrição</h4>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
               {ticket.description}
             </p>
           </div>

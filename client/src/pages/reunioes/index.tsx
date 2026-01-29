@@ -1281,12 +1281,12 @@ export default function ReunioesPage() {
                   })}
                   placeholder="- Item 1&#10;- Item 2&#10;- Item 3"
                   rows={6}
-                  maxLength={1000}
+                  maxLength={2000}
                   data-testid="input-meeting-agenda"
                 />
                 <div className="flex justify-end">
                   <span className="text-[10px] text-muted-foreground">
-                    {(newMeeting.meetingData.agenda || "").length}/1000
+                    {(newMeeting.meetingData.agenda || "").length}/2000
                   </span>
                 </div>
               </div>

@@ -549,17 +549,17 @@ export default function MeetingDetailPage() {
                       })}
                       placeholder="Pauta da reunião..."
                       rows={10}
-                      maxLength={1000}
+                      maxLength={2000}
                       data-testid="input-meeting-agenda"
                     />
                     <div className="flex justify-end">
                       <span className="text-[10px] text-muted-foreground">
-                        {(editedMeetingData.agenda || "").length}/1000
+                        {(editedMeetingData.agenda || "").length}/2000
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-1 whitespace-pre-wrap">
+                  <div className="mt-1 whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                     {editedMeetingData.agenda || <span className="text-muted-foreground">Nenhuma pauta definida</span>}
                   </div>
                 )}

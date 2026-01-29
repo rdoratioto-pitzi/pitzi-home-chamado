@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, Image, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +13,7 @@ export function BrandSettings() {
   const [logoPreviewLight, setLogoPreviewLight] = useState<string | null>(null);
   const [logoPreviewDark, setLogoPreviewDark] = useState<string | null>(null);
   const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<{ file: File; type: 'light' | 'dark' | 'favicon' } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const { data: faviconSetting, refetch: refetchFavicon } = useQuery<{ value: string }>({
@@ -49,7 +49,7 @@ export function BrandSettings() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'light' | 'dark' | 'favicon') => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.includes("image/png") && !file.type.includes("image/svg") && !file.type.includes("image/jpeg") && !file.type.includes("image/x-icon")) {
+      if (!file.type.includes("image/png") && !file.type.includes("image/svg") && !file.type.includes("image/jpeg") && !file.type.includes("image/x-icon") && !file.type.includes("image/vnd.microsoft.icon")) {
         toast({
           title: "Formato inválido",
           description: "Por favor, envie um arquivo PNG, JPG, SVG ou ICO.",
@@ -58,53 +58,73 @@ export function BrandSettings() {
         return;
       }
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (type === 'light') setLogoPreviewLight(reader.result as string);
-        else if (type === 'dark') setLogoPreviewDark(reader.result as string);
-        else setFaviconPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      const previewUrl = URL.createObjectURL(file);
+      if (type === 'light') setLogoPreviewLight(previewUrl);
+      else if (type === 'dark') setLogoPreviewDark(previewUrl);
+      else setFaviconPreview(previewUrl);
+      
+      setPendingFile({ file, type });
     }
   };
 
   const handleSave = async (type: 'light' | 'dark' | 'favicon') => {
-    let value: string | null = null;
-    let key = "";
-    
-    if (type === 'light') {
-      value = logoPreviewLight;
-      key = "logo_url_light";
-    } else if (type === 'dark') {
-      value = logoPreviewDark;
-      key = "logo_url_dark";
-    } else {
-      value = faviconPreview;
-      key = "favicon_url";
+    if (!pendingFile || pendingFile.type !== type) {
+      toast({
+        title: "Nenhum arquivo selecionado",
+        description: "Por favor, selecione um arquivo primeiro.",
+        variant: "destructive"
+      });
+      return;
     }
 
-    if (!value) return;
+    const { file } = pendingFile;
+    const key = type === 'light' ? "logo_url_light" : type === 'dark' ? "logo_url_dark" : "favicon_url";
     
     setIsSaving(true);
     try {
-      await apiRequest("POST", "/api/settings", { key, value });
+      const requestRes = await fetch("/api/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type
+        })
+      });
+      
+      if (!requestRes.ok) {
+        throw new Error("Failed to get upload URL");
+      }
+      
+      const { uploadURL, objectPath } = await requestRes.json();
+      
+      const uploadRes = await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: {
+          "Content-Type": file.type
+        }
+      });
+      
+      if (!uploadRes.ok) {
+        throw new Error("Failed to upload file");
+      }
+      
+      const fileUrl = `/objects${objectPath}`;
+      
+      await apiRequest("POST", "/api/settings", { key, value: fileUrl });
       await queryClient.invalidateQueries({ queryKey: ["/api/settings", key] });
       
       if (type === 'favicon') {
         await refetchFavicon();
-        const link = (document.querySelector("link[rel*='icon']") || document.createElement('link')) as HTMLLinkElement;
-        link.rel = 'shortcut icon';
-        link.href = value;
-        if (!link.parentNode) {
-          document.getElementsByTagName('head')[0].appendChild(link);
-        }
+        updateBrowserFavicon(fileUrl);
       } else if (type === 'light') {
         await refetchLogoLight();
       } else if (type === 'dark') {
         await refetchLogoDark();
       }
 
-      queryClient.setQueryData(["/api/settings", key], { value });
+      queryClient.setQueryData(["/api/settings", key], { value: fileUrl });
 
       toast({
         title: "Atualizado com sucesso",
@@ -114,14 +134,43 @@ export function BrandSettings() {
       if (type === 'light') setLogoPreviewLight(null);
       else if (type === 'dark') setLogoPreviewDark(null);
       else setFaviconPreview(null);
+      
+      setPendingFile(null);
     } catch (error) {
+      console.error("Upload error:", error);
       toast({
         title: "Erro ao salvar",
-        description: "Não foi possível salvar a alteração.",
+        description: "Não foi possível fazer o upload do arquivo.",
         variant: "destructive"
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const updateBrowserFavicon = (url: string) => {
+    const existingLinks = document.querySelectorAll("link[rel*='icon']");
+    existingLinks.forEach(link => link.remove());
+    
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.type = 'image/x-icon';
+    link.href = url + '?t=' + Date.now();
+    document.getElementsByTagName('head')[0].appendChild(link);
+    
+    const shortcutLink = document.createElement('link');
+    shortcutLink.rel = 'shortcut icon';
+    shortcutLink.href = url + '?t=' + Date.now();
+    document.getElementsByTagName('head')[0].appendChild(shortcutLink);
+  };
+
+  const handleCancel = (type: 'light' | 'dark' | 'favicon') => {
+    if (type === 'light') setLogoPreviewLight(null);
+    else if (type === 'dark') setLogoPreviewDark(null);
+    else setFaviconPreview(null);
+    
+    if (pendingFile?.type === type) {
+      setPendingFile(null);
     }
   };
 
@@ -167,7 +216,7 @@ export function BrandSettings() {
                   <Button size="sm" onClick={() => handleSave('light')} disabled={isSaving}>
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar Claro"}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setLogoPreviewLight(null)}>Cancelar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleCancel('light')}>Cancelar</Button>
                 </div>
               )}
             </div>
@@ -202,7 +251,7 @@ export function BrandSettings() {
                   <Button size="sm" onClick={() => handleSave('dark')} disabled={isSaving}>
                     {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar Escuro"}
                   </Button>
-                  <Button size="sm" variant="ghost" className="text-white hover:text-white/80" onClick={() => setLogoPreviewDark(null)}>Cancelar</Button>
+                  <Button size="sm" variant="ghost" className="text-white hover:text-white/80" onClick={() => handleCancel('dark')}>Cancelar</Button>
                 </div>
               )}
             </div>
@@ -248,7 +297,7 @@ export function BrandSettings() {
                 <Button size="sm" onClick={() => handleSave('favicon')} disabled={isSaving}>
                   {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar Favicon"}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setFaviconPreview(null)}>Cancelar</Button>
+                <Button size="sm" variant="ghost" onClick={() => handleCancel('favicon')}>Cancelar</Button>
               </div>
             )}
           </div>

@@ -795,7 +795,7 @@ export default function TarefasPage() {
                                         </Badge>
                                       </div>
                                       {task.description && (
-                                        <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
+                                        <p className="text-sm text-muted-foreground line-clamp-1 mb-2 break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                                           {task.description}
                                         </p>
                                       )}

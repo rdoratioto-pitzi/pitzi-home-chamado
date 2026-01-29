@@ -470,7 +470,7 @@ export default function TaskDetailPage() {
                 </div>
               </div>
             ) : (
-              <p className="text-muted-foreground whitespace-pre-wrap">
+              <p className="text-muted-foreground whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                 {task.description || "Nenhuma descrição"}
               </p>
             )}
@@ -585,7 +585,7 @@ export default function TaskDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-1 whitespace-pre-wrap">
+                    <div className="mt-1 whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                       {editedMeetingData.agenda || <span className="text-muted-foreground">Nenhuma pauta definida</span>}
                     </div>
                   )}
