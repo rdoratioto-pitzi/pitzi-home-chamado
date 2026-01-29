@@ -656,7 +656,14 @@ export async function registerRoutes(
   // ============== KEY RESULT UPDATES (Check-ins) ==============
   app.get("/api/key-results/:id/updates", async (req, res) => {
     const updates = await storage.getKeyResultUpdates(req.params.id);
-    res.json(updates);
+    const users = await storage.getUsers();
+    
+    const updatesWithUser = updates.map(update => ({
+      ...update,
+      user: users.find(u => u.id === update.userId)
+    }));
+    
+    res.json(updatesWithUser);
   });
 
   app.post("/api/key-results/:id/updates", async (req, res) => {

@@ -27,7 +27,7 @@ import { apiRequest } from "@/lib/queryClient";
 import type { KeyResult, KeyResultUpdate } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TrendingUp, TrendingDown, Minus, Clock } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Clock, User } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -48,7 +48,7 @@ export function KeyResultUpdateDialog({ open, onOpenChange, keyResult }: KeyResu
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: updates = [], isLoading: updatesLoading } = useQuery<KeyResultUpdate[]>({
+  const { data: updates = [], isLoading: updatesLoading } = useQuery<(KeyResultUpdate & { user?: { name: string } })[]>({
     queryKey: ["/api/key-results", keyResult?.id, "updates"],
     enabled: !!keyResult?.id,
   });
@@ -68,10 +68,11 @@ export function KeyResultUpdateDialog({ open, onOpenChange, keyResult }: KeyResu
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
+      const user = JSON.parse(localStorage.getItem("renov-user") || "{}");
       return apiRequest("POST", `/api/key-results/${keyResult?.id}/updates`, {
         newValue: String(data.newValue),
         comment: data.comment,
-        userId: "system",
+        userId: user.id || "system",
       });
     },
     onSuccess: () => {
@@ -250,6 +251,9 @@ export function KeyResultUpdateDialog({ open, onOpenChange, keyResult }: KeyResu
                               </span>
                             </div>
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <User className="h-3 w-3" />
+                              <span>{update.user?.name || "Sistema"}</span>
+                              <span className="mx-1">•</span>
                               <Clock className="h-3 w-3" />
                               {update.createdAt && formatDistanceToNow(new Date(update.createdAt), {
                                 addSuffix: true,
