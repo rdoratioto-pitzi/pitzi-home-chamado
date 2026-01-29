@@ -21,7 +21,12 @@ export function getCurrentUser(): CurrentUser | null {
   try {
     const userStr = sessionStorage.getItem("user");
     if (!userStr) return null;
-    return JSON.parse(userStr);
+    const user = JSON.parse(userStr);
+    // Standardize isAdmin check
+    if (user && typeof user.isAdmin === 'undefined' && typeof user.is_admin !== 'undefined') {
+      user.isAdmin = user.is_admin;
+    }
+    return user;
   } catch {
     return null;
   }
