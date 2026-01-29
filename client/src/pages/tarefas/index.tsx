@@ -528,13 +528,6 @@ export default function TarefasPage() {
         />
 
         <div className="p-6 flex-1 overflow-auto">
-          <div className="mb-6 p-4 border-2 border-dashed border-muted-foreground/20 rounded-lg bg-muted/10 hover:bg-muted/20 transition-colors cursor-pointer group" onClick={handleOpenNormalTaskDialog}>
-            <div className="flex items-center justify-center gap-2 text-muted-foreground group-hover:text-primary transition-colors">
-              <Plus className="h-5 w-5" />
-              <span className="font-medium text-sm">Adicionar nova tarefa nesta área...</span>
-            </div>
-          </div>
-
           <Card className="shadow-sm border-border/60 p-6 mb-6">
             <div className="flex items-center gap-4">
               <div className="relative flex-1 max-w-md">
@@ -612,6 +605,13 @@ export default function TarefasPage() {
               </div>
             </div>
           </Card>
+
+          <div className="mb-6 p-4 border-2 border-dashed border-muted-foreground/20 rounded-lg bg-muted/10 hover:bg-muted/20 transition-colors cursor-pointer group" onClick={handleOpenNormalTaskDialog}>
+            <div className="flex items-center justify-center gap-2 text-muted-foreground group-hover:text-primary transition-colors">
+              <Plus className="h-5 w-5" />
+              <span className="font-medium text-sm">+ Adicionar nova tarefa</span>
+            </div>
+          </div>
 
           {tasksLoading ? (
             <div className="text-center py-12 text-muted-foreground">Carregando tarefas...</div>
