@@ -14,6 +14,8 @@ import ProjetosPage from "@/pages/projetos/index";
 import KanbanPage from "@/pages/projetos/kanban";
 import TarefasPage from "@/pages/tarefas/index";
 import TaskDetailPage from "@/pages/tarefas/detail";
+import ReunioesPage from "@/pages/reunioes/index";
+import MeetingDetailPage from "@/pages/reunioes/detail";
 import OKRsPage from "@/pages/okrs/index";
 import LogisticaPage from "@/pages/logistica/index";
 import LogisticsDashboard from "@/pages/logistica/dashboard";
@@ -52,6 +54,16 @@ function Router() {
       <Route path="/tarefas/:id">
         <ProtectedRoute requiredPermission="tarefas">
           <TaskDetailPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/reunioes">
+        <ProtectedRoute requiredPermission="tarefas">
+          <ReunioesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/reunioes/:id">
+        <ProtectedRoute requiredPermission="tarefas">
+          <MeetingDetailPage />
         </ProtectedRoute>
       </Route>
       <Route path="/okrs">

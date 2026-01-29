@@ -16,7 +16,8 @@ import {
   Calculator,
   Code2,
   User,
-  LogOut
+  LogOut,
+  Video
 } from "lucide-react";
 import {
   Sidebar,
@@ -69,6 +70,12 @@ const allMenuItems = [
     title: "Tarefas",
     url: "/tarefas",
     icon: CheckSquare,
+    module: "tarefas" as keyof ModulePermissions,
+  },
+  {
+    title: "Reuniões",
+    url: "/reunioes",
+    icon: Video,
     module: "tarefas" as keyof ModulePermissions,
   },
   {
