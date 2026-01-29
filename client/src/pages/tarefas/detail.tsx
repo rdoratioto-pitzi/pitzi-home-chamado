@@ -69,7 +69,7 @@ interface MeetingData {
   time?: string;
   location?: string;
   participants?: string[];
-  agenda?: string[];
+  agenda?: string;
   discussions?: string;
   decisions?: string[];
   actions?: Array<{ description: string; responsible: string; deadline: string }>;
@@ -442,21 +442,19 @@ export default function TaskDetailPage() {
                   <label className="text-sm font-medium text-muted-foreground">Pauta</label>
                   {isEditing ? (
                     <Textarea
-                      value={editedMeetingData.agenda?.join("\n") || ""}
+                      value={editedMeetingData.agenda || ""}
                       onChange={(e) => setEditedMeetingData({ 
                         ...editedMeetingData, 
-                        agenda: e.target.value.split("\n").filter(Boolean)
+                        agenda: e.target.value
                       })}
-                      placeholder="Um item por linha"
+                      placeholder="Pauta da reunião..."
                       rows={10}
                       data-testid="input-meeting-agenda"
                     />
                   ) : (
-                    <ul className="mt-1 list-disc list-inside">
-                      {editedMeetingData.agenda?.map((item, i) => (
-                        <li key={i}>{item}</li>
-                      )) || <li className="text-muted-foreground">Nenhum item</li>}
-                    </ul>
+                    <div className="mt-1 whitespace-pre-wrap">
+                      {editedMeetingData.agenda || <span className="text-muted-foreground">Nenhuma pauta definida</span>}
+                    </div>
                   )}
                 </div>
 
