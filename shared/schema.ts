@@ -224,15 +224,64 @@ export const keyResults = pgTable("key_results", {
   tenantId: varchar("tenant_id"),
   objectiveId: varchar("objective_id").notNull(),
   title: text("title").notNull(),
-  targetValue: integer("target_value").notNull(),
-  currentValue: integer("current_value").notNull().default(0),
+  description: text("description"),
+  // Measurement type: percentage, absolute, monetary, temporal, binary, decreasing
+  measurementType: text("measurement_type").notNull().default("percentage"),
+  // For absolute/monetary/temporal: starting value
+  startValue: decimal("start_value"),
+  // Target value (can be decimal for percentages, monetary, temporal)
+  targetValue: decimal("target_value").notNull(),
+  // Current value
+  currentValue: decimal("current_value").notNull().default("0"),
+  // Unit label (%, R$, horas, dias, etc.)
   unit: text("unit"),
+  // Multiple responsible users (JSON array of user IDs)
+  responsibleIds: text("responsible_ids"),
+  // Estimated completion date
+  dueDate: timestamp("due_date"),
+  // Status based on deadline: on_track, at_risk, overdue
+  deadlineStatus: text("deadline_status").default("on_track"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+const baseInsertKeyResultSchema = createInsertSchema(keyResults).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertKeyResultSchema = baseInsertKeyResultSchema.extend({
+  dueDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ),
+  startValue: z.union([z.string(), z.number(), z.null()]).optional().transform(val => 
+    val !== null && val !== undefined ? String(val) : null
+  ),
+  targetValue: z.union([z.string(), z.number()]).transform(val => String(val)),
+  currentValue: z.union([z.string(), z.number()]).optional().transform(val => 
+    val !== null && val !== undefined ? String(val) : "0"
+  ),
+});
+export type InsertKeyResult = z.infer<typeof insertKeyResultSchema>;
+export type KeyResult = typeof keyResults.$inferSelect;
+
+// ============== KEY RESULT UPDATES (Check-ins) ==============
+export const keyResultUpdates = pgTable("key_result_updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  keyResultId: varchar("key_result_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  // Previous and new values for tracking changes
+  previousValue: decimal("previous_value"),
+  newValue: decimal("new_value").notNull(),
+  // Progress percentage at this update
+  progressPercentage: decimal("progress_percentage"),
+  // Comment/description of the update
+  comment: text("comment"),
+  // Evidence links (JSON array of URLs)
+  evidenceLinks: text("evidence_links"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertKeyResultSchema = createInsertSchema(keyResults).omit({ id: true, createdAt: true });
-export type InsertKeyResult = z.infer<typeof insertKeyResultSchema>;
-export type KeyResult = typeof keyResults.$inferSelect;
+export const insertKeyResultUpdateSchema = createInsertSchema(keyResultUpdates).omit({ id: true, createdAt: true });
+export type InsertKeyResultUpdate = z.infer<typeof insertKeyResultUpdateSchema>;
+export type KeyResultUpdate = typeof keyResultUpdates.$inferSelect;
 
 // ============== LOGISTICS ==============
 export const shipments = pgTable("shipments", {

@@ -27,6 +27,7 @@ export default function Home() {
     tickets: number;
     projects: number;
     tasks: number;
+    meetings: number;
     objectives: number;
     logistica: number;
   }>({

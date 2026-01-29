@@ -9,6 +9,7 @@ import {
   type KanbanComment, type InsertKanbanComment,
   type Objective, type InsertObjective,
   type KeyResult, type InsertKeyResult,
+  type KeyResultUpdate, type InsertKeyResultUpdate,
   type Shipment, type InsertShipment,
   type ShipmentEvent, type InsertShipmentEvent,
   type Setting, type InsertSetting,
@@ -25,7 +26,7 @@ import {
   type LogisticaReversaEvento, type InsertLogisticaReversaEvento,
   type LogisticsDashboardStats,
   users, tickets, ticketResponsaveis, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
-  objectives, keyResults, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
+  objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
   collectionRequests, logisticaReversaPedidos, logisticaReversaEventos
 } from "@shared/schema";
@@ -92,11 +93,16 @@ export interface IStorage {
   deleteObjective(id: string): Promise<boolean>;
 
   // Key Results
+  getKeyResult(id: string): Promise<KeyResult | undefined>;
   getKeyResults(): Promise<KeyResult[]>;
   getKeyResultsByObjective(objectiveId: string): Promise<KeyResult[]>;
   createKeyResult(kr: InsertKeyResult): Promise<KeyResult>;
   updateKeyResult(id: string, data: Partial<KeyResult>): Promise<KeyResult | undefined>;
   deleteKeyResult(id: string): Promise<boolean>;
+
+  // Key Result Updates (Check-ins)
+  getKeyResultUpdates(keyResultId: string): Promise<KeyResultUpdate[]>;
+  createKeyResultUpdate(update: InsertKeyResultUpdate): Promise<KeyResultUpdate>;
 
   // Shipments
   getShipment(id: string): Promise<Shipment | undefined>;
@@ -400,6 +406,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Key Results
+  async getKeyResult(id: string): Promise<KeyResult | undefined> {
+    const [kr] = await db.select().from(keyResults).where(eq(keyResults.id, id));
+    return kr;
+  }
   async getKeyResults(): Promise<KeyResult[]> {
     return await db.select().from(keyResults);
   }
@@ -411,12 +421,22 @@ export class DatabaseStorage implements IStorage {
     return kr;
   }
   async updateKeyResult(id: string, data: Partial<KeyResult>): Promise<KeyResult | undefined> {
-    const [kr] = await db.update(keyResults).set(data).where(eq(keyResults.id, id)).returning();
+    const updateData = { ...data, updatedAt: new Date() };
+    const [kr] = await db.update(keyResults).set(updateData).where(eq(keyResults.id, id)).returning();
     return kr;
   }
   async deleteKeyResult(id: string): Promise<boolean> {
     const result = await db.delete(keyResults).where(eq(keyResults.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Key Result Updates (Check-ins)
+  async getKeyResultUpdates(keyResultId: string): Promise<KeyResultUpdate[]> {
+    return await db.select().from(keyResultUpdates).where(eq(keyResultUpdates.keyResultId, keyResultId));
+  }
+  async createKeyResultUpdate(update: InsertKeyResultUpdate): Promise<KeyResultUpdate> {
+    const [u] = await db.insert(keyResultUpdates).values(update).returning();
+    return u;
   }
 
   // Shipments

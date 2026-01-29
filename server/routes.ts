@@ -23,6 +23,7 @@ import {
   insertKanbanCommentSchema,
   insertObjectiveSchema,
   insertKeyResultSchema,
+  insertKeyResultUpdateSchema,
   insertShipmentSchema,
   insertShipmentEventSchema,
   insertTaskAreaSchema,
@@ -640,10 +641,90 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/key-results/:id", async (req, res) => {
+    const kr = await storage.getKeyResult(req.params.id);
+    if (!kr) return res.status(404).json({ error: "Key result not found" });
+    res.json(kr);
+  });
+
   app.delete("/api/key-results/:id", async (req, res) => {
     const deleted = await storage.deleteKeyResult(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Key result not found" });
     res.status(204).send();
+  });
+
+  // ============== KEY RESULT UPDATES (Check-ins) ==============
+  app.get("/api/key-results/:id/updates", async (req, res) => {
+    const updates = await storage.getKeyResultUpdates(req.params.id);
+    res.json(updates);
+  });
+
+  app.post("/api/key-results/:id/updates", async (req, res) => {
+    try {
+      const kr = await storage.getKeyResult(req.params.id);
+      if (!kr) return res.status(404).json({ error: "Key result not found" });
+
+      const validated = insertKeyResultUpdateSchema.parse({
+        ...req.body,
+        keyResultId: req.params.id,
+        previousValue: kr.currentValue,
+      });
+
+      // Calculate progress percentage based on measurement type
+      const startVal = parseFloat(kr.startValue || "0");
+      const targetVal = parseFloat(kr.targetValue || "100");
+      const newVal = parseFloat(validated.newValue || "0");
+      
+      let progressPercentage: number;
+      if (kr.measurementType === "decreasing") {
+        // For decreasing: progress = (start - current) / (start - target) * 100
+        progressPercentage = targetVal !== startVal ? ((startVal - newVal) / (startVal - targetVal)) * 100 : 0;
+      } else if (kr.measurementType === "binary") {
+        // For binary: 0 or 100
+        progressPercentage = newVal > 0 ? 100 : 0;
+      } else {
+        // For percentage, absolute, monetary, temporal
+        progressPercentage = targetVal !== startVal ? ((newVal - startVal) / (targetVal - startVal)) * 100 : 0;
+      }
+      
+      // Clamp between 0 and 100
+      progressPercentage = Math.max(0, Math.min(100, progressPercentage));
+
+      const updateData = {
+        ...validated,
+        progressPercentage: String(progressPercentage),
+      };
+
+      const update = await storage.createKeyResultUpdate(updateData);
+
+      // Update the key result current value and deadline status
+      const now = new Date();
+      let deadlineStatus = kr.deadlineStatus;
+      if (kr.dueDate) {
+        const dueDate = new Date(kr.dueDate);
+        const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntilDue < 0) {
+          deadlineStatus = "overdue";
+        } else if (daysUntilDue <= 7) {
+          deadlineStatus = "at_risk";
+        } else {
+          deadlineStatus = "on_track";
+        }
+      }
+
+      await storage.updateKeyResult(req.params.id, {
+        currentValue: validated.newValue,
+        deadlineStatus,
+      });
+
+      res.status(201).json(update);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      console.error("Error creating key result update:", error);
+      res.status(400).json({ error: "Failed to create key result update" });
+    }
   });
 
   // ============== SHIPMENTS ==============
@@ -780,8 +861,9 @@ export async function registerRoutes(
             if (member && owner) {
               sendSharedAreaInviteEmail(
                 member,
-                owner.name,
-                area.name
+                area.name,
+                area.id,
+                owner.name
               ).catch(err => console.error(`[api/task-areas] Error sending email to ${member.email}:`, err));
             }
           } catch (memberError) {
@@ -828,8 +910,9 @@ export async function registerRoutes(
               if (member && owner) {
                 sendSharedAreaInviteEmail(
                   member,
-                  owner.name,
-                  area.name
+                  area.name,
+                  area.id,
+                  owner.name
                 ).catch(err => console.error(`[api/task-areas] Error sending email to ${member.email}:`, err));
               }
             } catch (memberError) {
