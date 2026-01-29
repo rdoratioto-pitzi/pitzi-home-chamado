@@ -233,6 +233,19 @@ Na inicialização, o servidor executa `server/seed.ts` que:
 - **Props**: `variant` (light/dark/white), `size` (sm/md/lg/xl)
 - **Uso**: `<RenovLogo size="lg" variant="white" />`
 
+### RichTextarea
+- **Componente**: `client/src/components/rich-textarea.tsx`
+- **Funcionalidades**:
+  - Upload de imagens via seleção de arquivo, drag-and-drop, ou colagem (Ctrl+V)
+  - Limite máximo de 5MB por imagem
+  - Preview de imagens em grid com opção de remoção
+  - Contador de caracteres integrado
+- **Props**:
+  - `value`, `onChange`: Controle do texto
+  - `images`, `onImagesChange`: Controle das imagens anexadas
+  - `maxLength`: Limite de caracteres
+  - `rows`, `placeholder`: Configuração visual
+
 ## Preferências do Usuário
 
 - Interface em português brasileiro
