@@ -100,7 +100,8 @@ export async function registerRoutes(
 
       const openTickets = tickets.filter(t => t.status !== "closed").length;
       const activeProjects = projects.length;
-      const pendingTasks = tasks.filter(t => t.status !== "completed" && t.status !== "archived").length;
+      const pendingTasks = tasks.filter(t => t.type !== "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
+      const scheduledMeetings = tasks.filter(t => t.type === "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
       const activeObjectives = objectives.length;
       const inTransitShipments = shipments.filter(s => s.status === "in_transit").length;
 
@@ -108,6 +109,7 @@ export async function registerRoutes(
         tickets: openTickets,
         projects: activeProjects,
         tasks: pendingTasks,
+        meetings: scheduledMeetings,
         objectives: activeObjectives,
         logistica: inTransitShipments,
       });

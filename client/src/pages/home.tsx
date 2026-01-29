@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2 } from "lucide-react";
+import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2, Video } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getCurrentUser, getUserPermissions, type UserPermissions } from "@/lib/permissions";
 import { useState, useEffect } from "react";
@@ -54,11 +54,20 @@ export default function Home() {
     },
     {
       title: "Tarefas",
-      description: "Gerencie tarefas individuais e notas de reunião",
+      description: "Gerencie tarefas individuais por áreas",
       icon: CheckSquare,
       href: "/tarefas",
       stats: { label: "Tarefas pendentes", value: stats?.tasks ?? 0 },
       color: "bg-green-500/10 text-green-600 dark:text-green-400",
+      permissionKey: "tarefas" as keyof UserPermissions,
+    },
+    {
+      title: "Reuniões",
+      description: "Gestão de reuniões com pauta e participantes",
+      icon: Video,
+      href: "/reunioes",
+      stats: { label: "Reuniões agendadas", value: stats?.meetings ?? 0 },
+      color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
       permissionKey: "tarefas" as keyof UserPermissions,
     },
     {
