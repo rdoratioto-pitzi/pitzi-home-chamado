@@ -96,11 +96,21 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
 
   const { data: cardData } = useQuery<KanbanCard>({
     queryKey: ["/api/cards", cardId],
+    queryFn: async () => {
+      const res = await fetch(`/api/cards/${cardId}`);
+      if (!res.ok) throw new Error("Failed to fetch card");
+      return res.json();
+    },
     enabled: !!cardId,
   });
 
   const { data: comments = [] } = useQuery<KanbanComment[]>({
     queryKey: ["/api/cards", cardId, "comments"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cards/${cardId}/comments`);
+      if (!res.ok) throw new Error("Failed to fetch comments");
+      return res.json();
+    },
     enabled: !!cardId,
   });
 
