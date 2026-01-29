@@ -63,16 +63,18 @@ export async function registerRoutes(
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
       
-      console.log(`[auth] User found: ${user.email}, status: ${user.status}`);
+      console.log(`[auth] User found: ${user.email}, status: ${user.status}, isAdmin: ${user.isAdmin}, password in DB: "${user.password}"`);
       if (user.password !== validated.password) {
-        console.log(`[auth] Password mismatch for: ${user.email}`);
+        console.log(`[auth] Password mismatch for: ${user.email}. Expected: "${user.password}", Got: "${validated.password}"`);
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
       
       if (user.status !== "active") {
+        console.log(`[auth] User inactive: ${user.email}`);
         return res.status(401).json({ success: false, message: "Sua conta está inativa. Entre em contato com o administrador." });
       }
       
+      console.log(`[auth] Login successful for: ${user.email}, isAdmin: ${user.isAdmin}`);
       res.json({ 
         success: true, 
         user: {
