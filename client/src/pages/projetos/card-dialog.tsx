@@ -312,9 +312,15 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                             placeholder="Descreva os objetivos deste card..."
                             className="min-h-[100px]"
                             data-testid="input-card-objectives"
+                            maxLength={1000}
                             {...field}
                           />
                         </FormControl>
+                        <div className="flex justify-end">
+                          <span className="text-[10px] text-muted-foreground">
+                            {(field.value || "").length}/1000
+                          </span>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -331,9 +337,15 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                             placeholder="Descreva o desenvolvimento técnico..."
                             className="min-h-[100px]"
                             data-testid="input-card-development"
+                            maxLength={1000}
                             {...field}
                           />
                         </FormControl>
+                        <div className="flex justify-end">
+                          <span className="text-[10px] text-muted-foreground">
+                            {(field.value || "").length}/1000
+                          </span>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}

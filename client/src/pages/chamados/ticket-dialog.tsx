@@ -298,13 +298,14 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                       className="min-h-[120px] resize-y"
                       data-testid="input-ticket-description"
                       aria-label="Descrição do chamado"
+                      maxLength={1000}
                       {...field}
                     />
                   </FormControl>
                   <div className="flex justify-between items-center">
                     <FormMessage />
                     <span className={`text-xs ${descriptionValue.length >= 20 ? 'text-muted-foreground' : 'text-destructive'}`}>
-                      {descriptionValue.length}/20 caracteres
+                      {descriptionValue.length}/1000 caracteres
                     </span>
                   </div>
                 </FormItem>
