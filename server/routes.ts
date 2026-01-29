@@ -765,21 +765,25 @@ export async function registerRoutes(
         const owner = await storage.getUser(validated.ownerId);
         
         for (const userId of memberIds) {
-          // Create area member
-          await storage.createTaskAreaMember({
-            areaId: area.id,
-            userId,
-            role: "member"
-          });
-          
-          // Send email notification
-          const member = await storage.getUser(userId);
-          if (member && owner) {
-            sendSharedAreaInviteEmail(
-              member,
-              owner.name,
-              area.name
-            ).catch(console.error);
+          try {
+            // Create area member
+            await storage.addTaskAreaMember({
+              areaId: area.id,
+              userId,
+              role: "member"
+            });
+            
+            // Send email notification
+            const member = await storage.getUser(userId);
+            if (member && owner) {
+              sendSharedAreaInviteEmail(
+                member,
+                owner.name,
+                area.name
+              ).catch(err => console.error(`[api/task-areas] Error sending email to ${member.email}:`, err));
+            }
+          } catch (memberError) {
+            console.error(`[api/task-areas] Error adding member ${userId} to area ${area.id}:`, memberError);
           }
         }
       }
