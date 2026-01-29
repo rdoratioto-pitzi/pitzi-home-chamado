@@ -9,6 +9,7 @@ O Renov Home é uma aplicação web interna que oferece:
 - **Gestão de Chamados**: Sistema de suporte interno para TI, RH, operações, etc.
 - **Projetos**: Gerenciamento de projetos com quadros Kanban
 - **Tarefas**: Gerenciamento de tarefas por áreas com comentários e reações
+- **Reuniões**: Módulo independente para gestão de reuniões com pauta, participantes e atas
 - **OKRs**: Objetivos e resultados-chave por trimestre
 - **Logística**: Rastreamento, simulação de frete e logística reversa
 - **APIs Log**: Documentação de integrações (Correios, APIs internas, operadores)
@@ -61,6 +62,9 @@ client/
 │       ├── chamados/
 │       ├── projetos/
 │       ├── tarefas/
+│       ├── reunioes/
+│       │   ├── index.tsx      # Lista de reuniões
+│       │   └── detail.tsx     # Detalhes da reunião
 │       ├── okrs/
 │       ├── logistica/
 │       │   ├── simular-frete.tsx
@@ -199,10 +203,17 @@ Na inicialização, o servidor executa `server/seed.ts` que:
 - **Visualização Kanban**: Colunas A Fazer, Em Andamento, Concluído, Arquivado
 - **Drag-and-drop**: Arraste tarefas entre colunas para atualizar status
 - **Ordenação flexível**: Por prioridade (com data como critério secundário), por data (com prioridade como secundário), ou ordem manual personalizada
+- **Áreas compartilhadas**: Áreas podem ser privadas ou compartilhadas com membros
+- **Módulo independente**: Tarefas são gerenciadas separadamente de reuniões
+
+### Reuniões
+- **Módulo independente**: Reuniões agora são gerenciadas em um módulo separado (/reunioes)
+- **Áreas compartilhadas**: Utiliza a mesma infraestrutura de áreas do módulo de Tarefas
 - **Reuniões recorrentes**: Toggle "Repetir" com opções diária ou semanal (seleção de dias da semana), data de término opcional
 - **Participantes múltiplos**: Multi-select para usuários do sistema com busca, suporte a participantes externos via email
 - **Convites por email**: Ao criar reunião, envia email com arquivo ICS (calendário) anexado para todos os participantes
 - **Pauta com formatação**: Campo de pauta aceita quebras de linha para melhor organização
+- **Página de detalhes**: Visualização completa da reunião com todas as informações
 - **Limitações ICS (MVP)**: 
   - Convites são enviados apenas na criação (editar/cancelar reuniões não atualiza calendários dos participantes)
   - Conversão de timezone usa date-fns-tz com America/Sao_Paulo (DST-aware)
