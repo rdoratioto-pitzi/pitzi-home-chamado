@@ -540,16 +540,24 @@ export default function MeetingDetailPage() {
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Pauta</label>
                 {isEditing ? (
-                  <Textarea
-                    value={editedMeetingData.agenda || ""}
-                    onChange={(e) => setEditedMeetingData({ 
-                      ...editedMeetingData, 
-                      agenda: e.target.value
-                    })}
-                    placeholder="Pauta da reunião..."
-                    rows={10}
-                    data-testid="input-meeting-agenda"
-                  />
+                  <div className="space-y-1">
+                    <Textarea
+                      value={editedMeetingData.agenda || ""}
+                      onChange={(e) => setEditedMeetingData({ 
+                        ...editedMeetingData, 
+                        agenda: e.target.value
+                      })}
+                      placeholder="Pauta da reunião..."
+                      rows={10}
+                      maxLength={1000}
+                      data-testid="input-meeting-agenda"
+                    />
+                    <div className="flex justify-end">
+                      <span className="text-[10px] text-muted-foreground">
+                        {(editedMeetingData.agenda || "").length}/1000
+                      </span>
+                    </div>
+                  </div>
                 ) : (
                   <div className="mt-1 whitespace-pre-wrap">
                     {editedMeetingData.agenda || <span className="text-muted-foreground">Nenhuma pauta definida</span>}

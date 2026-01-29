@@ -1393,8 +1393,14 @@ export default function TarefasPage() {
                     })}
                     placeholder="Descreva a pauta da reunião...&#10;&#10;Você pode usar quebras de linha para organizar."
                     rows={6}
+                    maxLength={1000}
                     data-testid="input-meeting-agenda"
                   />
+                  <div className="flex justify-end">
+                    <span className="text-[10px] text-muted-foreground">
+                      {(newTask.meetingData.agenda || "").length}/1000
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-2">

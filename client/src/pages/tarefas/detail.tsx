@@ -454,13 +454,21 @@ export default function TaskDetailPage() {
           <div className="border-t border-border pt-6">
             <h3 className="font-medium mb-3">Descrição</h3>
             {isEditing ? (
-              <Textarea
-                value={editedTask.description || ""}
-                onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
-                placeholder="Adicione uma descrição..."
-                rows={4}
-                data-testid="input-edit-description"
-              />
+              <div className="space-y-1">
+                <Textarea
+                  value={editedTask.description || ""}
+                  onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
+                  placeholder="Adicione uma descrição..."
+                  rows={4}
+                  maxLength={1000}
+                  data-testid="input-edit-description"
+                />
+                <div className="flex justify-end">
+                  <span className="text-[10px] text-muted-foreground">
+                    {(editedTask.description || "").length}/1000
+                  </span>
+                </div>
+              </div>
             ) : (
               <p className="text-muted-foreground whitespace-pre-wrap">
                 {task.description || "Nenhuma descrição"}
@@ -558,16 +566,24 @@ export default function TaskDetailPage() {
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Pauta</label>
                   {isEditing ? (
-                    <Textarea
-                      value={editedMeetingData.agenda || ""}
-                      onChange={(e) => setEditedMeetingData({ 
-                        ...editedMeetingData, 
-                        agenda: e.target.value
-                      })}
-                      placeholder="Pauta da reunião..."
-                      rows={10}
-                      data-testid="input-meeting-agenda"
-                    />
+                    <div className="space-y-1">
+                      <Textarea
+                        value={editedMeetingData.agenda || ""}
+                        onChange={(e) => setEditedMeetingData({ 
+                          ...editedMeetingData, 
+                          agenda: e.target.value
+                        })}
+                        placeholder="Pauta da reunião..."
+                        rows={10}
+                        maxLength={1000}
+                        data-testid="input-meeting-agenda"
+                      />
+                      <div className="flex justify-end">
+                        <span className="text-[10px] text-muted-foreground">
+                          {(editedMeetingData.agenda || "").length}/1000
+                        </span>
+                      </div>
+                    </div>
                   ) : (
                     <div className="mt-1 whitespace-pre-wrap">
                       {editedMeetingData.agenda || <span className="text-muted-foreground">Nenhuma pauta definida</span>}
