@@ -54,7 +54,7 @@ const MODULES = [
   { key: "tarefas", label: "Tarefas" },
   { key: "okrs", label: "OKRs" },
   { key: "logistica", label: "Logística" },
-  { key: "apis", label: "APIs Log" },
+  { key: "apis", label: "Integrações" },
   { key: "configuracoes", label: "Configurações" },
 ] as const;
 

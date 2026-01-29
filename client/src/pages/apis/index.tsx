@@ -16,7 +16,11 @@ import {
   CheckCircle,
   Clock,
   Settings2,
-  Users
+  Users,
+  BarChart3,
+  DollarSign,
+  ArrowRight,
+  Database
 } from "lucide-react";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }> = {
@@ -64,9 +68,9 @@ export default function ApisPage() {
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader 
-        title="APIs Log" 
-        description="Documentação interna de endpoints e integrações com operadores logísticos."
-        breadcrumbs={[{ label: "APIs Log" }]}
+        title="Integrações" 
+        description="Documentação de APIs internas, integrações e operadores logísticos."
+        breadcrumbs={[{ label: "Integrações" }]}
       />
 
       <main className="flex-1 p-6 space-y-6">
@@ -226,6 +230,120 @@ export default function ApisPage() {
                       </div>
                     )}
                   </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="internas" className="m-0 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Card className="border-2 border-border/60 hover:border-primary/30 transition-all" data-testid="card-api-bi-rs">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="h-14 w-14 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                          <BarChart3 className="h-7 w-7 text-blue-600" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-[18px] font-bold">API Leitura BI RS</CardTitle>
+                            <Badge variant="outline" className="text-[10px] bg-yellow-500/10 text-yellow-700 border-yellow-500/30">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Em breve
+                            </Badge>
+                          </div>
+                          <CardDescription className="mt-1.5 text-[13px]">
+                            Consulta interna via API da Renov para dados de BI do RS
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-4 rounded-lg bg-muted/30 border border-border/40">
+                        <div className="flex items-start gap-3">
+                          <Database className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-[13px] font-semibold text-foreground">Dados disponíveis</p>
+                            <p className="text-[12px] text-muted-foreground mt-1">
+                              Relatórios, métricas de vendas, indicadores de performance e dashboards do Rio Grande do Sul
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <Alert className="bg-blue-500/5 border-blue-500/20">
+                        <AlertCircle className="h-4 w-4 text-blue-600" />
+                        <AlertTitle className="text-[13px] font-bold text-blue-700">Integração Pendente</AlertTitle>
+                        <AlertDescription className="text-[12px] text-blue-600/80 mt-1">
+                          Esta integração será configurada em breve. Os endpoints serão documentados após a implementação.
+                        </AlertDescription>
+                      </Alert>
+
+                      <div className="pt-2">
+                        <Button variant="outline" className="w-full gap-2" disabled>
+                          <ArrowRight className="h-4 w-4" />
+                          Configurar Integração
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-2 border-border/60 hover:border-primary/30 transition-all" data-testid="card-api-pricing">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="h-14 w-14 rounded-xl bg-green-500/10 flex items-center justify-center">
+                          <DollarSign className="h-7 w-7 text-green-600" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-[18px] font-bold">API Pricing</CardTitle>
+                            <Badge variant="outline" className="text-[10px] bg-yellow-500/10 text-yellow-700 border-yellow-500/30">
+                              <Clock className="h-3 w-3 mr-1" />
+                              Em breve
+                            </Badge>
+                          </div>
+                          <CardDescription className="mt-1.5 text-[13px]">
+                            Consulta do módulo de Pricing para precificação dinâmica
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-4 rounded-lg bg-muted/30 border border-border/40">
+                        <div className="flex items-start gap-3">
+                          <Database className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-[13px] font-semibold text-foreground">Funcionalidades planejadas</p>
+                            <p className="text-[12px] text-muted-foreground mt-1">
+                              Cálculo de preços, margens, tabelas de precificação e simulações de cenários
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <Alert className="bg-green-500/5 border-green-500/20">
+                        <AlertCircle className="h-4 w-4 text-green-600" />
+                        <AlertTitle className="text-[13px] font-bold text-green-700">Módulo em Desenvolvimento</AlertTitle>
+                        <AlertDescription className="text-[12px] text-green-600/80 mt-1">
+                          O módulo de Pricing está sendo desenvolvido. Esta integração será habilitada após sua conclusão.
+                        </AlertDescription>
+                      </Alert>
+
+                      <div className="pt-2">
+                        <Button variant="outline" className="w-full gap-2" disabled>
+                          <ArrowRight className="h-4 w-4" />
+                          Configurar Integração
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="operadores" className="m-0 space-y-6">
+                <div className="text-center py-12">
+                  <Truck className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                  <h3 className="text-lg font-bold text-muted-foreground">Operadores Logísticos</h3>
+                  <p className="text-sm text-muted-foreground/70 mt-2">
+                    Documentação de integrações com Jadlog, Azul Cargo e outros operadores.
+                  </p>
                 </div>
               </TabsContent>
             </CardContent>

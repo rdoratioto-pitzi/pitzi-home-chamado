@@ -272,9 +272,9 @@ export function AppSidebar() {
                     isActive={location === "/apis" || location.startsWith("/apis/")}
                     className={`h-11 px-3 transition-all duration-200 rounded-lg ${location.startsWith("/apis") ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                   >
-                    <Link href="/apis" data-testid="link-apis">
+                    <Link href="/apis" data-testid="link-integracoes">
                       <Code2 className={`h-[20px] w-[20px] ${location.startsWith("/apis") ? 'text-primary' : 'text-muted-foreground'}`} />
-                      <span className="text-[14px]">APIs Log</span>
+                      <span className="text-[14px]">Integrações</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

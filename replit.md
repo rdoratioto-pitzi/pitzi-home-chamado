@@ -12,7 +12,7 @@ O Renov Home é uma aplicação web interna que oferece:
 - **Reuniões**: Módulo independente para gestão de reuniões com pauta, participantes e atas
 - **OKRs**: Objetivos e resultados-chave por trimestre
 - **Logística**: Rastreamento, simulação de frete e logística reversa
-- **APIs Log**: Documentação de integrações (Correios, APIs internas, operadores)
+- **Integrações**: Documentação de APIs internas (BI RS, Pricing), Correios e operadores logísticos
 - **Configurações**: Gerenciamento de usuários com permissões por módulo
 
 ## Identidade Visual
@@ -139,7 +139,7 @@ Os usuários têm permissões granulares por módulo:
 - Tarefas
 - OKRs
 - Logística
-- APIs Log
+- Integrações
 - Configurações
 
 ## Funcionalidades de Logística
