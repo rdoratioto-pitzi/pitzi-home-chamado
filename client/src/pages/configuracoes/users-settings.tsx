@@ -86,11 +86,13 @@ export function UsersSettings() {
 
   useEffect(() => {
     const checkAdminStatus = () => {
-      setCurrentUserIsAdmin(checkIsAdmin());
+      const user = getCurrentUser();
+      setCurrentUserIsAdmin(user?.isAdmin === true);
     };
     checkAdminStatus();
-    const interval = setInterval(checkAdminStatus, 500);
-    return () => clearInterval(interval);
+    // Listen for storage events (login/update)
+    window.addEventListener("storage", checkAdminStatus);
+    return () => window.removeEventListener("storage", checkAdminStatus);
   }, []);
 
   const { data: users = [], isLoading } = useQuery<User[]>({
