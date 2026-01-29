@@ -1254,8 +1254,8 @@ export default function ReunioesPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Pauta</label>
+              <div className="space-y-4">
+                <label className="text-sm font-medium">Pauta <span className="text-destructive">*</span></label>
                 <RichTextarea
                   value={newMeeting.meetingData.agenda}
                   onChange={(v) => setNewMeeting({ 

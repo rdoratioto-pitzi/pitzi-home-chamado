@@ -28,6 +28,7 @@ import {
   Download,
   ArrowRight,
   Maximize2,
+  Paperclip,
 } from "lucide-react";
 import {
   Select,
@@ -88,6 +89,7 @@ export default function MeetingDetailPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+  const [commentImages, setCommentImages] = useState<string[]>([]);
   const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editedMeeting, setEditedMeeting] = useState<Partial<Task>>({});
@@ -155,15 +157,17 @@ export default function MeetingDetailPage() {
   });
 
   const createCommentMutation = useMutation({
-    mutationFn: async (data: { content: string; parentCommentId?: string }) => {
+    mutationFn: async (data: { content: string; parentCommentId?: string; images: string[] }) => {
       return apiRequest("POST", `/api/tasks/${id}/comments`, {
         ...data,
+        attachments: data.images.length > 0 ? JSON.stringify(data.images) : null,
         authorId: "admin",
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "comments"] });
       setNewComment("");
+      setCommentImages([]);
       setReplyingTo(null);
       toast({ title: "Comentário adicionado!" });
     },
@@ -187,10 +191,11 @@ export default function MeetingDetailPage() {
   };
 
   const handleSubmitComment = () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() && commentImages.length === 0) return;
     createCommentMutation.mutate({
       content: newComment,
       parentCommentId: replyingTo || undefined,
+      images: commentImages,
     });
   };
 
@@ -707,15 +712,45 @@ export default function MeetingDetailPage() {
                           {author?.name?.slice(0, 2).toUpperCase() || "US"}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{author?.name || "Usuário"}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(comment.createdAt || "").toLocaleString("pt-BR")}
-                          </span>
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
-                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">{author?.name || "Usuário"}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(comment.createdAt || "").toLocaleString("pt-BR")}
+                              </span>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                              {comment.content}
+                            </p>
+                            {comment.attachments && (
+                              <div className="grid grid-cols-2 gap-2 mt-2">
+                                {(() => {
+                                  try {
+                                    const attachments = JSON.parse(comment.attachments);
+                                    if (Array.isArray(attachments)) {
+                                      return attachments.map((url: string, i: number) => (
+                                        <Dialog key={i}>
+                                          <DialogTrigger asChild>
+                                            <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer">
+                                              <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
+                                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <Maximize2 className="h-6 w-6 text-white" />
+                                              </div>
+                                            </div>
+                                          </DialogTrigger>
+                                          <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none">
+                                            <img src={url} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain mx-auto" />
+                                          </DialogContent>
+                                        </Dialog>
+                                      ));
+                                    }
+                                  } catch (e) {
+                                    return null;
+                                  }
+                                })()}
+                              </div>
+                            )}
+                            <div className="flex items-center gap-2 mt-2">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -799,26 +834,25 @@ export default function MeetingDetailPage() {
           </div>
           
           {!replyingTo && (
-            <div className="flex gap-2 border-t border-border pt-4">
-              <Input
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
+            <div className="flex flex-col gap-2 border-t border-border pt-4">
+              <RichTextarea
                 placeholder="Adicione um comentário..."
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmitComment();
-                  }
-                }}
+                value={newComment}
+                onChange={setNewComment}
+                images={commentImages}
+                onImagesChange={setCommentImages}
+                rows={3}
+                maxLength={1000}
                 data-testid="input-new-comment"
               />
               <Button 
-                size="icon" 
                 onClick={handleSubmitComment}
-                disabled={!newComment.trim() || createCommentMutation.isPending}
+                disabled={(!newComment.trim() && commentImages.length === 0) || createCommentMutation.isPending}
+                className="w-full"
                 data-testid="button-submit-comment"
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-4 w-4 mr-2" />
+                {createCommentMutation.isPending ? "Enviando..." : "Enviar Comentário"}
               </Button>
             </div>
           )}
