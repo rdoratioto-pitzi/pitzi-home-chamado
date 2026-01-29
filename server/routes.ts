@@ -54,14 +54,18 @@ export async function registerRoutes(
   app.post("/api/auth/login", async (req, res) => {
     try {
       const validated = loginSchema.parse(req.body);
+      console.log(`[auth] Login attempt for: ${validated.email}`);
       const users = await storage.getUsers();
-      const user = users.find(u => u.email === validated.email);
+      const user = users.find(u => u.email.toLowerCase() === validated.email.toLowerCase());
       
       if (!user) {
+        console.log(`[auth] User not found: ${validated.email}`);
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
       
+      console.log(`[auth] User found: ${user.email}, status: ${user.status}`);
       if (user.password !== validated.password) {
+        console.log(`[auth] Password mismatch for: ${user.email}`);
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
       
