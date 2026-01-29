@@ -1071,8 +1071,14 @@ export default function TarefasPage() {
                     onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
                     placeholder="Detalhes da tarefa..."
                     rows={3}
+                    maxLength={1000}
                     data-testid="input-task-description"
                   />
+                  <div className="flex justify-end">
+                    <span className="text-[10px] text-muted-foreground">
+                      {(newTask.description || "").length}/1000
+                    </span>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
