@@ -151,11 +151,19 @@ export default function ProjetosPage() {
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4" />
-                            <span>
-                              {project.startDate 
-                                ? new Date(project.startDate).toLocaleDateString("pt-BR") 
-                                : "Sem data"}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span>
+                                {project.startDate 
+                                  ? new Date(project.startDate).toLocaleDateString("pt-BR") 
+                                  : "Sem data"}
+                              </span>
+                              {project.endDate && (
+                                <>
+                                  <span>-</span>
+                                  <span>{new Date(project.endDate).toLocaleDateString("pt-BR")}</span>
+                                </>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4" />

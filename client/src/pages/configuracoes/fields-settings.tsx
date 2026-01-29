@@ -254,10 +254,6 @@ export function FieldsSettings() {
             <MapPin className="h-4 w-4 mr-2" />
             Locais
           </TabsTrigger>
-          <TabsTrigger value="areas" data-testid="tab-field-areas">
-            <FolderOpen className="h-4 w-4 mr-2" />
-            Áreas
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="categories">
@@ -289,21 +285,6 @@ export function FieldsSettings() {
             description="Defina os locais/sistemas onde os chamados podem ocorrer"
             icon={MapPin}
             defaultItems={defaultLocations}
-            showLabel={false}
-          />
-        </TabsContent>
-
-        <TabsContent value="areas">
-          <FieldManager 
-            settingKey="task_areas_config"
-            title="Áreas de Tarefas"
-            description="Configure as áreas que aparecem no gerenciamento de tarefas"
-            icon={FolderOpen}
-            defaultItems={[
-              { value: "ti", label: "TI" },
-              { value: "rh", label: "RH" },
-              { value: "operacoes", label: "Operações" },
-            ]}
             showLabel={false}
           />
         </TabsContent>
