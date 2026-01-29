@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/page-header";
@@ -7,6 +7,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { 
   Plus, 
   Folder, 
@@ -24,8 +27,12 @@ import {
   Trash2,
   Edit,
   LayoutGrid,
-  List
+  List,
+  Repeat,
+  X,
+  GripVertical
 } from "lucide-react";
+import type { User as UserType } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -98,20 +105,42 @@ export default function TarefasPage() {
     areaId: "",
     createdBy: "admin",
     assigneeId: "",
+    assigneeIds: [] as string[],
     dueDate: "",
     meetingData: {
       date: "",
       time: "",
       location: "",
       participants: [] as string[],
-      agenda: [] as string[],
+      externalParticipants: [] as string[],
+      agenda: "",
       actions: [] as { description: string; responsible: string; deadline: string }[],
-    }
+    },
+    isRecurring: false,
+    recurrenceType: "daily" as "daily" | "weekly",
+    recurrenceWeekdays: [] as number[],
+    recurrenceEndDate: "",
   });
+
+  const [participantInput, setParticipantInput] = useState("");
+  const [externalParticipantInput, setExternalParticipantInput] = useState("");
 
   const { data: areas = [], isLoading: areasLoading } = useQuery<TaskArea[]>({
     queryKey: ["/api/task-areas"],
   });
+
+  const { data: users = [] } = useQuery<UserType[]>({
+    queryKey: ["/api/users"],
+  });
+
+  const filteredUsers = useMemo(() => {
+    if (!participantInput) return users;
+    const search = participantInput.toLowerCase();
+    return users.filter(u => 
+      u.name.toLowerCase().includes(search) || 
+      u.email.toLowerCase().includes(search)
+    );
+  }, [users, participantInput]);
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks", selectedAreaId],
@@ -166,6 +195,13 @@ export default function TarefasPage() {
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: typeof newTask) => {
+      const meetingDataPayload = data.type === "meeting_note" ? {
+        ...data.meetingData,
+        agenda: data.meetingData.agenda,
+        participants: data.meetingData.participants,
+        externalParticipants: data.meetingData.externalParticipants,
+      } : undefined;
+      
       const payload = {
         title: data.title,
         description: data.description || undefined,
@@ -176,7 +212,12 @@ export default function TarefasPage() {
         createdBy: data.createdBy,
         dueDate: data.dueDate || null,
         assigneeId: data.assigneeId || undefined,
-        meetingData: data.type === "meeting_note" ? data.meetingData : undefined,
+        assigneeIds: data.assigneeIds.length > 0 ? JSON.stringify(data.assigneeIds) : undefined,
+        meetingData: meetingDataPayload ? JSON.stringify(meetingDataPayload) : undefined,
+        isRecurring: data.isRecurring,
+        recurrenceType: data.isRecurring ? data.recurrenceType : undefined,
+        recurrenceWeekdays: data.isRecurring && data.recurrenceType === "weekly" ? JSON.stringify(data.recurrenceWeekdays) : undefined,
+        recurrenceEndDate: data.isRecurring && data.recurrenceEndDate ? data.recurrenceEndDate : undefined,
       };
       return apiRequest("POST", "/api/tasks", payload);
     },
@@ -194,16 +235,24 @@ export default function TarefasPage() {
         areaId: "",
         createdBy: "admin",
         assigneeId: "",
+        assigneeIds: [],
         dueDate: "",
         meetingData: {
           date: "",
           time: "",
           location: "",
           participants: [],
-          agenda: [],
+          externalParticipants: [],
+          agenda: "",
           actions: [],
-        }
+        },
+        isRecurring: false,
+        recurrenceType: "daily",
+        recurrenceWeekdays: [],
+        recurrenceEndDate: "",
       });
+      setParticipantInput("");
+      setExternalParticipantInput("");
       toast({ title: "Tarefa criada com sucesso!" });
     },
     onError: (error: Error) => {
@@ -234,18 +283,53 @@ export default function TarefasPage() {
     },
   });
 
-  const filteredTasks = tasks.filter(task => {
-    if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
+  const [sortBy, setSortBy] = useState<"priority" | "date" | "custom">("priority");
+
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+
+  const filteredTasks = useMemo(() => {
+    let result = tasks.filter(task => {
+      if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) {
+        return false;
+      }
+      if (statusFilter !== "all" && task.status !== statusFilter) {
+        return false;
+      }
+      if (typeFilter !== "all" && task.type !== typeFilter) {
+        return false;
+      }
+      return true;
+    });
+
+    if (sortBy === "priority") {
+      result = [...result].sort((a, b) => {
+        const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 1;
+        const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 1;
+        if (priorityA !== priorityB) return priorityA - priorityB;
+        if (a.dueDate && b.dueDate) {
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        }
+        if (a.dueDate) return -1;
+        if (b.dueDate) return 1;
+        return 0;
+      });
+    } else if (sortBy === "date") {
+      result = [...result].sort((a, b) => {
+        if (a.dueDate && b.dueDate) {
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        }
+        if (a.dueDate) return -1;
+        if (b.dueDate) return 1;
+        const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 1;
+        const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 1;
+        return priorityA - priorityB;
+      });
+    } else {
+      result = [...result].sort((a, b) => (a.order || 0) - (b.order || 0));
     }
-    if (statusFilter !== "all" && task.status !== statusFilter) {
-      return false;
-    }
-    if (typeFilter !== "all" && task.type !== typeFilter) {
-      return false;
-    }
-    return true;
-  });
+
+    return result;
+  }, [tasks, searchQuery, statusFilter, typeFilter, sortBy]);
 
   const selectedArea = areas.find(a => a.id === selectedAreaId);
 
@@ -276,18 +360,32 @@ export default function TarefasPage() {
 
   const handleOpenTaskDialog = (type: "task" | "meeting_note" = "task") => {
     setNewTask({
-      ...newTask,
+      title: "",
+      description: "",
       type,
+      status: "todo",
+      priority: "medium",
       areaId: selectedAreaId || (areas[0]?.id || ""),
+      createdBy: "admin",
+      assigneeId: "",
+      assigneeIds: [],
+      dueDate: "",
       meetingData: {
         date: "",
         time: "",
         location: "",
-        participants: [] as string[],
-        agenda: [] as string[],
-        actions: [] as { description: string; responsible: string; deadline: string }[],
-      }
+        participants: [],
+        externalParticipants: [],
+        agenda: "",
+        actions: [],
+      },
+      isRecurring: false,
+      recurrenceType: "daily",
+      recurrenceWeekdays: [],
+      recurrenceEndDate: "",
     });
+    setParticipantInput("");
+    setExternalParticipantInput("");
     setShowTaskDialog(true);
   };
 
@@ -444,6 +542,17 @@ export default function TarefasPage() {
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="task">Tarefas</SelectItem>
                   <SelectItem value="meeting_note">Reuniões</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as "priority" | "date" | "custom")}>
+                <SelectTrigger className="w-40" data-testid="select-sort-by">
+                  <SelectValue placeholder="Ordenar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="priority">Por Prioridade</SelectItem>
+                  <SelectItem value="date">Por Data</SelectItem>
+                  <SelectItem value="custom">Ordem Manual</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -850,6 +959,7 @@ export default function TarefasPage() {
                         ...newTask, 
                         meetingData: { ...newTask.meetingData, date: e.target.value } 
                       })}
+                      data-testid="input-meeting-date"
                     />
                   </div>
                   <div className="space-y-2">
@@ -861,9 +971,112 @@ export default function TarefasPage() {
                         ...newTask, 
                         meetingData: { ...newTask.meetingData, time: e.target.value } 
                       })}
+                      data-testid="input-meeting-time"
                     />
                   </div>
                 </div>
+
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Repeat className="h-4 w-4 text-muted-foreground" />
+                    <Label htmlFor="recurring-toggle" className="text-sm font-medium cursor-pointer">
+                      Repetir
+                    </Label>
+                  </div>
+                  <Switch
+                    id="recurring-toggle"
+                    checked={newTask.isRecurring}
+                    onCheckedChange={(checked) => setNewTask({ ...newTask, isRecurring: checked })}
+                    data-testid="switch-recurring"
+                  />
+                </div>
+
+                {newTask.isRecurring && (
+                  <div className="space-y-3 p-3 border rounded-lg bg-background">
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="recurrence"
+                          value="daily"
+                          checked={newTask.recurrenceType === "daily"}
+                          onChange={() => setNewTask({ ...newTask, recurrenceType: "daily", recurrenceWeekdays: [] })}
+                          className="w-4 h-4 text-primary"
+                        />
+                        <span className="text-sm">Diária</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="recurrence"
+                          value="weekly"
+                          checked={newTask.recurrenceType === "weekly"}
+                          onChange={() => setNewTask({ ...newTask, recurrenceType: "weekly" })}
+                          className="w-4 h-4 text-primary"
+                        />
+                        <span className="text-sm">Semanal</span>
+                      </label>
+                    </div>
+
+                    {newTask.recurrenceType === "weekly" && (
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { value: 0, label: "Dom" },
+                          { value: 1, label: "Seg" },
+                          { value: 2, label: "Ter" },
+                          { value: 3, label: "Qua" },
+                          { value: 4, label: "Qui" },
+                          { value: 5, label: "Sex" },
+                          { value: 6, label: "Sáb" },
+                        ].map((day) => (
+                          <label key={day.value} className="flex items-center gap-1.5 cursor-pointer">
+                            <Checkbox
+                              checked={newTask.recurrenceWeekdays.includes(day.value)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setNewTask({ 
+                                    ...newTask, 
+                                    recurrenceWeekdays: [...newTask.recurrenceWeekdays, day.value].sort()
+                                  });
+                                } else {
+                                  setNewTask({ 
+                                    ...newTask, 
+                                    recurrenceWeekdays: newTask.recurrenceWeekdays.filter(d => d !== day.value)
+                                  });
+                                }
+                              }}
+                            />
+                            <span className="text-sm">{day.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Repetir até (opcional)</label>
+                      <Input
+                        type="date"
+                        value={newTask.recurrenceEndDate}
+                        onChange={(e) => setNewTask({ ...newTask, recurrenceEndDate: e.target.value })}
+                        data-testid="input-recurrence-end"
+                      />
+                    </div>
+
+                    {newTask.meetingData.time && (
+                      <p className="text-xs text-muted-foreground bg-primary/10 p-2 rounded">
+                        {newTask.recurrenceType === "daily" 
+                          ? `Repete todos os dias às ${newTask.meetingData.time}`
+                          : newTask.recurrenceWeekdays.length > 0
+                            ? `Repete às ${newTask.meetingData.time} em: ${newTask.recurrenceWeekdays.map(d => 
+                                ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][d]
+                              ).join(", ")}`
+                            : "Selecione os dias da semana"
+                        }
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Local</label>
                   <Input
@@ -873,35 +1086,153 @@ export default function TarefasPage() {
                       meetingData: { ...newTask.meetingData, location: e.target.value } 
                     })}
                     placeholder="Local da reunião"
+                    data-testid="input-meeting-location"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Participantes</label>
-                  <Input
-                    value={newTask.meetingData.participants.join(", ")}
-                    onChange={(e) => setNewTask({ 
-                      ...newTask, 
-                      meetingData: { 
-                        ...newTask.meetingData, 
-                        participants: e.target.value.split(",").map(p => p.trim()).filter(Boolean) 
-                      } 
+                  <label className="text-sm font-medium">Participantes do Sistema</label>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {newTask.meetingData.participants.map((userId) => {
+                      const user = users.find(u => u.id === userId);
+                      return (
+                        <Badge key={userId} variant="secondary" className="gap-1">
+                          {user?.name || userId}
+                          <button
+                            type="button"
+                            onClick={() => setNewTask({
+                              ...newTask,
+                              meetingData: {
+                                ...newTask.meetingData,
+                                participants: newTask.meetingData.participants.filter(p => p !== userId)
+                              }
+                            })}
+                            className="ml-1 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
                     })}
-                    placeholder="Participantes (separados por vírgula)"
-                  />
+                  </div>
+                  <div className="relative">
+                    <Input
+                      value={participantInput}
+                      onChange={(e) => setParticipantInput(e.target.value)}
+                      placeholder="Buscar usuário por nome ou email..."
+                      data-testid="input-participant-search"
+                    />
+                    {participantInput && filteredUsers.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                        {filteredUsers
+                          .filter(u => !newTask.meetingData.participants.includes(u.id))
+                          .slice(0, 5)
+                          .map((user) => (
+                            <button
+                              key={user.id}
+                              type="button"
+                              className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 text-sm"
+                              onClick={() => {
+                                setNewTask({
+                                  ...newTask,
+                                  meetingData: {
+                                    ...newTask.meetingData,
+                                    participants: [...newTask.meetingData.participants, user.id]
+                                  }
+                                });
+                                setParticipantInput("");
+                              }}
+                            >
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span>{user.name}</span>
+                              <span className="text-muted-foreground text-xs">({user.email})</span>
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Participantes Externos (emails)</label>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {newTask.meetingData.externalParticipants.map((email, idx) => (
+                      <Badge key={idx} variant="outline" className="gap-1">
+                        {email}
+                        <button
+                          type="button"
+                          onClick={() => setNewTask({
+                            ...newTask,
+                            meetingData: {
+                              ...newTask.meetingData,
+                              externalParticipants: newTask.meetingData.externalParticipants.filter((_, i) => i !== idx)
+                            }
+                          })}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      value={externalParticipantInput}
+                      onChange={(e) => setExternalParticipantInput(e.target.value)}
+                      placeholder="email@exemplo.com"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && externalParticipantInput.includes("@")) {
+                          e.preventDefault();
+                          setNewTask({
+                            ...newTask,
+                            meetingData: {
+                              ...newTask.meetingData,
+                              externalParticipants: [...newTask.meetingData.externalParticipants, externalParticipantInput]
+                            }
+                          });
+                          setExternalParticipantInput("");
+                        }
+                      }}
+                      data-testid="input-external-participant"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (externalParticipantInput.includes("@")) {
+                          setNewTask({
+                            ...newTask,
+                            meetingData: {
+                              ...newTask.meetingData,
+                              externalParticipants: [...newTask.meetingData.externalParticipants, externalParticipantInput]
+                            }
+                          });
+                          setExternalParticipantInput("");
+                        }
+                      }}
+                      disabled={!externalParticipantInput.includes("@")}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Pauta</label>
                   <Textarea
-                    value={newTask.meetingData.agenda.join("\n")}
+                    value={newTask.meetingData.agenda}
                     onChange={(e) => setNewTask({ 
                       ...newTask, 
                       meetingData: { 
                         ...newTask.meetingData, 
-                        agenda: e.target.value.split("\n").filter(Boolean) 
+                        agenda: e.target.value
                       } 
                     })}
-                    placeholder="Itens da pauta (um por linha)"
+                    placeholder="Descreva a pauta da reunião...&#10;&#10;Você pode usar quebras de linha para organizar."
                     rows={6}
+                    data-testid="input-meeting-agenda"
                   />
                 </div>
               </div>

@@ -326,10 +326,17 @@ export const tasks = pgTable("tasks", {
   status: text("status").notNull().default("todo"),
   priority: text("priority").notNull().default("medium"),
   assigneeId: varchar("assignee_id"),
+  assigneeIds: text("assignee_ids"), // JSON array of user IDs for multi-assignee
   dueDate: timestamp("due_date"),
   createdBy: varchar("created_by").notNull(),
   meetingData: text("meeting_data"),
   order: integer("order").notNull().default(0),
+  // Recurrence fields
+  isRecurring: boolean("is_recurring").default(false),
+  recurrenceType: text("recurrence_type"), // "daily" | "weekly"
+  recurrenceWeekdays: text("recurrence_weekdays"), // JSON array of weekday numbers [1,2,3,4,5] for Mon-Fri
+  recurrenceEndDate: timestamp("recurrence_end_date"),
+  parentTaskId: varchar("parent_task_id"), // Reference to template/parent for recurring instances
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -337,6 +344,9 @@ export const tasks = pgTable("tasks", {
 const baseInsertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTaskSchema = baseInsertTaskSchema.extend({
   dueDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => 
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ),
+  recurrenceEndDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val => 
     val ? (typeof val === 'string' ? new Date(val) : val) : null
   ),
 });
