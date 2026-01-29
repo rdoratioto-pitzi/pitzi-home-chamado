@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Upload, Image, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { RenovLogo } from "@/components/renov-logo";
-import { useTheme } from "@/hooks/use-theme";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export function BrandSettings() {
@@ -15,6 +15,36 @@ export function BrandSettings() {
   const [logoPreviewDark, setLogoPreviewDark] = useState<string | null>(null);
   const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const { data: faviconSetting, refetch: refetchFavicon } = useQuery<{ value: string }>({
+    queryKey: ["/api/settings/favicon_url"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/favicon_url");
+      if (!res.ok) return { value: "" };
+      return res.json();
+    },
+    initialData: { value: "" }
+  });
+
+  const { data: logoUrlLightSetting, refetch: refetchLogoLight } = useQuery<{ value: string }>({
+    queryKey: ["/api/settings/logo_url_light"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/logo_url_light");
+      if (!res.ok) return { value: "" };
+      return res.json();
+    },
+    initialData: { value: "" }
+  });
+
+  const { data: logoUrlDarkSetting, refetch: refetchLogoDark } = useQuery<{ value: string }>({
+    queryKey: ["/api/settings/logo_url_dark"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/logo_url_dark");
+      if (!res.ok) return { value: "" };
+      return res.json();
+    },
+    initialData: { value: "" }
+  });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'light' | 'dark' | 'favicon') => {
     const file = e.target.files?.[0];
@@ -58,14 +88,23 @@ export function BrandSettings() {
     setIsSaving(true);
     try {
       await apiRequest("POST", "/api/settings", { key, value });
-      queryClient.invalidateQueries({ queryKey: [`/api/settings/${key}`] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/settings", key] });
       
       if (type === 'favicon') {
-        const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
-        (link as HTMLLinkElement).rel = 'shortcut icon';
-        (link as HTMLLinkElement).href = value;
-        document.getElementsByTagName('head')[0].appendChild(link);
+        await refetchFavicon();
+        const link = (document.querySelector("link[rel*='icon']") || document.createElement('link')) as HTMLLinkElement;
+        link.rel = 'shortcut icon';
+        link.href = value;
+        if (!link.parentNode) {
+          document.getElementsByTagName('head')[0].appendChild(link);
+        }
+      } else if (type === 'light') {
+        await refetchLogoLight();
+      } else if (type === 'dark') {
+        await refetchLogoDark();
       }
+
+      queryClient.setQueryData(["/api/settings", key], { value });
 
       toast({
         title: "Atualizado com sucesso",
@@ -114,6 +153,8 @@ export function BrandSettings() {
                 />
                 {logoPreviewLight ? (
                   <img src={logoPreviewLight} alt="Preview Claro" className="h-12 w-auto object-contain" />
+                ) : logoUrlLightSetting.value ? (
+                  <img src={logoUrlLightSetting.value} alt="Logo Claro Atual" className="h-12 w-auto object-contain" />
                 ) : (
                   <RenovLogo variant="light" size="lg" className="h-12 w-auto" />
                 )}
@@ -147,6 +188,8 @@ export function BrandSettings() {
                 />
                 {logoPreviewDark ? (
                   <img src={logoPreviewDark} alt="Preview Escuro" className="h-12 w-auto object-contain" />
+                ) : logoUrlDarkSetting.value ? (
+                  <img src={logoUrlDarkSetting.value} alt="Logo Escuro Atual" className="h-12 w-auto object-contain" />
                 ) : (
                   <RenovLogo variant="dark" size="lg" className="h-12 w-auto" />
                 )}
@@ -191,6 +234,8 @@ export function BrandSettings() {
               />
               {faviconPreview ? (
                 <img src={faviconPreview} alt="Preview Favicon" className="h-8 w-8 object-contain" />
+              ) : faviconSetting.value ? (
+                <img src={faviconSetting.value} alt="Favicon Atual" className="h-8 w-8 object-contain" />
               ) : (
                 <Image className="h-8 w-8 text-muted-foreground/40" />
               )}
