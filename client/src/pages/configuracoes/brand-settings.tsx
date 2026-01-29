@@ -13,15 +13,16 @@ export function BrandSettings() {
   const { toast } = useToast();
   const [logoPreviewLight, setLogoPreviewLight] = useState<string | null>(null);
   const [logoPreviewDark, setLogoPreviewDark] = useState<string | null>(null);
+  const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'light' | 'dark') => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'light' | 'dark' | 'favicon') => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.includes("image/png") && !file.type.includes("image/svg") && !file.type.includes("image/jpeg")) {
+      if (!file.type.includes("image/png") && !file.type.includes("image/svg") && !file.type.includes("image/jpeg") && !file.type.includes("image/x-icon")) {
         toast({
           title: "Formato inválido",
-          description: "Por favor, envie um arquivo PNG, JPG ou SVG.",
+          description: "Por favor, envie um arquivo PNG, JPG, SVG ou ICO.",
           variant: "destructive",
         });
         return;
@@ -30,31 +31,54 @@ export function BrandSettings() {
       const reader = new FileReader();
       reader.onload = () => {
         if (type === 'light') setLogoPreviewLight(reader.result as string);
-        else setLogoPreviewDark(reader.result as string);
+        else if (type === 'dark') setLogoPreviewDark(reader.result as string);
+        else setFaviconPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSave = async (type: 'light' | 'dark') => {
-    const value = type === 'light' ? logoPreviewLight : logoPreviewDark;
+  const handleSave = async (type: 'light' | 'dark' | 'favicon') => {
+    let value: string | null = null;
+    let key = "";
+    
+    if (type === 'light') {
+      value = logoPreviewLight;
+      key = "logo_url_light";
+    } else if (type === 'dark') {
+      value = logoPreviewDark;
+      key = "logo_url_dark";
+    } else {
+      value = faviconPreview;
+      key = "favicon_url";
+    }
+
     if (!value) return;
     
     setIsSaving(true);
-    const key = type === 'light' ? "logo_url_light" : "logo_url_dark";
     try {
       await apiRequest("POST", "/api/settings", { key, value });
       queryClient.invalidateQueries({ queryKey: [`/api/settings/${key}`] });
+      
+      if (type === 'favicon') {
+        const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+        (link as HTMLLinkElement).rel = 'shortcut icon';
+        (link as HTMLLinkElement).href = value;
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+
       toast({
-        title: "Logo atualizado",
-        description: `O logo do tema ${type === 'light' ? 'claro' : 'escuro'} foi atualizado.`,
+        title: "Atualizado com sucesso",
+        description: `${type === 'favicon' ? 'Favicon' : 'Logo'} atualizado.`,
       });
+
       if (type === 'light') setLogoPreviewLight(null);
-      else setLogoPreviewDark(null);
+      else if (type === 'dark') setLogoPreviewDark(null);
+      else setFaviconPreview(null);
     } catch (error) {
       toast({
         title: "Erro ao salvar",
-        description: "Não foi possível salvar o novo logo.",
+        description: "Não foi possível salvar a alteração.",
         variant: "destructive"
       });
     } finally {
@@ -139,6 +163,49 @@ export function BrandSettings() {
                 </div>
               )}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm border-border/60">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-[18px] font-bold">Favicon Renov Home</CardTitle>
+          <CardDescription className="text-[13px]">
+            Clique no quadro abaixo para fazer upload do ícone da aba do navegador.
+            Medida ideal: 32x32px ou 48x48px. Formatos: PNG ou ICO.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 max-w-sm">
+            <Label>Ícone do Navegador (Favicon)</Label>
+            <div 
+              className="relative group cursor-pointer p-8 rounded-lg bg-white border-2 border-dashed border-muted-foreground/20 hover:border-primary/50 transition-colors flex flex-col items-center justify-center min-h-[120px] w-[120px]"
+              onClick={() => document.getElementById('favicon-upload')?.click()}
+            >
+              <input 
+                type="file" 
+                id="favicon-upload"
+                className="hidden"
+                onChange={(e) => handleFileChange(e, 'favicon')}
+                accept=".png,.ico"
+              />
+              {faviconPreview ? (
+                <img src={faviconPreview} alt="Preview Favicon" className="h-8 w-8 object-contain" />
+              ) : (
+                <Image className="h-8 w-8 text-muted-foreground/40" />
+              )}
+              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
+                <Upload className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+            {faviconPreview && (
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => handleSave('favicon')} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar Favicon"}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setFaviconPreview(null)}>Cancelar</Button>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
