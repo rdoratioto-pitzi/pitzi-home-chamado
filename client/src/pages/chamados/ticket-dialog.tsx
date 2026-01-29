@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   Select,
   SelectContent,
@@ -150,6 +150,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
     },
   });
 
+  const [attachments, setAttachments] = useState<string[]>([]);
   const descriptionValue = form.watch("description") || "";
   const titleValue = form.watch("title") || "";
 
@@ -157,6 +158,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
     mutationFn: async (data: FormData) => {
       const payload: Record<string, unknown> = {
         ...data,
+        attachments: attachments.length > 0 ? JSON.stringify(attachments) : null,
         requesterId: "admin",
         status: "open",
         code: "",
@@ -293,21 +295,17 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                     Descrição <span className="text-destructive">*</span>
                   </FormLabel>
                   <FormControl>
-                    <Textarea
+                    <RichTextarea
                       placeholder="Descreva detalhadamente o problema ou solicitação... (mínimo 20 caracteres)"
-                      className="min-h-[120px] resize-y"
-                      data-testid="input-ticket-description"
-                      aria-label="Descrição do chamado"
+                      value={field.value}
+                      onChange={field.onChange}
+                      images={attachments}
+                      onImagesChange={setAttachments}
                       maxLength={1000}
-                      {...field}
+                      data-testid="input-ticket-description"
                     />
                   </FormControl>
-                  <div className="flex justify-between items-center">
-                    <FormMessage />
-                    <span className={`text-xs ${descriptionValue.length >= 20 ? 'text-muted-foreground' : 'text-destructive'}`}>
-                      {descriptionValue.length}/1000 caracteres
-                    </span>
-                  </div>
+                  <FormMessage />
                 </FormItem>
               )}
             />

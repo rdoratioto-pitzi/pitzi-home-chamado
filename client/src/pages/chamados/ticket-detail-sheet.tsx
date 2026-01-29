@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   Sheet,
@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -19,10 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle } from "lucide-react";
+import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2 } from "lucide-react";
 import type { Ticket, TicketComment } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface TicketDetailSheetProps {
   ticket: Ticket | null;
@@ -119,8 +124,16 @@ const getTimeOpenInfo = (createdAt: Date | string | null): { text: string; color
 
 export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   const [comment, setComment] = useState("");
+  const [commentImages, setCommentImages] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (ticket) {
+      setComment("");
+      setCommentImages([]);
+    }
+  }, [ticket]);
 
   const { data: comments = [] } = useQuery<TicketComment[]>({
     queryKey: ["/api/tickets", ticket?.id, "comments"],
@@ -141,9 +154,10 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   });
 
   const commentMutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async (data: { content: string; images: string[] }) => {
       return apiRequest("POST", `/api/tickets/${ticket?.id}/comments`, {
-        content,
+        content: data.content,
+        attachments: data.images.length > 0 ? JSON.stringify(data.images) : null,
         userId: "admin",
         ticketId: ticket?.id,
       });
@@ -151,6 +165,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticket?.id, "comments"] });
       setComment("");
+      setCommentImages([]);
       toast({
         title: "Comentário adicionado",
         description: "Seu comentário foi adicionado com sucesso.",
@@ -163,8 +178,8 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   };
 
   const handleSubmitComment = () => {
-    if (comment.trim()) {
-      commentMutation.mutate(comment);
+    if (comment.trim() || commentImages.length > 0) {
+      commentMutation.mutate({ content: comment, images: commentImages });
     }
   };
 
@@ -204,9 +219,37 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
 
           <div>
             <h4 className="text-sm font-medium mb-2">Descrição</h4>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words overflow-hidden mb-4" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
               {ticket.description}
             </p>
+            {ticket.attachments && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {(() => {
+                  try {
+                    const attachments = JSON.parse(ticket.attachments);
+                    if (Array.isArray(attachments)) {
+                      return attachments.map((url, i) => (
+                        <Dialog key={i}>
+                          <DialogTrigger asChild>
+                            <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer">
+                              <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
+                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <Maximize2 className="h-6 w-6 text-white" />
+                              </div>
+                            </div>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none">
+                            <img src={url} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain mx-auto" />
+                          </DialogContent>
+                        </Dialog>
+                      ));
+                    }
+                  } catch (e) {
+                    return null;
+                  }
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Timeline Section */}
@@ -308,16 +351,44 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                     <Avatar className="h-8 w-8">
                       <AvatarFallback className="text-xs">AD</AvatarFallback>
                     </Avatar>
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">Admin</span>
                         <span className="text-xs text-muted-foreground">
                           {c.createdAt ? new Date(c.createdAt).toLocaleDateString("pt-BR") : "-"}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
+                      <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         {c.content}
                       </p>
+                      {c.attachments && (
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          {(() => {
+                            try {
+                              const attachments = JSON.parse(c.attachments);
+                              if (Array.isArray(attachments)) {
+                                return attachments.map((url, i) => (
+                                  <Dialog key={i}>
+                                    <DialogTrigger asChild>
+                                      <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer">
+                                        <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
+                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                          <Maximize2 className="h-6 w-6 text-white" />
+                                        </div>
+                                      </div>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none">
+                                      <img src={url} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain mx-auto" />
+                                    </DialogContent>
+                                  </Dialog>
+                                ));
+                              }
+                            } catch (e) {
+                              return null;
+                            }
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -327,16 +398,19 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
         </div>
 
         <div className="border-t pt-4 space-y-2">
-          <Textarea
+          <RichTextarea
             placeholder="Adicione um comentário..."
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            className="min-h-[80px]"
+            onChange={setComment}
+            images={commentImages}
+            onImagesChange={setCommentImages}
+            rows={3}
+            maxLength={1000}
             data-testid="input-comment"
           />
           <Button 
             onClick={handleSubmitComment}
-            disabled={!comment.trim() || commentMutation.isPending}
+            disabled={(!comment.trim() && commentImages.length === 0) || commentMutation.isPending}
             className="w-full"
             data-testid="button-submit-comment"
           >

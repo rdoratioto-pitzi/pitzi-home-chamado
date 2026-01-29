@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   ArrowLeft,
   Calendar,
@@ -27,6 +27,7 @@ import {
   X,
   Download,
   ArrowRight,
+  Maximize2,
 } from "lucide-react";
 import {
   Select,
@@ -41,6 +42,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
@@ -71,6 +77,7 @@ interface MeetingData {
   participants?: string[];
   externalParticipants?: string[];
   agenda?: string;
+  agendaImages?: string[];
   discussions?: string;
   decisions?: string[];
   actions?: Array<{ description: string; responsible: string; deadline: string }>;
@@ -540,27 +547,46 @@ export default function MeetingDetailPage() {
               <div>
                 <label className="text-sm font-medium text-muted-foreground">Pauta</label>
                 {isEditing ? (
-                  <div className="space-y-1">
-                    <Textarea
-                      value={editedMeetingData.agenda || ""}
-                      onChange={(e) => setEditedMeetingData({ 
-                        ...editedMeetingData, 
-                        agenda: e.target.value
-                      })}
-                      placeholder="Pauta da reunião..."
-                      rows={10}
-                      maxLength={2000}
-                      data-testid="input-meeting-agenda"
-                    />
-                    <div className="flex justify-end">
-                      <span className="text-[10px] text-muted-foreground">
-                        {(editedMeetingData.agenda || "").length}/2000
-                      </span>
-                    </div>
-                  </div>
+                  <RichTextarea
+                    value={editedMeetingData.agenda || ""}
+                    onChange={(v) => setEditedMeetingData({ 
+                      ...editedMeetingData, 
+                      agenda: v
+                    })}
+                    images={editedMeetingData.agendaImages || []}
+                    onImagesChange={(imgs) => setEditedMeetingData({
+                      ...editedMeetingData,
+                      agendaImages: imgs
+                    })}
+                    placeholder="Pauta da reunião..."
+                    rows={10}
+                    maxLength={2000}
+                    data-testid="input-meeting-agenda"
+                  />
                 ) : (
-                  <div className="mt-1 whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                    {editedMeetingData.agenda || <span className="text-muted-foreground">Nenhuma pauta definida</span>}
+                  <div className="mt-1 space-y-4">
+                    <div className="whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                      {editedMeetingData.agenda || <span className="text-muted-foreground">Nenhuma pauta definida</span>}
+                    </div>
+                    {editedMeetingData.agendaImages && editedMeetingData.agendaImages.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                        {editedMeetingData.agendaImages.map((url, i) => (
+                          <Dialog key={i}>
+                            <DialogTrigger asChild>
+                              <div className="relative group rounded-lg overflow-hidden border bg-muted/50 aspect-video flex items-center justify-center cursor-pointer">
+                                <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
+                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Maximize2 className="h-6 w-6 text-white" />
+                                </div>
+                              </div>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none">
+                              <img src={url} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain mx-auto" />
+                            </DialogContent>
+                          </Dialog>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

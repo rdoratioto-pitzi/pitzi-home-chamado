@@ -1,13 +1,13 @@
 import { useState, useRef, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, X, Loader2 } from "lucide-react";
+import { ImageIcon, X, Loader2, Maximize2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface UploadedImage {
-  url: string;
-  name: string;
-}
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface RichTextareaProps {
   value: string;
@@ -60,7 +60,7 @@ export function RichTextarea({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: file.name,
+          name: file.name || "pasted-image.png",
           size: file.size,
           contentType: file.type
         })
@@ -126,29 +126,35 @@ export function RichTextarea({
 
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
-    const imageItems = Array.from(items).filter(item => item.type.startsWith("image/"));
-
-    if (imageItems.length === 0) return;
-
-    e.preventDefault();
-    setIsUploading(true);
-    const newImages: string[] = [];
-
-    for (const item of imageItems) {
-      const file = item.getAsFile();
-      if (file) {
-        const url = await uploadImage(file);
-        if (url) {
-          newImages.push(url);
-        }
+    const files: File[] = [];
+    
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) {
+        const file = items[i].getAsFile();
+        if (file) files.push(file);
       }
     }
 
-    if (newImages.length > 0 && onImagesChange) {
-      onImagesChange([...images, ...newImages]);
+    if (files.length === 0) return;
+
+    // Se houver imagens, prevenimos o comportamento padrão de colar texto se houver apenas imagens
+    // Mas se o usuário estiver colando texto e imagens, o ideal é processar ambos.
+    // Para simplificar e garantir que a imagem seja processada:
+    setIsUploading(true);
+    const uploadedUrls: string[] = [];
+
+    for (const file of files) {
+      const url = await uploadImage(file);
+      if (url) {
+        uploadedUrls.push(url);
+      }
+    }
+
+    if (uploadedUrls.length > 0 && onImagesChange) {
+      onImagesChange([...images, ...uploadedUrls]);
       toast({
         title: "Imagem colada",
-        description: `${newImages.length} imagem(ns) adicionada(s) com sucesso.`,
+        description: `${uploadedUrls.length} imagem(ns) adicionada(s) via área de transferência.`,
       });
     }
 
@@ -216,20 +222,33 @@ export function RichTextarea({
       {images.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
           {images.map((url, index) => (
-            <div key={index} className="relative group rounded-lg overflow-hidden border">
+            <div key={index} className="relative group rounded-lg overflow-hidden border bg-muted/50 aspect-video flex items-center justify-center">
               <img
                 src={url}
                 alt={`Anexo ${index + 1}`}
-                className="w-full h-24 object-cover"
+                className="max-w-full max-h-full object-contain cursor-pointer"
               />
-              <button
-                type="button"
-                onClick={() => removeImage(index)}
-                className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                data-testid={dataTestId ? `${dataTestId}-remove-image-${index}` : undefined}
-              >
-                <X className="h-3 w-3" />
-              </button>
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button size="icon" variant="secondary" className="h-8 w-8">
+                      <Maximize2 className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl w-[90vw] p-0 overflow-hidden bg-transparent border-none">
+                    <img src={url} alt="Preview" className="w-full h-auto max-h-[85vh] object-contain mx-auto" />
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  size="icon"
+                  variant="destructive"
+                  className="h-8 w-8"
+                  onClick={() => removeImage(index)}
+                  data-testid={dataTestId ? `${dataTestId}-remove-image-${index}` : undefined}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           ))}
         </div>

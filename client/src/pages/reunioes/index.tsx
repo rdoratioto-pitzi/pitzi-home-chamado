@@ -10,29 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { 
-  Plus, 
-  Folder, 
-  Users, 
-  User, 
-  Search,
-  Filter,
-  MoreHorizontal,
-  Calendar,
-  CheckCircle2,
-  Circle,
-  Clock,
-  Archive,
-  FileText,
-  Trash2,
-  Edit,
-  LayoutGrid,
-  List,
-  Repeat,
-  X,
-  Video
-} from "lucide-react";
+import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   Dialog,
   DialogContent,
@@ -117,6 +97,7 @@ export default function ReunioesPage() {
     recurrenceEndDate: "",
   });
 
+  const [agendaImages, setAgendaImages] = useState<string[]>([]);
   const [participantInput, setParticipantInput] = useState("");
   const [externalParticipantInput, setExternalParticipantInput] = useState("");
 
@@ -199,6 +180,7 @@ export default function ReunioesPage() {
       const meetingDataPayload = {
         ...data.meetingData,
         agenda: data.meetingData.agenda,
+        agendaImages: agendaImages,
         participants: data.meetingData.participants,
         externalParticipants: data.meetingData.externalParticipants,
       };
@@ -326,6 +308,7 @@ export default function ReunioesPage() {
       recurrenceWeekdays: [],
       recurrenceEndDate: "",
     });
+    setAgendaImages([]);
     setParticipantInput("");
     setExternalParticipantInput("");
   };
@@ -1273,22 +1256,19 @@ export default function ReunioesPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Pauta</label>
-                <Textarea
+                <RichTextarea
                   value={newMeeting.meetingData.agenda}
-                  onChange={(e) => setNewMeeting({ 
+                  onChange={(v) => setNewMeeting({ 
                     ...newMeeting, 
-                    meetingData: { ...newMeeting.meetingData, agenda: e.target.value } 
+                    meetingData: { ...newMeeting.meetingData, agenda: v } 
                   })}
-                  placeholder="- Item 1&#10;- Item 2&#10;- Item 3"
-                  rows={6}
+                  images={agendaImages}
+                  onImagesChange={setAgendaImages}
+                  placeholder="Tópicos a serem discutidos..."
                   maxLength={2000}
+                  rows={5}
                   data-testid="input-meeting-agenda"
                 />
-                <div className="flex justify-end">
-                  <span className="text-[10px] text-muted-foreground">
-                    {(newMeeting.meetingData.agenda || "").length}/2000
-                  </span>
-                </div>
               </div>
 
               <div className="space-y-2">

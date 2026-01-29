@@ -103,6 +103,7 @@ export const ticketComments = pgTable("ticket_comments", {
   ticketId: varchar("ticket_id").notNull(),
   userId: varchar("user_id").notNull(),
   content: text("content").notNull(),
+  attachments: text("attachments"), // JSON array of attachment URLs
   isInternal: boolean("is_internal").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
