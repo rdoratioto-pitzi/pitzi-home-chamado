@@ -29,7 +29,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { User } from "@shared/schema";
+import type { User, Project } from "@shared/schema";
+import { useEffect } from "react";
 
 const formSchema = z.object({
   name: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
@@ -44,9 +45,10 @@ type FormData = z.infer<typeof formSchema>;
 interface ProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  project?: Project;
 }
 
-export function ProjectDialog({ open, onOpenChange }: ProjectDialogProps) {
+export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -57,13 +59,33 @@ export function ProjectDialog({ open, onOpenChange }: ProjectDialogProps) {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: "",
-      description: "",
-      ownerId: "admin",
-      startDate: "",
-      endDate: "",
+      name: project?.name || "",
+      description: project?.description || "",
+      ownerId: project?.ownerId || "admin",
+      startDate: project?.startDate ? format(new Date(project.startDate), "yyyy-MM-dd") : "",
+      endDate: project?.endDate ? format(new Date(project.endDate), "yyyy-MM-dd") : "",
     },
   });
+
+  useEffect(() => {
+    if (project) {
+      form.reset({
+        name: project.name,
+        description: project.description || "",
+        ownerId: project.ownerId,
+        startDate: project.startDate ? format(new Date(project.startDate), "yyyy-MM-dd") : "",
+        endDate: project.endDate ? format(new Date(project.endDate), "yyyy-MM-dd") : "",
+      });
+    } else {
+      form.reset({
+        name: "",
+        description: "",
+        ownerId: "admin",
+        startDate: "",
+        endDate: "",
+      });
+    }
+  }, [project, form]);
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -71,15 +93,19 @@ export function ProjectDialog({ open, onOpenChange }: ProjectDialogProps) {
         ...data,
         startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
         endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
-        status: "active",
+        status: project?.status || "active",
       };
+      
+      if (project) {
+        return apiRequest("PATCH", `/api/projects/${project.id}`, payload);
+      }
       return apiRequest("POST", "/api/projects", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
       toast({
-        title: "Projeto criado",
-        description: "O projeto foi criado com sucesso.",
+        title: project ? "Projeto atualizado" : "Projeto criado",
+        description: `O projeto foi ${project ? "atualizado" : "criado"} com sucesso.`,
       });
       form.reset();
       onOpenChange(false);
@@ -87,7 +113,7 @@ export function ProjectDialog({ open, onOpenChange }: ProjectDialogProps) {
     onError: () => {
       toast({
         title: "Erro",
-        description: "Não foi possível criar o projeto.",
+        description: `Não foi possível ${project ? "atualizar" : "criar"} o projeto.`,
         variant: "destructive",
       });
     },
@@ -101,9 +127,9 @@ export function ProjectDialog({ open, onOpenChange }: ProjectDialogProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Novo Projeto</DialogTitle>
+          <DialogTitle>{project ? "Editar Projeto" : "Novo Projeto"}</DialogTitle>
           <DialogDescription>
-            Crie um novo projeto para organizar suas tarefas em um quadro Kanban.
+            {project ? "Atualize as informações do seu projeto." : "Crie um novo projeto para organizar suas tarefas em um quadro Kanban."}
           </DialogDescription>
         </DialogHeader>
 
@@ -254,7 +280,7 @@ export function ProjectDialog({ open, onOpenChange }: ProjectDialogProps) {
                 disabled={mutation.isPending}
                 data-testid="button-submit-project"
               >
-                {mutation.isPending ? "Criando..." : "Criar Projeto"}
+                {mutation.isPending ? (project ? "Salvando..." : "Criando...") : (project ? "Salvar Alterações" : "Criar Projeto")}
               </Button>
             </DialogFooter>
           </form>

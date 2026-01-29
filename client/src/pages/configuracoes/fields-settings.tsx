@@ -29,13 +29,15 @@ function FieldManager({
   title, 
   description,
   icon: Icon,
-  defaultItems 
+  defaultItems,
+  showLabel = true
 }: { 
   settingKey: string; 
   title: string; 
   description: string;
   icon: React.ElementType;
   defaultItems: FieldItem[];
+  showLabel?: boolean;
 }) {
   const { toast } = useToast();
   const [newItem, setNewItem] = useState({ value: "", label: "" });
@@ -69,16 +71,17 @@ function FieldManager({
   });
 
   const handleAdd = () => {
-    if (!newItem.value || !newItem.label) {
+    if (!newItem.value || (showLabel && !newItem.label)) {
       toast({ title: "Preencha todos os campos", variant: "destructive" });
       return;
     }
-    const exists = items.some(i => i.value === newItem.value);
+    const finalItem = showLabel ? newItem : { ...newItem, label: newItem.value };
+    const exists = items.some(i => i.value === finalItem.value);
     if (exists) {
       toast({ title: "Este valor já existe", variant: "destructive" });
       return;
     }
-    saveMutation.mutate([...items, newItem]);
+    saveMutation.mutate([...items, finalItem]);
     setNewItem({ value: "", label: "" });
   };
 
@@ -94,8 +97,9 @@ function FieldManager({
 
   const handleSaveEdit = () => {
     if (editingIndex === null) return;
+    const finalEditValue = showLabel ? editValue : { ...editValue, label: editValue.value };
     const newItems = [...items];
-    newItems[editingIndex] = editValue;
+    newItems[editingIndex] = finalEditValue;
     saveMutation.mutate(newItems);
     setEditingIndex(null);
   };
@@ -123,13 +127,15 @@ function FieldManager({
             className="flex-1"
             data-testid={`input-${settingKey}-value`}
           />
-          <Input
-            placeholder="Rótulo (ex: TI / Infraestrutura)"
-            value={newItem.label}
-            onChange={(e) => setNewItem({ ...newItem, label: e.target.value })}
-            className="flex-1"
-            data-testid={`input-${settingKey}-label`}
-          />
+          {showLabel && (
+            <Input
+              placeholder="Rótulo (ex: TI / Infraestrutura)"
+              value={newItem.label}
+              onChange={(e) => setNewItem({ ...newItem, label: e.target.value })}
+              className="flex-1"
+              data-testid={`input-${settingKey}-label`}
+            />
+          )}
           <Button onClick={handleAdd} data-testid={`button-add-${settingKey}`}>
             <Plus className="h-4 w-4 mr-2" />
             Adicionar
@@ -150,12 +156,14 @@ function FieldManager({
                     className="flex-1"
                     data-testid={`input-edit-${settingKey}-value`}
                   />
-                  <Input
-                    value={editValue.label}
-                    onChange={(e) => setEditValue({ ...editValue, label: e.target.value })}
-                    className="flex-1"
-                    data-testid={`input-edit-${settingKey}-label`}
-                  />
+                  {showLabel && (
+                    <Input
+                      value={editValue.label}
+                      onChange={(e) => setEditValue({ ...editValue, label: e.target.value })}
+                      className="flex-1"
+                      data-testid={`input-edit-${settingKey}-label`}
+                    />
+                  )}
                   <Button size="icon" variant="ghost" onClick={handleSaveEdit}>
                     <Save className="h-4 w-4 text-green-600" />
                   </Button>
@@ -168,7 +176,8 @@ function FieldManager({
                   <Badge variant="outline" className="font-mono">
                     {item.value}
                   </Badge>
-                  <span className="flex-1">{item.label}</span>
+                  {showLabel && <span className="flex-1">{item.label}</span>}
+                  <div className={showLabel ? "" : "flex-1"} />
                   <Button 
                     size="icon" 
                     variant="ghost" 
@@ -227,7 +236,7 @@ export function FieldsSettings() {
       <div>
         <h2 className="text-lg font-semibold mb-1">Campos Dinâmicos</h2>
         <p className="text-sm text-muted-foreground">
-          Configure as opções disponíveis nos campos dos chamados
+          Configure as opções disponíveis nos campos dos chamados e tarefas
         </p>
       </div>
 
@@ -245,6 +254,10 @@ export function FieldsSettings() {
             <MapPin className="h-4 w-4 mr-2" />
             Locais
           </TabsTrigger>
+          <TabsTrigger value="areas" data-testid="tab-field-areas">
+            <FolderOpen className="h-4 w-4 mr-2" />
+            Áreas
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="categories">
@@ -254,6 +267,7 @@ export function FieldsSettings() {
             description="Defina as categorias disponíveis para classificar os chamados"
             icon={FolderOpen}
             defaultItems={defaultCategories}
+            showLabel={false}
           />
         </TabsContent>
 
@@ -264,6 +278,7 @@ export function FieldsSettings() {
             description="Defina os tipos de chamados (Bug, Melhoria, Negócio, etc.)"
             icon={Tag}
             defaultItems={defaultTypes}
+            showLabel={false}
           />
         </TabsContent>
 
@@ -274,28 +289,25 @@ export function FieldsSettings() {
             description="Defina os locais/sistemas onde os chamados podem ocorrer"
             icon={MapPin}
             defaultItems={defaultLocations}
+            showLabel={false}
+          />
+        </TabsContent>
+
+        <TabsContent value="areas">
+          <FieldManager 
+            settingKey="task_areas_config"
+            title="Áreas de Tarefas"
+            description="Configure as áreas que aparecem no gerenciamento de tarefas"
+            icon={FolderOpen}
+            defaultItems={[
+              { value: "ti", label: "TI" },
+              { value: "rh", label: "RH" },
+              { value: "operacoes", label: "Operações" },
+            ]}
+            showLabel={false}
           />
         </TabsContent>
       </Tabs>
-
-      <div className="mt-8">
-        <h2 className="text-lg font-semibold mb-1">Áreas de Tarefas</h2>
-        <p className="text-sm text-muted-foreground">
-          Gerencie as áreas disponíveis no módulo de tarefas
-        </p>
-      </div>
-
-      <FieldManager 
-        settingKey="task_areas_config"
-        title="Áreas de Tarefas"
-        description="Configure as áreas que aparecem no gerenciamento de tarefas"
-        icon={FolderOpen}
-        defaultItems={[
-          { value: "ti", label: "TI" },
-          { value: "rh", label: "RH" },
-          { value: "operacoes", label: "Operações" },
-        ]}
-      />
     </div>
   );
 }

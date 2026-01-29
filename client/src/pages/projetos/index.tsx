@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, FolderKanban, Calendar, Users } from "lucide-react";
+import { Plus, Search, FolderKanban, Calendar, Users, Edit2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Project, User } from "@shared/schema";
 import { ProjectDialog } from "./project-dialog";
@@ -31,6 +31,7 @@ const statusLabels: Record<string, string> = {
 
 export default function ProjetosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
@@ -40,6 +41,18 @@ export default function ProjetosPage() {
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
+
+  const handleNewProject = () => {
+    setSelectedProject(undefined);
+    setIsDialogOpen(true);
+  };
+
+  const handleEditProject = (e: React.MouseEvent, project: Project) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedProject(project);
+    setIsDialogOpen(true);
+  };
 
   const filteredProjects = projects.filter((project) =>
     project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -54,7 +67,7 @@ export default function ProjetosPage() {
         title="Projetos" 
         breadcrumbs={[{ label: "Projetos" }]}
         actions={
-          <Button onClick={() => setIsDialogOpen(true)} data-testid="button-new-project">
+          <Button onClick={handleNewProject} data-testid="button-new-project">
             <Plus className="h-4 w-4 mr-2" />
             Novo Projeto
           </Button>
@@ -106,9 +119,20 @@ export default function ProjetosPage() {
               return (
                 <Link key={project.id} href={`/projetos/${project.id}`}>
                   <Card 
-                    className="shadow-sm border-border/60 cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 h-full"
+                    className="shadow-sm border-border/60 cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 h-full relative group"
                     data-testid={`card-project-${project.id}`}
                   >
+                    <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border shadow-sm"
+                        onClick={(e) => handleEditProject(e, project)}
+                        data-testid={`button-edit-project-${project.id}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <CardHeader className="pb-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
@@ -148,7 +172,11 @@ export default function ProjetosPage() {
         )}
       </main>
 
-      <ProjectDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
+      <ProjectDialog 
+        open={isDialogOpen} 
+        onOpenChange={setIsDialogOpen} 
+        project={selectedProject} 
+      />
     </div>
   );
 }
