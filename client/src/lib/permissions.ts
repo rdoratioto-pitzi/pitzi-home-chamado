@@ -22,9 +22,11 @@ export function getCurrentUser(): CurrentUser | null {
     const userStr = sessionStorage.getItem("user");
     if (!userStr) return null;
     const user = JSON.parse(userStr);
-    // Standardize isAdmin check
-    if (user && typeof user.isAdmin === 'undefined' && typeof user.is_admin !== 'undefined') {
-      user.isAdmin = user.is_admin;
+    // Standardize isAdmin check - handle multiple formats
+    if (user) {
+      // Check for is_admin (snake_case from DB) or isAdmin (camelCase from API)
+      const adminValue = user.isAdmin ?? user.is_admin;
+      user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
     }
     return user;
   } catch {

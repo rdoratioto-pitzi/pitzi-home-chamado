@@ -76,7 +76,7 @@ export async function registerRoutes(
           name: user.name,
           email: user.email,
           modulePermissions: user.modulePermissions,
-          isAdmin: user.isAdmin,
+          isAdmin: user.isAdmin === true,
           status: user.status,
         }
       });
