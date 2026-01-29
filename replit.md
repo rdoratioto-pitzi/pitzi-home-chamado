@@ -198,6 +198,14 @@ Na inicialização, o servidor executa `server/seed.ts` que:
 ### Tarefas
 - **Visualização Kanban**: Colunas A Fazer, Em Andamento, Concluído, Arquivado
 - **Drag-and-drop**: Arraste tarefas entre colunas para atualizar status
+- **Ordenação flexível**: Por prioridade (com data como critério secundário), por data (com prioridade como secundário), ou ordem manual personalizada
+- **Reuniões recorrentes**: Toggle "Repetir" com opções diária ou semanal (seleção de dias da semana), data de término opcional
+- **Participantes múltiplos**: Multi-select para usuários do sistema com busca, suporte a participantes externos via email
+- **Convites por email**: Ao criar reunião, envia email com arquivo ICS (calendário) anexado para todos os participantes
+- **Pauta com formatação**: Campo de pauta aceita quebras de linha para melhor organização
+- **Limitações ICS (MVP)**: 
+  - Convites são enviados apenas na criação (editar/cancelar reuniões não atualiza calendários dos participantes)
+  - Conversão de timezone usa date-fns-tz com America/Sao_Paulo (DST-aware)
 
 ### Login
 - **Layout Metronic Classic**: Tela dividida com branding à esquerda e formulário à direita

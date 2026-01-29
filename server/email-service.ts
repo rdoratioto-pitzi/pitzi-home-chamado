@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
-import type { Ticket, User, TicketComment } from "@shared/schema";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import type { Ticket, User, TicketComment, Task } from "@shared/schema";
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -314,5 +315,352 @@ export async function sendTicketCommentEmail(
     console.log(`Comment email sent for ticket ${ticket.code}`);
   } catch (error) {
     console.error("Failed to send email:", error);
+  }
+}
+
+function escapeICSText(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '');
+}
+
+function escapeICSParam(text: string): string {
+  if (text.includes(',') || text.includes(';') || text.includes(':') || text.includes('"')) {
+    return `"${text.replace(/"/g, '\\"')}"`;
+  }
+  return text;
+}
+
+function foldICSLine(line: string): string {
+  if (line.length <= 75) return line;
+  const parts: string[] = [];
+  let current = line;
+  while (current.length > 75) {
+    parts.push(current.substring(0, 75));
+    current = ' ' + current.substring(75);
+  }
+  parts.push(current);
+  return parts.join('\r\n');
+}
+
+function generateICSContent(
+  meeting: {
+    title: string;
+    date: string;
+    time: string;
+    location?: string;
+    description?: string;
+    organizerName: string;
+    organizerEmail: string;
+    isRecurring?: boolean;
+    recurrenceType?: string;
+    recurrenceWeekdays?: number[];
+    recurrenceEndDate?: string;
+  },
+  attendees: { name: string; email: string }[]
+): string {
+  const uid = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@renovhome.com.br`;
+  const now = new Date();
+  
+  const [year, month, day] = meeting.date.split('-').map(Number);
+  const [hour, minute] = meeting.time.split(':').map(Number);
+  
+  const SAO_PAULO_TZ = 'America/Sao_Paulo';
+  
+  // Create a date representing the intended local time in São Paulo
+  // Then convert to UTC using timezone-aware library
+  const localDateTime = new Date(year, month - 1, day, hour, minute, 0);
+  const startUTC = fromZonedTime(localDateTime, SAO_PAULO_TZ);
+  const endUTC = new Date(startUTC.getTime() + 60 * 60 * 1000);
+  
+  const formatDateUTC = (d: Date): string => {
+    return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  };
+  
+  const dtStart = formatDateUTC(startUTC);
+  const dtEnd = formatDateUTC(endUTC);
+  
+  const attendeeLines = attendees
+    .map(a => `ATTENDEE;CN=${escapeICSParam(a.name)};RSVP=TRUE:mailto:${a.email}`);
+
+  let rrule = '';
+  if (meeting.isRecurring) {
+    if (meeting.recurrenceType === 'daily') {
+      rrule = 'RRULE:FREQ=DAILY';
+    } else if (meeting.recurrenceType === 'weekly' && meeting.recurrenceWeekdays && meeting.recurrenceWeekdays.length > 0) {
+      const days = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+      const dayList = meeting.recurrenceWeekdays.map(d => days[d]).join(',');
+      rrule = `RRULE:FREQ=WEEKLY;BYDAY=${dayList}`;
+    }
+    if (rrule && meeting.recurrenceEndDate) {
+      const [ey, em, ed] = meeting.recurrenceEndDate.split('-').map(Number);
+      // Convert end of day in São Paulo to UTC
+      const endLocalDateTime = new Date(ey, em - 1, ed, 23, 59, 59);
+      const untilUTC = fromZonedTime(endLocalDateTime, SAO_PAULO_TZ);
+      rrule += `;UNTIL=${formatDateUTC(untilUTC)}`;
+    }
+  }
+
+  const rawLines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Renov Home//Meeting Invite//PT',
+    'CALSCALE:GREGORIAN',
+    'METHOD:REQUEST',
+    'BEGIN:VEVENT',
+    `UID:${uid}`,
+    `DTSTAMP:${formatDateUTC(now)}`,
+    `DTSTART:${dtStart}`,
+    `DTEND:${dtEnd}`,
+    `SUMMARY:${escapeICSText(meeting.title)}`,
+    `LOCATION:${escapeICSText(meeting.location || '')}`,
+    `DESCRIPTION:${escapeICSText(meeting.description || '')}`,
+    `ORGANIZER;CN=${escapeICSParam(meeting.organizerName)}:mailto:${meeting.organizerEmail}`,
+    ...attendeeLines,
+    rrule,
+    'STATUS:CONFIRMED',
+    'SEQUENCE:0',
+    'END:VEVENT',
+    'END:VCALENDAR'
+  ].filter(line => line.length > 0);
+
+  return rawLines.map(line => foldICSLine(line)).join('\r\n');
+}
+
+export async function sendMeetingInviteEmail(
+  task: Task,
+  organizer: User,
+  participants: User[],
+  externalEmails: string[]
+): Promise<void> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log("SMTP not configured, skipping meeting invite email");
+    return;
+  }
+
+  let meetingData: {
+    date: string;
+    time: string;
+    location?: string;
+    agenda?: string;
+  };
+
+  try {
+    meetingData = typeof task.meetingData === 'string' 
+      ? JSON.parse(task.meetingData)
+      : task.meetingData as unknown as typeof meetingData;
+  } catch {
+    console.log("Failed to parse meeting data, skipping invite");
+    return;
+  }
+
+  if (!meetingData?.date || !meetingData?.time) {
+    console.log("Meeting data incomplete, skipping invite");
+    return;
+  }
+
+  const recipients = [
+    ...participants.map(p => p.email),
+    ...externalEmails
+  ].filter(Boolean);
+
+  if (recipients.length === 0) return;
+
+  const attendees = [
+    ...participants.map(p => ({ name: p.name, email: p.email })),
+    ...externalEmails.map(e => ({ name: e, email: e }))
+  ];
+
+  let recurrenceWeekdays: number[] = [];
+  try {
+    recurrenceWeekdays = typeof task.recurrenceWeekdays === 'string'
+      ? JSON.parse(task.recurrenceWeekdays)
+      : (task.recurrenceWeekdays as unknown as number[]) || [];
+  } catch {
+    recurrenceWeekdays = [];
+  }
+
+  const icsContent = generateICSContent(
+    {
+      title: task.title,
+      date: meetingData.date,
+      time: meetingData.time,
+      location: meetingData.location,
+      description: typeof meetingData.agenda === 'string' ? meetingData.agenda : '',
+      organizerName: organizer.name,
+      organizerEmail: organizer.email,
+      isRecurring: task.isRecurring || false,
+      recurrenceType: task.recurrenceType || undefined,
+      recurrenceWeekdays,
+      recurrenceEndDate: task.recurrenceEndDate || undefined
+    },
+    attendees
+  );
+
+  const formattedDate = new Date(`${meetingData.date}T${meetingData.time}`).toLocaleDateString('pt-BR', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>${emailStyles}</head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Convite de Reunião</h1>
+        </div>
+        <div class="content">
+          <p>Olá,</p>
+          <p>Você foi convidado(a) para uma reunião no Renov Home:</p>
+          
+          <div class="ticket-info">
+            <h3>${task.title}</h3>
+            <p><span class="label">Data e Hora:</span> ${formattedDate}</p>
+            ${meetingData.location ? `<p><span class="label">Local:</span> ${meetingData.location}</p>` : ''}
+            <p><span class="label">Organizador:</span> ${organizer.name}</p>
+            <p><span class="label">Participantes:</span> ${attendees.map(a => a.name).join(', ')}</p>
+          </div>
+          
+          ${meetingData.agenda ? `
+            <p><strong>Pauta:</strong></p>
+            <div style="background: #f0f0f0; padding: 16px; border-radius: 8px; margin: 16px 0;">
+              <p style="margin: 0; white-space: pre-wrap;">${meetingData.agenda}</p>
+            </div>
+          ` : ''}
+          
+          <a href="${BASE_URL}/tarefas" class="btn">Ver no Renov Home</a>
+          
+          <p style="margin-top: 24px; font-size: 14px; color: #666;">
+            O arquivo de calendário (.ics) está anexado a este email. Você pode adicionar diretamente à sua agenda.
+          </p>
+        </div>
+        <div class="footer">
+          <p>Renov Home - Sistema de Gestão Interna</p>
+          <p>Este é um email automático, não responda.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Renov Home" <${process.env.SMTP_USER}>`,
+      to: recipients.join(", "),
+      subject: `Convite: ${task.title} - ${formattedDate}`,
+      html,
+      icalEvent: {
+        filename: 'invite.ics',
+        method: 'request',
+        content: icsContent
+      }
+    });
+    console.log(`Meeting invite sent for "${task.title}" to ${recipients.join(", ")}`);
+  } catch (error) {
+    console.error("Failed to send meeting invite:", error);
+  }
+}
+
+export async function sendMeetingUpdatedEmail(
+  task: Task,
+  organizer: User,
+  participants: User[],
+  externalEmails: string[],
+  changeType: 'rescheduled' | 'cancelled' | 'updated'
+): Promise<void> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log("SMTP not configured, skipping meeting update email");
+    return;
+  }
+
+  let meetingData: {
+    date: string;
+    time: string;
+    location?: string;
+    agenda?: string;
+  } | null = null;
+
+  try {
+    meetingData = typeof task.meetingData === 'string' 
+      ? JSON.parse(task.meetingData)
+      : task.meetingData as unknown as typeof meetingData;
+  } catch {
+    meetingData = null;
+  }
+
+  const recipients = [
+    ...participants.map(p => p.email),
+    ...externalEmails
+  ].filter(Boolean);
+
+  if (recipients.length === 0) return;
+
+  const titleMap = {
+    rescheduled: 'Reunião Reagendada',
+    cancelled: 'Reunião Cancelada',
+    updated: 'Reunião Atualizada'
+  };
+
+  const formattedDate = meetingData?.date && meetingData?.time 
+    ? new Date(`${meetingData.date}T${meetingData.time}`).toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : 'Data a definir';
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>${emailStyles}</head>
+    <body>
+      <div class="container">
+        <div class="header" style="${changeType === 'cancelled' ? 'background-color: #dc3545;' : ''}">
+          <h1>${titleMap[changeType]}</h1>
+        </div>
+        <div class="content">
+          <p>Olá,</p>
+          <p>A reunião "${task.title}" foi ${changeType === 'rescheduled' ? 'reagendada' : changeType === 'cancelled' ? 'cancelada' : 'atualizada'}.</p>
+          
+          <div class="ticket-info">
+            <h3>${task.title}</h3>
+            <p><span class="label">Data e Hora:</span> ${formattedDate}</p>
+            ${meetingData?.location ? `<p><span class="label">Local:</span> ${meetingData.location}</p>` : ''}
+            <p><span class="label">Organizador:</span> ${organizer.name}</p>
+          </div>
+          
+          <a href="${BASE_URL}/tarefas" class="btn">Ver no Renov Home</a>
+        </div>
+        <div class="footer">
+          <p>Renov Home - Sistema de Gestão Interna</p>
+          <p>Este é um email automático, não responda.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Renov Home" <${process.env.SMTP_USER}>`,
+      to: recipients.join(", "),
+      subject: `${titleMap[changeType]}: ${task.title}`,
+      html
+    });
+    console.log(`Meeting ${changeType} email sent for "${task.title}"`);
+  } catch (error) {
+    console.error("Failed to send meeting update email:", error);
   }
 }

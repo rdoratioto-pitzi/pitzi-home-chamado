@@ -6,7 +6,8 @@ import {
   sendTicketCreatedEmail, 
   sendTicketAssignedEmail, 
   sendTicketStatusChangedEmail, 
-  sendTicketCommentEmail 
+  sendTicketCommentEmail,
+  sendMeetingInviteEmail
 } from "./email-service";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
@@ -849,6 +850,38 @@ export async function registerRoutes(
     try {
       const validated = insertTaskSchema.parse(req.body);
       const task = await storage.createTask(validated);
+      
+      if (task.type === "meeting_note") {
+        let meetingData: {
+          date?: string;
+          time?: string;
+          participants?: string[];
+          externalParticipants?: string[];
+        } | null = null;
+        
+        try {
+          meetingData = typeof task.meetingData === 'string'
+            ? JSON.parse(task.meetingData)
+            : task.meetingData as unknown as typeof meetingData;
+        } catch {
+          meetingData = null;
+        }
+        
+        if (meetingData?.date && meetingData?.time) {
+          const organizer = await storage.getUser(task.createdBy);
+          if (organizer) {
+            const participantIds = meetingData.participants || [];
+            const participants = await Promise.all(
+              participantIds.map((id: string) => storage.getUser(id))
+            );
+            const validParticipants = participants.filter((p): p is NonNullable<typeof p> => p !== undefined);
+            const externalEmails = meetingData.externalParticipants || [];
+            
+            sendMeetingInviteEmail(task, organizer, validParticipants, externalEmails).catch(console.error);
+          }
+        }
+      }
+      
       res.status(201).json(task);
     } catch (error) {
       if (error instanceof z.ZodError) {
