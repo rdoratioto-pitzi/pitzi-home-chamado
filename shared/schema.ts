@@ -57,6 +57,7 @@ export const tickets = pgTable("tickets", {
   code: text("code").notNull(), // CHM-001, CHM-002, etc.
   title: text("title").notNull(),
   description: text("description").notNull(),
+  attachments: text("attachments"), // JSON array of attachment URLs
   category: text("category").notNull(),
   type: text("type").notNull().default("bug"), // bug, melhoria, negocio
   location: text("location").notNull().default("outros"), // RS, RG, Dash, One, Home, Omie, Outros
@@ -371,6 +372,7 @@ export const tasks = pgTable("tasks", {
   areaId: varchar("area_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
+  attachments: text("attachments"), // JSON array of attachment URLs
   type: text("type").notNull().default("task"),
   status: text("status").notNull().default("todo"),
   priority: text("priority").notNull().default("medium"),

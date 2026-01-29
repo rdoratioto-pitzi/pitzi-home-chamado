@@ -10,20 +10,28 @@ function FaviconManager() {
     queryKey: ["/api/settings/favicon_url"],
     queryFn: async () => {
       const res = await fetch("/api/settings/favicon_url");
-      if (!res.ok) return null;
+      if (!res.ok) return { value: "" };
       return res.json();
     },
-    staleTime: Infinity,
+    staleTime: 60000,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
     if (faviconSetting?.value) {
-      const link = (document.querySelector("link[rel*='icon']") || document.createElement('link')) as HTMLLinkElement;
-      link.rel = 'shortcut icon';
-      link.href = faviconSetting.value;
-      if (!link.parentNode) {
-        document.getElementsByTagName('head')[0].appendChild(link);
-      }
+      const existingLinks = document.querySelectorAll("link[rel*='icon']");
+      existingLinks.forEach(link => link.remove());
+      
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/x-icon';
+      link.href = faviconSetting.value + (faviconSetting.value.includes('?') ? '&' : '?') + 't=' + Date.now();
+      document.getElementsByTagName('head')[0].appendChild(link);
+      
+      const shortcutLink = document.createElement('link');
+      shortcutLink.rel = 'shortcut icon';
+      shortcutLink.href = faviconSetting.value + (faviconSetting.value.includes('?') ? '&' : '?') + 't=' + Date.now();
+      document.getElementsByTagName('head')[0].appendChild(shortcutLink);
     }
   }, [faviconSetting]);
 

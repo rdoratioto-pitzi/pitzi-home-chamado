@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   ArrowLeft,
   Calendar,
@@ -86,6 +87,7 @@ export default function TaskDetailPage() {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editedTask, setEditedTask] = useState<Partial<Task>>({});
   const [editedMeetingData, setEditedMeetingData] = useState<MeetingData>({});
+  const [editedAttachments, setEditedAttachments] = useState<string[]>([]);
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionPosition, setMentionPosition] = useState(0);
@@ -120,6 +122,13 @@ export default function TaskDetailPage() {
           setEditedMeetingData(JSON.parse(task.meetingData));
         } catch {
           setEditedMeetingData({});
+        }
+      }
+      if (task.attachments) {
+        try {
+          setEditedAttachments(JSON.parse(task.attachments));
+        } catch {
+          setEditedAttachments([]);
         }
       }
     }
@@ -178,6 +187,7 @@ export default function TaskDetailPage() {
   const handleSave = () => {
     const data: Partial<Task> = {
       ...editedTask,
+      attachments: JSON.stringify(editedAttachments),
       meetingData: task?.type === "meeting_note" ? JSON.stringify(editedMeetingData) : undefined,
     };
     updateTaskMutation.mutate(data);
@@ -454,25 +464,35 @@ export default function TaskDetailPage() {
           <div className="border-t border-border pt-6">
             <h3 className="font-medium mb-3">Descrição</h3>
             {isEditing ? (
-              <div className="space-y-1">
-                <Textarea
-                  value={editedTask.description || ""}
-                  onChange={(e) => setEditedTask({ ...editedTask, description: e.target.value })}
-                  placeholder="Adicione uma descrição..."
-                  rows={4}
-                  maxLength={1000}
-                  data-testid="input-edit-description"
-                />
-                <div className="flex justify-end">
-                  <span className="text-[10px] text-muted-foreground">
-                    {(editedTask.description || "").length}/1000
-                  </span>
-                </div>
-              </div>
+              <RichTextarea
+                value={editedTask.description || ""}
+                onChange={(value) => setEditedTask({ ...editedTask, description: value })}
+                images={editedAttachments}
+                onImagesChange={setEditedAttachments}
+                placeholder="Adicione uma descrição..."
+                rows={4}
+                maxLength={1000}
+                data-testid="input-edit-description"
+              />
             ) : (
-              <p className="text-muted-foreground whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                {task.description || "Nenhuma descrição"}
-              </p>
+              <div>
+                <p className="text-muted-foreground whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                  {task.description || "Nenhuma descrição"}
+                </p>
+                {task.attachments && JSON.parse(task.attachments).length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3">
+                    {JSON.parse(task.attachments).map((url: string, index: number) => (
+                      <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="block">
+                        <img
+                          src={url}
+                          alt={`Anexo ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border hover:opacity-80 transition-opacity"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
