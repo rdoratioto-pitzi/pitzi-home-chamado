@@ -32,6 +32,7 @@ import {
   X,
   GripVertical
 } from "lucide-react";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import type { User as UserType } from "@shared/schema";
 import {
   Dialog,
@@ -417,6 +418,32 @@ export default function TarefasPage() {
 
   const handleOpenNormalTaskDialog = () => handleOpenTaskDialog("task");
 
+  const onDragEnd = (result: DropResult) => {
+    if (!result.destination || sortBy !== "custom") return;
+
+    // Only allow reordering within the same area if an area is selected, 
+    // or across all tasks if "Todas as Tarefas" is selected.
+    // The current filteredTasks already handles the view filtering.
+    const items = Array.from(filteredTasks);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    
+    // Optimistic update
+    queryClient.setQueryData(["/api/tasks", selectedAreaId], items);
+    
+    // Persist new order
+    const reorderUpdates = items.map((task: any, index: number) => ({
+      id: task.id,
+      order: index
+    }));
+    
+    apiRequest("PATCH", "/api/tasks/reorder", { updates: reorderUpdates })
+      .catch((error) => {
+        console.error("Failed to reorder tasks:", error);
+        queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      });
+  };
+
   return (
     <div className="flex h-full">
       <div className="w-64 border-r border-border bg-muted/30 flex flex-col">
@@ -634,178 +661,210 @@ export default function TarefasPage() {
           ) : viewMode === "kanban" ? (
             <TaskKanban tasks={filteredTasks} areas={areas} />
           ) : (
-            <div className={viewMode === "grid" ? "space-y-2" : "border rounded-md divide-y"}>
-              {filteredTasks.map((task) => {
-                const status = statusConfig[task.status as keyof typeof statusConfig];
-                const priority = priorityConfig[task.priority as keyof typeof priorityConfig];
-                const taskType = typeConfig[task.type as keyof typeof typeConfig];
-                const taskArea = areas.find(a => a.id === task.areaId);
-                const StatusIcon = status?.icon || Circle;
-                const TypeIcon = taskType?.icon || CheckCircle2;
-
-                if (viewMode === "list") {
-                  return (
-                    <div
-                      key={task.id}
-                      className="flex items-center gap-4 p-3 hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/tarefas/${task.id}`)}
-                      data-testid={`list-item-task-${task.id}`}
-                    >
-                      <button
-                        className="flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const nextStatus = task.status === "todo" ? "doing" : task.status === "doing" ? "done" : "todo";
-                          updateTaskMutation.mutate({ id: task.id, data: { status: nextStatus } });
-                        }}
-                      >
-                        <StatusIcon className={`h-5 w-5 ${
-                          task.status === "done" ? "text-green-500" : 
-                          task.status === "doing" ? "text-blue-500" : "text-gray-400"
-                        }`} />
-                      </button>
-                      <div className="flex-1 min-w-0 flex items-center gap-3">
-                        <span className={`font-medium truncate ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
-                          {task.title}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] h-4 px-1 flex-shrink-0">
-                          <TypeIcon className="h-2 w-2 mr-1" />
-                          {taskType?.label}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        {taskArea && (
-                          <div className="flex items-center gap-1.5">
-                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: taskArea.color || "#00A137" }} />
-                            <span className="text-xs text-muted-foreground">{taskArea.name}</span>
-                          </div>
-                        )}
-                        <Badge className={`text-[10px] h-4 px-1 ${priority?.color}`}>
-                          {priority?.label}
-                        </Badge>
-                        {task.dueDate && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            <span>{new Date(task.dueDate).toLocaleDateString("pt-BR")}</span>
-                          </div>
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => navigate(`/tarefas/${task.id}`)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Editar
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => deleteTaskMutation.mutate(task.id)}>
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Excluir
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <Card 
-                    key={task.id}
-                    className="p-4 hover-elevate cursor-pointer"
-                    onClick={() => navigate(`/tarefas/${task.id}`)}
-                    data-testid={`card-task-${task.id}`}
+            <DragDropContext onDragEnd={onDragEnd}>
+              <Droppable droppableId="tasks-list">
+                {(provided) => (
+                  <div 
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className={viewMode === "grid" ? "space-y-2" : "border rounded-md divide-y"}
                   >
-                    <div className="flex items-start gap-4">
-                      <button
-                        className="mt-1 flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const nextStatus = task.status === "todo" ? "doing" : task.status === "doing" ? "done" : "todo";
-                          updateTaskMutation.mutate({ id: task.id, data: { status: nextStatus } });
-                        }}
-                        data-testid={`button-toggle-status-${task.id}`}
-                      >
-                        <StatusIcon className={`h-5 w-5 ${
-                          task.status === "done" ? "text-green-500" : 
-                          task.status === "doing" ? "text-blue-500" : "text-gray-400"
-                        }`} />
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className={`font-medium ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
-                            {task.title}
-                          </h3>
-                          <Badge variant="outline" className="text-xs">
-                            <TypeIcon className="h-3 w-3 mr-1" />
-                            {taskType?.label}
-                          </Badge>
-                        </div>
-                        {task.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
-                            {task.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {taskArea && !selectedAreaId && (
-                            <Badge variant="secondary" className="text-xs">
-                              <div 
-                                className="h-2 w-2 rounded-full mr-1" 
-                                style={{ backgroundColor: taskArea.color || "#00A137" }}
-                              />
-                              {taskArea.name}
-                            </Badge>
+                    {filteredTasks.map((task, index) => {
+                      const status = statusConfig[task.status as keyof typeof statusConfig];
+                      const priority = priorityConfig[task.priority as keyof typeof priorityConfig];
+                      const taskType = typeConfig[task.type as keyof typeof typeConfig];
+                      const taskArea = areas.find(a => a.id === task.areaId);
+                      const StatusIcon = status?.icon || Circle;
+                      const TypeIcon = taskType?.icon || CheckCircle2;
+
+                      return (
+                        <Draggable 
+                          key={task.id} 
+                          draggableId={task.id} 
+                          index={index}
+                          isDragDisabled={sortBy !== "custom"}
+                        >
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              className={snapshot.isDragging ? "z-50 opacity-90 shadow-2xl" : ""}
+                            >
+                              {viewMode === "list" ? (
+                                <div
+                                  className="flex items-center gap-4 p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                                  onClick={() => navigate(`/tarefas/${task.id}`)}
+                                  data-testid={`list-item-task-${task.id}`}
+                                >
+                                  {sortBy === "custom" && (
+                                    <div {...provided.dragHandleProps} className="text-muted-foreground cursor-grab active:cursor-grabbing">
+                                      <GripVertical className="h-4 w-4" />
+                                    </div>
+                                  )}
+                                  <button
+                                    className="flex-shrink-0"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const nextStatus = task.status === "todo" ? "doing" : task.status === "doing" ? "done" : "todo";
+                                      updateTaskMutation.mutate({ id: task.id, data: { status: nextStatus } });
+                                    }}
+                                  >
+                                    <StatusIcon className={`h-5 w-5 ${
+                                      task.status === "done" ? "text-green-500" : 
+                                      task.status === "doing" ? "text-blue-500" : "text-gray-400"
+                                    }`} />
+                                  </button>
+                                  <div className="flex-1 min-w-0 flex items-center gap-3">
+                                    <span className={`font-medium truncate ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+                                      {task.title}
+                                    </span>
+                                    <Badge variant="outline" className="text-[10px] h-4 px-1 flex-shrink-0">
+                                      <TypeIcon className="h-2 w-2 mr-1" />
+                                      {taskType?.label}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-3 flex-shrink-0">
+                                    {taskArea && (
+                                      <div className="flex items-center gap-1.5">
+                                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: taskArea.color || "#00A137" }} />
+                                        <span className="text-xs text-muted-foreground">{taskArea.name}</span>
+                                      </div>
+                                    )}
+                                    <Badge className={`text-[10px] h-4 px-1 ${priority?.color}`}>
+                                      {priority?.label}
+                                    </Badge>
+                                    {task.dueDate && (
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Calendar className="h-3 w-3" />
+                                        <span>{new Date(task.dueDate).toLocaleDateString("pt-BR")}</span>
+                                      </div>
+                                    )}
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => e.stopPropagation()}>
+                                          <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => navigate(`/tarefas/${task.id}`)}>
+                                          <Edit className="h-4 w-4 mr-2" />
+                                          Editar
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem className="text-destructive" onClick={() => deleteTaskMutation.mutate(task.id)}>
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Excluir
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </div>
+                              ) : (
+                                <Card 
+                                  className="p-4 hover-elevate cursor-pointer relative"
+                                  onClick={() => navigate(`/tarefas/${task.id}`)}
+                                  data-testid={`card-task-${task.id}`}
+                                >
+                                  <div className="flex items-start gap-4">
+                                    {sortBy === "custom" && (
+                                      <div {...provided.dragHandleProps} className="mt-1.5 text-muted-foreground cursor-grab active:cursor-grabbing">
+                                        <GripVertical className="h-4 w-4" />
+                                      </div>
+                                    )}
+                                    <button
+                                      className="mt-1 flex-shrink-0"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const nextStatus = task.status === "todo" ? "doing" : task.status === "doing" ? "done" : "todo";
+                                        updateTaskMutation.mutate({ id: task.id, data: { status: nextStatus } });
+                                      }}
+                                      data-testid={`button-toggle-status-${task.id}`}
+                                    >
+                                      <StatusIcon className={`h-5 w-5 ${
+                                        task.status === "done" ? "text-green-500" : 
+                                        task.status === "doing" ? "text-blue-500" : "text-gray-400"
+                                      }`} />
+                                    </button>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <h3 className={`font-medium ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+                                          {task.title}
+                                        </h3>
+                                        <Badge variant="outline" className="text-xs">
+                                          <TypeIcon className="h-3 w-3 mr-1" />
+                                          {taskType?.label}
+                                        </Badge>
+                                      </div>
+                                      {task.description && (
+                                        <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
+                                          {task.description}
+                                        </p>
+                                      )}
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        {taskArea && !selectedAreaId && (
+                                          <Badge variant="secondary" className="text-xs">
+                                            <div 
+                                              className="h-2 w-2 rounded-full mr-1" 
+                                              style={{ backgroundColor: taskArea.color || "#00A137" }}
+                                            />
+                                            {taskArea.name}
+                                          </Badge>
+                                        )}
+                                        <Badge className={`text-xs ${priority?.color}`}>
+                                          {priority?.label}
+                                        </Badge>
+                                        {task.dueDate && (
+                                          <Badge variant="outline" className="text-xs">
+                                            <Calendar className="h-3 w-3 mr-1" />
+                                            {new Date(task.dueDate).toLocaleDateString("pt-BR")}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button 
+                                          size="icon" 
+                                          variant="ghost" 
+                                          className="h-8 w-8"
+                                          onClick={(e) => e.stopPropagation()}
+                                          data-testid={`button-task-menu-${task.id}`}
+                                        >
+                                          <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={(e) => {
+                                          e.stopPropagation();
+                                          navigate(`/tarefas/${task.id}`);
+                                        }}>
+                                          <Edit className="h-4 w-4 mr-2" />
+                                          Editar
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem 
+                                          className="text-destructive"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteTaskMutation.mutate(task.id);
+                                          }}
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Excluir
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </Card>
+                              )}
+                            </div>
                           )}
-                          <Badge className={`text-xs ${priority?.color}`}>
-                            {priority?.label}
-                          </Badge>
-                          {task.dueDate && (
-                            <Badge variant="outline" className="text-xs">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {new Date(task.dueDate).toLocaleDateString("pt-BR")}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button 
-                            size="icon" 
-                            variant="ghost" 
-                            className="h-8 w-8"
-                            onClick={(e) => e.stopPropagation()}
-                            data-testid={`button-task-menu-${task.id}`}
-                          >
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/tarefas/${task.id}`);
-                          }}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteTaskMutation.mutate(task.id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+                        </Draggable>
+                      );
+                    })}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
           )}
         </div>
       </div>

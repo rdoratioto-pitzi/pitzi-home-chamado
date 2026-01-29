@@ -1056,6 +1056,24 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/tasks/reorder", async (req, res) => {
+    try {
+      const { updates } = req.body;
+      if (!Array.isArray(updates)) {
+        return res.status(400).json({ error: "Updates must be an array" });
+      }
+      
+      await Promise.all(
+        updates.map(update => storage.updateTask(update.id, { order: update.order }))
+      );
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error reordering tasks:", error);
+      res.status(500).json({ error: "Failed to reorder tasks" });
+    }
+  });
+
   app.put("/api/tasks/:id", async (req, res) => {
     try {
       const partialSchema = insertTaskSchema.partial();
