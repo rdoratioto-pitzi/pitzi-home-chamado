@@ -336,17 +336,34 @@ export default function TarefasPage() {
 
   const selectedArea = areas.find(a => a.id === selectedAreaId);
 
-  const handleOpenAreaDialog = (area?: TaskArea) => {
+  const handleOpenAreaDialog = async (area?: TaskArea) => {
     if (area) {
       setEditingArea(area);
-      setNewArea({
-        name: area.name,
-        description: area.description || "",
-        visibility: area.visibility as "private" | "shared",
-        color: area.color || "#00A137",
-        ownerId: area.ownerId,
-        memberIds: [],
-      });
+      // Fetch current members when editing
+      try {
+        const response = await fetch(`/api/task-areas/${area.id}/members`);
+        if (response.ok) {
+          const members = await response.json();
+          setNewArea({
+            name: area.name,
+            description: area.description || "",
+            visibility: area.visibility as "private" | "shared",
+            color: area.color || "#00A137",
+            ownerId: area.ownerId,
+            memberIds: members.map((m: any) => m.userId),
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching area members:", error);
+        setNewArea({
+          name: area.name,
+          description: area.description || "",
+          visibility: area.visibility as "private" | "shared",
+          color: area.color || "#00A137",
+          ownerId: area.ownerId,
+          memberIds: [],
+        });
+      }
     } else {
       setEditingArea(null);
       setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin", memberIds: [] });

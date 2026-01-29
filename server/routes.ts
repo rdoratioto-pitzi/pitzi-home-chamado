@@ -799,10 +799,51 @@ export async function registerRoutes(
 
   app.put("/api/task-areas/:id", async (req, res) => {
     try {
+      const { memberIds, ...areaData } = req.body;
       const partialSchema = insertTaskAreaSchema.partial();
-      const validated = partialSchema.parse(req.body);
+      const validated = partialSchema.parse(areaData);
       const area = await storage.updateTaskArea(req.params.id, validated);
       if (!area) return res.status(404).json({ error: "Area not found" });
+
+      // Process shared area members on update
+      if (memberIds && Array.isArray(memberIds) && validated.visibility === "shared") {
+        const owner = await storage.getUser(area.ownerId);
+        const currentMembers = await storage.getTaskAreaMembers(area.id);
+        const currentMemberUserIds = currentMembers.map(m => m.userId);
+
+        for (const userId of memberIds) {
+          if (!currentMemberUserIds.includes(userId)) {
+            try {
+              // Add new member
+              await storage.addTaskAreaMember({
+                areaId: area.id,
+                userId,
+                role: "member"
+              });
+
+              // Send email notification only to new members
+              const member = await storage.getUser(userId);
+              if (member && owner) {
+                sendSharedAreaInviteEmail(
+                  member,
+                  owner.name,
+                  area.name
+                ).catch(err => console.error(`[api/task-areas] Error sending email to ${member.email}:`, err));
+              }
+            } catch (memberError) {
+              console.error(`[api/task-areas] Error adding member ${userId} to area ${area.id}:`, memberError);
+            }
+          }
+        }
+
+        // Optional: Remove members not in the new list
+        for (const member of currentMembers) {
+          if (!memberIds.includes(member.userId)) {
+            await storage.removeTaskAreaMember(member.id);
+          }
+        }
+      }
+
       res.json(area);
     } catch (error) {
       if (error instanceof z.ZodError) {
