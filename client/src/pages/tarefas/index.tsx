@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { RichTextarea } from "@/components/rich-textarea";
 import { 
   Plus, 
   Folder, 
@@ -30,7 +31,8 @@ import {
   List,
   Repeat,
   X,
-  GripVertical
+  GripVertical,
+  Maximize2
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import type { User as UserType } from "@shared/schema";
@@ -41,6 +43,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import {
   Select,
   SelectContent,
@@ -1066,19 +1069,16 @@ export default function TarefasPage() {
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Descrição</label>
-                  <Textarea
+                  <RichTextarea
                     value={newTask.description}
-                    onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
+                    onChange={(v) => setNewTask({ ...newTask, description: v })}
+                    images={(newTask as any).attachments ? JSON.parse((newTask as any).attachments) : []}
+                    onImagesChange={(imgs) => setNewTask({ ...newTask, attachments: JSON.stringify(imgs) } as any)}
                     placeholder="Detalhes da tarefa..."
-                    rows={3}
+                    rows={4}
                     maxLength={1000}
                     data-testid="input-task-description"
                   />
-                  <div className="flex justify-end">
-                    <span className="text-[10px] text-muted-foreground">
-                      {(newTask.description || "").length}/1000
-                    </span>
-                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -1382,25 +1382,28 @@ export default function TarefasPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Pauta</label>
-                  <Textarea
+                  <RichTextarea
                     value={newTask.meetingData.agenda}
-                    onChange={(e) => setNewTask({ 
+                    onChange={(v) => setNewTask({ 
                       ...newTask, 
                       meetingData: { 
                         ...newTask.meetingData, 
-                        agenda: e.target.value
+                        agenda: v
                       } 
                     })}
-                    placeholder="Descreva a pauta da reunião...&#10;&#10;Você pode usar quebras de linha para organizar."
+                    images={(newTask.meetingData as any).agendaImages || []}
+                    onImagesChange={(imgs) => setNewTask({
+                      ...newTask,
+                      meetingData: {
+                        ...newTask.meetingData,
+                        agendaImages: imgs
+                      } as any
+                    })}
+                    placeholder="Descreva a pauta da reunião..."
                     rows={6}
                     maxLength={1000}
                     data-testid="input-meeting-agenda"
                   />
-                  <div className="flex justify-end">
-                    <span className="text-[10px] text-muted-foreground">
-                      {(newTask.meetingData.agenda || "").length}/1000
-                    </span>
-                  </div>
                 </div>
 
                 <div className="space-y-2">
