@@ -434,7 +434,15 @@ export default function TaskDetailPage() {
                       data-testid="input-meeting-participants"
                     />
                   ) : (
-                    <p className="mt-1">{editedMeetingData.participants?.join(", ") || "-"}</p>
+                    <p className="mt-1">
+                      {editedMeetingData.participants?.length 
+                        ? editedMeetingData.participants.map(p => {
+                            const user = users.find(u => u.id === p);
+                            return user?.name || p;
+                          }).join(", ")
+                        : "-"
+                      }
+                    </p>
                   )}
                 </div>
 
