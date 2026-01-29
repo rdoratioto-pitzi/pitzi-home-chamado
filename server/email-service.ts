@@ -664,3 +664,108 @@ export async function sendMeetingUpdatedEmail(
     console.error("Failed to send meeting update email:", error);
   }
 }
+
+// Send email when user is mentioned in a comment
+export async function sendMentionNotificationEmail(
+  mentionedUser: User,
+  mentionerName: string,
+  taskTitle: string,
+  taskId: string,
+  commentContent: string
+): Promise<void> {
+  if (!mentionedUser.email) return;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>${emailStyles}</head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Renov Home</h1>
+        </div>
+        <div class="content">
+          <h2>Você foi mencionado em um comentário</h2>
+          <p>Olá ${mentionedUser.name},</p>
+          <p><strong>${mentionerName}</strong> mencionou você em um comentário na tarefa:</p>
+          
+          <div class="ticket-info">
+            <h3>${taskTitle}</h3>
+            <p style="margin-top: 12px; padding: 12px; background: white; border-radius: 4px; font-style: italic;">
+              "${commentContent.slice(0, 200)}${commentContent.length > 200 ? '...' : ''}"
+            </p>
+          </div>
+          
+          <a href="${BASE_URL}/tarefas/${taskId}" class="btn">Ver Tarefa</a>
+        </div>
+        <div class="footer">
+          <p>Renov Smart - Inovação em Gestão</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || '"Renov Home" <noreply@renovsmart.com.br>',
+      to: mentionedUser.email,
+      subject: `Você foi mencionado em: ${taskTitle}`,
+      html
+    });
+    console.log(`Mention notification email sent to ${mentionedUser.email}`);
+  } catch (error) {
+    console.error("Failed to send mention notification email:", error);
+  }
+}
+
+// Send email when user is added to a shared area
+export async function sendSharedAreaInviteEmail(
+  invitedUser: User,
+  areaName: string,
+  areaId: string,
+  ownerName: string
+): Promise<void> {
+  if (!invitedUser.email) return;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>${emailStyles}</head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Renov Home</h1>
+        </div>
+        <div class="content">
+          <h2>Convite para Área Compartilhada</h2>
+          <p>Olá ${invitedUser.name},</p>
+          <p>Você foi adicionado(a) à área compartilhada <strong>"${areaName}"</strong> por <strong>${ownerName}</strong>.</p>
+          
+          <div class="ticket-info">
+            <h3>${areaName}</h3>
+            <p>Agora você pode visualizar e colaborar em tarefas e reuniões desta área.</p>
+          </div>
+          
+          <a href="${BASE_URL}/tarefas" class="btn">Acessar Área</a>
+        </div>
+        <div class="footer">
+          <p>Renov Smart - Inovação em Gestão</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || '"Renov Home" <noreply@renovsmart.com.br>',
+      to: invitedUser.email,
+      subject: `Convite: Área Compartilhada "${areaName}"`,
+      html
+    });
+    console.log(`Shared area invite email sent to ${invitedUser.email}`);
+  } catch (error) {
+    console.error("Failed to send shared area invite email:", error);
+  }
+}

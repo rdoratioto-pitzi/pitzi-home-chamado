@@ -94,7 +94,9 @@ export default function TarefasPage() {
     visibility: "private" as "private" | "shared",
     color: "#00A137",
     ownerId: "admin",
+    memberIds: [] as string[],
   });
+  const [memberSearchInput, setMemberSearchInput] = useState("");
 
   const [newTask, setNewTask] = useState({
     title: "",
@@ -161,7 +163,8 @@ export default function TarefasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/task-areas"] });
       setShowAreaDialog(false);
-      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin" });
+      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin", memberIds: [] });
+      setMemberSearchInput("");
       toast({ title: "Área criada com sucesso!" });
     },
     onError: (error: Error) => {
@@ -342,11 +345,13 @@ export default function TarefasPage() {
         visibility: area.visibility as "private" | "shared",
         color: area.color || "#00A137",
         ownerId: area.ownerId,
+        memberIds: [],
       });
     } else {
       setEditingArea(null);
-      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin" });
+      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin", memberIds: [] });
     }
+    setMemberSearchInput("");
     setShowAreaDialog(true);
   };
 
@@ -834,6 +839,77 @@ export default function TarefasPage() {
                 </SelectContent>
               </Select>
             </div>
+            {newArea.visibility === "shared" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Compartilhar com</label>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {newArea.memberIds.map((userId) => {
+                    const user = users.find(u => u.id === userId);
+                    return (
+                      <Badge key={userId} variant="secondary" className="gap-1">
+                        {user?.name || userId}
+                        <button
+                          type="button"
+                          onClick={() => setNewArea({
+                            ...newArea,
+                            memberIds: newArea.memberIds.filter(id => id !== userId)
+                          })}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+                <div className="relative">
+                  <Input
+                    value={memberSearchInput}
+                    onChange={(e) => setMemberSearchInput(e.target.value)}
+                    placeholder="Buscar usuário para adicionar..."
+                    data-testid="input-member-search"
+                  />
+                  {memberSearchInput && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                      {users
+                        .filter(u => 
+                          !newArea.memberIds.includes(u.id) &&
+                          (u.name.toLowerCase().includes(memberSearchInput.toLowerCase()) ||
+                           u.email.toLowerCase().includes(memberSearchInput.toLowerCase()))
+                        )
+                        .slice(0, 5)
+                        .map((user) => (
+                          <button
+                            key={user.id}
+                            type="button"
+                            className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 text-sm"
+                            onClick={() => {
+                              setNewArea({
+                                ...newArea,
+                                memberIds: [...newArea.memberIds, user.id]
+                              });
+                              setMemberSearchInput("");
+                            }}
+                          >
+                            <User className="h-4 w-4 text-muted-foreground" />
+                            <span>{user.name}</span>
+                            <span className="text-muted-foreground text-xs">({user.email})</span>
+                          </button>
+                        ))}
+                      {users.filter(u => 
+                        !newArea.memberIds.includes(u.id) &&
+                        u.name.toLowerCase().includes(memberSearchInput.toLowerCase())
+                      ).length === 0 && (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Os usuários selecionados receberão um email de notificação e poderão acessar as tarefas desta área.
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Cor</label>
               <div className="flex gap-2">
@@ -1234,6 +1310,102 @@ export default function TarefasPage() {
                     rows={6}
                     data-testid="input-meeting-agenda"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Ações (opcional)</label>
+                  <div className="space-y-3">
+                    {newTask.meetingData.actions.map((action, index) => (
+                      <div key={index} className="flex gap-2 items-start p-3 border rounded-lg bg-muted/30">
+                        <div className="flex-1 space-y-2">
+                          <Input
+                            value={action.description}
+                            onChange={(e) => {
+                              const newActions = [...newTask.meetingData.actions];
+                              newActions[index] = { ...action, description: e.target.value };
+                              setNewTask({
+                                ...newTask,
+                                meetingData: { ...newTask.meetingData, actions: newActions }
+                              });
+                            }}
+                            placeholder="Descrição da ação *"
+                            data-testid={`input-action-description-${index}`}
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="relative">
+                              <Input
+                                value={action.responsible}
+                                onChange={(e) => {
+                                  const newActions = [...newTask.meetingData.actions];
+                                  newActions[index] = { ...action, responsible: e.target.value };
+                                  setNewTask({
+                                    ...newTask,
+                                    meetingData: { ...newTask.meetingData, actions: newActions }
+                                  });
+                                }}
+                                placeholder="Responsável"
+                                list={`action-responsible-${index}`}
+                                data-testid={`input-action-responsible-${index}`}
+                              />
+                              <datalist id={`action-responsible-${index}`}>
+                                {users.map(u => (
+                                  <option key={u.id} value={u.name} />
+                                ))}
+                              </datalist>
+                            </div>
+                            <Input
+                              type="date"
+                              value={action.deadline}
+                              onChange={(e) => {
+                                const newActions = [...newTask.meetingData.actions];
+                                newActions[index] = { ...action, deadline: e.target.value };
+                                setNewTask({
+                                  ...newTask,
+                                  meetingData: { ...newTask.meetingData, actions: newActions }
+                                });
+                              }}
+                              min={newTask.meetingData.date || undefined}
+                              data-testid={`input-action-deadline-${index}`}
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => {
+                            const newActions = newTask.meetingData.actions.filter((_, i) => i !== index);
+                            setNewTask({
+                              ...newTask,
+                              meetingData: { ...newTask.meetingData, actions: newActions }
+                            });
+                          }}
+                          data-testid={`button-remove-action-${index}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setNewTask({
+                          ...newTask,
+                          meetingData: {
+                            ...newTask.meetingData,
+                            actions: [...newTask.meetingData.actions, { description: "", responsible: "", deadline: "" }]
+                          }
+                        });
+                      }}
+                      data-testid="button-add-action"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar Ação
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}

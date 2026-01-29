@@ -7,7 +7,9 @@ import {
   sendTicketAssignedEmail, 
   sendTicketStatusChangedEmail, 
   sendTicketCommentEmail,
-  sendMeetingInviteEmail
+  sendMeetingInviteEmail,
+  sendMentionNotificationEmail,
+  sendSharedAreaInviteEmail
 } from "./email-service";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { 
@@ -210,7 +212,7 @@ export async function registerRoutes(
     try {
       const validated = insertTicketSchema.parse(req.body);
       
-      if (!validated.assigneeId) {
+      if (!validated.assigneeId && validated.category && validated.type) {
         const autoAssignee = await storage.findResponsavelForTicket(validated.category, validated.type);
         if (autoAssignee) {
           validated.assigneeId = autoAssignee;
@@ -754,8 +756,34 @@ export async function registerRoutes(
 
   app.post("/api/task-areas", async (req, res) => {
     try {
-      const validated = insertTaskAreaSchema.parse(req.body);
+      const { memberIds, ...areaData } = req.body;
+      const validated = insertTaskAreaSchema.parse(areaData);
       const area = await storage.createTaskArea(validated);
+      
+      // Process shared area members and send invites
+      if (memberIds && Array.isArray(memberIds) && memberIds.length > 0 && validated.visibility === "shared") {
+        const owner = await storage.getUser(validated.ownerId);
+        
+        for (const userId of memberIds) {
+          // Create area member
+          await storage.createTaskAreaMember({
+            areaId: area.id,
+            userId,
+            role: "member"
+          });
+          
+          // Send email notification
+          const member = await storage.getUser(userId);
+          if (member && owner) {
+            sendSharedAreaInviteEmail(
+              member,
+              owner.name,
+              area.name
+            ).catch(console.error);
+          }
+        }
+      }
+      
       res.status(201).json(area);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -923,6 +951,32 @@ export async function registerRoutes(
       const data = { ...req.body, taskId: req.params.id };
       const validated = insertTaskCommentSchema.parse(data);
       const comment = await storage.createTaskComment(validated);
+      
+      // Process @mentions and send notifications
+      const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
+      if (mentionMatches) {
+        const task = await storage.getTask(req.params.id);
+        const users = await storage.getUsers();
+        const author = await storage.getUser(validated.authorId);
+        
+        for (const mention of mentionMatches) {
+          const mentionedName = mention.slice(1).trim();
+          const mentionedUser = users.find(u => 
+            u.name.toLowerCase() === mentionedName.toLowerCase()
+          );
+          
+          if (mentionedUser && task && author) {
+            sendMentionNotificationEmail(
+              mentionedUser,
+              author.name,
+              task.title,
+              task.id,
+              validated.content
+            ).catch(console.error);
+          }
+        }
+      }
+      
       res.status(201).json(comment);
     } catch (error) {
       if (error instanceof z.ZodError) {

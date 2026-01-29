@@ -27,6 +27,8 @@ import {
   Trash2,
   Save,
   X,
+  Download,
+  ArrowRight,
 } from "lucide-react";
 import {
   Select,
@@ -84,6 +86,9 @@ export default function TaskDetailPage() {
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editedTask, setEditedTask] = useState<Partial<Task>>({});
   const [editedMeetingData, setEditedMeetingData] = useState<MeetingData>({});
+  const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionPosition, setMentionPosition] = useState(0);
 
   const { data: task, isLoading } = useQuery<Task>({
     queryKey: ["/api/tasks", id],
@@ -184,6 +189,99 @@ export default function TaskDetailPage() {
       content: newComment,
       parentCommentId: replyingTo || undefined,
     });
+  };
+
+  const convertActionToTask = async (action: { description: string; responsible: string; deadline: string }, _index: number) => {
+    try {
+      const responsibleUser = users.find(u => u.name.toLowerCase() === action.responsible.toLowerCase());
+      await apiRequest("POST", "/api/tasks", {
+        title: action.description,
+        description: `Ação originada da reunião: ${task?.title}`,
+        type: "task",
+        status: "todo",
+        priority: "medium",
+        areaId: task?.areaId,
+        createdBy: "admin",
+        assigneeId: responsibleUser?.id || undefined,
+        dueDate: action.deadline || null,
+        parentTaskId: task?.id,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({ title: "Tarefa criada a partir da ação!" });
+    } catch {
+      toast({ title: "Erro ao criar tarefa", variant: "destructive" });
+    }
+  };
+
+  const exportMeetingToPDF = async () => {
+    const { jsPDF } = await import("jspdf");
+    await import("jspdf-autotable");
+    
+    const doc = new jsPDF();
+    const meeting = editedMeetingData;
+    
+    doc.setFontSize(18);
+    doc.setTextColor(0, 161, 55);
+    doc.text("Renov Home - Agenda de Reunião", 14, 20);
+    
+    doc.setFontSize(14);
+    doc.setTextColor(0, 0, 0);
+    doc.text(task?.title || "Reunião", 14, 32);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    
+    let yPos = 45;
+    
+    doc.text(`Data: ${meeting.date || "-"}`, 14, yPos);
+    doc.text(`Horário: ${meeting.time || "-"}`, 80, yPos);
+    yPos += 8;
+    doc.text(`Local: ${meeting.location || "-"}`, 14, yPos);
+    yPos += 12;
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(12);
+    doc.text("Participantes:", 14, yPos);
+    yPos += 6;
+    doc.setFontSize(10);
+    const participantNames = meeting.participants?.map(p => {
+      const user = users.find(u => u.id === p);
+      return user?.name || p;
+    }).join(", ") || "-";
+    doc.text(participantNames, 14, yPos);
+    yPos += 12;
+    
+    doc.setFontSize(12);
+    doc.text("Pauta:", 14, yPos);
+    yPos += 6;
+    doc.setFontSize(10);
+    const agendaLines = doc.splitTextToSize(meeting.agenda || "Nenhuma pauta definida", 180);
+    doc.text(agendaLines, 14, yPos);
+    yPos += agendaLines.length * 5 + 10;
+    
+    if (meeting.actions?.length) {
+      doc.setFontSize(12);
+      doc.text("Ações:", 14, yPos);
+      yPos += 8;
+      
+      const tableData = meeting.actions.map((action) => [
+        action.description,
+        action.responsible || "-",
+        action.deadline ? new Date(action.deadline).toLocaleDateString("pt-BR") : "-"
+      ]);
+      
+      (doc as any).autoTable({
+        startY: yPos,
+        head: [["Descrição", "Responsável", "Prazo"]],
+        body: tableData,
+        theme: "striped",
+        headStyles: { fillColor: [0, 161, 55] },
+        margin: { left: 14, right: 14 },
+      });
+    }
+    
+    doc.save(`reuniao-${task?.id?.slice(0, 8)}.pdf`);
+    toast({ title: "PDF exportado com sucesso!" });
   };
 
   const rootComments = comments.filter(c => !c.parentCommentId);
@@ -372,10 +470,21 @@ export default function TaskDetailPage() {
 
           {task.type === "meeting_note" && (
             <div className="border-t border-border pt-6 mt-6">
-              <h3 className="font-medium mb-4 flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Agenda de Reunião
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-medium flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Agenda de Reunião
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportMeetingToPDF}
+                  data-testid="button-export-pdf"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar PDF
+                </Button>
+              </div>
               
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
@@ -529,13 +638,27 @@ export default function TaskDetailPage() {
                     <div className="space-y-2">
                       {editedMeetingData.actions?.length ? (
                         editedMeetingData.actions.map((action, i) => (
-                          <div key={i} className="flex items-center gap-4 p-2 bg-muted/50 rounded">
+                          <div key={i} className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
                             <span className="flex-1">{action.description}</span>
-                            <Badge variant="outline">{action.responsible}</Badge>
-                            <Badge variant="outline">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {action.deadline}
-                            </Badge>
+                            {action.responsible && (
+                              <Badge variant="outline">{action.responsible}</Badge>
+                            )}
+                            {action.deadline && (
+                              <Badge variant="outline">
+                                <Calendar className="h-3 w-3 mr-1" />
+                                {new Date(action.deadline).toLocaleDateString("pt-BR")}
+                              </Badge>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs"
+                              onClick={() => convertActionToTask(action, i)}
+                              data-testid={`button-convert-action-${i}`}
+                            >
+                              <ArrowRight className="h-3 w-3 mr-1" />
+                              Criar Tarefa
+                            </Button>
                           </div>
                         ))
                       ) : (
@@ -587,15 +710,59 @@ export default function TaskDetailPage() {
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">AD</AvatarFallback>
               </Avatar>
-              <div className="flex-1">
+              <div className="flex-1 relative">
                 <Textarea
                   value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setNewComment(value);
+                    
+                    const cursorPos = e.target.selectionStart;
+                    const textBeforeCursor = value.slice(0, cursorPos);
+                    const atMatch = textBeforeCursor.match(/@(\w*)$/);
+                    
+                    if (atMatch) {
+                      setMentionQuery(atMatch[1].toLowerCase());
+                      setMentionPosition(cursorPos - atMatch[0].length);
+                      setShowMentionSuggestions(true);
+                    } else {
+                      setShowMentionSuggestions(false);
+                    }
+                  }}
                   placeholder="Adicione um comentário... Use @nome para mencionar alguém"
                   rows={2}
                   className="resize-none mb-2"
                   data-testid="input-new-comment"
                 />
+                {showMentionSuggestions && (
+                  <div className="absolute z-20 left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-32 overflow-y-auto">
+                    {users
+                      .filter(u => u.name.toLowerCase().includes(mentionQuery) || u.email.toLowerCase().includes(mentionQuery))
+                      .slice(0, 5)
+                      .map(user => (
+                        <button
+                          key={user.id}
+                          type="button"
+                          className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 text-sm"
+                          onClick={() => {
+                            const before = newComment.slice(0, mentionPosition);
+                            const after = newComment.slice(mentionPosition + mentionQuery.length + 1);
+                            setNewComment(`${before}@${user.name} ${after}`);
+                            setShowMentionSuggestions(false);
+                          }}
+                        >
+                          <Avatar className="h-6 w-6">
+                            <AvatarFallback className="text-xs">{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <span>{user.name}</span>
+                          <span className="text-muted-foreground text-xs">({user.email})</span>
+                        </button>
+                      ))}
+                    {users.filter(u => u.name.toLowerCase().includes(mentionQuery)).length === 0 && (
+                      <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado</div>
+                    )}
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" disabled>
