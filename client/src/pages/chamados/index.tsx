@@ -103,12 +103,62 @@ const getTypeColor = (type: string): string => {
   return "bg-slate-500/10 text-slate-600 dark:text-slate-400";
 };
 
-// Helper function to calculate time open
+import { format, addHours, isWeekend, isBefore, addDays, getHours, setHours, setMinutes, setSeconds, addBusinessDays, isAfter } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
+
+const TIMEZONE = "America/Sao_Paulo";
+const WORK_START_HOUR = 8;
+const WORK_HOURS_PER_DAY = 8;
+
+function calculateBusinessSLADeadline(createdAt: Date, slaHours: number): Date {
+  // Convert to SP timezone
+  const zonedCreated = toZonedTime(createdAt, TIMEZONE);
+  let current = new Date(zonedCreated);
+
+  // If created before 08:00, move to 08:00 of the same day
+  if (getHours(current) < WORK_START_HOUR) {
+    current = setHours(setMinutes(setSeconds(current, 0), 0), WORK_START_HOUR);
+  }
+  
+  // If created after 16:00 (WORK_START_HOUR + WORK_HOURS_PER_DAY), move to next business day at 08:00
+  if (getHours(current) >= WORK_START_HOUR + WORK_HOURS_PER_DAY) {
+    current = addBusinessDays(setHours(setMinutes(setSeconds(current, 0), 0), WORK_START_HOUR), 1);
+  }
+  
+  // Ensure we are not on a weekend
+  if (isWeekend(current)) {
+    current = addBusinessDays(current, 1);
+    current = setHours(setMinutes(setSeconds(current, 0), 0), WORK_START_HOUR);
+  }
+
+  const fullDays = Math.floor(slaHours / WORK_HOURS_PER_DAY);
+  const remainingHours = slaHours % WORK_HOURS_PER_DAY;
+
+  // Add full business days
+  let deadline = addBusinessDays(current, fullDays);
+
+  // Calculate hours remaining in the current business day
+  const currentHour = getHours(deadline);
+  const hoursLeftInDay = (WORK_START_HOUR + WORK_HOURS_PER_DAY) - currentHour;
+  
+  if (remainingHours <= hoursLeftInDay) {
+    deadline = addHours(deadline, remainingHours);
+  } else {
+    // Move to next business day and add the spillover hours
+    deadline = addBusinessDays(setHours(setMinutes(setSeconds(deadline, 0), 0), WORK_START_HOUR), 1);
+    deadline = addHours(deadline, remainingHours - hoursLeftInDay);
+  }
+
+  return deadline;
+}
+
+// Helper function to calculate time open with business hours
 const calculateTimeOpen = (createdAt: Date | string | null): { text: string; colorClass: string } => {
   if (!createdAt) return { text: "-", colorClass: "text-muted-foreground" };
   
   const created = new Date(createdAt);
   const now = new Date();
+  
   const diffMs = now.getTime() - created.getTime();
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffHours / 24);
@@ -124,7 +174,6 @@ const calculateTimeOpen = (createdAt: Date | string | null): { text: string; col
     text = `${diffMinutes}m`;
   }
   
-  // Color indicators: green (<24h), yellow (24-72h), red (>72h)
   let colorClass: string;
   if (diffHours < 24) {
     colorClass = "text-green-600 dark:text-green-400";
@@ -156,23 +205,26 @@ const getSlaForTicket = (
   }
 
   const slaHoras = parseFloat(rule.slaHoras.toString());
+  const createdAt = ticket.dataAbertura ? new Date(ticket.dataAbertura) : ticket.createdAt ? new Date(ticket.createdAt) : null;
   
-  if (ticket.status === "closed" || ticket.status === "resolved") {
-    return { slaHoras, status: "dentro_prazo" };
-  }
-
-  const createdAt = ticket.createdAt ? new Date(ticket.createdAt) : null;
   if (!createdAt) {
     return { slaHoras, status: null };
   }
 
-  const now = new Date();
-  const diffMs = now.getTime() - createdAt.getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
+  const deadline = calculateBusinessSLADeadline(createdAt, slaHoras);
+  
+  if (ticket.status === "closed" || ticket.status === "resolved") {
+    if (ticket.dataResolucao) {
+      const resolutionDate = new Date(ticket.dataResolucao);
+      return isAfter(resolutionDate, deadline) ? { slaHoras, status: "em_atraso" } : { slaHoras, status: "dentro_prazo" };
+    }
+    return { slaHoras, status: "dentro_prazo" };
+  }
 
+  const now = new Date();
   return {
     slaHoras,
-    status: diffHours <= slaHoras ? "dentro_prazo" : "em_atraso",
+    status: isAfter(now, deadline) ? "em_atraso" : "dentro_prazo",
   };
 };
 
