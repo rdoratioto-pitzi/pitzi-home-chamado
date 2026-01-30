@@ -8,6 +8,7 @@ interface CorreiosCredentials {
   senha: string;
   cartaoPostagem: string;
   codAdministrativo: string;
+  token: string;
 }
 
 function getCredentials(): CorreiosCredentials {
@@ -16,14 +17,13 @@ function getCredentials(): CorreiosCredentials {
     senha: process.env.CORREIOS_SENHA || '',
     cartaoPostagem: process.env.CORREIOS_CARTAO_POSTAGEM || '',
     codAdministrativo: process.env.CORREIOS_COD_ADMINISTRATIVO || '',
+    token: process.env.CORREIOS_TOKEN || '',
   };
 }
 
 async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<any> {
-  const credentials = getCredentials();
-  
-  // Autenticação Basic (usuário:senha em Base64)
-  const authString = Buffer.from(`${credentials.usuario}:${credentials.senha}`).toString('base64');
+  // O Web Service SOAP de Logística Reversa NÃO usa autenticação no header HTTP
+  // As credenciais são passadas dentro do corpo XML da requisição SOAP
   
   const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
@@ -34,13 +34,14 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
   </soapenv:Body>
 </soapenv:Envelope>`;
 
+  console.log('Enviando requisição SOAP para Correios Logística Reversa...');
+
   try {
     const response = await fetch(CORREIOS_PRODUCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         'SOAPAction': soapAction,
-        'Authorization': `Basic ${authString}`,
       },
       body: soapEnvelope,
     });
@@ -52,7 +53,7 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
       
       // Mensagens de erro mais claras para o usuário
       if (response.status === 401) {
-        throw new Error('Credenciais dos Correios inválidas ou expiradas. Verifique CORREIOS_USUARIO e CORREIOS_SENHA.');
+        throw new Error('Credenciais dos Correios inválidas. Verifique CORREIOS_USUARIO (seu CNPJ ou usuário CWS) e CORREIOS_TOKEN (código de acesso de 40 caracteres gerado no portal CWS).');
       } else if (response.status === 403) {
         throw new Error('Acesso negado pelo serviço dos Correios. Verifique se o contrato está ativo.');
       } else if (response.status === 404) {
@@ -223,8 +224,13 @@ export async function solicitarPostagemReversa(params: SolicitarPostagemReversaP
     `;
   }).join('');
 
+  // Determina a senha: prioriza o token JWT (código de acesso de 40 chars) se disponível
+  const senhaAPI = credentials.token || credentials.senha;
+  
   const soapBody = `
     <ser:solicitarPostagemReversa>
+      <usuario>${credentials.usuario}</usuario>
+      <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
       <codigo_servico>${params.codigo_servico}</codigo_servico>
       <cartao>${credentials.cartaoPostagem}</cartao>
@@ -287,9 +293,12 @@ export interface CancelarPedidoResponse {
 
 export async function cancelarPedido(params: CancelarPedidoParams): Promise<CancelarPedidoResponse> {
   const credentials = getCredentials();
+  const senhaAPI = credentials.token || credentials.senha;
   
   const soapBody = `
     <ser:cancelarPedido>
+      <usuario>${credentials.usuario}</usuario>
+      <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
       <numeroPedido>${params.numeroPedido}</numeroPedido>
       <tipo>${params.tipo}</tipo>
@@ -349,9 +358,12 @@ export interface AcompanharPedidoResponse {
 
 export async function acompanharPedido(params: AcompanharPedidoParams): Promise<AcompanharPedidoResponse> {
   const credentials = getCredentials();
+  const senhaAPI = credentials.token || credentials.senha;
   
   const soapBody = `
     <ser:acompanharPedido>
+      <usuario>${credentials.usuario}</usuario>
+      <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
       <tipoBusca>${params.tipoBusca}</tipoBusca>
       <tipoSolicitacao>${params.tipoSolicitacao}</tipoSolicitacao>
@@ -402,9 +414,12 @@ export interface AcompanharPedidoPorDataResponse {
 
 export async function acompanharPedidoPorData(params: AcompanharPedidoPorDataParams): Promise<AcompanharPedidoPorDataResponse> {
   const credentials = getCredentials();
+  const senhaAPI = credentials.token || credentials.senha;
   
   const soapBody = `
     <ser:acompanharPedidoPorData>
+      <usuario>${credentials.usuario}</usuario>
+      <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
       <tipoSolicitacao>${params.tipoSolicitacao}</tipoSolicitacao>
       <data>${params.data}</data>
@@ -446,9 +461,12 @@ export interface RevalidarPrazoResponse {
 
 export async function revalidarPrazoAutorizacaoPostagem(params: RevalidarPrazoParams): Promise<RevalidarPrazoResponse> {
   const credentials = getCredentials();
+  const senhaAPI = credentials.token || credentials.senha;
   
   const soapBody = `
     <ser:revalidarPrazoAutorizacaoPostagem>
+      <usuario>${credentials.usuario}</usuario>
+      <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
       <numeroPedido>${params.numeroPedido}</numeroPedido>
       <qtdeDias>${params.qtdeDias}</qtdeDias>
@@ -486,9 +504,12 @@ export interface SolicitarRangeResponse {
 
 export async function solicitarRange(params: SolicitarRangeParams): Promise<SolicitarRangeResponse> {
   const credentials = getCredentials();
+  const senhaAPI = credentials.token || credentials.senha;
   
   const soapBody = `
     <ser:solicitarRange>
+      <usuario>${credentials.usuario}</usuario>
+      <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
       <tipo>${params.tipo}</tipo>
       ${params.servico ? `<servico>${params.servico}</servico>` : '<servico></servico>'}
