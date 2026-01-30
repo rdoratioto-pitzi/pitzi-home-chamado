@@ -28,9 +28,13 @@ export function RenovLogo({ variant = "light", size = "md", className = "" }: Re
   const logoUrlSetting = variant === "dark" || variant === "white" ? logoUrlDark : logoUrlLight;
 
   if (logoUrlSetting?.value) {
+    const src = logoUrlSetting.value.startsWith("/objects/") 
+      ? logoUrlSetting.value 
+      : `/objects/${logoUrlSetting.value.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
+
     return (
       <img 
-        src={logoUrlSetting.value} 
+        src={src} 
         alt="Renov Logo" 
         style={{ width, height, objectFit: 'contain' }}
         className={className}

@@ -110,7 +110,7 @@ export function BrandSettings() {
         throw new Error("Failed to upload file");
       }
       
-      const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects${objectPath}`;
+      const fileUrl = objectPath.startsWith("/objects/") ? objectPath : `/objects/${objectPath.replace(/^\//, '')}`;
       
       console.log("Saving file URL to settings:", key, fileUrl);
       await apiRequest("POST", "/api/settings", { key, value: fileUrl });
