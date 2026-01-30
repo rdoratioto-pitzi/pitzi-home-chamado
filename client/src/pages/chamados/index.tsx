@@ -184,6 +184,7 @@ export default function ChamadosPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const [slaFilter, setSlaFilter] = useState<string>("all");
   const [dateSortAsc, setDateSortAsc] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid">("list");
 
@@ -223,7 +224,14 @@ export default function ChamadosPage() {
       const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
       const matchesType = typeFilter === "all" || ticket.type === typeFilter;
       const matchesAssignee = assigneeFilter === "all" || ticket.assigneeId === assigneeFilter;
-      return matchesSearch && matchesStatus && matchesPriority && matchesType && matchesAssignee;
+      
+      let matchesSla = true;
+      if (slaFilter === "dentro_prazo" || slaFilter === "em_atraso") {
+        const sla = getSlaForTicket(ticket, slaRules);
+        matchesSla = sla.status === slaFilter;
+      }
+      
+      return matchesSearch && matchesStatus && matchesPriority && matchesType && matchesAssignee && matchesSla;
     })
     .sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -282,6 +290,16 @@ export default function ChamadosPage() {
     XLSX.writeFile(workbook, `chamados_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
+  const handleKpiClick = (type: "status" | "sla", value: string) => {
+    if (type === "status") {
+      setStatusFilter(value);
+      setSlaFilter("all");
+    } else {
+      setStatusFilter("all");
+      setSlaFilter(value);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader 
@@ -297,7 +315,10 @@ export default function ChamadosPage() {
 
       <main className="flex-1 p-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-7">
-          <Card className="shadow-sm border-border/60">
+          <Card 
+            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "all" && slaFilter === "all" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleKpiClick("status", "all")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Total</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
@@ -307,7 +328,10 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">registrados</p>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-border/60">
+          <Card 
+            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "open" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleKpiClick("status", "open")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Abertos</CardTitle>
               <AlertCircle className="h-4 w-4 text-blue-500" />
@@ -317,7 +341,10 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">aguardando</p>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-border/60">
+          <Card 
+            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "in_progress" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleKpiClick("status", "in_progress")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Andamento</CardTitle>
               <Clock className="h-4 w-4 text-yellow-500" />
@@ -327,7 +354,10 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">resolvendo</p>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-border/60">
+          <Card 
+            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "blocked" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleKpiClick("status", "blocked")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Bloqueados</CardTitle>
               <Ban className="h-4 w-4 text-red-500" />
@@ -337,7 +367,10 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">impedidos</p>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-border/60">
+          <Card 
+            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "resolved" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleKpiClick("status", "resolved")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Resolvidos</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -347,7 +380,10 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">concluídos</p>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-border/60">
+          <Card 
+            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${slaFilter === "dentro_prazo" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleKpiClick("sla", "dentro_prazo")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">No Prazo</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -359,7 +395,10 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">SLA OK</p>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-border/60">
+          <Card 
+            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${slaFilter === "em_atraso" ? "ring-2 ring-primary" : ""}`}
+            onClick={() => handleKpiClick("sla", "em_atraso")}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Em Atraso</CardTitle>
               <AlertCircle className="h-4 w-4 text-red-600" />
