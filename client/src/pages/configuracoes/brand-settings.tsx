@@ -110,9 +110,11 @@ export function BrandSettings() {
         throw new Error("Failed to upload file");
       }
       
-      const fileUrl = `/objects${objectPath}`;
+      const fileUrl = objectPath.startsWith("/objects") ? objectPath : `/objects${objectPath}`;
       
+      console.log("Saving file URL to settings:", key, fileUrl);
       await apiRequest("POST", "/api/settings", { key, value: fileUrl });
+      await queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/settings", key] });
       
       if (type === 'favicon') {

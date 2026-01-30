@@ -816,9 +816,14 @@ export async function registerRoutes(
   });
 
   app.get("/api/settings/:key", async (req, res) => {
-    const setting = await storage.getSetting(req.params.key);
-    if (!setting) return res.status(404).json({ error: "Setting not found" });
-    res.json(setting);
+    try {
+      const setting = await storage.getSetting(req.params.key);
+      if (!setting) return res.status(404).json({ error: "Setting not found" });
+      res.json(setting);
+    } catch (error) {
+      console.error(`Error fetching setting ${req.params.key}:`, error);
+      res.status(500).json({ error: "Internal server error" });
+    }
   });
 
   app.post("/api/settings", async (req, res) => {
@@ -834,6 +839,7 @@ export async function registerRoutes(
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation failed", details: error.errors });
       }
+      console.error("Error saving setting:", error);
       res.status(400).json({ error: "Failed to save setting" });
     }
   });

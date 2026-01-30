@@ -15,11 +15,17 @@ const sizeMap = {
 };
 
 export function RenovLogo({ variant = "light", size = "md", className = "" }: RenovLogoProps) {
-  const { data: logoUrlSetting } = useQuery<Setting>({ 
-    queryKey: [variant === "dark" || variant === "white" ? "/api/settings/logo_url_dark" : "/api/settings/logo_url_light"]
+  const { data: logoUrlLight } = useQuery<Setting>({ 
+    queryKey: ["/api/settings/logo_url_light"]
+  });
+
+  const { data: logoUrlDark } = useQuery<Setting>({ 
+    queryKey: ["/api/settings/logo_url_dark"]
   });
 
   const { width, height } = sizeMap[size];
+
+  const logoUrlSetting = variant === "dark" || variant === "white" ? logoUrlDark : logoUrlLight;
 
   if (logoUrlSetting?.value) {
     return (
@@ -28,6 +34,10 @@ export function RenovLogo({ variant = "light", size = "md", className = "" }: Re
         alt="Renov Logo" 
         style={{ width, height, objectFit: 'contain' }}
         className={className}
+        onError={(e) => {
+          // If image fails to load, hide it to show SVG fallback
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
       />
     );
   }
