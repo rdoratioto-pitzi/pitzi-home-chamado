@@ -1,9 +1,9 @@
 import { parseStringPromise, Builder } from 'xml2js';
 
-const CORREIOS_PRODUCTION_URL = 'https://cws.correios.com.br/logisticaReversaWS/logisticaReversaService';
+// URL corrigida do Web Service de Logística Reversa dos Correios (Produção)
+const CORREIOS_PRODUCTION_URL = 'https://cws.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS';
 
 interface CorreiosCredentials {
-  token: string;
   usuario: string;
   senha: string;
   cartaoPostagem: string;
@@ -12,7 +12,6 @@ interface CorreiosCredentials {
 
 function getCredentials(): CorreiosCredentials {
   return {
-    token: process.env.CORREIOS_TOKEN || '',
     usuario: process.env.CORREIOS_USUARIO || '',
     senha: process.env.CORREIOS_SENHA || '',
     cartaoPostagem: process.env.CORREIOS_CARTAO_POSTAGEM || '',
@@ -22,6 +21,9 @@ function getCredentials(): CorreiosCredentials {
 
 async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<any> {
   const credentials = getCredentials();
+  
+  // Autenticação Basic (usuário:senha em Base64)
+  const authString = Buffer.from(`${credentials.usuario}:${credentials.senha}`).toString('base64');
   
   const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
@@ -38,7 +40,7 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
         'SOAPAction': soapAction,
-        'Authorization': `Bearer ${credentials.token}`,
+        'Authorization': `Basic ${authString}`,
       },
       body: soapEnvelope,
     });
@@ -47,7 +49,21 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
     
     if (!response.ok) {
       console.error('SOAP HTTP Error:', response.status, responseText);
-      throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+      
+      // Mensagens de erro mais claras para o usuário
+      if (response.status === 401) {
+        throw new Error('Credenciais dos Correios inválidas ou expiradas. Verifique CORREIOS_USUARIO e CORREIOS_SENHA.');
+      } else if (response.status === 403) {
+        throw new Error('Acesso negado pelo serviço dos Correios. Verifique se o contrato está ativo.');
+      } else if (response.status === 404) {
+        throw new Error('Serviço dos Correios não encontrado. O endpoint pode ter sido alterado.');
+      } else if (response.status === 500) {
+        throw new Error('Erro interno no servidor dos Correios. Tente novamente mais tarde.');
+      } else if (response.status === 503) {
+        throw new Error('Serviço dos Correios temporariamente indisponível. Tente novamente mais tarde.');
+      }
+      
+      throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
     }
     
     const result = await parseStringPromise(responseText, { explicitArray: false, ignoreAttrs: true });
@@ -651,7 +667,7 @@ function maskValue(value: string): string {
 export function getCorreiosConfig() {
   const credentials = getCredentials();
   return {
-    configured: !!(credentials.token && credentials.usuario && credentials.cartaoPostagem && credentials.codAdministrativo),
+    configured: !!(credentials.usuario && credentials.senha && credentials.cartaoPostagem && credentials.codAdministrativo),
     cartaoPostagem: maskValue(credentials.cartaoPostagem),
     codAdministrativo: maskValue(credentials.codAdministrativo),
     usuario: maskValue(credentials.usuario),

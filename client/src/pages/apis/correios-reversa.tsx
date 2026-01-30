@@ -210,6 +210,7 @@ export default function CorreiosReversaPage() {
       toast({ title: "Solicitação enviada com sucesso!" });
     },
     onError: (error: any) => {
+      setApiResponse({ erro: true, mensagem: error.message });
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
@@ -224,6 +225,7 @@ export default function CorreiosReversaPage() {
       toast({ title: "Pedido cancelado com sucesso!" });
     },
     onError: (error: any) => {
+      setApiResponse({ erro: true, mensagem: error.message });
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
@@ -238,6 +240,7 @@ export default function CorreiosReversaPage() {
       toast({ title: "Consulta realizada!" });
     },
     onError: (error: any) => {
+      setApiResponse({ erro: true, mensagem: error.message });
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
@@ -252,6 +255,7 @@ export default function CorreiosReversaPage() {
       toast({ title: "Consulta realizada!" });
     },
     onError: (error: any) => {
+      setApiResponse({ erro: true, mensagem: error.message });
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
@@ -266,6 +270,7 @@ export default function CorreiosReversaPage() {
       toast({ title: "Prazo revalidado com sucesso!" });
     },
     onError: (error: any) => {
+      setApiResponse({ erro: true, mensagem: error.message });
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
@@ -280,6 +285,7 @@ export default function CorreiosReversaPage() {
       toast({ title: "Range solicitado com sucesso!" });
     },
     onError: (error: any) => {
+      setApiResponse({ erro: true, mensagem: error.message });
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
@@ -294,6 +300,7 @@ export default function CorreiosReversaPage() {
       toast({ title: "Dígito verificador calculado!" });
     },
     onError: (error: any) => {
+      setApiResponse({ erro: true, mensagem: error.message });
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
