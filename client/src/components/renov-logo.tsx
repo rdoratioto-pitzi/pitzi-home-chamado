@@ -14,6 +14,12 @@ const sizeMap = {
   xl: { width: 180, height: 50 },
 };
 
+function normalizeObjectPath(path: string): string {
+  if (!path) return "";
+  if (path.startsWith("/objects/")) return path;
+  return `/objects/${path.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
+}
+
 export function RenovLogo({ variant = "light", size = "md", className = "" }: RenovLogoProps) {
   const { data: logoUrlLight } = useQuery<Setting>({ 
     queryKey: ["/api/settings/logo_url_light"]
@@ -28,9 +34,7 @@ export function RenovLogo({ variant = "light", size = "md", className = "" }: Re
   const logoUrlSetting = variant === "dark" || variant === "white" ? logoUrlDark : logoUrlLight;
 
   if (logoUrlSetting?.value) {
-    const src = logoUrlSetting.value.startsWith("/objects/") 
-      ? logoUrlSetting.value 
-      : `/objects/${logoUrlSetting.value.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
+    const src = normalizeObjectPath(logoUrlSetting.value);
 
     return (
       <img 
