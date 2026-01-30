@@ -12,6 +12,7 @@ import {
   sendSharedAreaInviteEmail
 } from "./email-service";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
+import * as correiosService from "./correios-service";
 import { 
   insertUserSchema, 
   insertTicketSchema, 
@@ -1568,6 +1569,106 @@ export async function registerRoutes(
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to lookup CEP" });
+    }
+  });
+
+  // ============== CORREIOS LOGISTICA REVERSA ==============
+  
+  // Get Correios configuration status
+  app.get("/api/correios/config", async (req, res) => {
+    try {
+      const config = correiosService.getCorreiosConfig();
+      res.json(config);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get Correios configuration" });
+    }
+  });
+
+  // Solicitar Postagem Reversa (Authorization or Collection)
+  app.post("/api/correios/solicitar-postagem-reversa", async (req, res) => {
+    try {
+      const result = await correiosService.solicitarPostagemReversa(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Correios solicitarPostagemReversa error:", error);
+      res.status(500).json({ error: error.message || "Failed to request reverse posting" });
+    }
+  });
+
+  // Cancelar Pedido
+  app.post("/api/correios/cancelar-pedido", async (req, res) => {
+    try {
+      const result = await correiosService.cancelarPedido(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Correios cancelarPedido error:", error);
+      res.status(500).json({ error: error.message || "Failed to cancel request" });
+    }
+  });
+
+  // Acompanhar Pedido (by number)
+  app.post("/api/correios/acompanhar-pedido", async (req, res) => {
+    try {
+      const result = await correiosService.acompanharPedido(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Correios acompanharPedido error:", error);
+      res.status(500).json({ error: error.message || "Failed to track request" });
+    }
+  });
+
+  // Acompanhar Pedido por Data
+  app.post("/api/correios/acompanhar-pedido-por-data", async (req, res) => {
+    try {
+      const result = await correiosService.acompanharPedidoPorData(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Correios acompanharPedidoPorData error:", error);
+      res.status(500).json({ error: error.message || "Failed to track requests by date" });
+    }
+  });
+
+  // Revalidar Prazo Autorização de Postagem
+  app.post("/api/correios/revalidar-prazo", async (req, res) => {
+    try {
+      const result = await correiosService.revalidarPrazoAutorizacaoPostagem(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Correios revalidarPrazoAutorizacaoPostagem error:", error);
+      res.status(500).json({ error: error.message || "Failed to revalidate deadline" });
+    }
+  });
+
+  // Solicitar Range de e-Tickets
+  app.post("/api/correios/solicitar-range", async (req, res) => {
+    try {
+      const result = await correiosService.solicitarRange(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Correios solicitarRange error:", error);
+      res.status(500).json({ error: error.message || "Failed to request e-ticket range" });
+    }
+  });
+
+  // Calcular Dígito Verificador
+  app.post("/api/correios/calcular-digito-verificador", async (req, res) => {
+    try {
+      const result = await correiosService.calcularDigitoVerificador(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Correios calcularDigitoVerificador error:", error);
+      res.status(500).json({ error: error.message || "Failed to calculate check digit" });
+    }
+  });
+
+  // Solicitar Postagem Simultânea
+  app.post("/api/correios/solicitar-postagem-simultanea", async (req, res) => {
+    try {
+      const result = await correiosService.solicitarPostagemSimultanea(req.body);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Correios solicitarPostagemSimultanea error:", error);
+      res.status(500).json({ error: error.message || "Failed to request simultaneous posting" });
     }
   });
 

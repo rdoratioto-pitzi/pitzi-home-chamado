@@ -94,6 +94,11 @@ const logisticaSubItems = [
   { title: "Logística Reversa", url: "/logistica/reversa", icon: RotateCcw },
 ];
 
+const apisSubItems = [
+  { title: "Visão Geral", url: "/apis", icon: Code2 },
+  { title: "Correios - Logística Reversa", url: "/apis/correios-reversa", icon: RotateCcw },
+];
+
 function getCurrentUser() {
   try {
     const userStr = sessionStorage.getItem("user");
@@ -128,8 +133,10 @@ export function AppSidebar() {
   }, []);
 
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
+  const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   
   const isLogisticaActive = location.startsWith("/logistica");
+  const isApisActive = location.startsWith("/apis");
   
   const permissions = useMemo(() => {
     try {
@@ -266,18 +273,42 @@ export function AppSidebar() {
               )}
 
               {hasApisAccess && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild
-                    isActive={location === "/apis" || location.startsWith("/apis/")}
-                    className={`h-11 px-3 transition-all duration-200 rounded-lg ${location.startsWith("/apis") ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
-                  >
-                    <Link href="/apis" data-testid="link-integracoes">
-                      <Code2 className={`h-[20px] w-[20px] ${location.startsWith("/apis") ? 'text-primary' : 'text-muted-foreground'}`} />
-                      <span className="text-[14px]">Integrações</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <Collapsible open={apisOpen} onOpenChange={setApisOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton 
+                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isApisActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        isActive={isApisActive}
+                        data-testid="link-integracoes"
+                      >
+                        <Code2 className={`h-[20px] w-[20px] ${isApisActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">Integrações</span>
+                        {apisOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                        {apisSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
               )}
 
               {hasConfiguracoesAccess && (

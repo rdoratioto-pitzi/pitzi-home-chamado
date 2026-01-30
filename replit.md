@@ -121,6 +121,16 @@ shared/
 - `GET /api/logistics/logistica-reversa` - Listar pedidos de logística reversa
 - `POST /api/logistics/logistica-reversa/solicitar` - Solicitar coleta reversa
 
+### Correios Logística Reversa (SOAP/XML Web Service)
+- `POST /api/correios/solicitar-postagem-reversa` - Solicitar autorização de postagem reversa
+- `POST /api/correios/cancelar-pedido` - Cancelar pedido de logística reversa
+- `POST /api/correios/acompanhar-pedido` - Acompanhar pedido por código/tipo/resultado
+- `POST /api/correios/acompanhar-pedido-por-data` - Acompanhar pedidos por período
+- `POST /api/correios/revalidar-prazo` - Revalidar prazo de autorização de postagem
+- `POST /api/correios/solicitar-range` - Solicitar faixa de números para etiquetas
+- `POST /api/correios/calcular-digito-verificador` - Calcular dígito verificador de etiqueta
+- `POST /api/correios/solicitar-postagem-simultanea` - Solicitar postagem simultânea (Sedex Reverso)
+
 ### Usuários
 - `GET /api/users` - Listar usuários
 - `POST /api/users` - Criar usuário (com permissões por módulo)

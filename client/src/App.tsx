@@ -24,6 +24,7 @@ import SolicitacoesPage from "@/pages/logistica/solicitacoes";
 import LogisticaReversaPage from "@/pages/logistica/logistica-reversa";
 import SimularFretePage from "@/pages/logistica/simular-frete";
 import ApisPage from "@/pages/apis/index";
+import CorreiosReversaPage from "@/pages/apis/correios-reversa";
 import LoginPage from "@/pages/login";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
 
@@ -104,6 +105,11 @@ function Router() {
       <Route path="/apis">
         <ProtectedRoute requiredPermission="apis">
           <ApisPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/apis/correios-reversa">
+        <ProtectedRoute requiredPermission="apis">
+          <CorreiosReversaPage />
         </ProtectedRoute>
       </Route>
       <Route path="/login" component={LoginPage} />
