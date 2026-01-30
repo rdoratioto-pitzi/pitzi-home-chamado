@@ -183,6 +183,7 @@ export default function ChamadosPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [dateSortAsc, setDateSortAsc] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid">("list");
 
@@ -221,7 +222,8 @@ export default function ChamadosPage() {
       const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
       const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
       const matchesType = typeFilter === "all" || ticket.type === typeFilter;
-      return matchesSearch && matchesStatus && matchesPriority && matchesType;
+      const matchesAssignee = assigneeFilter === "all" || ticket.assigneeId === assigneeFilter;
+      return matchesSearch && matchesStatus && matchesPriority && matchesType && matchesAssignee;
     })
     .sort((a, b) => {
       const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -237,7 +239,18 @@ export default function ChamadosPage() {
     inProgress: tickets.filter(t => t.status === "in_progress").length,
     blocked: tickets.filter(t => t.status === "blocked").length,
     resolved: tickets.filter(t => t.status === "resolved").length,
+    dentroPrazo: tickets.filter(t => {
+      const sla = getSlaForTicket(t, slaRules);
+      return sla.status === "dentro_prazo";
+    }).length,
+    emAtraso: tickets.filter(t => {
+      const sla = getSlaForTicket(t, slaRules);
+      return sla.status === "em_atraso";
+    }).length,
   };
+
+  const dentroPrazoPerc = stats.total > 0 ? Math.round((stats.dentroPrazo / stats.total) * 100) : 0;
+  const emAtrasoPerc = stats.total > 0 ? Math.round((stats.emAtraso / stats.total) * 100) : 0;
 
   const exportToExcel = () => {
     const data = filteredTickets.map((ticket) => {
@@ -283,55 +296,79 @@ export default function ChamadosPage() {
       />
 
       <main className="flex-1 p-6 space-y-6">
-        <div className="grid gap-4 md:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-7">
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Total</CardTitle>
+              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Total</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-tickets">{stats.total}</div>
-              <p className="text-[11px] text-muted-foreground mt-1">chamados registrados</p>
+              <div className="text-xl font-bold" data-testid="text-total-tickets">{stats.total}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">registrados</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Abertos</CardTitle>
+              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Abertos</CardTitle>
               <AlertCircle className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600" data-testid="text-open-tickets">{stats.open}</div>
-              <p className="text-[11px] text-muted-foreground mt-1">aguardando</p>
+              <div className="text-xl font-bold text-blue-600" data-testid="text-open-tickets">{stats.open}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">aguardando</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Em Andamento</CardTitle>
+              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Andamento</CardTitle>
               <Clock className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600" data-testid="text-progress-tickets">{stats.inProgress}</div>
-              <p className="text-[11px] text-muted-foreground mt-1">sendo resolvidos</p>
+              <div className="text-xl font-bold text-yellow-600" data-testid="text-progress-tickets">{stats.inProgress}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">resolvendo</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Bloqueados</CardTitle>
+              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Bloqueados</CardTitle>
               <Ban className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600" data-testid="text-blocked-tickets">{stats.blocked}</div>
-              <p className="text-[11px] text-muted-foreground mt-1">impedidos</p>
+              <div className="text-xl font-bold text-red-600" data-testid="text-blocked-tickets">{stats.blocked}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">impedidos</p>
             </CardContent>
           </Card>
           <Card className="shadow-sm border-border/60">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Resolvidos</CardTitle>
+              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Resolvidos</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600" data-testid="text-resolved-tickets">{stats.resolved}</div>
-              <p className="text-[11px] text-muted-foreground mt-1">concluídos</p>
+              <div className="text-xl font-bold text-green-600" data-testid="text-resolved-tickets">{stats.resolved}</div>
+              <p className="text-[10px] text-muted-foreground mt-1">concluídos</p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-border/60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">No Prazo</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold text-green-700" data-testid="text-sla-in-time-tickets">
+                {stats.dentroPrazo} <span className="text-xs font-normal text-muted-foreground ml-1">({dentroPrazoPerc}%)</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">SLA OK</p>
+            </CardContent>
+          </Card>
+          <Card className="shadow-sm border-border/60">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
+              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Em Atraso</CardTitle>
+              <AlertCircle className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold text-red-700" data-testid="text-sla-overdue-tickets">
+                {stats.emAtraso} <span className="text-xs font-normal text-muted-foreground ml-1">({emAtrasoPerc}%)</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">SLA Vencido</p>
             </CardContent>
           </Card>
         </div>
@@ -393,7 +430,7 @@ export default function ChamadosPage() {
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="all">Status</SelectItem>
                     <SelectItem value="open">Abertos</SelectItem>
                     <SelectItem value="in_progress">Em Andamento</SelectItem>
                     <SelectItem value="blocked">Bloqueados</SelectItem>
@@ -406,7 +443,7 @@ export default function ChamadosPage() {
                     <SelectValue placeholder="Prioridade" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="all">Prioridade</SelectItem>
                     <SelectItem value="low">Baixa</SelectItem>
                     <SelectItem value="medium">Média</SelectItem>
                     <SelectItem value="high">Alta</SelectItem>
@@ -418,10 +455,21 @@ export default function ChamadosPage() {
                     <SelectValue placeholder="Tipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="all">Tipo</SelectItem>
                     <SelectItem value="bug">Bug</SelectItem>
                     <SelectItem value="melhoria">Melhoria</SelectItem>
                     <SelectItem value="negocio">Negócio</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                  <SelectTrigger className="w-full sm:w-[160px] h-10 text-[13px]" data-testid="select-assignee-filter">
+                    <SelectValue placeholder="Responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Responsável</SelectItem>
+                    {users.filter(u => u.status === "active").map(user => (
+                      <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
