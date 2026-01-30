@@ -635,8 +635,12 @@ export async function solicitarPostagemSimultanea(params: SolicitarPostagemSimul
     </coletas_solicitadas>
   `).join('');
 
+  const senhaAPI = credentials.token || credentials.senha;
+  
   const soapBody = `
     <ser:solicitarPostagemSimultanea>
+      <usuario>${credentials.usuario}</usuario>
+      <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
       <codigo_servico>${params.codigo_servico}</codigo_servico>
       <cartao>${credentials.cartaoPostagem}</cartao>
