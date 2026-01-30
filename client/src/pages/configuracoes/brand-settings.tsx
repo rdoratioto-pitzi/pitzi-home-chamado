@@ -8,6 +8,12 @@ import { useToast } from "@/hooks/use-toast";
 import { RenovLogo } from "@/components/renov-logo";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
+function normalizeObjectPath(path: string): string {
+  if (!path) return "";
+  if (path.startsWith("/objects/")) return path;
+  return `/objects/${path.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
+}
+
 export function BrandSettings() {
   const { toast } = useToast();
   const [logoPreviewLight, setLogoPreviewLight] = useState<string | null>(null);
@@ -110,7 +116,7 @@ export function BrandSettings() {
         throw new Error("Failed to upload file");
       }
       
-      const fileUrl = objectPath.startsWith("/objects/") ? objectPath : `/objects/${objectPath.replace(/^\//, '')}`;
+      const fileUrl = normalizeObjectPath(objectPath);
       
       console.log("Saving file URL to settings:", key, fileUrl);
       await apiRequest("POST", "/api/settings", { key, value: fileUrl });
@@ -151,18 +157,19 @@ export function BrandSettings() {
   };
 
   const updateBrowserFavicon = (url: string) => {
+    const normalizedUrl = normalizeObjectPath(url);
     const existingLinks = document.querySelectorAll("link[rel*='icon']");
     existingLinks.forEach(link => link.remove());
     
     const link = document.createElement('link');
     link.rel = 'icon';
     link.type = 'image/x-icon';
-    link.href = url + '?t=' + Date.now();
+    link.href = normalizedUrl + '?t=' + Date.now();
     document.getElementsByTagName('head')[0].appendChild(link);
     
     const shortcutLink = document.createElement('link');
     shortcutLink.rel = 'shortcut icon';
-    shortcutLink.href = url + '?t=' + Date.now();
+    shortcutLink.href = normalizedUrl + '?t=' + Date.now();
     document.getElementsByTagName('head')[0].appendChild(shortcutLink);
   };
 
@@ -205,7 +212,7 @@ export function BrandSettings() {
                 {logoPreviewLight ? (
                   <img src={logoPreviewLight} alt="Preview Claro" className="h-12 w-auto object-contain" />
                 ) : logoUrlLightSetting.value ? (
-                  <img src={logoUrlLightSetting.value} alt="Logo Claro Atual" className="h-12 w-auto object-contain" />
+                  <img src={normalizeObjectPath(logoUrlLightSetting.value)} alt="Logo Claro Atual" className="h-12 w-auto object-contain" />
                 ) : (
                   <RenovLogo variant="light" size="lg" className="h-12 w-auto" />
                 )}
@@ -240,7 +247,7 @@ export function BrandSettings() {
                 {logoPreviewDark ? (
                   <img src={logoPreviewDark} alt="Preview Escuro" className="h-12 w-auto object-contain" />
                 ) : logoUrlDarkSetting.value ? (
-                  <img src={logoUrlDarkSetting.value} alt="Logo Escuro Atual" className="h-12 w-auto object-contain" />
+                  <img src={normalizeObjectPath(logoUrlDarkSetting.value)} alt="Logo Escuro Atual" className="h-12 w-auto object-contain" />
                 ) : (
                   <RenovLogo variant="dark" size="lg" className="h-12 w-auto" />
                 )}
@@ -286,7 +293,7 @@ export function BrandSettings() {
               {faviconPreview ? (
                 <img src={faviconPreview} alt="Preview Favicon" className="h-8 w-8 object-contain" />
               ) : faviconSetting.value ? (
-                <img src={faviconSetting.value} alt="Favicon Atual" className="h-8 w-8 object-contain" />
+                <img src={normalizeObjectPath(faviconSetting.value)} alt="Favicon Atual" className="h-8 w-8 object-contain" />
               ) : (
                 <Image className="h-8 w-8 text-muted-foreground/40" />
               )}

@@ -72,9 +72,8 @@ export function registerObjectStorageRoutes(app: Express): void {
    */
   app.get(/^\/objects\/(.+)$/, async (req, res) => {
     try {
-      // Remove leading /objects if present in req.path to avoid double-prefixing in the service
-      const cleanPath = req.path.replace(/^\/objects\//, "/");
-      const objectFile = await objectStorageService.getObjectEntityFile(cleanPath);
+      // req.path should be /objects/uploads/uuid, pass it directly
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
       await objectStorageService.downloadObject(objectFile, res);
     } catch (error) {
       console.error("Error serving object:", error);
