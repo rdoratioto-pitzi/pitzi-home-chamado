@@ -191,6 +191,13 @@ Na inicialização, o servidor executa `server/seed.ts` que:
 - **Timeline do Chamado**: Visualização completa do ciclo de vida com cálculo de duração
 - **Coluna TEMPO ABERTO**: Indicador colorido (verde <24h, amarelo 24-72h, vermelho >72h)
 - **Auto-preenchimento de timestamps**: Resolução/fechamento preenchidos ao mudar status, primeira resposta ao comentar
+- **Controle de SLA**: Sistema de Service Level Agreement para chamados
+  - Regras configuráveis por combinação de Tipo (Bug/Melhoria) e Prioridade
+  - Configuração em Configurações → Campos Dinâmicos → SLA
+  - Coluna SLA na listagem mostrando horas configuradas (ex: 4h, 24h)
+  - Coluna Status SLA mostrando "Dentro do Prazo" (verde) ou "Em Atraso" (vermelho)
+  - Exportação Excel inclui colunas de SLA
+  - Nota: SLA não se aplica a tipo "Negócio", apenas Bug e Melhoria
 
 ### Notificações por Email
 - **Novo chamado criado**: Email enviado ao solicitante com detalhes do ticket
