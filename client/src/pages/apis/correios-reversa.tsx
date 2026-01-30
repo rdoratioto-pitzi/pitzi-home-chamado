@@ -504,6 +504,20 @@ export default function CorreiosReversaPage() {
                         </div>
 
                         <Separator />
+                        <div className="bg-muted/30 p-4 rounded-md border border-dashed">
+                          <h4 className="font-medium mb-2 flex items-center gap-2 text-sm">
+                            <Truck className="h-4 w-4" />
+                            Destinatário Fixo (Sua Empresa)
+                          </h4>
+                          <div className="text-xs space-y-1 text-muted-foreground">
+                            <p><strong>Nome:</strong> RENOV SOLUCOES E SERVICOS LTDA</p>
+                            <p><strong>Endereço:</strong> R LUIGI GALVANI, 200, CONJ 11</p>
+                            <p><strong>Bairro/Cidade:</strong> CIDADE MONCOES, SAO PAULO - SP</p>
+                            <p><strong>CEP:</strong> 04575-020</p>
+                          </div>
+                        </div>
+
+                        <Separator />
                         <h4 className="font-medium">Dados do Remetente</h4>
 
                         <FormField
