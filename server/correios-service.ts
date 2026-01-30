@@ -21,6 +21,25 @@ function getCredentials(): CorreiosCredentials {
   };
 }
 
+// Obtém a senha correta para o Web Service SOAP (código de 40 caracteres)
+// CORREIOS_SENHA deve conter o "Código de acesso a(s) API(s)" de 40 caracteres
+// CORREIOS_TOKEN pode conter o Token JWT (para APIs REST) que NÃO funciona com SOAP
+function getSoapPassword(credentials: CorreiosCredentials): string {
+  const senha = credentials.senha;
+  const token = credentials.token;
+  
+  // Prioriza senha de exatamente 40 caracteres (código de acesso)
+  if (senha && senha.length === 40) {
+    return senha;
+  }
+  // Se token tem 40 caracteres, pode ser o código de acesso colocado ali por engano
+  if (token && token.length === 40) {
+    return token;
+  }
+  // Fallback: usar senha se disponível
+  return senha || '';
+}
+
 async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<any> {
   // O Web Service SOAP de Logística Reversa NÃO usa autenticação no header HTTP
   // As credenciais são passadas dentro do corpo XML da requisição SOAP
@@ -34,14 +53,34 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
   </soapenv:Body>
 </soapenv:Envelope>`;
 
+  // Debug: Log credenciais usadas (mascaradas)
+  const credentials = getCredentials();
+  const senhaUsada = getSoapPassword(credentials);
+  console.log('=== DEBUG Correios SOAP ===');
+  console.log('Usuario:', credentials.usuario);
+  console.log('Senha length:', senhaUsada.length, 'chars');
+  console.log('Senha primeiros 6 chars:', senhaUsada.substring(0, 6) + '...');
+  console.log('CodAdministrativo:', credentials.codAdministrativo);
+  console.log('CartaoPostagem:', credentials.cartaoPostagem);
+  console.log('SOAPAction:', soapAction);
+  console.log('===========================');
+  
   console.log('Enviando requisição SOAP para Correios Logística Reversa...');
 
   try {
+    // Autenticação HTTP Basic (usuário:senha em base64)
+    const authString = Buffer.from(`${credentials.usuario}:${senhaUsada}`).toString('base64');
+    
+    // SOAPAction vazio com aspas é o padrão para muitos serviços SOAP
+    // O servidor deve determinar a operação pelo conteúdo do Body
+    console.log('SOAPAction: ""');
+    
     const response = await fetch(CORREIOS_PRODUCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': soapAction,
+        'SOAPAction': '""',
+        'Authorization': `Basic ${authString}`,
       },
       body: soapEnvelope,
     });
@@ -51,13 +90,23 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
     if (!response.ok) {
       console.error('SOAP HTTP Error:', response.status, responseText);
       
+      // Tenta extrair mensagem de erro SOAP
+      const soapFaultMatch = responseText.match(/<faultstring>([^<]+)<\/faultstring>/);
+      const soapFaultMessage = soapFaultMatch ? soapFaultMatch[1] : null;
+      
       // Mensagens de erro mais claras para o usuário
       if (response.status === 401) {
-        throw new Error('Credenciais dos Correios inválidas. Verifique CORREIOS_USUARIO (seu CNPJ ou usuário CWS) e CORREIOS_TOKEN (código de acesso de 40 caracteres gerado no portal CWS).');
+        throw new Error('Credenciais dos Correios inválidas. Verifique CORREIOS_USUARIO (seu CNPJ ou usuário CWS) e CORREIOS_SENHA (código de acesso de 40 caracteres).');
       } else if (response.status === 403) {
         throw new Error('Acesso negado pelo serviço dos Correios. Verifique se o contrato está ativo.');
       } else if (response.status === 404) {
         throw new Error('Serviço dos Correios não encontrado. O endpoint pode ter sido alterado.');
+      } else if (response.status === 500 && soapFaultMessage) {
+        // Erro SOAP com mensagem específica
+        if (soapFaultMessage.includes('IWS101')) {
+          throw new Error(`Correios: ${soapFaultMessage}. Seu contrato pode não ter permissão para o Web Service de Logística Reversa. Contate o representante comercial dos Correios.`);
+        }
+        throw new Error(`Correios: ${soapFaultMessage}`);
       } else if (response.status === 500) {
         throw new Error('Erro interno no servidor dos Correios. Tente novamente mais tarde.');
       } else if (response.status === 503) {
@@ -225,7 +274,7 @@ export async function solicitarPostagemReversa(params: SolicitarPostagemReversaP
   }).join('');
 
   // Determina a senha: prioriza o token JWT (código de acesso de 40 chars) se disponível
-  const senhaAPI = credentials.token || credentials.senha;
+  const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
     <ser:solicitarPostagemReversa>
@@ -293,7 +342,7 @@ export interface CancelarPedidoResponse {
 
 export async function cancelarPedido(params: CancelarPedidoParams): Promise<CancelarPedidoResponse> {
   const credentials = getCredentials();
-  const senhaAPI = credentials.token || credentials.senha;
+  const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
     <ser:cancelarPedido>
@@ -358,7 +407,7 @@ export interface AcompanharPedidoResponse {
 
 export async function acompanharPedido(params: AcompanharPedidoParams): Promise<AcompanharPedidoResponse> {
   const credentials = getCredentials();
-  const senhaAPI = credentials.token || credentials.senha;
+  const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
     <ser:acompanharPedido>
@@ -414,7 +463,7 @@ export interface AcompanharPedidoPorDataResponse {
 
 export async function acompanharPedidoPorData(params: AcompanharPedidoPorDataParams): Promise<AcompanharPedidoPorDataResponse> {
   const credentials = getCredentials();
-  const senhaAPI = credentials.token || credentials.senha;
+  const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
     <ser:acompanharPedidoPorData>
@@ -461,7 +510,7 @@ export interface RevalidarPrazoResponse {
 
 export async function revalidarPrazoAutorizacaoPostagem(params: RevalidarPrazoParams): Promise<RevalidarPrazoResponse> {
   const credentials = getCredentials();
-  const senhaAPI = credentials.token || credentials.senha;
+  const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
     <ser:revalidarPrazoAutorizacaoPostagem>
@@ -504,7 +553,7 @@ export interface SolicitarRangeResponse {
 
 export async function solicitarRange(params: SolicitarRangeParams): Promise<SolicitarRangeResponse> {
   const credentials = getCredentials();
-  const senhaAPI = credentials.token || credentials.senha;
+  const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
     <ser:solicitarRange>
@@ -635,7 +684,7 @@ export async function solicitarPostagemSimultanea(params: SolicitarPostagemSimul
     </coletas_solicitadas>
   `).join('');
 
-  const senhaAPI = credentials.token || credentials.senha;
+  const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
     <ser:solicitarPostagemSimultanea>
