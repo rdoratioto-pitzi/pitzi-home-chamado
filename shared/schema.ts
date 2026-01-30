@@ -595,6 +595,22 @@ export const insertFreightSimulationSchema = createInsertSchema(freightSimulatio
 export type InsertFreightSimulation = z.infer<typeof insertFreightSimulationSchema>;
 export type FreightSimulation = typeof freightSimulations.$inferSelect;
 
+// ============== SLA RULES ==============
+export const slaRules = pgTable("sla_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  tipo: text("tipo").notNull(), // bug, melhoria
+  prioridade: text("prioridade").notNull(), // low, medium, high, critical
+  slaHoras: decimal("sla_horas").notNull(), // SLA in hours
+  ativo: boolean("ativo").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSlaRuleSchema = createInsertSchema(slaRules).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSlaRule = z.infer<typeof insertSlaRuleSchema>;
+export type SlaRule = typeof slaRules.$inferSelect;
+
 // ============== HELPER TYPES ==============
 export type LogisticaReversaPedidoWithEventos = LogisticaReversaPedido & {
   eventos?: LogisticaReversaEvento[];

@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Plus, 
   Trash2, 
@@ -13,11 +20,12 @@ import {
   X,
   Tag,
   MapPin,
-  FolderOpen
+  FolderOpen,
+  Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Setting } from "@shared/schema";
+import type { Setting, SlaRule } from "@shared/schema";
 
 interface FieldItem {
   value: string;
@@ -205,6 +213,276 @@ function FieldManager({
   );
 }
 
+const priorityLabels: Record<string, string> = {
+  low: "Baixa",
+  medium: "Média",
+  high: "Alta",
+  critical: "Crítica",
+};
+
+const tipoLabels: Record<string, string> = {
+  bug: "Bug",
+  melhoria: "Melhoria",
+};
+
+function SlaManager() {
+  const { toast } = useToast();
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [newRule, setNewRule] = useState({ tipo: "", prioridade: "", slaHoras: "" });
+  const [editRule, setEditRule] = useState({ tipo: "", prioridade: "", slaHoras: "" });
+
+  const { data: slaRules = [], isLoading } = useQuery<SlaRule[]>({
+    queryKey: ["/api/slas"],
+  });
+
+  const { data: typesSetting } = useQuery<Setting>({
+    queryKey: ["/api/settings", "ticket_types"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/ticket_types");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  const types: FieldItem[] = typesSetting?.value 
+    ? JSON.parse(typesSetting.value).filter((t: FieldItem) => 
+        t.value.toLowerCase() === "bug" || t.value.toLowerCase() === "melhoria"
+      )
+    : [
+        { value: "bug", label: "Bug" },
+        { value: "melhoria", label: "Melhoria" },
+      ];
+
+  const priorities = [
+    { value: "low", label: "Baixa" },
+    { value: "medium", label: "Média" },
+    { value: "high", label: "Alta" },
+    { value: "critical", label: "Crítica" },
+  ];
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { tipo: string; prioridade: string; slaHoras: string }) => {
+      return apiRequest("POST", "/api/slas", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/slas"] });
+      toast({ title: "Regra de SLA criada com sucesso!" });
+      setNewRule({ tipo: "", prioridade: "", slaHoras: "" });
+      setIsAdding(false);
+    },
+    onError: (error: any) => {
+      const message = error?.message || "Erro ao criar regra de SLA";
+      toast({ title: message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { tipo: string; prioridade: string; slaHoras: string } }) => {
+      return apiRequest("PUT", `/api/slas/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/slas"] });
+      toast({ title: "Regra de SLA atualizada!" });
+      setEditingId(null);
+    },
+    onError: (error: any) => {
+      const message = error?.message || "Erro ao atualizar regra de SLA";
+      toast({ title: message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/slas/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/slas"] });
+      toast({ title: "Regra de SLA excluída!" });
+    },
+  });
+
+  const handleAdd = () => {
+    if (!newRule.tipo || !newRule.prioridade || !newRule.slaHoras) {
+      toast({ title: "Preencha todos os campos", variant: "destructive" });
+      return;
+    }
+    createMutation.mutate(newRule);
+  };
+
+  const handleUpdate = () => {
+    if (!editingId || !editRule.tipo || !editRule.prioridade || !editRule.slaHoras) {
+      toast({ title: "Preencha todos os campos", variant: "destructive" });
+      return;
+    }
+    updateMutation.mutate({ id: editingId, data: editRule });
+  };
+
+  const startEdit = (rule: SlaRule) => {
+    setEditingId(rule.id);
+    setEditRule({ 
+      tipo: rule.tipo, 
+      prioridade: rule.prioridade, 
+      slaHoras: rule.slaHoras?.toString() || "" 
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Clock className="h-5 w-5 text-primary" />
+          <CardTitle className="text-lg">Regras de SLA</CardTitle>
+        </div>
+        <CardDescription>
+          Configure o tempo máximo (em horas) para resolução de chamados por tipo e prioridade
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!isAdding && (
+          <Button onClick={() => setIsAdding(true)} data-testid="button-add-sla">
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Regra de SLA
+          </Button>
+        )}
+
+        {isAdding && (
+          <div className="flex flex-wrap gap-2 p-4 border rounded-md bg-muted/30">
+            <Select value={newRule.tipo} onValueChange={(v) => setNewRule({ ...newRule, tipo: v })}>
+              <SelectTrigger className="w-[160px]" data-testid="select-new-sla-tipo">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                {types.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>
+                    {t.label || tipoLabels[t.value.toLowerCase()] || t.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={newRule.prioridade} onValueChange={(v) => setNewRule({ ...newRule, prioridade: v })}>
+              <SelectTrigger className="w-[160px]" data-testid="select-new-sla-prioridade">
+                <SelectValue placeholder="Prioridade" />
+              </SelectTrigger>
+              <SelectContent>
+                {priorities.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Input
+              type="number"
+              placeholder="SLA (horas)"
+              value={newRule.slaHoras}
+              onChange={(e) => setNewRule({ ...newRule, slaHoras: e.target.value })}
+              className="w-[120px]"
+              data-testid="input-new-sla-horas"
+            />
+
+            <Button onClick={handleAdd} disabled={createMutation.isPending} data-testid="button-save-new-sla">
+              <Save className="h-4 w-4 mr-2" />
+              Salvar
+            </Button>
+            <Button variant="ghost" onClick={() => setIsAdding(false)} data-testid="button-cancel-new-sla">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {isLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : slaRules.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Nenhuma regra de SLA configurada. Clique em "Nova Regra de SLA" para começar.
+            </p>
+          ) : (
+            slaRules.map((rule) => (
+              <div 
+                key={rule.id}
+                className="flex items-center gap-2 p-3 border rounded-md bg-muted/30"
+              >
+                {editingId === rule.id ? (
+                  <>
+                    <Select value={editRule.tipo} onValueChange={(v) => setEditRule({ ...editRule, tipo: v })}>
+                      <SelectTrigger className="w-[160px]" data-testid={`select-edit-sla-tipo-${rule.id}`}>
+                        <SelectValue placeholder="Tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {types.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label || tipoLabels[t.value.toLowerCase()] || t.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={editRule.prioridade} onValueChange={(v) => setEditRule({ ...editRule, prioridade: v })}>
+                      <SelectTrigger className="w-[160px]" data-testid={`select-edit-sla-prioridade-${rule.id}`}>
+                        <SelectValue placeholder="Prioridade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {priorities.map((p) => (
+                          <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Input
+                      type="number"
+                      value={editRule.slaHoras}
+                      onChange={(e) => setEditRule({ ...editRule, slaHoras: e.target.value })}
+                      className="w-[120px]"
+                      data-testid={`input-edit-sla-horas-${rule.id}`}
+                    />
+
+                    <Button size="icon" variant="ghost" onClick={handleUpdate} data-testid={`button-save-edit-sla-${rule.id}`}>
+                      <Save className="h-4 w-4 text-green-600" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => setEditingId(null)} data-testid={`button-cancel-edit-sla-${rule.id}`}>
+                      <X className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Badge variant="outline" className="font-medium">
+                      {tipoLabels[rule.tipo.toLowerCase()] || rule.tipo}
+                    </Badge>
+                    <Badge variant="outline" className="font-medium">
+                      {priorityLabels[rule.prioridade] || rule.prioridade}
+                    </Badge>
+                    <span className="font-semibold text-primary">{rule.slaHoras}h</span>
+                    <div className="flex-1" />
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      onClick={() => startEdit(rule)}
+                      data-testid={`button-edit-sla-${rule.id}`}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      onClick={() => deleteMutation.mutate(rule.id)}
+                      className="text-destructive"
+                      data-testid={`button-delete-sla-${rule.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function FieldsSettings() {
   const defaultCategories = [
     { value: "ti", label: "TI / Infraestrutura" },
@@ -254,6 +532,10 @@ export function FieldsSettings() {
             <MapPin className="h-4 w-4 mr-2" />
             Locais
           </TabsTrigger>
+          <TabsTrigger value="sla" data-testid="tab-field-sla">
+            <Clock className="h-4 w-4 mr-2" />
+            SLA
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="categories">
@@ -287,6 +569,10 @@ export function FieldsSettings() {
             defaultItems={defaultLocations}
             showLabel={false}
           />
+        </TabsContent>
+
+        <TabsContent value="sla">
+          <SlaManager />
         </TabsContent>
       </Tabs>
     </div>

@@ -25,10 +25,11 @@ import {
   type LogisticaReversaPedido, type InsertLogisticaReversaPedido,
   type LogisticaReversaEvento, type InsertLogisticaReversaEvento,
   type LogisticsDashboardStats,
+  type SlaRule, type InsertSlaRule,
   users, tickets, ticketResponsaveis, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
-  collectionRequests, logisticaReversaPedidos, logisticaReversaEventos
+  collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql } from "drizzle-orm";
@@ -189,6 +190,14 @@ export interface IStorage {
 
   // Dashboard Stats
   getLogisticsDashboardStats(): Promise<LogisticsDashboardStats>;
+
+  // SLA Rules
+  getSlaRules(): Promise<SlaRule[]>;
+  getSlaRule(id: string): Promise<SlaRule | undefined>;
+  getSlaRuleByTipoAndPrioridade(tipo: string, prioridade: string): Promise<SlaRule | undefined>;
+  createSlaRule(rule: InsertSlaRule): Promise<SlaRule>;
+  updateSlaRule(id: string, data: Partial<SlaRule>): Promise<SlaRule | undefined>;
+  deleteSlaRule(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -703,6 +712,38 @@ export class DatabaseStorage implements IStorage {
       pendingRequests: allRequests.filter(r => r.status === "pending").length,
       deliveredRequests: allRequests.filter(r => r.status === "delivered").length,
     };
+  }
+
+  // SLA Rules
+  async getSlaRules(): Promise<SlaRule[]> {
+    return await db.select().from(slaRules);
+  }
+  async getSlaRule(id: string): Promise<SlaRule | undefined> {
+    const [rule] = await db.select().from(slaRules).where(eq(slaRules.id, id));
+    return rule;
+  }
+  async getSlaRuleByTipoAndPrioridade(tipo: string, prioridade: string): Promise<SlaRule | undefined> {
+    const [rule] = await db.select().from(slaRules).where(
+      and(
+        eq(slaRules.tipo, tipo),
+        eq(slaRules.prioridade, prioridade),
+        eq(slaRules.ativo, true)
+      )
+    );
+    return rule;
+  }
+  async createSlaRule(rule: InsertSlaRule): Promise<SlaRule> {
+    const [created] = await db.insert(slaRules).values(rule).returning();
+    return created;
+  }
+  async updateSlaRule(id: string, data: Partial<SlaRule>): Promise<SlaRule | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(slaRules).set(updateData).where(eq(slaRules.id, id)).returning();
+    return updated;
+  }
+  async deleteSlaRule(id: string): Promise<boolean> {
+    const result = await db.delete(slaRules).where(eq(slaRules.id, id)).returning();
+    return result.length > 0;
   }
 }
 

@@ -37,6 +37,7 @@ import {
   insertCollectionRequestSchema,
   insertLogisticaReversaPedidoSchema,
   insertLogisticaReversaEventoSchema,
+  insertSlaRuleSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1472,6 +1473,72 @@ export async function registerRoutes(
         { codigo: "G", nome: "Grande", dimensoes: "40x30x20cm", peso: 0.6 },
       ],
     });
+  });
+
+  // ============== SLA RULES ==============
+  app.get("/api/slas", async (req, res) => {
+    const rules = await storage.getSlaRules();
+    res.json(rules);
+  });
+
+  app.get("/api/slas/:id", async (req, res) => {
+    const rule = await storage.getSlaRule(req.params.id);
+    if (!rule) return res.status(404).json({ error: "SLA rule not found" });
+    res.json(rule);
+  });
+
+  app.post("/api/slas", async (req, res) => {
+    try {
+      const validated = insertSlaRuleSchema.parse(req.body);
+      
+      const existing = await storage.getSlaRuleByTipoAndPrioridade(validated.tipo, validated.prioridade);
+      if (existing) {
+        return res.status(409).json({ 
+          error: "conflict",
+          message: `Já existe uma regra de SLA para ${validated.tipo} com prioridade ${validated.prioridade}`
+        });
+      }
+      
+      const rule = await storage.createSlaRule(validated);
+      res.status(201).json(rule);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create SLA rule" });
+    }
+  });
+
+  app.put("/api/slas/:id", async (req, res) => {
+    try {
+      const partialSchema = insertSlaRuleSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      
+      if (validated.tipo && validated.prioridade) {
+        const existing = await storage.getSlaRuleByTipoAndPrioridade(validated.tipo, validated.prioridade);
+        if (existing && existing.id !== req.params.id) {
+          return res.status(409).json({ 
+            error: "conflict",
+            message: `Já existe uma regra de SLA para ${validated.tipo} com prioridade ${validated.prioridade}`
+          });
+        }
+      }
+      
+      const rule = await storage.updateSlaRule(req.params.id, validated);
+      if (!rule) return res.status(404).json({ error: "SLA rule not found" });
+      res.json(rule);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update SLA rule" });
+    }
+  });
+
+  app.delete("/api/slas/:id", async (req, res) => {
+    const deleted = await storage.deleteSlaRule(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "SLA rule not found" });
+    res.status(204).send();
   });
 
   // ============== CEP LOOKUP ==============

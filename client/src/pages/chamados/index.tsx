@@ -46,7 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import type { Ticket, User } from "@shared/schema";
+import type { Ticket, User, SlaRule } from "@shared/schema";
 import { TicketDialog } from "./ticket-dialog";
 import { TicketDetailSheet } from "./ticket-detail-sheet";
 import { TicketKanban } from "./ticket-kanban";
@@ -137,6 +137,45 @@ const calculateTimeOpen = (createdAt: Date | string | null): { text: string; col
   return { text, colorClass };
 };
 
+// Helper function to get SLA for a ticket
+const getSlaForTicket = (
+  ticket: Ticket, 
+  slaRules: SlaRule[]
+): { slaHoras: number | null; status: "dentro_prazo" | "em_atraso" | null } => {
+  const tipo = ticket.type?.toLowerCase();
+  if (tipo !== "bug" && tipo !== "melhoria") {
+    return { slaHoras: null, status: null };
+  }
+
+  const rule = slaRules.find(
+    r => r.tipo.toLowerCase() === tipo && r.prioridade === ticket.priority && r.ativo
+  );
+
+  if (!rule || !rule.slaHoras) {
+    return { slaHoras: null, status: null };
+  }
+
+  const slaHoras = parseFloat(rule.slaHoras.toString());
+  
+  if (ticket.status === "closed" || ticket.status === "resolved") {
+    return { slaHoras, status: "dentro_prazo" };
+  }
+
+  const createdAt = ticket.createdAt ? new Date(ticket.createdAt) : null;
+  if (!createdAt) {
+    return { slaHoras, status: null };
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - createdAt.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  return {
+    slaHoras,
+    status: diffHours <= slaHoras ? "dentro_prazo" : "em_atraso",
+  };
+};
+
 export default function ChamadosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -153,6 +192,10 @@ export default function ChamadosPage() {
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
+  });
+
+  const { data: slaRules = [] } = useQuery<SlaRule[]>({
+    queryKey: ["/api/slas"],
   });
 
   const { toast } = useToast();
@@ -201,6 +244,7 @@ export default function ChamadosPage() {
       const requester = getUser(ticket.requesterId);
       const assignee = getUser(ticket.assigneeId || null);
       const timeOpen = calculateTimeOpen(ticket.createdAt);
+      const slaInfo = getSlaForTicket(ticket, slaRules);
       return {
         "Código": ticket.code || "",
         "Título": ticket.title,
@@ -214,6 +258,8 @@ export default function ChamadosPage() {
         "Responsável": assignee?.name || "",
         "Abertura": ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "",
         "Tempo Aberto": timeOpen.text,
+        "SLA": slaInfo.slaHoras !== null ? `${slaInfo.slaHoras}h` : "—",
+        "Status SLA": slaInfo.status === "dentro_prazo" ? "Dentro do Prazo" : slaInfo.status === "em_atraso" ? "Em Atraso" : "—",
       };
     });
 
@@ -430,6 +476,8 @@ export default function ChamadosPage() {
                       </Button>
                     </TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tempo Aberto</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">SLA</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Status SLA</TableHead>
                     <TableHead className="w-[60px] text-[12px] font-bold uppercase tracking-wider">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -485,6 +533,36 @@ export default function ChamadosPage() {
                               <span className={`text-[12px] font-medium ${timeOpen.colorClass}`}>
                                 {timeOpen.text}
                               </span>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const slaInfo = getSlaForTicket(ticket, slaRules);
+                            if (slaInfo.slaHoras === null) {
+                              return <span className="text-[12px] text-muted-foreground">—</span>;
+                            }
+                            return (
+                              <span className="text-[12px] font-medium">
+                                {slaInfo.slaHoras}h
+                              </span>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell>
+                          {(() => {
+                            const slaInfo = getSlaForTicket(ticket, slaRules);
+                            if (slaInfo.status === null) {
+                              return <span className="text-[12px] text-muted-foreground">—</span>;
+                            }
+                            return slaInfo.status === "dentro_prazo" ? (
+                              <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider">
+                                Dentro do Prazo
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider">
+                                Em Atraso
+                              </Badge>
                             );
                           })()}
                         </TableCell>
