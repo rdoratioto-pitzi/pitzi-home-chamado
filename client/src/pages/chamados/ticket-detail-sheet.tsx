@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2 } from "lucide-react";
+import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2, Edit2, Check, X } from "lucide-react";
 import type { Ticket, TicketComment, User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -127,6 +127,8 @@ const getTimeOpenInfo = (createdAt: Date | string | null): { text: string; color
 export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   const [comment, setComment] = useState("");
   const [commentImages, setCommentImages] = useState<string[]>([]);
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [editedDescription, setEditedDescription] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -134,6 +136,8 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     if (ticket) {
       setComment("");
       setCommentImages([]);
+      setEditedDescription(ticket.description);
+      setIsEditingDescription(false);
     }
   }, [ticket]);
 
@@ -165,6 +169,15 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
 
   const handleAssigneeChange = (userId: string) => {
     updateMutation.mutate({ assigneeId: userId === "none" ? null : userId });
+  };
+
+  const handleSaveDescription = () => {
+    updateMutation.mutate({ 
+      description: editedDescription,
+      descriptionLastEditedBy: "admin", // In a real app, this would be the logged in user's ID
+      descriptionLastEditedAt: new Date()
+    });
+    setIsEditingDescription(false);
   };
 
   const commentMutation = useMutation({
@@ -228,10 +241,64 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
           </div>
 
           <div>
-            <h4 className="text-sm font-medium mb-2">Descrição</h4>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words overflow-hidden mb-4" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-              {ticket.description}
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-medium">Descrição</h4>
+              {!isEditingDescription && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 px-2" 
+                  onClick={() => setIsEditingDescription(true)}
+                >
+                  <Edit2 className="h-3.5 w-3.5 mr-1" />
+                  Editar
+                </Button>
+              )}
+            </div>
+            
+            {isEditingDescription ? (
+              <div className="space-y-2 mb-4">
+                <RichTextarea
+                  value={editedDescription}
+                  onChange={setEditedDescription}
+                  maxLength={2000}
+                  rows={6}
+                />
+                <div className="flex gap-2 justify-end">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      setIsEditingDescription(false);
+                      setEditedDescription(ticket.description);
+                    }}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Cancelar
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleSaveDescription}
+                    disabled={updateMutation.isPending || editedDescription === ticket.description}
+                  >
+                    <Check className="h-4 w-4 mr-1" />
+                    Salvar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words overflow-hidden mb-1" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                  {ticket.description}
+                </p>
+                {ticket.descriptionLastEditedAt && (
+                  <p className="text-[10px] text-muted-foreground mb-4 italic">
+                    Editado por {users.find(u => u.id === ticket.descriptionLastEditedBy)?.name || "Admin"} em {formatDateTime(ticket.descriptionLastEditedAt)}
+                  </p>
+                )}
+              </>
+            )}
+            
             {ticket.attachments && (
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {(() => {

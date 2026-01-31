@@ -75,6 +75,9 @@ export const tickets = pgTable("tickets", {
   dataPrimeiraResposta: timestamp("data_primeira_resposta"),
   dataResolucao: timestamp("data_resolucao"),
   dataFechamento: timestamp("data_fechamento"),
+  // Audit log for description edits
+  descriptionLastEditedBy: varchar("description_last_edited_by"),
+  descriptionLastEditedAt: timestamp("description_last_edited_at"),
 });
 
 export const insertTicketSchema = createInsertSchema(tickets).omit({ id: true, createdAt: true, updatedAt: true });
