@@ -1746,6 +1746,238 @@ export async function registerRoutes(
     }
   });
 
+  // ============== LOCAL PRICING DEVICES API ==============
+  
+  // Get all local pricing devices
+  app.get("/api/pricing/devices", async (req, res) => {
+    try {
+      const { categoryId, manufacturerName, isActive } = req.query;
+      const filters: any = {};
+      if (categoryId) filters.categoryId = categoryId as string;
+      if (manufacturerName) filters.manufacturerName = manufacturerName as string;
+      if (isActive !== undefined) filters.isActive = isActive === "true";
+      const devices = await storage.getPricingDevices(filters);
+      res.json(devices);
+    } catch (error: any) {
+      console.error("Get pricing devices error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get single device
+  app.get("/api/pricing/devices/:id", async (req, res) => {
+    try {
+      const device = await storage.getPricingDevice(req.params.id);
+      if (!device) {
+        return res.status(404).json({ error: "Device not found" });
+      }
+      res.json(device);
+    } catch (error: any) {
+      console.error("Get pricing device error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create device
+  app.post("/api/pricing/devices", async (req, res) => {
+    try {
+      const device = await storage.createPricingDevice(req.body);
+      res.status(201).json(device);
+    } catch (error: any) {
+      console.error("Create pricing device error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update device
+  app.patch("/api/pricing/devices/:id", async (req, res) => {
+    try {
+      const device = await storage.updatePricingDevice(req.params.id, req.body);
+      if (!device) {
+        return res.status(404).json({ error: "Device not found" });
+      }
+      res.json(device);
+    } catch (error: any) {
+      console.error("Update pricing device error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete device
+  app.delete("/api/pricing/devices/:id", async (req, res) => {
+    try {
+      const success = await storage.deletePricingDevice(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Device not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete pricing device error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get price history for a device
+  app.get("/api/pricing/devices/:id/history", async (req, res) => {
+    try {
+      const history = await storage.getPricingPriceHistory(req.params.id);
+      res.json(history);
+    } catch (error: any) {
+      console.error("Get pricing history error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add price history entry
+  app.post("/api/pricing/devices/:id/history", async (req, res) => {
+    try {
+      const entry = await storage.createPricingPriceHistory({
+        ...req.body,
+        deviceId: req.params.id,
+      });
+      res.status(201).json(entry);
+    } catch (error: any) {
+      console.error("Create pricing history error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============== PRICING ALERTS API ==============
+  
+  app.get("/api/pricing/alerts", async (req, res) => {
+    try {
+      const { userId } = req.query;
+      const alerts = await storage.getPricingAlerts(userId as string | undefined);
+      res.json(alerts);
+    } catch (error: any) {
+      console.error("Get pricing alerts error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/pricing/alerts", async (req, res) => {
+    try {
+      const alert = await storage.createPricingAlert(req.body);
+      res.status(201).json(alert);
+    } catch (error: any) {
+      console.error("Create pricing alert error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/pricing/alerts/:id", async (req, res) => {
+    try {
+      const alert = await storage.updatePricingAlert(req.params.id, req.body);
+      if (!alert) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      res.json(alert);
+    } catch (error: any) {
+      console.error("Update pricing alert error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/pricing/alerts/:id", async (req, res) => {
+    try {
+      const success = await storage.deletePricingAlert(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete pricing alert error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============== PRICING ANALYTICS API ==============
+  
+  // Get deflation indicators
+  app.get("/api/pricing/analytics/deflation", async (req, res) => {
+    try {
+      const devices = await storage.getPricingDevices({ isActive: true });
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now);
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const deflationData: any[] = [];
+      
+      for (const device of devices) {
+        const history = await storage.getPricingPriceHistory(device.id);
+        if (history.length < 2) continue;
+        
+        // Sort by date
+        const sorted = history.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
+        // Calculate 30-day change
+        const recent = sorted.filter(h => new Date(h.date) >= thirtyDaysAgo);
+        if (recent.length < 2) continue;
+        
+        const oldestPrice = parseFloat(recent[0].avgPrice || "0");
+        const newestPrice = parseFloat(recent[recent.length - 1].avgPrice || "0");
+        const change = oldestPrice > 0 ? ((newestPrice - oldestPrice) / oldestPrice) * 100 : 0;
+        
+        // Calculate weekly variation
+        const weekRecent = sorted.filter(h => new Date(h.date) >= sevenDaysAgo);
+        let weeklyVariation = 0;
+        if (weekRecent.length >= 2) {
+          const weekOld = parseFloat(weekRecent[0].avgPrice || "0");
+          const weekNew = parseFloat(weekRecent[weekRecent.length - 1].avgPrice || "0");
+          weeklyVariation = weekOld > 0 ? ((weekNew - weekOld) / weekOld) * 100 : 0;
+        }
+        
+        deflationData.push({
+          deviceId: device.id,
+          deviceName: `${device.manufacturerName} ${device.modelName} ${device.storage}GB`,
+          manufacturerName: device.manufacturerName,
+          categoryName: device.categoryName,
+          currentPrice: newestPrice,
+          priceChange30d: change,
+          weeklyVariation,
+        });
+      }
+      
+      // Sort by price change (most negative = biggest drop)
+      const sorted = deflationData.sort((a, b) => a.priceChange30d - b.priceChange30d);
+      
+      // Calculate averages
+      const avgDeflation = deflationData.length > 0 
+        ? deflationData.reduce((acc, d) => acc + d.priceChange30d, 0) / deflationData.length 
+        : 0;
+      
+      const avgWeeklyVariation = deflationData.length > 0
+        ? deflationData.reduce((acc, d) => acc + d.weeklyVariation, 0) / deflationData.length
+        : 0;
+
+      // Group by manufacturer
+      const byManufacturer: Record<string, number[]> = {};
+      deflationData.forEach(d => {
+        if (!byManufacturer[d.manufacturerName]) byManufacturer[d.manufacturerName] = [];
+        byManufacturer[d.manufacturerName].push(d.priceChange30d);
+      });
+      
+      const deflationByBrand = Object.entries(byManufacturer).map(([brand, changes]) => ({
+        brand,
+        avgDeflation: changes.reduce((a, b) => a + b, 0) / changes.length,
+      }));
+
+      res.json({
+        avgMonthlyDeflation: avgDeflation,
+        avgWeeklyVariation,
+        top10Drops: sorted.slice(0, 10),
+        top10Rises: [...sorted].reverse().slice(0, 10),
+        deflationByBrand,
+        totalDevices: devices.length,
+      });
+    } catch (error: any) {
+      console.error("Get deflation analytics error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
 

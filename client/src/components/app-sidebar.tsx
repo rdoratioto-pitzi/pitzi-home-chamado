@@ -21,7 +21,9 @@ import {
   DollarSign,
   BarChart3,
   Search,
-  FileSpreadsheet
+  FileSpreadsheet,
+  LineChart,
+  TrendingDown,
 } from "lucide-react";
 import {
   Sidebar,
@@ -106,6 +108,8 @@ const apisSubItems = [
 const pricingSubItems = [
   { title: "Visão Geral", url: "/pricing", icon: LayoutDashboard },
   { title: "Análise de Produtos", url: "/pricing/analise", icon: Search },
+  { title: "Gráficos Evolutivos", url: "/pricing/graficos", icon: LineChart },
+  { title: "Indicadores de Deflação", url: "/pricing/indicadores", icon: TrendingDown },
   { title: "Detalhes de Produtos", url: "/pricing/detalhes", icon: BarChart3 },
   { title: "Relatórios", url: "/pricing/relatorios", icon: FileSpreadsheet },
 ];

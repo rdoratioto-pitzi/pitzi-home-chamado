@@ -612,6 +612,63 @@ export const insertSlaRuleSchema = createInsertSchema(slaRules).omit({ id: true,
 export type InsertSlaRule = z.infer<typeof insertSlaRuleSchema>;
 export type SlaRule = typeof slaRules.$inferSelect;
 
+// ============== PRICING DEVICES (Monitored Devices) ==============
+export const pricingDevices = pgTable("pricing_devices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  categoryId: text("category_id").notNull(), // iPhone or Smartphone category UUID
+  categoryName: text("category_name").notNull(), // iPhone, Smartphone
+  manufacturerName: text("manufacturer_name").notNull(), // Apple, Samsung
+  modelName: text("model_name").notNull(), // iPhone 11, Galaxy S25
+  storage: integer("storage").notNull(), // 128, 256, etc
+  condition: text("condition").default("novo"), // novo, seminovo, usado
+  imageUrl: text("image_url"),
+  specs: text("specs"), // JSON with technical specs
+  releaseDate: timestamp("release_date"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPricingDeviceSchema = createInsertSchema(pricingDevices).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPricingDevice = z.infer<typeof insertPricingDeviceSchema>;
+export type PricingDevice = typeof pricingDevices.$inferSelect;
+
+// ============== PRICING PRICE HISTORY ==============
+export const pricingPriceHistory = pgTable("pricing_price_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  deviceId: varchar("device_id").notNull(),
+  date: timestamp("date").notNull(),
+  minPrice: decimal("min_price"),
+  avgPrice: decimal("avg_price"),
+  maxPrice: decimal("max_price"),
+  sampleCount: integer("sample_count").default(0),
+  source: text("source").default("scraping"), // scraping, manual, api
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPricingPriceHistorySchema = createInsertSchema(pricingPriceHistory).omit({ id: true, createdAt: true });
+export type InsertPricingPriceHistory = z.infer<typeof insertPricingPriceHistorySchema>;
+export type PricingPriceHistory = typeof pricingPriceHistory.$inferSelect;
+
+// ============== PRICING ALERTS ==============
+export const pricingAlerts = pgTable("pricing_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  userId: varchar("user_id").notNull(),
+  deviceId: varchar("device_id").notNull(),
+  alertType: text("alert_type").notNull(), // price_drop, price_rise
+  thresholdPercent: decimal("threshold_percent").notNull(), // X%
+  isActive: boolean("is_active").default(true),
+  lastTriggered: timestamp("last_triggered"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPricingAlertSchema = createInsertSchema(pricingAlerts).omit({ id: true, createdAt: true });
+export type InsertPricingAlert = z.infer<typeof insertPricingAlertSchema>;
+export type PricingAlert = typeof pricingAlerts.$inferSelect;
+
 // ============== HELPER TYPES ==============
 export type LogisticaReversaPedidoWithEventos = LogisticaReversaPedido & {
   eventos?: LogisticaReversaEvento[];

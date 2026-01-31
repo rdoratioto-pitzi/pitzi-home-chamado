@@ -26,10 +26,14 @@ import {
   type LogisticaReversaEvento, type InsertLogisticaReversaEvento,
   type LogisticsDashboardStats,
   type SlaRule, type InsertSlaRule,
+  type PricingDevice, type InsertPricingDevice,
+  type PricingPriceHistory, type InsertPricingPriceHistory,
+  type PricingAlert, type InsertPricingAlert,
   users, tickets, ticketResponsaveis, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
-  collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules
+  collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules,
+  pricingDevices, pricingPriceHistory, pricingAlerts
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql } from "drizzle-orm";
@@ -198,6 +202,24 @@ export interface IStorage {
   createSlaRule(rule: InsertSlaRule): Promise<SlaRule>;
   updateSlaRule(id: string, data: Partial<SlaRule>): Promise<SlaRule | undefined>;
   deleteSlaRule(id: string): Promise<boolean>;
+
+  // Pricing Devices
+  getPricingDevice(id: string): Promise<PricingDevice | undefined>;
+  getPricingDevices(filters?: { categoryId?: string; manufacturerName?: string; isActive?: boolean }): Promise<PricingDevice[]>;
+  createPricingDevice(device: InsertPricingDevice): Promise<PricingDevice>;
+  updatePricingDevice(id: string, data: Partial<PricingDevice>): Promise<PricingDevice | undefined>;
+  deletePricingDevice(id: string): Promise<boolean>;
+
+  // Pricing Price History
+  getPricingPriceHistory(deviceId: string, startDate?: Date, endDate?: Date): Promise<PricingPriceHistory[]>;
+  createPricingPriceHistory(history: InsertPricingPriceHistory): Promise<PricingPriceHistory>;
+
+  // Pricing Alerts
+  getPricingAlerts(userId?: string): Promise<PricingAlert[]>;
+  getPricingAlert(id: string): Promise<PricingAlert | undefined>;
+  createPricingAlert(alert: InsertPricingAlert): Promise<PricingAlert>;
+  updatePricingAlert(id: string, data: Partial<PricingAlert>): Promise<PricingAlert | undefined>;
+  deletePricingAlert(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -743,6 +765,75 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteSlaRule(id: string): Promise<boolean> {
     const result = await db.delete(slaRules).where(eq(slaRules.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Pricing Devices
+  async getPricingDevice(id: string): Promise<PricingDevice | undefined> {
+    const [device] = await db.select().from(pricingDevices).where(eq(pricingDevices.id, id));
+    return device;
+  }
+  async getPricingDevices(filters?: { categoryId?: string; manufacturerName?: string; isActive?: boolean }): Promise<PricingDevice[]> {
+    let query = db.select().from(pricingDevices);
+    const conditions: any[] = [];
+    if (filters?.categoryId) {
+      conditions.push(eq(pricingDevices.categoryId, filters.categoryId));
+    }
+    if (filters?.manufacturerName) {
+      conditions.push(eq(pricingDevices.manufacturerName, filters.manufacturerName));
+    }
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(pricingDevices.isActive, filters.isActive));
+    }
+    if (conditions.length > 0) {
+      return await db.select().from(pricingDevices).where(and(...conditions));
+    }
+    return await db.select().from(pricingDevices);
+  }
+  async createPricingDevice(device: InsertPricingDevice): Promise<PricingDevice> {
+    const [created] = await db.insert(pricingDevices).values(device).returning();
+    return created;
+  }
+  async updatePricingDevice(id: string, data: Partial<PricingDevice>): Promise<PricingDevice | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(pricingDevices).set(updateData).where(eq(pricingDevices.id, id)).returning();
+    return updated;
+  }
+  async deletePricingDevice(id: string): Promise<boolean> {
+    const result = await db.delete(pricingDevices).where(eq(pricingDevices.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Pricing Price History
+  async getPricingPriceHistory(deviceId: string, startDate?: Date, endDate?: Date): Promise<PricingPriceHistory[]> {
+    return await db.select().from(pricingPriceHistory).where(eq(pricingPriceHistory.deviceId, deviceId));
+  }
+  async createPricingPriceHistory(history: InsertPricingPriceHistory): Promise<PricingPriceHistory> {
+    const [created] = await db.insert(pricingPriceHistory).values(history).returning();
+    return created;
+  }
+
+  // Pricing Alerts
+  async getPricingAlerts(userId?: string): Promise<PricingAlert[]> {
+    if (userId) {
+      return await db.select().from(pricingAlerts).where(eq(pricingAlerts.userId, userId));
+    }
+    return await db.select().from(pricingAlerts);
+  }
+  async getPricingAlert(id: string): Promise<PricingAlert | undefined> {
+    const [alert] = await db.select().from(pricingAlerts).where(eq(pricingAlerts.id, id));
+    return alert;
+  }
+  async createPricingAlert(alert: InsertPricingAlert): Promise<PricingAlert> {
+    const [created] = await db.insert(pricingAlerts).values(alert).returning();
+    return created;
+  }
+  async updatePricingAlert(id: string, data: Partial<PricingAlert>): Promise<PricingAlert | undefined> {
+    const [updated] = await db.update(pricingAlerts).set(data).where(eq(pricingAlerts.id, id)).returning();
+    return updated;
+  }
+  async deletePricingAlert(id: string): Promise<boolean> {
+    const result = await db.delete(pricingAlerts).where(eq(pricingAlerts.id, id)).returning();
     return result.length > 0;
   }
 }
