@@ -447,7 +447,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             images={commentImages}
             onImagesChange={setCommentImages}
             rows={3}
-            maxLength={1000}
+            maxLength={2000}
             data-testid="input-comment"
           />
           <Button 

@@ -301,7 +301,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                       onChange={field.onChange}
                       images={attachments}
                       onImagesChange={setAttachments}
-                      maxLength={1000}
+                      maxLength={2000}
                       data-testid="input-ticket-description"
                     />
                   </FormControl>
