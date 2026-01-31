@@ -24,6 +24,7 @@ import {
   FileSpreadsheet,
   LineChart,
   TrendingDown,
+  Bell,
 } from "lucide-react";
 import {
   Sidebar,
@@ -106,11 +107,13 @@ const apisSubItems = [
 ];
 
 const pricingSubItems = [
-  { title: "Visão Geral", url: "/pricing", icon: LayoutDashboard },
-  { title: "Análise de Produtos", url: "/pricing/analise", icon: Search },
+  { title: "Dashboard", url: "/pricing/dashboard", icon: LayoutDashboard },
+  { title: "Visão Geral", url: "/pricing", icon: Search },
+  { title: "Análise de Produtos", url: "/pricing/analise", icon: BarChart3 },
   { title: "Gráficos Evolutivos", url: "/pricing/graficos", icon: LineChart },
   { title: "Indicadores de Deflação", url: "/pricing/indicadores", icon: TrendingDown },
-  { title: "Detalhes de Produtos", url: "/pricing/detalhes", icon: BarChart3 },
+  { title: "Alertas de Preço", url: "/pricing/alertas", icon: Bell },
+  { title: "Detalhes de Produtos", url: "/pricing/detalhes", icon: Search },
   { title: "Relatórios", url: "/pricing/relatorios", icon: FileSpreadsheet },
 ];
 

@@ -33,6 +33,8 @@ import PricingDetailsPage from "@/pages/pricing/detalhes";
 import PricingReportsPage from "@/pages/pricing/relatorios";
 import PricingGraficosPage from "@/pages/pricing/graficos";
 import PricingIndicadoresPage from "@/pages/pricing/indicadores";
+import PricingAlertasPage from "@/pages/pricing/alertas";
+import PricingDashboardPage from "@/pages/pricing/dashboard";
 
 function Router() {
   return (
@@ -146,6 +148,16 @@ function Router() {
       <Route path="/pricing/indicadores">
         <ProtectedRoute requiredPermission="pricing">
           <PricingIndicadoresPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/pricing/alertas">
+        <ProtectedRoute requiredPermission="pricing">
+          <PricingAlertasPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/pricing/dashboard">
+        <ProtectedRoute requiredPermission="pricing">
+          <PricingDashboardPage />
         </ProtectedRoute>
       </Route>
       <Route path="/login" component={LoginPage} />
