@@ -257,36 +257,38 @@ export async function registerRoutes(
 
   app.patch("/api/tickets/:id", async (req, res) => {
     try {
-      const partialSchema = insertTicketSchema.partial();
-      const validated = partialSchema.parse(req.body);
-      
       const oldTicket = await storage.getTicket(req.params.id);
       if (!oldTicket) return res.status(404).json({ error: "Ticket not found" });
       
       // Auto-fill timestamp fields based on status changes
-      const updateData: any = { ...validated };
-      if (validated.status && validated.status !== oldTicket.status) {
-        if (validated.status === "resolved" && !oldTicket.dataResolucao) {
+      const updateData: any = { ...req.body };
+      if (req.body.status && req.body.status !== oldTicket.status) {
+        if (req.body.status === "resolved" && !oldTicket.dataResolucao) {
           updateData.dataResolucao = new Date();
         }
-        if (validated.status === "closed" && !oldTicket.dataFechamento) {
+        if (req.body.status === "closed" && !oldTicket.dataFechamento) {
           updateData.dataFechamento = new Date();
         }
+      }
+
+      // Handle date conversion for audit fields if present
+      if (updateData.descriptionLastEditedAt) {
+        updateData.descriptionLastEditedAt = new Date(updateData.descriptionLastEditedAt);
       }
       
       const ticket = await storage.updateTicket(req.params.id, updateData);
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
       
-      if (validated.status && validated.status !== oldTicket.status) {
+      if (req.body.status && req.body.status !== oldTicket.status) {
         const requester = await storage.getUser(ticket.requesterId);
         const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
         if (requester) {
-          sendTicketStatusChangedEmail(ticket, oldTicket.status, validated.status, requester, assignee || null).catch(console.error);
+          sendTicketStatusChangedEmail(ticket, oldTicket.status, req.body.status, requester, assignee || null).catch(console.error);
         }
       }
       
-      if (validated.assigneeId && validated.assigneeId !== oldTicket.assigneeId) {
-        const assignee = await storage.getUser(validated.assigneeId);
+      if (req.body.assigneeId && req.body.assigneeId !== oldTicket.assigneeId) {
+        const assignee = await storage.getUser(req.body.assigneeId);
         if (assignee) {
           sendTicketAssignedEmail(ticket, assignee).catch(console.error);
         }
@@ -294,9 +296,7 @@ export async function registerRoutes(
       
       res.json(ticket);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Validation failed", details: error.errors });
-      }
+      console.error("Error updating ticket:", error);
       res.status(400).json({ error: "Failed to update ticket" });
     }
   });

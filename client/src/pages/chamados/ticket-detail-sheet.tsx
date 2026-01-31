@@ -175,7 +175,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     updateMutation.mutate({ 
       description: editedDescription,
       descriptionLastEditedBy: "admin", // In a real app, this would be the logged in user's ID
-      descriptionLastEditedAt: new Date()
+      descriptionLastEditedAt: new Date().toISOString() as any
     });
     setIsEditingDescription(false);
   };
