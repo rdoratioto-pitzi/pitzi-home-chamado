@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2 } from "lucide-react";
-import type { Ticket, TicketComment } from "@shared/schema";
+import type { Ticket, TicketComment, User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -324,6 +324,24 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                 </div>
               )}
             </div>
+          </div>
+
+          <div>
+            <h4 className="text-sm font-medium mb-2">Responsável</h4>
+            <Select 
+              value={ticket.assigneeId || "none"} 
+              onValueChange={handleAssigneeChange}
+            >
+              <SelectTrigger className="w-full" data-testid="select-change-assignee">
+                <SelectValue placeholder="Selecione um responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Não atribuído</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div>
