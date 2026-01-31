@@ -1,303 +1,82 @@
 # Renov Home
 
-Plataforma interna de gestão da Renov para gerenciamento de chamados, projetos, OKRs, tarefas e logística.
+## Overview
 
-## Visão Geral
+Renov Home is an internal web platform designed to streamline and centralize various operational aspects for Renov. Its primary purpose is to enhance efficiency across different departments by providing integrated tools for managing customer support tickets, projects, tasks, OKRs (Objectives and Key Results), logistics, and pricing.
 
-O Renov Home é uma aplicação web interna que oferece:
+The platform aims to:
+- **Improve internal communication and collaboration:** By centralizing different workflows into a single system.
+- **Boost productivity:** Through structured project and task management, and automated processes.
+- **Provide data-driven insights:** With features like OKR tracking and pricing analysis.
+- **Optimize logistics operations:** Offering tools for freight simulation, tracking, and reverse logistics.
+- **Ensure consistent brand identity:** Through a modern and clean UI/UX aligned with Renov's branding.
 
-- **Gestão de Chamados**: Sistema de suporte interno para TI, RH, operações, etc.
-- **Projetos**: Gerenciamento de projetos com quadros Kanban
-- **Tarefas**: Gerenciamento de tarefas por áreas com comentários e reações
-- **Reuniões**: Módulo independente para gestão de reuniões com pauta, participantes e atas
-- **OKRs**: Objetivos e resultados-chave por trimestre
-- **Logística**: Rastreamento, simulação de frete e logística reversa
-- **Pricing**: Monitoramento de preços de smartphones/iPhones via integração com RenovSmart API
-- **Integrações**: Documentação de APIs internas (BI RS, Pricing), Correios e operadores logísticos
-- **Configurações**: Gerenciamento de usuários com permissões por módulo
+Key capabilities include:
+- Comprehensive ticket management (internal support for IT, HR, operations).
+- Project management with Kanban boards.
+- Task management by area, supporting comments and reactions.
+- Dedicated module for meeting management including agendas and minutes.
+- Quarterly OKR tracking.
+- Logistics functionalities: tracking, freight simulation, and reverse logistics.
+- Real-time pricing monitoring for smartphones/iPhones via external API integration.
+- Documentation of internal APIs (BI RS, Pricing) and integrations with external services like Correios.
+- User and permission management with granular control per module.
 
-## Identidade Visual
-
-Seguindo as diretrizes de marca da Renov:
-- **Cor primária**: Verde Renov (#00A137)
-- **Cores secundárias**: Preto (#000000) e Branco (#FFFFFF)
-- **Tipografia**: Montserrat (Regular, Medium, Bold)
-
-## Stack Técnica
-
-### Frontend
-- React 18 com TypeScript
-- Tailwind CSS para estilização
-- Shadcn/UI como biblioteca de componentes
-- Wouter para roteamento
-- TanStack Query para gerenciamento de estado/dados
-- React Hook Form + Zod para formulários
-
-### Backend
-- Node.js com Express
-- TypeScript
-- Armazenamento em memória (MemStorage)
-- API REST em `/api/...`
-
-## Arquitetura Multi-tenant
-
-O sistema está preparado para multi-tenant com:
-- Campo `tenantId` em todas as tabelas
-- Isolamento de dados por tenant
-- Preparação para N organizações
-
-## Estrutura do Projeto
-
-```
-client/
-├── src/
-│   ├── components/     # Componentes reutilizáveis
-│   │   ├── ui/        # Componentes Shadcn
-│   │   ├── app-sidebar.tsx
-│   │   ├── page-header.tsx
-│   │   ├── renov-logo.tsx
-│   │   └── theme-toggle.tsx
-│   ├── hooks/         # Hooks customizados
-│   ├── lib/           # Utilitários
-│   └── pages/         # Páginas por módulo
-│       ├── chamados/
-│       ├── projetos/
-│       ├── tarefas/
-│       ├── reunioes/
-│       │   ├── index.tsx      # Lista de reuniões
-│       │   └── detail.tsx     # Detalhes da reunião
-│       ├── okrs/
-│       ├── logistica/
-│       │   ├── simular-frete.tsx
-│       │   └── logistica-reversa.tsx
-│       ├── pricing/
-│       │   ├── index.tsx           # Visão Geral
-│       │   ├── analise.tsx         # Análise de Produtos
-│       │   ├── detalhes.tsx        # Detalhes do Produto
-│       │   └── relatorios.tsx      # Relatórios
-│       ├── apis/
-│       └── configuracoes/
-server/
-├── routes.ts          # Rotas da API
-├── storage.ts         # Interface e implementação do storage
-└── index.ts           # Entrada do servidor
-shared/
-└── schema.ts          # Schemas e tipos compartilhados
-```
-
-## APIs Disponíveis
-
-### Autenticação
-- `POST /api/auth/login` - Login com email/senha
-
-### Chamados
-- `GET /api/tickets` - Listar chamados
-- `POST /api/tickets` - Criar chamado
-- `PATCH /api/tickets/:id` - Atualizar chamado
-- `GET /api/tickets/:id/comments` - Listar comentários
-- `POST /api/tickets/:id/comments` - Adicionar comentário
-
-### Projetos
-- `GET /api/projects` - Listar projetos
-- `POST /api/projects` - Criar projeto
-- `GET /api/projects/:id/columns` - Listar colunas Kanban
-- `GET /api/projects/:id/cards` - Listar cards
-- `POST /api/columns` - Criar coluna
-- `POST /api/cards` - Criar card
-- `PATCH /api/cards/:id` - Mover/atualizar card
-
-### Tarefas
-- `GET /api/task-areas` - Listar áreas
-- `POST /api/task-areas` - Criar área
-- `GET /api/tasks` - Listar tarefas
-- `POST /api/tasks` - Criar tarefa
-- `PATCH /api/tasks/:id` - Atualizar tarefa
-
-### OKRs
-- `GET /api/objectives` - Listar objetivos
-- `POST /api/objectives` - Criar objetivo
-- `GET /api/key-results` - Listar key results
-- `POST /api/key-results` - Criar key result
-- `PATCH /api/key-results/:id` - Atualizar progresso
-
-### Logística
-- `GET /api/logistics/dashboard` - Estatísticas do dashboard
-- `GET /api/logistics/operators` - Listar operadores
-- `POST /api/logistics/requests` - Criar solicitação de frete
-- `GET /api/logistics/logistica-reversa` - Listar pedidos de logística reversa
-- `POST /api/logistics/logistica-reversa/solicitar` - Solicitar coleta reversa
-
-### Correios Logística Reversa (SOAP/XML Web Service)
-- `POST /api/correios/solicitar-postagem-reversa` - Solicitar autorização de postagem reversa
-- `POST /api/correios/cancelar-pedido` - Cancelar pedido de logística reversa
-- `POST /api/correios/acompanhar-pedido` - Acompanhar pedido por código/tipo/resultado
-- `POST /api/correios/acompanhar-pedido-por-data` - Acompanhar pedidos por período
-- `POST /api/correios/revalidar-prazo` - Revalidar prazo de autorização de postagem
-- `POST /api/correios/solicitar-range` - Solicitar faixa de números para etiquetas
-- `POST /api/correios/calcular-digito-verificador` - Calcular dígito verificador de etiqueta
-- `POST /api/correios/solicitar-postagem-simultanea` - Solicitar postagem simultânea (Sedex Reverso)
-
-### Usuários
-- `GET /api/users` - Listar usuários
-- `POST /api/users` - Criar usuário (com permissões por módulo)
-- `PATCH /api/users/:id` - Atualizar usuário
-
-### Configurações
-- `GET /api/settings` - Listar configurações
-- `GET /api/settings/:key` - Obter configuração específica
-- `POST /api/settings` - Salvar configuração (key/value)
-
-## Módulos de Permissões
-
-Os usuários têm permissões granulares por módulo:
-- Chamados
-- Projetos
-- Tarefas
-- OKRs
-- Logística
-- Pricing
-- Integrações
-- Configurações
-
-## Módulo Pricing
-
-Sistema de monitoramento de preços de smartphones/iPhones via integração com RenovSmart API.
-
-### Funcionalidades
-- **Visão Geral** (/pricing): Filtros por categoria (iPhone/Smartphone), marca, modelo e capacidade
-- **Análise de Produtos** (/pricing/analise): Seleção e comparação de dispositivos em tabela
-- **Detalhes do Produto** (/pricing/detalhes): Gráficos de histórico de preços, anúncios e preços internos
-- **Relatórios** (/pricing/relatorios): Relatórios comparativos e exportação Excel
-
-### API Backend (Proxy RenovSmart)
-- `GET /api/pricing/eligible-devices` - Lista dispositivos elegíveis por categoria
-- `GET /api/pricing/search` - Busca anúncios de produtos
-- `GET /api/pricing/agg/by-device` - Dados agregados por dispositivo (min/avg/max)
-- `GET /api/pricing/eligible-devices/price` - Preços internos do dispositivo
-
-### Categorias Suportadas
-- iPhone: `d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345`
-- Smartphone (Geral): `d686a25d-045d-4b8c-9d7c-35a21d29d31b`
-
-### Notas Técnicas
-- Cache de 5 minutos (staleTime) via TanStack Query
-- Gráficos com Recharts (AreaChart, LineChart, BarChart)
-- Exportação Excel com biblioteca xlsx
-- Graceful degradation: retorna dados vazios se API externa falhar
-
-## Funcionalidades de Logística
-
-### Simular Frete
-- Comparação de preços entre operadores (Correios, Jadlog, Azul Cargo)
-- Cálculo de prazos de entrega
-- Seleção da melhor opção
-
-### Logística Reversa
-- **Solicitar Coleta**: Formulário completo com dados do remetente, itens a coletar (com IMEI), embalagem, adicional ANAC
-- **Coleta em Massa**: Importação de arquivo para múltiplas coletas
-- **Acompanhamento**: Visualização e filtros de pedidos
-- **Consultas**: Rastreamento de etiquetas e pedidos
-
-## Notas de Segurança (MVP)
-
-> **IMPORTANTE**: A autenticação atual é simplificada para MVP. Em produção, implementar:
-> - Hash de senhas com bcrypt/argon2
-> - JWT com HttpOnly cookies
-> - Middleware de autenticação no backend
-> - Rate limiting e proteção contra brute force
-
-## Executando o Projeto
-
-O workflow "Start application" executa `npm run dev` que inicia:
-- Servidor Express na porta 5000
-- Vite dev server para o frontend
-
-## Seed Automático
-
-Na inicialização, o servidor executa `server/seed.ts` que:
-- Cria usuário admin (admin@renov.com.br / admin123) se não existir
-- Cria áreas de tarefas padrão (TI, RH, Operações) se não existirem
-- Funciona tanto em desenvolvimento quanto em produção
-
-## Funcionalidades Recentes
-
-### Chamados (Tickets)
-- **Código automático sequencial**: Cada chamado recebe um código único no formato CHA-0001, CHA-0002, etc.
-- **Campos de classificação**: Tipo (Bug, Melhoria, Negócio) e Local (RS, RG, Dash, One, Home, Omie, Outros)
-- **Status bloqueado**: Novo status para tickets que estão aguardando terceiros
-- **Visualização Kanban**: Toggle entre Grid/Lista/Kanban com drag-and-drop
-- **Exportar Excel**: Download de todos os chamados em formato XLSX
-- **Atribuição automática**: Sistema de atribuição baseado em categoria+tipo com balanceamento round-robin
-- **Coluna Responsável**: Exibição do responsável na listagem de chamados
-- **Seleção manual de responsável**: Campo opcional no formulário de criação
-- **Timestamp tracking**: Campos dataAbertura, dataPrimeiraResposta, dataResolucao, dataFechamento
-- **Timeline do Chamado**: Visualização completa do ciclo de vida com cálculo de duração
-- **Coluna TEMPO ABERTO**: Indicador colorido (verde <24h, amarelo 24-72h, vermelho >72h)
-- **Auto-preenchimento de timestamps**: Resolução/fechamento preenchidos ao mudar status, primeira resposta ao comentar
-- **Controle de SLA**: Sistema de Service Level Agreement para chamados
-  - Regras configuráveis por combinação de Tipo (Bug/Melhoria) e Prioridade
-  - Configuração em Configurações → Campos Dinâmicos → SLA
-  - Coluna SLA na listagem mostrando horas configuradas (ex: 4h, 24h)
-  - Coluna Status SLA mostrando "Dentro do Prazo" (verde) ou "Em Atraso" (vermelho)
-  - Exportação Excel inclui colunas de SLA
-  - Nota: SLA não se aplica a tipo "Negócio", apenas Bug e Melhoria
-
-### Notificações por Email
-- **Novo chamado criado**: Email enviado ao solicitante com detalhes do ticket
-- **Chamado atribuído**: Email enviado ao responsável quando um ticket é atribuído
-- **Status alterado**: Email enviado ao solicitante quando o status muda
-- **Comentário adicionado**: Email enviado aos envolvidos quando há novo comentário
-- **Templates HTML profissionais**: Design responsivo com identidade visual Renov
-
-### Tarefas
-- **Visualização Kanban**: Colunas A Fazer, Em Andamento, Concluído, Arquivado
-- **Drag-and-drop**: Arraste tarefas entre colunas para atualizar status
-- **Ordenação flexível**: Por prioridade (com data como critério secundário), por data (com prioridade como secundário), ou ordem manual personalizada
-- **Áreas compartilhadas**: Áreas podem ser privadas ou compartilhadas com membros
-- **Módulo independente**: Tarefas são gerenciadas separadamente de reuniões
-
-### Reuniões
-- **Módulo independente**: Reuniões agora são gerenciadas em um módulo separado (/reunioes)
-- **Áreas compartilhadas**: Utiliza a mesma infraestrutura de áreas do módulo de Tarefas
-- **Reuniões recorrentes**: Toggle "Repetir" com opções diária ou semanal (seleção de dias da semana), data de término opcional
-- **Participantes múltiplos**: Multi-select para usuários do sistema com busca, suporte a participantes externos via email
-- **Convites por email**: Ao criar reunião, envia email com arquivo ICS (calendário) anexado para todos os participantes
-- **Pauta com formatação**: Campo de pauta aceita quebras de linha para melhor organização
-- **Página de detalhes**: Visualização completa da reunião com todas as informações
-- **Limitações ICS (MVP)**: 
-  - Convites são enviados apenas na criação (editar/cancelar reuniões não atualiza calendários dos participantes)
-  - Conversão de timezone usa date-fns-tz com America/Sao_Paulo (DST-aware)
-
-### Login
-- **Layout Metronic Classic**: Tela dividida com branding à esquerda e formulário à direita
-- **Credenciais de teste**: admin@renov.com.br / admin123
-
-### Configurações
-- **Gerenciamento de Campos**: Configurar Categorias, Tipos e Locais dinâmicos
-- **Responsáveis por Chamados**: Definir regras de atribuição automática por categoria+tipo
-- **Gerenciamento de Usuários**: Convidar usuários com email automático de boas-vindas
-
-## Componentes Reutilizáveis
-
-### RenovLogo
-- **Props**: `variant` (light/dark/white), `size` (sm/md/lg/xl)
-- **Uso**: `<RenovLogo size="lg" variant="white" />`
-
-### RichTextarea
-- **Componente**: `client/src/components/rich-textarea.tsx`
-- **Funcionalidades**:
-  - Upload de imagens via seleção de arquivo, drag-and-drop, ou colagem (Ctrl+V)
-  - Limite máximo de 5MB por imagem
-  - Preview de imagens em grid com opção de remoção
-  - Contador de caracteres integrado
-- **Props**:
-  - `value`, `onChange`: Controle do texto
-  - `images`, `onImagesChange`: Controle das imagens anexadas
-  - `maxLength`: Limite de caracteres
-  - `rows`, `placeholder`: Configuração visual
-
-## Preferências do Usuário
+## User Preferences
 
 - Interface em português brasileiro
 - Tema claro como padrão (com suporte a tema escuro)
 - Design limpo e moderno seguindo identidade Renov
+
+## System Architecture
+
+Renov Home adopts a client-server architecture with a clear separation of concerns.
+
+**UI/UX Decisions:**
+- **Branding:** Adheres strictly to Renov's brand guidelines:
+    - Primary Color: Renov Green (#00A137)
+    - Secondary Colors: Black (#000000) and White (#FFFFFF)
+    - Typography: Montserrat (Regular, Medium, Bold)
+- **Design System:** Utilizes Shadcn/UI for components, ensuring a consistent and modern look and feel.
+- **Responsiveness:** Designed to be a responsive web application.
+- **Theming:** Supports both light (default) and dark themes.
+
+**Technical Implementations & Feature Specifications:**
+
+- **Frontend:**
+    - Developed with React 18 and TypeScript.
+    - Styled using Tailwind CSS for utility-first styling.
+    - Wouter for client-side routing.
+    - TanStack Query for efficient data fetching, caching, and state management.
+    - React Hook Form with Zod for robust form validation.
+    - **Reusable Components:**
+        - `RenovLogo`: Customizable logo component with `variant` and `size` props.
+        - `RichTextarea`: Advanced textarea supporting image uploads (selection, drag-and-drop, paste), image previews with removal, and character counting.
+- **Backend:**
+    - Built with Node.js and Express, written in TypeScript.
+    - Uses in-memory storage (MemStorage) for MVP data persistence.
+    - Exposes a RESTful API at `/api/...`.
+- **Multi-tenant Architecture:**
+    - Designed for multi-tenancy from the ground up, incorporating a `tenantId` field in all data structures.
+    - Ensures data isolation per tenant, allowing for future support of multiple organizations.
+- **Module-specific Features:**
+    - **Tickets:** Sequential auto-generated codes (e.g., CHA-0001), categorization by Type (Bug, Improvement, Business) and Location, Kanban view with drag-and-drop, Excel export, automatic assignment rules (round-robin), responsible tracking, timestamp tracking (open, first response, resolution, close), SLA management with configurable rules and visual status indicators.
+    - **Tasks:** Kanban view with drag-and-drop, flexible sorting (priority, date, manual), support for private and shared areas.
+    - **Meetings:** Standalone module, supports shared areas, recurring meetings (daily/weekly), multi-participant selection (internal/external), email invitations with ICS attachments, formatted agendas.
+    - **Pricing:** Dashboard with KPIs and charts, detailed product analysis and comparison, historical price graphing, deflation indicators, customizable price alerts, comprehensive product details.
+    - **Logistics:** Freight simulation comparing multiple operators, reverse logistics request forms (individual and bulk via import), tracking and order management.
+- **Email Notifications:** Implemented for key events in Ticket management (creation, assignment, status change, comments), utilizing professional HTML templates with Renov's branding.
+- **User Management:** Granular permissions per module (Tickets, Projects, Tasks, OKRs, Logistics, Pricing, Integrations, Configurations), user invitation system with welcome emails.
+- **Configuration Management:** Dynamic field configuration (categories, types, locations), automatic assignment rules for tickets.
+
+## External Dependencies
+
+- **Correios API (SOAP/XML Web Service):** Integrated for reverse logistics functionalities, including requesting reverse postage authorization, canceling orders, tracking orders, revalidating deadlines, requesting label ranges, and calculating verification digits.
+- **RenovSmart API:** Used by the Pricing module to fetch smartphone/iPhone pricing data.
+- **PostgreSQL Database:** Used for persistent storage in the Pricing module (pricingDevices, pricingPriceHistory, pricingAlerts).
+- **Shadcn/UI:** Component library for the frontend.
+- **Tailwind CSS:** Utility-first CSS framework for styling.
+- **Recharts:** JavaScript charting library for data visualization (AreaChart, LineChart, BarChart, PieChart).
+- **xlsx:** Library for Excel file generation and export.
+- **html2canvas:** Library for capturing screenshots of web pages (used for graphic downloads).
+- **date-fns-tz:** Library for timezone-aware date manipulation.
