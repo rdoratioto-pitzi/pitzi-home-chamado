@@ -29,11 +29,15 @@ import {
   type PricingDevice, type InsertPricingDevice,
   type PricingPriceHistory, type InsertPricingPriceHistory,
   type PricingAlert, type InsertPricingAlert,
+  type MetaArea, type InsertMetaArea,
+  type Meta, type InsertMeta,
+  type MetaCheckin, type InsertMetaCheckin,
   users, tickets, ticketResponsaveis, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
   collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules,
-  pricingDevices, pricingPriceHistory, pricingAlerts
+  pricingDevices, pricingPriceHistory, pricingAlerts,
+  metaAreas, metas, metaCheckins
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql } from "drizzle-orm";
@@ -220,6 +224,25 @@ export interface IStorage {
   createPricingAlert(alert: InsertPricingAlert): Promise<PricingAlert>;
   updatePricingAlert(id: string, data: Partial<PricingAlert>): Promise<PricingAlert | undefined>;
   deletePricingAlert(id: string): Promise<boolean>;
+
+  // Meta Areas
+  getMetaAreas(): Promise<MetaArea[]>;
+  getMetaArea(id: string): Promise<MetaArea | undefined>;
+  getMetaAreaByName(name: string): Promise<MetaArea | undefined>;
+  createMetaArea(area: InsertMetaArea): Promise<MetaArea>;
+  updateMetaArea(id: string, data: Partial<MetaArea>): Promise<MetaArea | undefined>;
+  deleteMetaArea(id: string): Promise<boolean>;
+
+  // Metas (Goals)
+  getMetas(filters?: { month?: string; areaId?: string; responsibleId?: string }): Promise<Meta[]>;
+  getMeta(id: string): Promise<Meta | undefined>;
+  createMeta(meta: InsertMeta): Promise<Meta>;
+  updateMeta(id: string, data: Partial<Meta>): Promise<Meta | undefined>;
+  deleteMeta(id: string): Promise<boolean>;
+
+  // Meta Check-ins
+  getMetaCheckins(metaId: string): Promise<MetaCheckin[]>;
+  createMetaCheckin(checkin: InsertMetaCheckin): Promise<MetaCheckin>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -835,6 +858,80 @@ export class DatabaseStorage implements IStorage {
   async deletePricingAlert(id: string): Promise<boolean> {
     const result = await db.delete(pricingAlerts).where(eq(pricingAlerts.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Meta Areas
+  async getMetaAreas(): Promise<MetaArea[]> {
+    return await db.select().from(metaAreas).where(eq(metaAreas.archived, false));
+  }
+  async getMetaArea(id: string): Promise<MetaArea | undefined> {
+    const [area] = await db.select().from(metaAreas).where(eq(metaAreas.id, id));
+    return area;
+  }
+  async getMetaAreaByName(name: string): Promise<MetaArea | undefined> {
+    const [area] = await db.select().from(metaAreas).where(
+      and(
+        sql`LOWER(${metaAreas.name}) = LOWER(${name})`,
+        eq(metaAreas.archived, false)
+      )
+    );
+    return area;
+  }
+  async createMetaArea(area: InsertMetaArea): Promise<MetaArea> {
+    const [created] = await db.insert(metaAreas).values(area).returning();
+    return created;
+  }
+  async updateMetaArea(id: string, data: Partial<MetaArea>): Promise<MetaArea | undefined> {
+    const [updated] = await db.update(metaAreas).set(data).where(eq(metaAreas.id, id)).returning();
+    return updated;
+  }
+  async deleteMetaArea(id: string): Promise<boolean> {
+    const result = await db.delete(metaAreas).where(eq(metaAreas.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Metas (Goals)
+  async getMetas(filters?: { month?: string; areaId?: string; responsibleId?: string }): Promise<Meta[]> {
+    const conditions = [];
+    if (filters?.month) {
+      conditions.push(eq(metas.month, filters.month));
+    }
+    if (filters?.areaId) {
+      conditions.push(eq(metas.areaId, filters.areaId));
+    }
+    if (filters?.responsibleId) {
+      conditions.push(eq(metas.responsibleId, filters.responsibleId));
+    }
+    if (conditions.length > 0) {
+      return await db.select().from(metas).where(and(...conditions));
+    }
+    return await db.select().from(metas);
+  }
+  async getMeta(id: string): Promise<Meta | undefined> {
+    const [meta] = await db.select().from(metas).where(eq(metas.id, id));
+    return meta;
+  }
+  async createMeta(meta: InsertMeta): Promise<Meta> {
+    const [created] = await db.insert(metas).values(meta).returning();
+    return created;
+  }
+  async updateMeta(id: string, data: Partial<Meta>): Promise<Meta | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(metas).set(updateData).where(eq(metas.id, id)).returning();
+    return updated;
+  }
+  async deleteMeta(id: string): Promise<boolean> {
+    const result = await db.delete(metas).where(eq(metas.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Meta Check-ins
+  async getMetaCheckins(metaId: string): Promise<MetaCheckin[]> {
+    return await db.select().from(metaCheckins).where(eq(metaCheckins.metaId, metaId));
+  }
+  async createMetaCheckin(checkin: InsertMetaCheckin): Promise<MetaCheckin> {
+    const [created] = await db.insert(metaCheckins).values(checkin).returning();
+    return created;
   }
 }
 

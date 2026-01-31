@@ -702,3 +702,73 @@ export type ApiEndpoint = {
   path: string;
   description: string;
 };
+
+// ============== METAS (Goals) MODULE ==============
+
+// Areas de Negócio for Metas
+export const metaAreas = pgTable("meta_areas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#00A137"),
+  archived: boolean("archived").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMetaAreaSchema = createInsertSchema(metaAreas).omit({ id: true, createdAt: true });
+export type InsertMetaArea = z.infer<typeof insertMetaAreaSchema>;
+export type MetaArea = typeof metaAreas.$inferSelect;
+
+// Metas (Goals)
+export const metas = pgTable("metas", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  title: text("title").notNull(),
+  description: text("description"),
+  areaId: varchar("area_id").notNull(),
+  responsibleId: varchar("responsible_id").notNull(),
+  // Measurement type (reused from OKRs): percentage, absolute, monetary, binary
+  measurementType: text("measurement_type").notNull().default("percentage"),
+  // Target value
+  targetValue: decimal("target_value").notNull(),
+  // Current value
+  currentValue: decimal("current_value").notNull().default("0"),
+  // Unit label (%, R$, unidades, etc.)
+  unit: text("unit"),
+  // Month in format YYYY-MM
+  month: text("month").notNull(),
+  // Status: on_track, at_risk, overdue, completed
+  status: text("status").notNull().default("on_track"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+const baseInsertMetaSchema = createInsertSchema(metas).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMetaSchema = baseInsertMetaSchema.extend({
+  targetValue: z.union([z.string(), z.number()]).transform(val => String(val)),
+  currentValue: z.union([z.string(), z.number()]).optional().transform(val => 
+    val !== null && val !== undefined ? String(val) : "0"
+  ),
+});
+export type InsertMeta = z.infer<typeof insertMetaSchema>;
+export type Meta = typeof metas.$inferSelect;
+
+// Meta Check-ins (progress updates)
+export const metaCheckins = pgTable("meta_checkins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  metaId: varchar("meta_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  previousValue: decimal("previous_value").notNull(),
+  newValue: decimal("new_value").notNull(),
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+const baseInsertMetaCheckinSchema = createInsertSchema(metaCheckins).omit({ id: true, createdAt: true });
+export const insertMetaCheckinSchema = baseInsertMetaCheckinSchema.extend({
+  previousValue: z.union([z.string(), z.number()]).transform(val => String(val)),
+  newValue: z.union([z.string(), z.number()]).transform(val => String(val)),
+});
+export type InsertMetaCheckin = z.infer<typeof insertMetaCheckinSchema>;
+export type MetaCheckin = typeof metaCheckins.$inferSelect;
