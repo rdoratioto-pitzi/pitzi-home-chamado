@@ -142,18 +142,30 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     enabled: !!ticket?.id,
   });
 
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
   const updateMutation = useMutation({
-    mutationFn: async (data: { status: string }) => {
+    mutationFn: async (data: Partial<Ticket>) => {
       return apiRequest("PATCH", `/api/tickets/${ticket?.id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
       toast({
-        title: "Status atualizado",
-        description: "O status do chamado foi atualizado com sucesso.",
+        title: "Chamado atualizado",
+        description: "As informações do chamado foram atualizadas.",
       });
     },
   });
+
+  const handleStatusChange = (status: string) => {
+    updateMutation.mutate({ status });
+  };
+
+  const handleAssigneeChange = (userId: string) => {
+    updateMutation.mutate({ assigneeId: userId === "none" ? null : userId });
+  };
 
   const commentMutation = useMutation({
     mutationFn: async (data: { content: string; images: string[] }) => {
@@ -174,10 +186,6 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
       });
     },
   });
-
-  const handleStatusChange = (status: string) => {
-    updateMutation.mutate({ status });
-  };
 
   const handleSubmitComment = () => {
     if (comment.trim() || commentImages.length > 0) {
