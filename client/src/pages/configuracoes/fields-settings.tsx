@@ -246,13 +246,8 @@ function SlaManager() {
   });
 
   const types: FieldItem[] = typesSetting?.value 
-    ? JSON.parse(typesSetting.value).filter((t: FieldItem) => 
-        t.value.toLowerCase() === "bug" || t.value.toLowerCase() === "melhoria"
-      )
-    : [
-        { value: "bug", label: "Bug" },
-        { value: "melhoria", label: "Melhoria" },
-      ];
+    ? JSON.parse(typesSetting.value)
+    : defaultTypes;
 
   const priorities = [
     { value: "low", label: "Baixa" },

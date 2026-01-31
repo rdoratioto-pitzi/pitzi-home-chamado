@@ -30,7 +30,7 @@ export function RichTextarea({
   onImagesChange,
   placeholder,
   rows = 4,
-  maxLength = 1000,
+  maxLength = 2000,
   disabled = false,
   "data-testid": dataTestId,
 }: RichTextareaProps) {
