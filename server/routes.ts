@@ -275,6 +275,8 @@ export async function registerRoutes(
       if (updateData.descriptionLastEditedAt) {
         updateData.descriptionLastEditedAt = new Date(updateData.descriptionLastEditedAt);
       }
+
+      console.log("Updating ticket with data:", JSON.stringify(updateData, null, 2));
       
       const ticket = await storage.updateTicket(req.params.id, updateData);
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });

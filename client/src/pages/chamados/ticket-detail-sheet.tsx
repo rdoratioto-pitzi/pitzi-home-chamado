@@ -172,9 +172,10 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   };
 
   const handleSaveDescription = () => {
+    console.log("Saving description:", editedDescription);
     updateMutation.mutate({ 
       description: editedDescription,
-      descriptionLastEditedBy: "admin", // In a real app, this would be the logged in user's ID
+      descriptionLastEditedBy: "admin", 
       descriptionLastEditedAt: new Date().toISOString() as any
     });
     setIsEditingDescription(false);
@@ -293,7 +294,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                 </p>
                 {ticket.descriptionLastEditedAt && (
                   <p className="text-[10px] text-muted-foreground mb-4 italic">
-                    Editado por {users.find(u => u.id === ticket.descriptionLastEditedBy)?.name || "Admin"} em {formatDateTime(ticket.descriptionLastEditedAt)}
+                    Editado por {users.find(u => u.id === ticket.descriptionLastEditedBy || u.email === ticket.descriptionLastEditedBy)?.name || "Admin"} em {formatDateTime(ticket.descriptionLastEditedAt)}
                   </p>
                 )}
               </>
