@@ -1672,6 +1672,80 @@ export async function registerRoutes(
     }
   });
 
+  // ============== PRICING API PROXY (RenovSmart) ==============
+  const RENOVSMART_API_BASE = "https://rp.renovsmart.com.br/api";
+
+  app.get("/api/pricing/eligible-devices", async (req, res) => {
+    try {
+      const { categoryId, pageNumber = "1", pageSize = "500" } = req.query;
+      if (!categoryId) {
+        return res.json({ items: [], currentPage: 1, hasNextPage: false });
+      }
+      const url = `${RENOVSMART_API_BASE}/eligible-devices?categoryId=${categoryId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn(`RenovSmart eligible-devices returned ${response.status}, returning empty result`);
+        return res.json({ items: [], currentPage: 1, hasNextPage: false });
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Pricing eligible-devices error:", error);
+      res.json({ items: [], currentPage: 1, hasNextPage: false });
+    }
+  });
+
+  app.get("/api/pricing/search", async (req, res) => {
+    try {
+      const queryParams = new URLSearchParams(req.query as Record<string, string>).toString();
+      const url = `${RENOVSMART_API_BASE}/search?${queryParams}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn(`RenovSmart search returned ${response.status}, returning empty result`);
+        return res.json({ raw: { shopping_results: [] } });
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Pricing search error:", error);
+      res.json({ raw: { shopping_results: [] } });
+    }
+  });
+
+  app.get("/api/pricing/agg/by-device", async (req, res) => {
+    try {
+      const queryParams = new URLSearchParams(req.query as Record<string, string>).toString();
+      const url = `${RENOVSMART_API_BASE}/agg/by-device?${queryParams}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn(`RenovSmart agg/by-device returned ${response.status}, returning empty result`);
+        return res.json([]);
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Pricing agg/by-device error:", error);
+      res.json([]);
+    }
+  });
+
+  app.get("/api/pricing/eligible-devices/price", async (req, res) => {
+    try {
+      const queryParams = new URLSearchParams(req.query as Record<string, string>).toString();
+      const url = `${RENOVSMART_API_BASE}/eligible-devices/price?${queryParams}`;
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn(`RenovSmart eligible-devices/price returned ${response.status}, returning empty result`);
+        return res.json({});
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Pricing eligible-devices/price error:", error);
+      res.json({});
+    }
+  });
+
   // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
 

@@ -155,8 +155,35 @@ Os usuários têm permissões granulares por módulo:
 - Tarefas
 - OKRs
 - Logística
+- Pricing
 - Integrações
 - Configurações
+
+## Módulo Pricing
+
+Sistema de monitoramento de preços de smartphones/iPhones via integração com RenovSmart API.
+
+### Funcionalidades
+- **Visão Geral** (/pricing): Filtros por categoria (iPhone/Smartphone), marca, modelo e capacidade
+- **Análise de Produtos** (/pricing/analise): Seleção e comparação de dispositivos em tabela
+- **Detalhes do Produto** (/pricing/detalhes): Gráficos de histórico de preços, anúncios e preços internos
+- **Relatórios** (/pricing/relatorios): Relatórios comparativos e exportação Excel
+
+### API Backend (Proxy RenovSmart)
+- `GET /api/pricing/eligible-devices` - Lista dispositivos elegíveis por categoria
+- `GET /api/pricing/search` - Busca anúncios de produtos
+- `GET /api/pricing/agg/by-device` - Dados agregados por dispositivo (min/avg/max)
+- `GET /api/pricing/eligible-devices/price` - Preços internos do dispositivo
+
+### Categorias Suportadas
+- iPhone: `d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345`
+- Smartphone (Geral): `d686a25d-045d-4b8c-9d7c-35a21d29d31b`
+
+### Notas Técnicas
+- Cache de 5 minutos (staleTime) via TanStack Query
+- Gráficos com Recharts (AreaChart, LineChart, BarChart)
+- Exportação Excel com biblioteca xlsx
+- Graceful degradation: retorna dados vazios se API externa falhar
 
 ## Funcionalidades de Logística
 

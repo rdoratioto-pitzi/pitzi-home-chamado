@@ -59,7 +59,7 @@ import {
   AreaChart,
 } from "recharts";
 
-const RENOVSMART_API_BASE = "https://rp.renovsmart.com.br/api";
+const PRICING_API_BASE = "/api/pricing";
 
 const CATEGORIES = [
   { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
@@ -119,7 +119,7 @@ export default function PricingDetailsPage() {
     queryKey: ["pricing-agg", brand, model, storage, months],
     queryFn: async () => {
       if (!brand || !model || !storage) return [];
-      const url = `${RENOVSMART_API_BASE}/agg/by-device?manufacturer=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&storage=${storage}&months=${months}&page=1&pageSize=1000`;
+      const url = `${PRICING_API_BASE}/agg/by-device?manufacturer=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&storage=${storage}&months=${months}&page=1&pageSize=1000`;
       const response = await fetch(url);
       if (!response.ok) throw new Error("Erro ao carregar dados agregados");
       return response.json();
@@ -132,7 +132,7 @@ export default function PricingDetailsPage() {
     queryKey: ["pricing-search", category, brand, model, storage],
     queryFn: async () => {
       if (!brand || !model || !storage) return { raw: { shopping_results: [] } };
-      const url = `${RENOVSMART_API_BASE}/search?categoryId=${category}&manufacturer=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&storage=${storage}&ignoreLastUpdateDate=false`;
+      const url = `${PRICING_API_BASE}/search?categoryId=${category}&manufacturer=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&storage=${storage}&ignoreLastUpdateDate=false`;
       const response = await fetch(url);
       if (!response.ok) throw new Error("Erro ao carregar anúncios");
       return response.json();
@@ -145,7 +145,7 @@ export default function PricingDetailsPage() {
     queryKey: ["pricing-internal", category, brand, model, storage],
     queryFn: async () => {
       if (!brand || !model || !storage) return {};
-      const url = `${RENOVSMART_API_BASE}/eligible-devices/price?categoryId=${category}&manufacturerName=${encodeURIComponent(brand)}&modelName=${encodeURIComponent(model)}&storage=${storage}`;
+      const url = `${PRICING_API_BASE}/eligible-devices/price?categoryId=${category}&manufacturerName=${encodeURIComponent(brand)}&modelName=${encodeURIComponent(model)}&storage=${storage}`;
       const response = await fetch(url);
       if (!response.ok) return {};
       return response.json();

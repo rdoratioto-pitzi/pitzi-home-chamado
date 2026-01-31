@@ -47,7 +47,7 @@ import {
   Legend,
 } from "recharts";
 
-const RENOVSMART_API_BASE = "https://rp.renovsmart.com.br/api";
+const PRICING_API_BASE = "/api/pricing";
 
 const CATEGORIES = [
   { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
@@ -104,7 +104,7 @@ export default function PricingReportsPage() {
     queryKey: ["pricing-devices", selectedCategory],
     queryFn: async () => {
       const response = await fetch(
-        `${RENOVSMART_API_BASE}/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=500`
+        `${PRICING_API_BASE}/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=500`
       );
       if (!response.ok) throw new Error("Erro ao carregar dispositivos");
       return response.json();
@@ -130,7 +130,7 @@ export default function PricingReportsPage() {
       await Promise.all(
         selectedDevices.map(async (device) => {
           try {
-            const url = `${RENOVSMART_API_BASE}/agg/by-device?manufacturer=${encodeURIComponent(device.brand)}&model=${encodeURIComponent(device.model)}&storage=${device.storage}&months=${months}&page=1&pageSize=1000`;
+            const url = `${PRICING_API_BASE}/agg/by-device?manufacturer=${encodeURIComponent(device.brand)}&model=${encodeURIComponent(device.model)}&storage=${device.storage}&months=${months}&page=1&pageSize=1000`;
             const response = await fetch(url);
             if (response.ok) {
               const data = await response.json();

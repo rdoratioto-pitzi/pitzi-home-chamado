@@ -29,7 +29,7 @@ import {
   BarChart3,
 } from "lucide-react";
 
-const RENOVSMART_API_BASE = "https://rp.renovsmart.com.br/api";
+const PRICING_API_BASE = "/api/pricing";
 
 const CATEGORIES = [
   { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
@@ -57,11 +57,11 @@ export default function PricingOverviewPage() {
   const [selectedStorages, setSelectedStorages] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const { data: devicesData, isLoading: isLoadingDevices, refetch } = useQuery<EligibleDevicesResponse>({
+  const { data: devicesData, isLoading: isLoadingDevices, refetch, error: devicesError } = useQuery<EligibleDevicesResponse>({
     queryKey: ["pricing-devices", selectedCategory],
     queryFn: async () => {
       const response = await fetch(
-        `${RENOVSMART_API_BASE}/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=500`
+        `${PRICING_API_BASE}/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=500`
       );
       if (!response.ok) throw new Error("Erro ao carregar dispositivos");
       return response.json();
@@ -217,15 +217,15 @@ export default function PricingOverviewPage() {
               <div className="space-y-2">
                 <Label>Marca</Label>
                 <Select
-                  value={selectedBrand}
-                  onValueChange={setSelectedBrand}
+                  value={selectedBrand || "__all__"}
+                  onValueChange={(value) => setSelectedBrand(value === "__all__" ? "" : value)}
                   disabled={isLoadingDevices}
                 >
                   <SelectTrigger data-testid="select-brand">
                     <SelectValue placeholder="Todas as marcas" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todas as marcas</SelectItem>
+                    <SelectItem value="__all__">Todas as marcas</SelectItem>
                     {brands.map((brand) => (
                       <SelectItem key={brand} value={brand}>
                         {brand}
@@ -238,15 +238,15 @@ export default function PricingOverviewPage() {
               <div className="space-y-2">
                 <Label>Modelo</Label>
                 <Select
-                  value={selectedModel}
-                  onValueChange={setSelectedModel}
+                  value={selectedModel || "__all__"}
+                  onValueChange={(value) => setSelectedModel(value === "__all__" ? "" : value)}
                   disabled={!selectedBrand || isLoadingDevices}
                 >
                   <SelectTrigger data-testid="select-model">
                     <SelectValue placeholder={selectedBrand ? "Todos os modelos" : "Selecione a marca"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos os modelos</SelectItem>
+                    <SelectItem value="__all__">Todos os modelos</SelectItem>
                     {models.map((model) => (
                       <SelectItem key={model} value={model}>
                         {model}
