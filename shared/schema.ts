@@ -46,6 +46,7 @@ export type ModulePermissions = {
   tarefas: boolean;
   okrs: boolean;
   logistica: boolean;
+  pricing: boolean;
   apis: boolean;
   configuracoes: boolean;
 };

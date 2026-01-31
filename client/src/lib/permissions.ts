@@ -4,6 +4,7 @@ export interface UserPermissions {
   tarefas: boolean;
   okrs: boolean;
   logistica: boolean;
+  pricing: boolean;
   apis: boolean;
   configuracoes: boolean;
 }
@@ -41,6 +42,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     tarefas: false,
     okrs: false,
     logistica: false,
+    pricing: false,
     apis: false,
     configuracoes: false,
   };
@@ -54,6 +56,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       tarefas: true,
       okrs: true,
       logistica: true,
+      pricing: true,
       apis: true,
       configuracoes: true,
     };

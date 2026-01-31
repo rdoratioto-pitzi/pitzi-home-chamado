@@ -27,6 +27,10 @@ import ApisPage from "@/pages/apis/index";
 import CorreiosReversaPage from "@/pages/apis/correios-reversa";
 import LoginPage from "@/pages/login";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
+import PricingOverviewPage from "@/pages/pricing/index";
+import PricingAnalysisPage from "@/pages/pricing/analise";
+import PricingDetailsPage from "@/pages/pricing/detalhes";
+import PricingReportsPage from "@/pages/pricing/relatorios";
 
 function Router() {
   return (
@@ -110,6 +114,26 @@ function Router() {
       <Route path="/apis/correios-reversa">
         <ProtectedRoute requiredPermission="apis">
           <CorreiosReversaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/pricing">
+        <ProtectedRoute requiredPermission="pricing">
+          <PricingOverviewPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/pricing/analise">
+        <ProtectedRoute requiredPermission="pricing">
+          <PricingAnalysisPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/pricing/detalhes">
+        <ProtectedRoute requiredPermission="pricing">
+          <PricingDetailsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/pricing/relatorios">
+        <ProtectedRoute requiredPermission="pricing">
+          <PricingReportsPage />
         </ProtectedRoute>
       </Route>
       <Route path="/login" component={LoginPage} />

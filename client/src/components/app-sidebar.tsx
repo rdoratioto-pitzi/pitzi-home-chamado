@@ -17,7 +17,11 @@ import {
   Code2,
   User,
   LogOut,
-  Video
+  Video,
+  DollarSign,
+  BarChart3,
+  Search,
+  FileSpreadsheet
 } from "lucide-react";
 import {
   Sidebar,
@@ -99,6 +103,13 @@ const apisSubItems = [
   { title: "Correios - Logística Reversa", url: "/apis/correios-reversa", icon: RotateCcw },
 ];
 
+const pricingSubItems = [
+  { title: "Visão Geral", url: "/pricing", icon: LayoutDashboard },
+  { title: "Análise de Produtos", url: "/pricing/analise", icon: Search },
+  { title: "Detalhes de Produtos", url: "/pricing/detalhes", icon: BarChart3 },
+  { title: "Relatórios", url: "/pricing/relatorios", icon: FileSpreadsheet },
+];
+
 function getCurrentUser() {
   try {
     const userStr = sessionStorage.getItem("user");
@@ -134,9 +145,11 @@ export function AppSidebar() {
 
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
+  const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
   
   const isLogisticaActive = location.startsWith("/logistica");
   const isApisActive = location.startsWith("/apis");
+  const isPricingActive = location.startsWith("/pricing");
   
   const permissions = useMemo(() => {
     try {
@@ -147,6 +160,7 @@ export function AppSidebar() {
           tarefas: true,
           okrs: true,
           logistica: true,
+          pricing: true,
           apis: true,
           configuracoes: true,
         };
@@ -165,6 +179,7 @@ export function AppSidebar() {
       tarefas: false,
       okrs: false,
       logistica: false,
+      pricing: false,
       apis: false,
       configuracoes: false,
     };
@@ -178,6 +193,7 @@ export function AppSidebar() {
   }, [permissions]);
   
   const hasLogisticaAccess = permissions.logistica === true;
+  const hasPricingAccess = permissions.pricing === true;
   const hasApisAccess = permissions.apis === true;
   const hasConfiguracoesAccess = permissions.configuracoes === true;
 
@@ -259,6 +275,45 @@ export function AppSidebar() {
                             <SidebarMenuSubItem key={subItem.url}>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {hasPricingAccess && (
+                <Collapsible open={pricingOpen} onOpenChange={setPricingOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton 
+                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isPricingActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        isActive={isPricingActive}
+                        data-testid="link-pricing"
+                      >
+                        <DollarSign className={`h-[20px] w-[20px] ${isPricingActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">Pricing</span>
+                        {pricingOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                        {pricingSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[13.5px]">{subItem.title}</span>
                                 </Link>

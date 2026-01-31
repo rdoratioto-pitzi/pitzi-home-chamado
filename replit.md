@@ -12,6 +12,7 @@ O Renov Home é uma aplicação web interna que oferece:
 - **Reuniões**: Módulo independente para gestão de reuniões com pauta, participantes e atas
 - **OKRs**: Objetivos e resultados-chave por trimestre
 - **Logística**: Rastreamento, simulação de frete e logística reversa
+- **Pricing**: Monitoramento de preços de smartphones/iPhones via integração com RenovSmart API
 - **Integrações**: Documentação de APIs internas (BI RS, Pricing), Correios e operadores logísticos
 - **Configurações**: Gerenciamento de usuários com permissões por módulo
 
@@ -69,6 +70,11 @@ client/
 │       ├── logistica/
 │       │   ├── simular-frete.tsx
 │       │   └── logistica-reversa.tsx
+│       ├── pricing/
+│       │   ├── index.tsx           # Visão Geral
+│       │   ├── analise.tsx         # Análise de Produtos
+│       │   ├── detalhes.tsx        # Detalhes do Produto
+│       │   └── relatorios.tsx      # Relatórios
 │       ├── apis/
 │       └── configuracoes/
 server/
