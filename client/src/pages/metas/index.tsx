@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { format, addMonths, subMonths, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "wouter";
 import {
@@ -19,6 +19,8 @@ import {
   ArrowRight,
   BarChart3,
   Users,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   PieChart,
@@ -59,17 +61,27 @@ function getCurrentUser() {
 }
 
 export default function MetasVisaoGeralPage() {
-  const currentMonth = format(new Date(), "yyyy-MM");
-  const currentMonthLabel = format(new Date(), "MMMM yyyy", { locale: ptBR });
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
+  const currentMonthLabel = format(parseISO(`${selectedMonth}-01`), "MMMM yyyy", { locale: ptBR });
   const currentUser = getCurrentUser();
 
   const { data: metas = [], isLoading: metasLoading } = useQuery<Meta[]>({
-    queryKey: ["/api/metas", { month: currentMonth }],
+    queryKey: ["/api/metas", { month: selectedMonth }],
     queryFn: async () => {
-      const res = await fetch(`/api/metas?month=${currentMonth}`);
+      const res = await fetch(`/api/metas?month=${selectedMonth}`);
       return res.json();
     },
   });
+
+  const handlePrevMonth = () => {
+    const prev = subMonths(parseISO(`${selectedMonth}-01`), 1);
+    setSelectedMonth(format(prev, "yyyy-MM"));
+  };
+
+  const handleNextMonth = () => {
+    const next = addMonths(parseISO(`${selectedMonth}-01`), 1);
+    setSelectedMonth(format(next, "yyyy-MM"));
+  };
 
   const { data: areas = [] } = useQuery<MetaArea[]>({
     queryKey: ["/api/meta-areas"],
@@ -199,8 +211,30 @@ export default function MetasVisaoGeralPage() {
 
       <main className="flex-1 p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold capitalize">{currentMonthLabel}</h2>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center bg-muted rounded-lg p-1">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8" 
+                onClick={handlePrevMonth}
+                data-testid="button-prev-month"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="px-4 min-w-[140px] text-center">
+                <h2 className="text-sm font-bold capitalize">{currentMonthLabel}</h2>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8" 
+                onClick={handleNextMonth}
+                data-testid="button-next-month"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
             <p className="text-sm text-muted-foreground">Acompanhamento das metas do mês</p>
           </div>
         </div>

@@ -162,8 +162,24 @@ export default function GestaoMetasPage() {
     comment: "",
   });
 
+  const getMonthOptions = () => {
+    const options = [];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    for (let i = currentMonth; i < 12; i++) {
+      const date = new Date(currentYear, i, 1);
+      options.push({
+        value: format(date, "yyyy-MM"),
+        label: format(date, "MMMM yyyy", { locale: ptBR }),
+      });
+    }
+    return options;
+  };
+
+  const monthOptions = getMonthOptions();
   const currentUser = getCurrentUser();
-  const monthOptions = generateMonthOptions();
 
   const { data: metas = [], isLoading: metasLoading } = useQuery<Meta[]>({
     queryKey: ["/api/metas", { month: selectedMonth }],
@@ -826,7 +842,7 @@ export default function GestaoMetasPage() {
                 <Label>Tipo de Valor *</Label>
                 <Select 
                   value={metaForm.measurementType} 
-                  onValueChange={v => setMetaForm({ ...metaForm, measurementType: v })}
+                  onValueChange={v => setMetaForm({ ...metaForm, measurementType: v, targetValue: "" })}
                 >
                   <SelectTrigger data-testid="select-meta-type">
                     <SelectValue />
@@ -840,13 +856,47 @@ export default function GestaoMetasPage() {
               </div>
               <div>
                 <Label>Valor Meta *</Label>
-                <Input
-                  type="number"
-                  value={metaForm.targetValue}
-                  onChange={e => setMetaForm({ ...metaForm, targetValue: e.target.value })}
-                  placeholder={metaForm.measurementType === "binary" ? "1" : "100"}
-                  data-testid="input-meta-target"
-                />
+                {metaForm.measurementType === "monetary" ? (
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">R$</span>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      className="pl-9"
+                      value={metaForm.targetValue}
+                      onChange={e => setMetaForm({ ...metaForm, targetValue: e.target.value })}
+                      placeholder="0,00"
+                      data-testid="input-meta-target-monetary"
+                    />
+                  </div>
+                ) : metaForm.measurementType === "binary" ? (
+                  <Select 
+                    value={metaForm.targetValue} 
+                    onValueChange={v => setMetaForm({ ...metaForm, targetValue: v })}
+                  >
+                    <SelectTrigger data-testid="select-meta-target-binary">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">Sim</SelectItem>
+                      <SelectItem value="0">Não</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      className={metaForm.measurementType === "percentage" ? "pr-9" : ""}
+                      value={metaForm.targetValue}
+                      onChange={e => setMetaForm({ ...metaForm, targetValue: e.target.value })}
+                      placeholder={metaForm.measurementType === "percentage" ? "100" : "0"}
+                      data-testid="input-meta-target"
+                    />
+                    {metaForm.measurementType === "percentage" && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             <div>
