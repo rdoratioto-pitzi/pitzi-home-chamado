@@ -39,6 +39,9 @@ import {
   insertLogisticaReversaPedidoSchema,
   insertLogisticaReversaEventoSchema,
   insertSlaRuleSchema,
+  insertMetaAreaSchema,
+  insertMetaSchema,
+  insertMetaCheckinSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1974,6 +1977,209 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       console.error("Get deflation analytics error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============== METAS (Goals) API ==============
+  
+  // Meta Areas
+  app.get("/api/meta-areas", async (req, res) => {
+    try {
+      const areas = await storage.getMetaAreas();
+      res.json(areas);
+    } catch (error: any) {
+      console.error("Get meta areas error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/meta-areas/:id", async (req, res) => {
+    try {
+      const area = await storage.getMetaArea(req.params.id);
+      if (!area) {
+        return res.status(404).json({ error: "Area not found" });
+      }
+      res.json(area);
+    } catch (error: any) {
+      console.error("Get meta area error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/meta-areas", async (req, res) => {
+    try {
+      const parsed = insertMetaAreaSchema.parse(req.body);
+      // Check for duplicate name
+      const existing = await storage.getMetaAreaByName(parsed.name);
+      if (existing) {
+        return res.status(400).json({ error: "Já existe uma área com este nome" });
+      }
+      const area = await storage.createMetaArea(parsed);
+      res.status(201).json(area);
+    } catch (error: any) {
+      console.error("Create meta area error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/meta-areas/:id", async (req, res) => {
+    try {
+      // If updating name, check for duplicates
+      if (req.body.name) {
+        const existing = await storage.getMetaAreaByName(req.body.name);
+        if (existing && existing.id !== req.params.id) {
+          return res.status(400).json({ error: "Já existe uma área com este nome" });
+        }
+      }
+      const updated = await storage.updateMetaArea(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Area not found" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update meta area error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/meta-areas/:id", async (req, res) => {
+    try {
+      // Check if there are metas linked to this area
+      const metas = await storage.getMetas({ areaId: req.params.id });
+      if (metas.length > 0) {
+        // Archive instead of delete
+        const updated = await storage.updateMetaArea(req.params.id, { archived: true });
+        return res.json({ archived: true, area: updated });
+      }
+      const success = await storage.deleteMetaArea(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Area not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete meta area error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Metas
+  app.get("/api/metas", async (req, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.month) filters.month = req.query.month as string;
+      if (req.query.areaId) filters.areaId = req.query.areaId as string;
+      if (req.query.responsibleId) filters.responsibleId = req.query.responsibleId as string;
+      const metas = await storage.getMetas(filters);
+      res.json(metas);
+    } catch (error: any) {
+      console.error("Get metas error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/metas/:id", async (req, res) => {
+    try {
+      const meta = await storage.getMeta(req.params.id);
+      if (!meta) {
+        return res.status(404).json({ error: "Meta not found" });
+      }
+      res.json(meta);
+    } catch (error: any) {
+      console.error("Get meta error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/metas", async (req, res) => {
+    try {
+      const parsed = insertMetaSchema.parse(req.body);
+      const meta = await storage.createMeta(parsed);
+      res.status(201).json(meta);
+    } catch (error: any) {
+      console.error("Create meta error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/metas/:id", async (req, res) => {
+    try {
+      const updated = await storage.updateMeta(req.params.id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Meta not found" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update meta error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/metas/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteMeta(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Meta not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete meta error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Meta Check-ins
+  app.get("/api/metas/:id/checkins", async (req, res) => {
+    try {
+      const checkins = await storage.getMetaCheckins(req.params.id);
+      res.json(checkins);
+    } catch (error: any) {
+      console.error("Get meta checkins error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/metas/:id/checkins", async (req, res) => {
+    try {
+      const meta = await storage.getMeta(req.params.id);
+      if (!meta) {
+        return res.status(404).json({ error: "Meta not found" });
+      }
+      
+      const parsed = insertMetaCheckinSchema.parse({
+        ...req.body,
+        metaId: req.params.id,
+        previousValue: meta.currentValue,
+      });
+      
+      const checkin = await storage.createMetaCheckin(parsed);
+      
+      // Update meta's current value and status
+      const targetValue = parseFloat(meta.targetValue || "100");
+      const newValue = parseFloat(parsed.newValue);
+      let status = "on_track";
+      
+      if (targetValue > 0) {
+        const progress = (newValue / targetValue) * 100;
+        if (progress >= 100) {
+          status = "completed";
+        } else if (progress < 50) {
+          // Check if we're past day 15 of the month
+          const today = new Date();
+          if (today.getDate() > 15) {
+            status = "overdue";
+          }
+        }
+      }
+      
+      await storage.updateMeta(req.params.id, { 
+        currentValue: parsed.newValue,
+        status 
+      });
+      
+      res.status(201).json(checkin);
+    } catch (error: any) {
+      console.error("Create meta checkin error:", error);
       res.status(500).json({ error: error.message });
     }
   });
