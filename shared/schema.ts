@@ -44,6 +44,8 @@ export type ModulePermissions = {
   chamados: boolean;
   projetos: boolean;
   tarefas: boolean;
+  reunioes: boolean;
+  metas: boolean;
   okrs: boolean;
   logistica: boolean;
   pricing: boolean;
