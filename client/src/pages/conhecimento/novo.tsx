@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RichTextarea } from "@/components/rich-textarea";
 import { 
   Save, 
   Send,
@@ -17,7 +17,11 @@ import {
   Plus,
   Upload,
   FileText,
-  AlertCircle
+  AlertCircle,
+  File,
+  Image,
+  FileType,
+  Loader2
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/permissions";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -46,6 +50,33 @@ const TIPOS = [
 
 const VERSOES = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10"];
 
+const ALLOWED_FILE_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+];
+
+const getFileIcon = (type: string) => {
+  if (type.startsWith("image/")) return Image;
+  if (type.includes("pdf")) return FileType;
+  return File;
+};
+
+interface Attachment {
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+}
+
 export default function NovoDocumentoPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -57,9 +88,13 @@ export default function NovoDocumentoPage() {
   const [versao, setVersao] = useState("V1");
   const [dataMesAno, setDataMesAno] = useState(format(new Date(), "yyyy-MM"));
   const [conteudo, setConteudo] = useState("");
+  const [conteudoImages, setConteudoImages] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [visibilidade, setVisibilidade] = useState("todos");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   const nomeArquivo = useMemo(() => {
     if (!area || !tipo || !titulo) return "";
@@ -74,6 +109,70 @@ export default function NovoDocumentoPage() {
 
   const isValid = area && tipo && titulo && versao && dataMesAno;
 
+  const handleAttachmentSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingAttachment(true);
+    const newAttachments: Attachment[] = [];
+
+    for (const file of Array.from(files)) {
+      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+        toast({
+          title: "Formato não suportado",
+          description: `O arquivo ${file.name} não é suportado. Formatos aceitos: PDF, Word, Excel, PowerPoint, imagens.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        toast({
+          title: "Arquivo muito grande",
+          description: `O arquivo ${file.name} excede o limite de 10MB.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+
+      newAttachments.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        dataUrl,
+      });
+    }
+
+    if (newAttachments.length > 0) {
+      setAttachments(prev => [...prev, ...newAttachments]);
+      toast({
+        title: "Anexos adicionados",
+        description: `${newAttachments.length} arquivo(s) anexado(s) com sucesso.`,
+      });
+    }
+
+    setIsUploadingAttachment(false);
+    if (attachmentInputRef.current) {
+      attachmentInputRef.current.value = "";
+    }
+  }, [toast]);
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const createMutation = useMutation({
     mutationFn: async (sendForApproval: boolean) => {
       const document = await apiRequest("POST", "/api/conhecimento", {
@@ -84,6 +183,8 @@ export default function NovoDocumentoPage() {
         dataMesAno,
         nomeArquivo,
         conteudo,
+        conteudoImages: conteudoImages.length > 0 ? JSON.stringify(conteudoImages) : null,
+        anexos: attachments.length > 0 ? JSON.stringify(attachments) : null,
         tags: tags.length > 0 ? JSON.stringify(tags) : null,
         visibilidade,
         criadorId: user?.id,
@@ -226,16 +327,78 @@ export default function NovoDocumentoPage() {
           <Card>
             <CardHeader>
               <CardTitle>Conteúdo</CardTitle>
-              <CardDescription>Escreva o conteúdo do documento</CardDescription>
+              <CardDescription>Escreva o conteúdo do documento. Você pode adicionar imagens e prints de tela.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Textarea
+              <RichTextarea
                 value={conteudo}
-                onChange={(e) => setConteudo(e.target.value)}
+                onChange={setConteudo}
+                images={conteudoImages}
+                onImagesChange={setConteudoImages}
                 placeholder="Digite o conteúdo do documento aqui..."
-                className="min-h-[300px]"
+                rows={12}
+                maxLength={50000}
                 data-testid="textarea-conteudo"
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Anexos</CardTitle>
+              <CardDescription>Anexe documentos PDF, Word, Excel, PowerPoint ou imagens (máx. 10MB cada)</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.webp"
+                multiple
+                className="hidden"
+                onChange={handleAttachmentSelect}
+              />
+              
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => attachmentInputRef.current?.click()}
+                disabled={isUploadingAttachment}
+                data-testid="button-adicionar-anexo"
+              >
+                {isUploadingAttachment ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-2" />
+                )}
+                Adicionar Anexo
+              </Button>
+
+              {attachments.length > 0 && (
+                <div className="space-y-2">
+                  {attachments.map((attachment, index) => {
+                    const IconComponent = getFileIcon(attachment.type);
+                    return (
+                      <div key={index} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                        <IconComponent className="h-8 w-8 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{attachment.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => removeAttachment(index)}
+                          data-testid={`button-remove-anexo-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

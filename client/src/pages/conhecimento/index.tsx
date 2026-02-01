@@ -156,8 +156,8 @@ export default function ConhecimentoPage() {
         
         <div className="flex flex-wrap gap-2 items-center">
           <Select value={areaFilter} onValueChange={setAreaFilter}>
-            <SelectTrigger className="w-[140px]" data-testid="select-area">
-              <SelectValue placeholder="Área" />
+            <SelectTrigger className="w-[160px]" data-testid="select-area">
+              <SelectValue placeholder="Filtrar por Área" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as Áreas</SelectItem>
@@ -168,8 +168,8 @@ export default function ConhecimentoPage() {
           </Select>
 
           <Select value={tipoFilter} onValueChange={setTipoFilter}>
-            <SelectTrigger className="w-[140px]" data-testid="select-tipo">
-              <SelectValue placeholder="Tipo" />
+            <SelectTrigger className="w-[160px]" data-testid="select-tipo">
+              <SelectValue placeholder="Filtrar por Tipo" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Tipos</SelectItem>
@@ -180,8 +180,8 @@ export default function ConhecimentoPage() {
           </Select>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]" data-testid="select-status">
-              <SelectValue placeholder="Status" />
+            <SelectTrigger className="w-[160px]" data-testid="select-status">
+              <SelectValue placeholder="Filtrar por Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Status</SelectItem>
@@ -217,26 +217,6 @@ export default function ConhecimentoPage() {
                 <span className="text-2xl font-bold">{count}</span>
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-        {STATUS_OPTIONS.map(status => {
-          const count = stats?.byStatus[status.value] || 0;
-          const isActive = statusFilter === status.value;
-          return (
-            <button
-              key={status.value}
-              onClick={() => setStatusFilter(isActive ? "all" : status.value)}
-              className={`flex items-center justify-between p-3 rounded-lg border transition-all ${isActive ? 'border-primary bg-primary/5' : 'hover:bg-muted'}`}
-              data-testid={`filter-status-${status.value}`}
-            >
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className={status.color}>{status.label}</Badge>
-              </div>
-              <span className="font-bold text-lg">{count}</span>
-            </button>
           );
         })}
       </div>

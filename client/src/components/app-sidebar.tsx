@@ -121,7 +121,6 @@ const pricingSubItems = [
 
 const conhecimentoSubItems = [
   { title: "Visão Geral", url: "/conhecimento", icon: LayoutDashboard },
-  { title: "Todos os Documentos", url: "/conhecimento/documentos", icon: FileText },
   { title: "Meus Favoritos", url: "/conhecimento/favoritos", icon: Star },
 ];
 

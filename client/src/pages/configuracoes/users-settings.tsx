@@ -32,6 +32,7 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, MoreHorizontal, Eye, EyeOff } from "lucide-react";
 import {
   DropdownMenu,
@@ -62,11 +63,30 @@ const MODULES = [
   { key: "configuracoes", label: "Configurações" },
 ] as const;
 
+const AREAS_NEGOCIO = [
+  { value: "LAB", label: "Laboratório" },
+  { value: "RH", label: "Recursos Humanos" },
+  { value: "COM", label: "Comercial" },
+  { value: "FIN", label: "Financeiro" },
+  { value: "MKT", label: "Marketing" },
+  { value: "OPS", label: "Operações" },
+  { value: "TI", label: "Tecnologia" },
+];
+
+const PERFIS_ACESSO = [
+  { value: "assistente", label: "Assistente" },
+  { value: "analista", label: "Analista" },
+  { value: "gestor", label: "Gestor" },
+  { value: "diretor", label: "Diretor" },
+];
+
 const formSchema = z.object({
   name: z.string().min(2, "Nome deve ter no mínimo 2 caracteres"),
   email: z.string().email("Email inválido"),
   password: z.string().optional(),
   isAdmin: z.boolean().default(false),
+  areaNegocio: z.string().optional(),
+  perfilAcesso: z.string().optional(),
   modulePermissions: z.object({
     chamados: z.boolean(),
     projetos: z.boolean(),
@@ -114,6 +134,8 @@ export function UsersSettings() {
       email: "",
       password: "",
       isAdmin: false,
+      areaNegocio: "",
+      perfilAcesso: "",
       modulePermissions: {
         chamados: true,
         projetos: true,
@@ -137,6 +159,8 @@ export function UsersSettings() {
         email: data.email,
         ...(data.password ? { password: data.password } : {}),
         isAdmin: data.isAdmin,
+        areaNegocio: data.areaNegocio || null,
+        perfilAcesso: data.perfilAcesso || null,
         status: editingUser?.status || "active",
         authMethod: editingUser?.authMethod || "email",
         modulePermissions: JSON.stringify(data.modulePermissions),
@@ -209,6 +233,8 @@ export function UsersSettings() {
       email: user.email,
       password: "",
       isAdmin: user.isAdmin || false,
+      areaNegocio: user.areaNegocio || "",
+      perfilAcesso: user.perfilAcesso || "",
       modulePermissions: perms,
     });
     setIsDialogOpen(true);
@@ -221,6 +247,8 @@ export function UsersSettings() {
       email: "",
       password: "",
       isAdmin: false,
+      areaNegocio: "",
+      perfilAcesso: "",
       modulePermissions: {
         chamados: true,
         projetos: true,
@@ -441,6 +469,54 @@ export function UsersSettings() {
                   </FormItem>
                 )}
               />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="areaNegocio"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Área de Negócio</FormLabel>
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-area-negocio">
+                            <SelectValue placeholder="Selecione a área" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {AREAS_NEGOCIO.map(area => (
+                            <SelectItem key={area.value} value={area.value}>{area.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="perfilAcesso"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Perfil de Acesso</FormLabel>
+                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-perfil-acesso">
+                            <SelectValue placeholder="Selecione o perfil" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {PERFIS_ACESSO.map(perfil => (
+                            <SelectItem key={perfil.value} value={perfil.value}>{perfil.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <FormField
                 control={form.control}

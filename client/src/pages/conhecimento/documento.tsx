@@ -27,7 +27,8 @@ import {
   Eye,
   FileText,
   Shield,
-  AlertTriangle
+  AlertTriangle,
+  Download
 } from "lucide-react";
 import type { KnowledgeDocument, KnowledgeDocumentVersion, KnowledgeAuditLog, User as UserType } from "@shared/schema";
 import { getCurrentUser, isAdmin } from "@/lib/permissions";
@@ -252,12 +253,28 @@ export default function DocumentoPage() {
       </div>
 
       {document.status === "aprovado" && document.aprovadoPor && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 flex items-center gap-3">
-          <CheckCircle className="h-5 w-5 text-green-600" />
-          <span className="text-sm">
-            Aprovado por <strong>{getUserName(document.aprovadoPor)}</strong> em{" "}
-            {document.aprovadoEm && format(new Date(document.aprovadoEm), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
-          </span>
+        <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <span className="text-sm">
+              Aprovado por <strong>{getUserName(document.aprovadoPor)}</strong> em{" "}
+              {document.aprovadoEm && format(new Date(document.aprovadoEm), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}
+            </span>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              toast({
+                title: "Exportar PDF",
+                description: "Funcionalidade de exportação em PDF será implementada em breve.",
+              });
+            }}
+            data-testid="button-exportar-pdf"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Exportar PDF
+          </Button>
         </div>
       )}
 
