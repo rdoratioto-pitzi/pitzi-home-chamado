@@ -1,40 +1,54 @@
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { format, addMonths, subMonths, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Link } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import {
   Target,
   CheckCircle2,
-  Clock,
-  AlertTriangle,
   TrendingUp,
-  ArrowRight,
-  BarChart3,
-  Users,
+  Plus,
   ChevronLeft,
   ChevronRight,
+  RefreshCw,
+  Clock,
+  BarChart3,
+  Building2,
+  CalendarClock,
 } from "lucide-react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-} from "recharts";
-import type { Meta, MetaArea, User } from "@shared/schema";
+import type { Meta, MetaArea, User, MetaCheckin } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
 
 const statusColors: Record<string, string> = {
   on_track: "bg-green-500/10 text-green-600 dark:text-green-400",
@@ -50,7 +64,19 @@ const statusLabels: Record<string, string> = {
   completed: "Concluído",
 };
 
-const pieColors = ["#22c55e", "#f59e0b", "#ef4444", "#3b82f6"];
+const measurementLabels: Record<string, string> = {
+  percentage: "%",
+  absolute: "Absoluto",
+  monetary: "R$",
+  binary: "Sim/Não",
+};
+
+const measurementUnits: Record<string, string> = {
+  percentage: "%",
+  absolute: "Pontos",
+  monetary: "R$",
+  binary: "",
+};
 
 function getCurrentUser() {
   try {
@@ -61,9 +87,31 @@ function getCurrentUser() {
 }
 
 export default function MetasVisaoGeralPage() {
+  const { toast } = useToast();
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
   const currentMonthLabel = format(parseISO(`${selectedMonth}-01`), "MMMM yyyy", { locale: ptBR });
   const currentUser = getCurrentUser();
+
+  const [isMetaDialogOpen, setIsMetaDialogOpen] = useState(false);
+  const [isCheckinDialogOpen, setIsCheckinDialogOpen] = useState(false);
+  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
+  const [checkinMeta, setCheckinMeta] = useState<Meta | null>(null);
+
+  const [metaForm, setMetaForm] = useState({
+    title: "",
+    description: "",
+    areaId: "",
+    responsibleId: "",
+    measurementType: "percentage",
+    targetValue: "",
+    unit: "",
+    month: selectedMonth,
+  });
+
+  const [checkinForm, setCheckinForm] = useState({
+    newValue: "",
+    comment: "",
+  });
 
   const { data: metas = [], isLoading: metasLoading } = useQuery<Meta[]>({
     queryKey: ["/api/metas", { month: selectedMonth }],
@@ -71,6 +119,14 @@ export default function MetasVisaoGeralPage() {
       const res = await fetch(`/api/metas?month=${selectedMonth}`);
       return res.json();
     },
+  });
+
+  const { data: areas = [] } = useQuery<MetaArea[]>({
+    queryKey: ["/api/meta-areas"],
+  });
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
   });
 
   const handlePrevMonth = () => {
@@ -83,13 +139,78 @@ export default function MetasVisaoGeralPage() {
     setSelectedMonth(format(next, "yyyy-MM"));
   };
 
-  const { data: areas = [] } = useQuery<MetaArea[]>({
-    queryKey: ["/api/meta-areas"],
+  const createMetaMutation = useMutation({
+    mutationFn: async (data: any) => apiRequest("POST", "/api/metas", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/metas"] });
+      toast({ title: "Meta criada com sucesso!" });
+      setIsMetaDialogOpen(false);
+      resetMetaForm();
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao criar meta", description: error.message, variant: "destructive" });
+    },
   });
 
-  const { data: users = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+  const createCheckinMutation = useMutation({
+    mutationFn: async ({ metaId, data }: { metaId: string; data: any }) =>
+      apiRequest("POST", `/api/metas/${metaId}/checkins`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/metas"] });
+      toast({ title: "Check-in registrado com sucesso!" });
+      setIsCheckinDialogOpen(false);
+      setCheckinMeta(null);
+      setCheckinForm({ newValue: "", comment: "" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro ao registrar check-in", description: error.message, variant: "destructive" });
+    },
   });
+
+  const resetMetaForm = () => {
+    setMetaForm({
+      title: "",
+      description: "",
+      areaId: selectedAreaId || "",
+      responsibleId: "",
+      measurementType: "percentage",
+      targetValue: "",
+      unit: "",
+      month: selectedMonth,
+    });
+  };
+
+  const openNewMetaDialog = (areaId: string) => {
+    setSelectedAreaId(areaId);
+    setMetaForm(prev => ({ ...prev, areaId, month: selectedMonth }));
+    setIsMetaDialogOpen(true);
+  };
+
+  const openCheckin = (meta: Meta) => {
+    setCheckinMeta(meta);
+    setCheckinForm({ newValue: meta.currentValue || "0", comment: "" });
+    setIsCheckinDialogOpen(true);
+  };
+
+  const handleSaveMeta = () => {
+    const data = {
+      ...metaForm,
+      targetValue: parseFloat(metaForm.targetValue) || 0,
+    };
+    createMetaMutation.mutate(data);
+  };
+
+  const handleCheckin = () => {
+    if (!checkinMeta) return;
+    createCheckinMutation.mutate({
+      metaId: checkinMeta.id,
+      data: {
+        userId: currentUser?.id || "",
+        newValue: parseFloat(checkinForm.newValue) || 0,
+        comment: checkinForm.comment || null,
+      },
+    });
+  };
 
   const getProgress = (meta: Meta): number => {
     const current = parseFloat(meta.currentValue || "0");
@@ -104,90 +225,53 @@ export default function MetasVisaoGeralPage() {
   const getAreaById = (id: string) => areas.find(a => a.id === id);
   const getUserById = (id: string) => users.find(u => u.id === id);
 
+  const activeAreas = useMemo(() => {
+    return areas.filter(a => !a.archived);
+  }, [areas]);
+
+  const metasByArea = useMemo(() => {
+    const grouped: Record<string, Meta[]> = {};
+    activeAreas.forEach(area => {
+      grouped[area.id] = metas.filter(m => m.areaId === area.id);
+    });
+    return grouped;
+  }, [metas, activeAreas]);
+
   const stats = useMemo(() => {
     const total = metas.length;
-    const completed = metas.filter(m => m.status === "completed").length;
-    const onTrack = metas.filter(m => m.status === "on_track").length;
-    const atRisk = metas.filter(m => m.status === "at_risk").length;
-    const overdue = metas.filter(m => m.status === "overdue").length;
+    const completed = metas.filter(m => m.status === "completed" || getProgress(m) >= 100).length;
     const avgProgress = total > 0 
       ? metas.reduce((sum, m) => sum + getProgress(m), 0) / total 
       : 0;
-    return { total, completed, onTrack, atRisk, overdue, avgProgress };
-  }, [metas]);
 
-  const myMetas = useMemo(() => {
-    if (!currentUser) return [];
-    return metas.filter(m => m.responsibleId === currentUser.id);
-  }, [metas, currentUser]);
-
-  const pieData = useMemo(() => [
-    { name: "No Prazo", value: stats.onTrack, color: "#22c55e" },
-    { name: "Em Risco", value: stats.atRisk, color: "#f59e0b" },
-    { name: "Atrasado", value: stats.overdue, color: "#ef4444" },
-    { name: "Concluído", value: stats.completed, color: "#3b82f6" },
-  ].filter(d => d.value > 0), [stats]);
-
-  const areaProgressData = useMemo(() => {
-    const grouped: Record<string, { total: number; progress: number; name: string; color: string }> = {};
-    
-    metas.forEach(meta => {
-      const area = getAreaById(meta.areaId);
-      if (!area) return;
-      
-      if (!grouped[meta.areaId]) {
-        grouped[meta.areaId] = { total: 0, progress: 0, name: area.name, color: area.color };
-      }
-      grouped[meta.areaId].total++;
-      grouped[meta.areaId].progress += getProgress(meta);
+    const byArea: Record<string, { total: number; completed: number; avgProgress: number; name: string }> = {};
+    activeAreas.forEach(area => {
+      const areaMetas = metas.filter(m => m.areaId === area.id);
+      const areaCompleted = areaMetas.filter(m => m.status === "completed" || getProgress(m) >= 100).length;
+      const areaAvgProgress = areaMetas.length > 0 
+        ? areaMetas.reduce((sum, m) => sum + getProgress(m), 0) / areaMetas.length 
+        : 0;
+      byArea[area.id] = {
+        total: areaMetas.length,
+        completed: areaCompleted,
+        avgProgress: areaAvgProgress,
+        name: area.name,
+      };
     });
 
-    return Object.values(grouped).map(g => ({
-      name: g.name,
-      progresso: Math.round(g.progress / g.total),
-      fill: g.color,
-    }));
-  }, [metas, areas]);
-
-  const topPerformers = useMemo(() => {
-    const byUser: Record<string, { userId: string; totalProgress: number; count: number }> = {};
-    
-    metas.forEach(meta => {
-      if (!byUser[meta.responsibleId]) {
-        byUser[meta.responsibleId] = { userId: meta.responsibleId, totalProgress: 0, count: 0 };
-      }
-      byUser[meta.responsibleId].totalProgress += getProgress(meta);
-      byUser[meta.responsibleId].count++;
-    });
-
-    return Object.values(byUser)
-      .map(u => ({
-        user: getUserById(u.userId),
-        avgProgress: u.count > 0 ? u.totalProgress / u.count : 0,
-        metasCount: u.count,
-      }))
-      .filter(u => u.user)
-      .sort((a, b) => b.avgProgress - a.avgProgress)
-      .slice(0, 5);
-  }, [metas, users]);
-
-  const recentMetas = useMemo(() => {
-    return [...metas]
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, 5);
-  }, [metas]);
+    return { total, completed, avgProgress, byArea };
+  }, [metas, activeAreas]);
 
   if (metasLoading) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader title="Metas" breadcrumbs={[{ label: "Metas" }, { label: "Visão Geral" }]} />
+        <PageHeader title="Metas" breadcrumbs={[{ label: "Metas" }]} />
         <main className="flex-1 p-6 space-y-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24" />)}
           </div>
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Skeleton className="h-80" />
-            <Skeleton className="h-80" />
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-40 rounded-xl" />)}
           </div>
         </main>
       </div>
@@ -198,45 +282,44 @@ export default function MetasVisaoGeralPage() {
     <div className="flex flex-col min-h-full">
       <PageHeader
         title="Metas"
-        breadcrumbs={[{ label: "Metas" }, { label: "Visão Geral" }]}
+        breadcrumbs={[{ label: "Metas" }]}
         actions={
-          <Link href="/metas/gestao">
-            <Button data-testid="button-ir-gestao">
-              Gerenciar Metas
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          </Link>
+          <Button onClick={() => setIsMetaDialogOpen(true)} data-testid="button-nova-meta">
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Meta
+          </Button>
         }
       />
 
       <main className="flex-1 p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center bg-muted rounded-lg p-1">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8" 
-                onClick={handlePrevMonth}
-                data-testid="button-prev-month"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="px-4 min-w-[140px] text-center">
-                <h2 className="text-sm font-bold capitalize">{currentMonthLabel}</h2>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8" 
-                onClick={handleNextMonth}
-                data-testid="button-next-month"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="text-sm text-muted-foreground">Acompanhamento das metas do mês</p>
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div>
+            <h2 className="text-[20px] font-bold tracking-tight">Metas Mensais</h2>
+            <p className="text-[14px] text-muted-foreground mt-1">
+              Acompanhe o progresso das metas por área de negócio
+            </p>
           </div>
+          <Card className="shadow-sm border-border/60 p-1 flex gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handlePrevMonth}
+              data-testid="button-prev-month"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="px-4 min-w-[140px] text-center flex items-center justify-center" data-testid="text-current-month">
+              <span className="text-sm font-bold capitalize">{currentMonthLabel}</span>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleNextMonth}
+              data-testid="button-next-month"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </Card>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -254,17 +337,50 @@ export default function MetasVisaoGeralPage() {
             </CardContent>
           </Card>
 
+          <Card data-testid="card-by-area">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <Building2 className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-muted-foreground mb-1">Total por Área</p>
+                  <div className="space-y-0.5 max-h-20 overflow-auto">
+                    {Object.entries(stats.byArea)
+                      .filter(([_, data]) => data.total > 0)
+                      .map(([areaId, data]) => (
+                        <div key={areaId} className="flex items-center justify-between text-xs" data-testid={`text-area-count-${areaId}`}>
+                          <span className="truncate text-muted-foreground">{data.name}</span>
+                          <span className="font-bold ml-2">{data.total}</span>
+                        </div>
+                      ))}
+                    {Object.values(stats.byArea).every(d => d.total === 0) && (
+                      <span className="text-xs text-muted-foreground">Nenhuma meta</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card data-testid="card-progress">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-500/10">
-                  <TrendingUp className="h-5 w-5 text-blue-500" />
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <TrendingUp className="h-5 w-5 text-purple-500" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <p className="text-sm text-muted-foreground">Progresso Médio</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-2xl font-bold">{stats.avgProgress.toFixed(0)}%</p>
-                    <Progress value={stats.avgProgress} className="flex-1 h-2" />
+                  <p className="text-2xl font-bold" data-testid="text-avg-progress">{stats.avgProgress.toFixed(0)}%</p>
+                  <div className="space-y-0.5 mt-1 max-h-16 overflow-auto">
+                    {Object.entries(stats.byArea)
+                      .filter(([_, data]) => data.total > 0)
+                      .map(([areaId, data]) => (
+                        <div key={areaId} className="flex items-center justify-between text-xs" data-testid={`text-area-progress-${areaId}`}>
+                          <span className="truncate text-muted-foreground">{data.name}</span>
+                          <span className="font-medium ml-2">{data.avgProgress.toFixed(0)}%</span>
+                        </div>
+                      ))}
                   </div>
                 </div>
               </div>
@@ -273,251 +389,415 @@ export default function MetasVisaoGeralPage() {
 
           <Card data-testid="card-completed">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
+              <div className="flex items-start gap-3">
                 <div className="p-2 rounded-lg bg-green-500/10">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Concluídas</p>
-                  <p className="text-2xl font-bold">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-muted-foreground">Metas Atingidas</p>
+                  <p className="text-2xl font-bold" data-testid="text-completed-count">
                     {stats.completed}
                     <span className="text-sm font-normal text-muted-foreground ml-1">
-                      / {stats.total}
+                      ({stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(0) : 0}%)
                     </span>
                   </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card data-testid="card-attention">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-red-500/10">
-                  <AlertTriangle className="h-5 w-5 text-red-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Precisam Atenção</p>
-                  <p className="text-2xl font-bold">{stats.atRisk + stats.overdue}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-base font-medium">Distribuição por Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {pieData.length === 0 ? (
-                <div className="h-64 flex items-center justify-center text-muted-foreground">
-                  Nenhuma meta cadastrada
-                </div>
-              ) : (
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, value }) => `${name}: ${value}`}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-base font-medium">Progresso por Área</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {areaProgressData.length === 0 ? (
-                <div className="h-64 flex items-center justify-center text-muted-foreground">
-                  Nenhuma área com metas
-                </div>
-              ) : (
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={areaProgressData} layout="vertical">
-                      <XAxis type="number" domain={[0, 100]} tickFormatter={v => `${v}%`} />
-                      <YAxis type="category" dataKey="name" width={100} />
-                      <Tooltip formatter={(value) => [`${value}%`, "Progresso"]} />
-                      <Bar dataKey="progresso" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          {currentUser && myMetas.length > 0 && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                <CardTitle className="text-base font-medium">Minhas Metas</CardTitle>
-                <Link href="/metas/gestao">
-                  <Button variant="ghost" size="sm">Ver Todas</Button>
-                </Link>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {myMetas.slice(0, 4).map(meta => {
-                  const area = getAreaById(meta.areaId);
-                  const progress = getProgress(meta);
-                  
-                  return (
-                    <div key={meta.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{meta.title}</p>
-                          {area && (
-                            <Badge 
-                              variant="outline" 
-                              className="text-xs shrink-0"
-                              style={{ borderColor: area.color, color: area.color }}
-                            >
-                              {area.name}
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Progress value={progress} className="flex-1 h-1.5" />
-                          <span className="text-xs text-muted-foreground w-10 text-right">
-                            {progress.toFixed(0)}%
+                  <div className="space-y-0.5 mt-1 max-h-16 overflow-auto">
+                    {Object.entries(stats.byArea)
+                      .filter(([_, data]) => data.total > 0)
+                      .map(([areaId, data]) => (
+                        <div key={areaId} className="flex items-center justify-between text-xs" data-testid={`text-area-completed-${areaId}`}>
+                          <span className="truncate text-muted-foreground">{data.name}</span>
+                          <span className="font-medium ml-2">
+                            {data.completed} ({data.total > 0 ? ((data.completed / data.total) * 100).toFixed(0) : 0}%)
                           </span>
                         </div>
-                      </div>
-                      <Badge className={statusColors[meta.status]} data-testid={`my-meta-status-${meta.id}`}>
-                        {statusLabels[meta.status]}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Top Performers
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {topPerformers.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground">
-                  Nenhum dado disponível
-                </div>
-              ) : (
-                topPerformers.map((item, index) => (
-                  <div key={item.user?.id} className="flex items-center gap-3">
-                    <div className="w-6 text-center font-bold text-muted-foreground">
-                      {index + 1}
-                    </div>
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs">
-                        {item.user?.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.user?.name}</p>
-                      <p className="text-xs text-muted-foreground">{item.metasCount} metas</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-primary">{item.avgProgress.toFixed(0)}%</p>
-                    </div>
+                      ))}
                   </div>
-                ))
-              )}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-            <CardTitle className="text-base font-medium">Metas Recentes</CardTitle>
-            <Link href="/metas/gestao">
-              <Button variant="ghost" size="sm">Ver Todas</Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {recentMetas.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                <Target className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                <p>Nenhuma meta cadastrada para este mês</p>
-                <Link href="/metas/gestao">
-                  <Button className="mt-4" variant="outline">Criar Primeira Meta</Button>
-                </Link>
+        {activeAreas.length === 0 ? (
+          <Card className="shadow-sm border-border/60 text-center py-16">
+            <CardContent>
+              <div className="h-16 w-16 bg-muted/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Building2 className="h-8 w-8 text-muted-foreground/50" />
               </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                {recentMetas.map(meta => {
-                  const area = getAreaById(meta.areaId);
-                  const user = getUserById(meta.responsibleId);
-                  const progress = getProgress(meta);
+              <h3 className="text-[18px] font-bold">Nenhuma área de negócio cadastrada</h3>
+              <p className="text-[14px] text-muted-foreground mt-2 max-w-xs mx-auto">
+                Acesse a gestão de metas para criar áreas de negócio e começar a cadastrar metas
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Accordion type="multiple" className="space-y-4" defaultValue={activeAreas.map(a => a.id)}>
+            {activeAreas.map((area) => {
+              const areaMetas = metasByArea[area.id] || [];
+              const areaStats = stats.byArea[area.id];
 
-                  return (
-                    <div 
-                      key={meta.id} 
-                      className="p-3 border rounded-lg hover:border-primary/50 transition-colors"
-                      data-testid={`recent-meta-${meta.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <h4 className="text-sm font-medium line-clamp-2">{meta.title}</h4>
-                        <Badge className={`${statusColors[meta.status]} shrink-0`}>
-                          {statusLabels[meta.status]}
-                        </Badge>
-                      </div>
-                      {area && (
-                        <Badge 
-                          variant="outline" 
-                          className="text-xs mb-2"
-                          style={{ borderColor: area.color, color: area.color }}
+              return (
+                <AccordionItem 
+                  key={area.id} 
+                  value={area.id}
+                  className="border-0"
+                  data-testid={`accordion-area-${area.id}`}
+                >
+                  <Card className="shadow-sm border-border/60 overflow-hidden hover:border-primary/20 transition-all duration-200">
+                    <AccordionTrigger className="px-6 py-5 hover:no-underline" data-testid={`trigger-area-${area.id}`}>
+                      <div className="flex items-start gap-5 flex-1 text-left">
+                        <div 
+                          className="h-11 w-11 shrink-0 rounded-xl flex items-center justify-center"
+                          style={{ backgroundColor: `${area.color}20`, color: area.color }}
                         >
-                          {area.name}
-                        </Badge>
-                      )}
-                      <div className="flex items-center gap-1.5 mb-2">
-                        {user && (
-                          <>
-                            <Avatar className="h-4 w-4">
-                              <AvatarFallback className="text-[8px]">
-                                {user.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-xs text-muted-foreground truncate">{user.name}</span>
-                          </>
+                          <Building2 className="h-6 w-6" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <h3 className="text-[16px] font-bold text-foreground leading-tight truncate" data-testid={`text-area-name-${area.id}`}>{area.name}</h3>
+                            <Badge 
+                              variant="secondary" 
+                              className="font-bold text-[10px] uppercase tracking-wider"
+                              style={{ backgroundColor: `${area.color}15`, color: area.color }}
+                              data-testid={`badge-area-metas-${area.id}`}
+                            >
+                              {areaMetas.length} {areaMetas.length === 1 ? 'Meta' : 'Metas'}
+                            </Badge>
+                          </div>
+                          {areaMetas.length > 0 && (
+                            <div className="mt-4 flex items-center gap-4">
+                              <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden" data-testid={`progress-area-${area.id}`}>
+                                <div 
+                                  className="h-full transition-all duration-500 rounded-full" 
+                                  style={{ width: `${areaStats?.avgProgress || 0}%`, backgroundColor: area.color }} 
+                                />
+                              </div>
+                              <span className="text-[13px] font-bold min-w-[35px]" style={{ color: area.color }} data-testid={`text-area-avg-${area.id}`}>
+                                {(areaStats?.avgProgress || 0).toFixed(0)}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="px-6 pb-6 pt-2 space-y-4 border-t border-border/40 bg-muted/5">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">
+                            Metas ({areaMetas.length})
+                          </h4>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            className="text-primary font-bold"
+                            onClick={() => openNewMetaDialog(area.id)}
+                            data-testid={`button-add-meta-${area.id}`}
+                          >
+                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                            Nova Meta
+                          </Button>
+                        </div>
+                        
+                        {areaMetas.length === 0 ? (
+                          <div className="text-center py-8 rounded-lg border border-dashed border-border/60">
+                            <p className="text-[13px] text-muted-foreground">
+                              Nenhuma meta cadastrada para esta área neste mês.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 gap-3">
+                            {areaMetas.map((meta) => {
+                              const progress = getProgress(meta);
+                              const user = getUserById(meta.responsibleId);
+                              const current = parseFloat(meta.currentValue || "0");
+                              const target = parseFloat(meta.targetValue || "100");
+
+                              return (
+                                <Card 
+                                  key={meta.id} 
+                                  className="p-4 shadow-none border-border/40 bg-background hover-elevate cursor-pointer" 
+                                  data-testid={`card-meta-${meta.id}`}
+                                  onClick={() => openCheckin(meta)}
+                                >
+                                  <div className="flex items-start gap-4">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                                        <p className="text-[14px] font-bold text-foreground leading-snug" data-testid={`text-meta-title-${meta.id}`}>{meta.title}</p>
+                                        <Badge variant="secondary" className="text-[9px] uppercase font-bold" data-testid={`badge-meta-type-${meta.id}`}>
+                                          {measurementLabels[meta.measurementType] || meta.measurementType}
+                                        </Badge>
+                                        <Badge 
+                                          variant="outline" 
+                                          className={`text-[9px] uppercase font-bold ${statusColors[meta.status]}`}
+                                          data-testid={`badge-meta-status-${meta.id}`}
+                                        >
+                                          <CalendarClock className="h-3 w-3 mr-1" />
+                                          {statusLabels[meta.status]}
+                                        </Badge>
+                                      </div>
+                                      
+                                      <div className="flex items-center gap-4 mb-2">
+                                        <div className="flex-1 bg-muted rounded-full h-1.5" data-testid={`progress-meta-${meta.id}`}>
+                                          <div 
+                                            className="h-full rounded-full transition-all"
+                                            style={{ 
+                                              width: `${progress}%`,
+                                              backgroundColor: area.color
+                                            }}
+                                          />
+                                        </div>
+                                        <span className="text-[11px] font-bold text-muted-foreground whitespace-nowrap" data-testid={`text-meta-value-${meta.id}`}>
+                                          {meta.measurementType === "binary" 
+                                            ? (current > 0 ? "1 / 1" : "0 / 1")
+                                            : `${current} / ${target} ${meta.unit || measurementUnits[meta.measurementType]}`
+                                          }
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+                                        {user && (
+                                          <div className="flex items-center gap-1" data-testid={`text-meta-responsible-${meta.id}`}>
+                                            <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
+                                              {user.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                                            </div>
+                                            <span>{user.name}</span>
+                                          </div>
+                                        )}
+                                        <div className="flex items-center gap-1" data-testid={`text-meta-month-${meta.id}`}>
+                                          <Clock className="h-3 w-3" />
+                                          <span>
+                                            {format(parseISO(`${meta.month}-01`), "MMM yyyy", { locale: ptBR })}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex flex-col items-center gap-2">
+                                      <div 
+                                        className="h-12 w-12 shrink-0 rounded-full border-2 flex items-center justify-center"
+                                        style={{ borderColor: `${area.color}40` }}
+                                        data-testid={`circle-progress-${meta.id}`}
+                                      >
+                                        <span className="text-[13px] font-bold" style={{ color: area.color }}>
+                                          {progress.toFixed(0)}%
+                                        </span>
+                                      </div>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="text-[10px]"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openCheckin(meta);
+                                        }}
+                                        data-testid={`button-checkin-${meta.id}`}
+                                      >
+                                        <RefreshCw className="h-3 w-3 mr-1" />
+                                        Check-in
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </Card>
+                              );
+                            })}
+                          </div>
                         )}
                       </div>
-                      <div className="space-y-1">
-                        <Progress value={progress} className="h-1.5" />
-                        <p className="text-xs text-right text-muted-foreground">{progress.toFixed(0)}%</p>
-                      </div>
-                    </div>
-                  );
-                })}
+                    </AccordionContent>
+                  </Card>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        )}
+      </main>
+
+      <Dialog open={isMetaDialogOpen} onOpenChange={setIsMetaDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Nova Meta</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Título *</Label>
+              <Input
+                value={metaForm.title}
+                onChange={e => setMetaForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Ex: Aumentar vendas em 20%"
+                data-testid="input-meta-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Descrição</Label>
+              <Textarea
+                value={metaForm.description}
+                onChange={e => setMetaForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Descreva a meta..."
+                rows={2}
+                data-testid="input-meta-description"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Área de Negócio *</Label>
+                <Select
+                  value={metaForm.areaId}
+                  onValueChange={val => setMetaForm(prev => ({ ...prev, areaId: val }))}
+                >
+                  <SelectTrigger data-testid="select-meta-area">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {activeAreas.map(area => (
+                      <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Responsável *</Label>
+                <Select
+                  value={metaForm.responsibleId}
+                  onValueChange={val => setMetaForm(prev => ({ ...prev, responsibleId: val }))}
+                >
+                  <SelectTrigger data-testid="select-meta-responsible">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map(user => (
+                      <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Tipo de Medição *</Label>
+                <Select
+                  value={metaForm.measurementType}
+                  onValueChange={val => setMetaForm(prev => ({ ...prev, measurementType: val }))}
+                >
+                  <SelectTrigger data-testid="select-meta-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Percentual (%)</SelectItem>
+                    <SelectItem value="absolute">Quantidade</SelectItem>
+                    <SelectItem value="monetary">Monetário (R$)</SelectItem>
+                    <SelectItem value="binary">Sim/Não</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {metaForm.measurementType !== "binary" && (
+                <div className="space-y-2">
+                  <Label>Valor Alvo *</Label>
+                  <Input
+                    type="number"
+                    value={metaForm.targetValue}
+                    onChange={e => setMetaForm(prev => ({ ...prev, targetValue: e.target.value }))}
+                    placeholder={metaForm.measurementType === "percentage" ? "100" : "0"}
+                    data-testid="input-meta-target"
+                  />
+                </div>
+              )}
+            </div>
+
+            {metaForm.measurementType === "absolute" && (
+              <div className="space-y-2">
+                <Label>Unidade</Label>
+                <Input
+                  value={metaForm.unit}
+                  onChange={e => setMetaForm(prev => ({ ...prev, unit: e.target.value }))}
+                  placeholder="Ex: Pontos, Unidades, Itens..."
+                  data-testid="input-meta-unit"
+                />
               </div>
             )}
-          </CardContent>
-        </Card>
-      </main>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMetaDialogOpen(false)} data-testid="button-cancel-meta">
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleSaveMeta}
+              disabled={!metaForm.title || !metaForm.areaId || !metaForm.responsibleId || createMetaMutation.isPending}
+              data-testid="button-save-meta"
+            >
+              {createMetaMutation.isPending ? "Salvando..." : "Criar Meta"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCheckinDialogOpen} onOpenChange={setIsCheckinDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Check-in de Progresso</DialogTitle>
+          </DialogHeader>
+          {checkinMeta && (
+            <div className="space-y-4 py-4">
+              <div className="p-4 bg-muted/30 rounded-lg" data-testid="card-checkin-info">
+                <h4 className="font-bold text-sm mb-1" data-testid="text-checkin-meta-title">{checkinMeta.title}</h4>
+                <p className="text-xs text-muted-foreground" data-testid="text-checkin-area">
+                  {getAreaById(checkinMeta.areaId)?.name}
+                </p>
+                <div className="flex justify-between items-center mt-3">
+                  <span className="text-sm text-muted-foreground">Progresso atual:</span>
+                  <span className="text-lg font-bold" data-testid="text-checkin-current-progress">
+                    {checkinMeta.currentValue || 0} / {checkinMeta.targetValue} 
+                    {checkinMeta.measurementType !== "binary" && ` ${checkinMeta.unit || measurementUnits[checkinMeta.measurementType]}`}
+                  </span>
+                </div>
+                <Progress value={getProgress(checkinMeta)} className="h-2 mt-2" data-testid="progress-checkin" />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Novo Valor *</Label>
+                <Input
+                  type="number"
+                  value={checkinForm.newValue}
+                  onChange={e => setCheckinForm(prev => ({ ...prev, newValue: e.target.value }))}
+                  placeholder="Informe o valor atual"
+                  data-testid="input-checkin-value"
+                />
+                {checkinMeta.measurementType === "binary" && (
+                  <p className="text-xs text-muted-foreground">0 = Não concluído, 1 = Concluído</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Comentário (opcional)</Label>
+                <Textarea
+                  value={checkinForm.comment}
+                  onChange={e => setCheckinForm(prev => ({ ...prev, comment: e.target.value }))}
+                  placeholder="O que mudou? Obstáculos encontrados?"
+                  rows={3}
+                  data-testid="input-checkin-comment"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCheckinDialogOpen(false)} data-testid="button-cancel-checkin">
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleCheckin}
+              disabled={createCheckinMutation.isPending}
+              data-testid="button-submit-checkin"
+            >
+              {createCheckinMutation.isPending ? "Salvando..." : "Registrar Check-in"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
