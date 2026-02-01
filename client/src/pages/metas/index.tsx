@@ -697,41 +697,41 @@ export default function MetasPage() {
                 </Button>
               </Card>
             ) : (
-              <Accordion type="multiple" defaultValue={Object.keys(metasByArea)} className="space-y-3">
-                {Object.entries(metasByArea).map(([areaId, areaMetas]) => {
-                  const area = getAreaById(areaId);
-                  const avgProgress = areaMetas.reduce((sum, m) => sum + getProgress(m), 0) / areaMetas.length;
-                  const completedCount = areaMetas.filter(m => m.status === "completed").length;
+              <div className="space-y-8">
+                {activeAreas.map(area => {
+                  const areaMetas = metasByArea[area.id] || [];
+                  if (areaMetas.length === 0) return null;
+                  
+                  const areaCompleted = areaMetas.filter(m => m.status === "completed" || getProgress(m) >= 100).length;
+                  const areaProgress = areaMetas.length > 0 
+                    ? areaMetas.reduce((sum, m) => sum + getProgress(m), 0) / areaMetas.length 
+                    : 0;
 
                   return (
-                    <AccordionItem key={areaId} value={areaId} className="border rounded-lg px-4" data-testid={`accordion-area-${areaId}`}>
-                      <AccordionTrigger className="hover:no-underline py-3" data-testid={`trigger-area-${areaId}`}>
-                        <div className="flex items-center gap-3 flex-1">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: area?.color || "#888" }}
-                          />
-                          <span className="font-medium" data-testid={`text-area-name-${areaId}`}>{area?.name || "Sem Área"}</span>
-                          <Badge variant="outline" className="ml-2" data-testid={`badge-area-metas-${areaId}`}>
-                            {completedCount}/{areaMetas.length} concluídas
+                    <div key={area.id} className="space-y-4" data-testid={`area-group-${area.id}`}>
+                      <div className="flex items-center justify-between group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: area.color }} />
+                          <h3 className="text-lg font-bold">{area.name}</h3>
+                          <Badge variant="outline" className="text-[10px] h-5">
+                            {areaCompleted}/{areaMetas.length} concluídas
                           </Badge>
-                          <div className="flex-1 max-w-[120px] ml-auto mr-4" data-testid={`progress-area-${areaId}`}>
-                            <Progress value={avgProgress} className="h-2" />
-                          </div>
-                          <span className="text-sm text-muted-foreground w-12 text-right" data-testid={`text-area-avg-${areaId}`}>
-                            {avgProgress.toFixed(0)}%
+                        </div>
+                        <div className="flex items-center gap-4 min-w-[200px]">
+                          <Progress value={areaProgress} className="h-1.5 flex-1" />
+                          <span className="text-xs font-medium text-muted-foreground w-8 text-right">
+                            {areaProgress.toFixed(0)}%
                           </span>
                         </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-4">
-                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {areaMetas.map(renderMetaCard)}
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
+                      </div>
+                      
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {areaMetas.map(meta => renderMetaCard(meta))}
+                      </div>
+                    </div>
                   );
                 })}
-              </Accordion>
+              </div>
             )}
           </TabsContent>
 
