@@ -697,10 +697,11 @@ export default function MetasPage() {
                 </Button>
               </Card>
             ) : (
-              <div className="space-y-8">
+              <Accordion type="multiple" defaultValue={activeAreas.map(a => a.id)} className="space-y-3">
                 {activeAreas.map(area => {
                   const areaMetas = metasByArea[area.id] || [];
-                  if (areaMetas.length === 0) return null;
+                  if (areaMetas.length === 0 && !searchTerm && statusFilter === "all") return null;
+                  if (areaMetas.length === 0 && (searchTerm || statusFilter !== "all")) return null;
                   
                   const areaCompleted = areaMetas.filter(m => m.status === "completed" || getProgress(m) >= 100).length;
                   const areaProgress = areaMetas.length > 0 
@@ -708,30 +709,31 @@ export default function MetasPage() {
                     : 0;
 
                   return (
-                    <div key={area.id} className="space-y-4" data-testid={`area-group-${area.id}`}>
-                      <div className="flex items-center justify-between group">
-                        <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: area.color }} />
-                          <h3 className="text-lg font-bold">{area.name}</h3>
-                          <Badge variant="outline" className="text-[10px] h-5">
+                    <AccordionItem key={area.id} value={area.id} className="border rounded-lg px-4" data-testid={`area-group-${area.id}`}>
+                      <AccordionTrigger className="hover:no-underline py-3">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: area.color }} />
+                          <span className="font-bold text-lg">{area.name}</span>
+                          <Badge variant="outline" className="text-[10px] h-5 ml-2">
                             {areaCompleted}/{areaMetas.length} concluídas
                           </Badge>
-                        </div>
-                        <div className="flex items-center gap-4 min-w-[200px]">
-                          <Progress value={areaProgress} className="h-1.5 flex-1" />
-                          <span className="text-xs font-medium text-muted-foreground w-8 text-right">
+                          <div className="flex-1 max-w-[150px] ml-auto mr-4">
+                            <Progress value={areaProgress} className="h-2" />
+                          </div>
+                          <span className="text-sm font-medium text-muted-foreground w-12 text-right">
                             {areaProgress.toFixed(0)}%
                           </span>
                         </div>
-                      </div>
-                      
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                        {areaMetas.map(meta => renderMetaCard(meta))}
-                      </div>
-                    </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-4">
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 mt-2">
+                          {areaMetas.map(meta => renderMetaCard(meta))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
                   );
                 })}
-              </div>
+              </Accordion>
             )}
           </TabsContent>
 
