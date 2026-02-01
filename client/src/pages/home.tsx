@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import type { AiConversation, AiMessage } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
+import MacGyverIcon from "@/components/Chat/MacGyverIcon";
 
 function formatDate(date: Date | string | null): string {
   if (!date) return "";
@@ -249,9 +250,7 @@ export default function Home() {
             {showWelcome && (
               <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
                 <div className="relative">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
-                    <Sparkles className="h-10 w-10 text-primary-foreground" />
-                  </div>
+                  <MacGyverIcon size={80} />
                 </div>
                 
                 <div className="space-y-2">
@@ -259,7 +258,8 @@ export default function Home() {
                     Macgyver IA Renov
                   </h1>
                   <p className="text-muted-foreground max-w-xl">
-                    Inspirado no agente que resolvia o impossível com o mínimo, estou aqui para transformar suas dúvidas em soluções práticas. Sem clipes de papel, só respostas inteligentes!
+                    MacGyver resolvia qualquer problema com clipe de papel e criatividade. 
+                    Eu faço o mesmo, mas com IA e sem gambiarras!
                     <br />
                     Como posso te ajudar hoje?
                   </p>
