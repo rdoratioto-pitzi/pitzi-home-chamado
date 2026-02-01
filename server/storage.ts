@@ -32,12 +32,17 @@ import {
   type MetaArea, type InsertMetaArea,
   type Meta, type InsertMeta,
   type MetaCheckin, type InsertMetaCheckin,
+  type KnowledgeDocument, type InsertKnowledgeDocument,
+  type KnowledgeDocumentVersion, type InsertKnowledgeDocumentVersion,
+  type KnowledgeAuditLog, type InsertKnowledgeAuditLog,
+  type KnowledgeFavorite, type InsertKnowledgeFavorite,
   users, tickets, ticketResponsaveis, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
   collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules,
   pricingDevices, pricingPriceHistory, pricingAlerts,
-  metaAreas, metas, metaCheckins
+  metaAreas, metas, metaCheckins,
+  knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql } from "drizzle-orm";
@@ -243,6 +248,28 @@ export interface IStorage {
   // Meta Check-ins
   getMetaCheckins(metaId: string): Promise<MetaCheckin[]>;
   createMetaCheckin(checkin: InsertMetaCheckin): Promise<MetaCheckin>;
+
+  // Knowledge Base Documents
+  getKnowledgeDocuments(filters?: { area?: string; tipo?: string; status?: string; search?: string }): Promise<KnowledgeDocument[]>;
+  getKnowledgeDocument(id: string): Promise<KnowledgeDocument | undefined>;
+  createKnowledgeDocument(doc: InsertKnowledgeDocument): Promise<KnowledgeDocument>;
+  updateKnowledgeDocument(id: string, data: Partial<KnowledgeDocument>): Promise<KnowledgeDocument | undefined>;
+  deleteKnowledgeDocument(id: string): Promise<boolean>;
+  getKnowledgeDocumentStats(): Promise<{ total: number; byTipo: Record<string, number>; byArea: Record<string, number>; byStatus: Record<string, number> }>;
+
+  // Knowledge Document Versions
+  getKnowledgeDocumentVersions(documentId: string): Promise<KnowledgeDocumentVersion[]>;
+  createKnowledgeDocumentVersion(version: InsertKnowledgeDocumentVersion): Promise<KnowledgeDocumentVersion>;
+
+  // Knowledge Audit Logs
+  getKnowledgeAuditLogs(documentId: string): Promise<KnowledgeAuditLog[]>;
+  createKnowledgeAuditLog(log: InsertKnowledgeAuditLog): Promise<KnowledgeAuditLog>;
+
+  // Knowledge Favorites
+  getKnowledgeFavorites(userId: string): Promise<KnowledgeFavorite[]>;
+  getKnowledgeFavorite(userId: string, documentId: string): Promise<KnowledgeFavorite | undefined>;
+  createKnowledgeFavorite(favorite: InsertKnowledgeFavorite): Promise<KnowledgeFavorite>;
+  deleteKnowledgeFavorite(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -932,6 +959,113 @@ export class DatabaseStorage implements IStorage {
   async createMetaCheckin(checkin: InsertMetaCheckin): Promise<MetaCheckin> {
     const [created] = await db.insert(metaCheckins).values(checkin).returning();
     return created;
+  }
+
+  // Knowledge Base Documents
+  async getKnowledgeDocuments(filters?: { area?: string; tipo?: string; status?: string; search?: string }): Promise<KnowledgeDocument[]> {
+    const conditions = [];
+    if (filters?.area) {
+      conditions.push(eq(knowledgeDocuments.area, filters.area));
+    }
+    if (filters?.tipo) {
+      conditions.push(eq(knowledgeDocuments.tipo, filters.tipo));
+    }
+    if (filters?.status) {
+      conditions.push(eq(knowledgeDocuments.status, filters.status));
+    }
+    if (filters?.search) {
+      const searchTerm = `%${filters.search.toLowerCase()}%`;
+      conditions.push(
+        or(
+          sql`LOWER(${knowledgeDocuments.titulo}) LIKE ${searchTerm}`,
+          sql`LOWER(${knowledgeDocuments.nomeArquivo}) LIKE ${searchTerm}`,
+          sql`LOWER(${knowledgeDocuments.conteudo}) LIKE ${searchTerm}`,
+          sql`LOWER(${knowledgeDocuments.tags}) LIKE ${searchTerm}`
+        )
+      );
+    }
+    if (conditions.length > 0) {
+      return await db.select().from(knowledgeDocuments).where(and(...conditions)).orderBy(sql`${knowledgeDocuments.createdAt} DESC`);
+    }
+    return await db.select().from(knowledgeDocuments).orderBy(sql`${knowledgeDocuments.createdAt} DESC`);
+  }
+
+  async getKnowledgeDocument(id: string): Promise<KnowledgeDocument | undefined> {
+    const [doc] = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, id));
+    return doc;
+  }
+
+  async createKnowledgeDocument(doc: InsertKnowledgeDocument): Promise<KnowledgeDocument> {
+    const [created] = await db.insert(knowledgeDocuments).values(doc).returning();
+    return created;
+  }
+
+  async updateKnowledgeDocument(id: string, data: Partial<KnowledgeDocument>): Promise<KnowledgeDocument | undefined> {
+    const updateData = { ...data, updatedAt: new Date() };
+    const [updated] = await db.update(knowledgeDocuments).set(updateData).where(eq(knowledgeDocuments.id, id)).returning();
+    return updated;
+  }
+
+  async deleteKnowledgeDocument(id: string): Promise<boolean> {
+    const result = await db.delete(knowledgeDocuments).where(eq(knowledgeDocuments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getKnowledgeDocumentStats(): Promise<{ total: number; byTipo: Record<string, number>; byArea: Record<string, number>; byStatus: Record<string, number> }> {
+    const docs = await this.getKnowledgeDocuments();
+    const byTipo: Record<string, number> = {};
+    const byArea: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+
+    docs.forEach(doc => {
+      byTipo[doc.tipo] = (byTipo[doc.tipo] || 0) + 1;
+      byArea[doc.area] = (byArea[doc.area] || 0) + 1;
+      byStatus[doc.status] = (byStatus[doc.status] || 0) + 1;
+    });
+
+    return { total: docs.length, byTipo, byArea, byStatus };
+  }
+
+  // Knowledge Document Versions
+  async getKnowledgeDocumentVersions(documentId: string): Promise<KnowledgeDocumentVersion[]> {
+    return await db.select().from(knowledgeDocumentVersions).where(eq(knowledgeDocumentVersions.documentId, documentId)).orderBy(sql`${knowledgeDocumentVersions.createdAt} DESC`);
+  }
+
+  async createKnowledgeDocumentVersion(version: InsertKnowledgeDocumentVersion): Promise<KnowledgeDocumentVersion> {
+    const [created] = await db.insert(knowledgeDocumentVersions).values(version).returning();
+    return created;
+  }
+
+  // Knowledge Audit Logs
+  async getKnowledgeAuditLogs(documentId: string): Promise<KnowledgeAuditLog[]> {
+    return await db.select().from(knowledgeAuditLogs).where(eq(knowledgeAuditLogs.documentId, documentId)).orderBy(sql`${knowledgeAuditLogs.createdAt} DESC`);
+  }
+
+  async createKnowledgeAuditLog(log: InsertKnowledgeAuditLog): Promise<KnowledgeAuditLog> {
+    const [created] = await db.insert(knowledgeAuditLogs).values(log).returning();
+    return created;
+  }
+
+  // Knowledge Favorites
+  async getKnowledgeFavorites(userId: string): Promise<KnowledgeFavorite[]> {
+    return await db.select().from(knowledgeFavorites).where(eq(knowledgeFavorites.userId, userId));
+  }
+
+  async getKnowledgeFavorite(userId: string, documentId: string): Promise<KnowledgeFavorite | undefined> {
+    const [fav] = await db.select().from(knowledgeFavorites).where(
+      and(eq(knowledgeFavorites.userId, userId), eq(knowledgeFavorites.documentId, documentId))
+    );
+    return fav;
+  }
+
+  async createKnowledgeFavorite(favorite: InsertKnowledgeFavorite): Promise<KnowledgeFavorite> {
+    const [created] = await db.insert(knowledgeFavorites).values(favorite).returning();
+    return created;
+  }
+
+  async deleteKnowledgeFavorite(id: string): Promise<boolean> {
+    const result = await db.delete(knowledgeFavorites).where(eq(knowledgeFavorites.id, id)).returning();
+    return result.length > 0;
   }
 }
 

@@ -42,6 +42,10 @@ import {
   insertMetaAreaSchema,
   insertMetaSchema,
   insertMetaCheckinSchema,
+  insertKnowledgeDocumentSchema,
+  insertKnowledgeDocumentVersionSchema,
+  insertKnowledgeAuditLogSchema,
+  insertKnowledgeFavoriteSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -102,12 +106,15 @@ export async function registerRoutes(
   // ============== DASHBOARD STATS ==============
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
-      const [tickets, projects, tasks, objectives, shipments] = await Promise.all([
+      const [tickets, projects, tasks, objectives, shipments, metas, pricingAlerts, knowledgeDocs] = await Promise.all([
         storage.getTickets(),
         storage.getProjects(),
         storage.getTasks({}),
         storage.getObjectives(),
         storage.getShipments(),
+        storage.getMetas({}),
+        storage.getPricingAlerts(),
+        storage.getKnowledgeDocuments({ status: "aprovado" }),
       ]);
 
       const openTickets = tickets.filter(t => t.status !== "closed").length;
@@ -116,6 +123,9 @@ export async function registerRoutes(
       const scheduledMeetings = tasks.filter(t => t.type === "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
       const activeObjectives = objectives.length;
       const inTransitShipments = shipments.filter(s => s.status === "in_transit").length;
+      const activeMetas = metas.filter(m => m.status !== "completed").length;
+      const activeAlerts = pricingAlerts.filter(a => a.isActive).length;
+      const approvedDocs = knowledgeDocs.length;
 
       res.json({
         tickets: openTickets,
@@ -124,6 +134,9 @@ export async function registerRoutes(
         meetings: scheduledMeetings,
         objectives: activeObjectives,
         logistica: inTransitShipments,
+        metas: activeMetas,
+        pricing: activeAlerts,
+        conhecimento: approvedDocs,
       });
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -2182,6 +2195,388 @@ export async function registerRoutes(
       res.status(201).json(checkin);
     } catch (error: any) {
       console.error("Create meta checkin error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============== KNOWLEDGE BASE (Base de Conhecimento) ==============
+
+  // Get all documents with filters
+  app.get("/api/conhecimento", async (req, res) => {
+    try {
+      const { area, tipo, status, search } = req.query;
+      const docs = await storage.getKnowledgeDocuments({
+        area: area as string | undefined,
+        tipo: tipo as string | undefined,
+        status: status as string | undefined,
+        search: search as string | undefined,
+      });
+      res.json(docs);
+    } catch (error: any) {
+      console.error("Get knowledge documents error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get document stats
+  app.get("/api/conhecimento/stats", async (req, res) => {
+    try {
+      const stats = await storage.getKnowledgeDocumentStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get knowledge stats error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get single document
+  app.get("/api/conhecimento/:id", async (req, res) => {
+    try {
+      const doc = await storage.getKnowledgeDocument(req.params.id);
+      if (!doc) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Log view action
+      const userId = req.query.userId as string;
+      if (userId) {
+        await storage.createKnowledgeAuditLog({
+          documentId: doc.id,
+          userId,
+          acao: "visualizou",
+        });
+      }
+      
+      res.json(doc);
+    } catch (error: any) {
+      console.error("Get knowledge document error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create new document
+  app.post("/api/conhecimento", async (req, res) => {
+    try {
+      const parsed = insertKnowledgeDocumentSchema.parse(req.body);
+      const doc = await storage.createKnowledgeDocument(parsed);
+      
+      // Log creation
+      await storage.createKnowledgeAuditLog({
+        documentId: doc.id,
+        userId: doc.criadorId,
+        acao: "criou",
+      });
+      
+      // Create initial version
+      await storage.createKnowledgeDocumentVersion({
+        documentId: doc.id,
+        versao: doc.versao,
+        conteudo: doc.conteudo,
+        anexos: doc.anexos,
+        alteradoPor: doc.criadorId,
+        resumoAlteracoes: "Versão inicial",
+      });
+      
+      res.status(201).json(doc);
+    } catch (error: any) {
+      console.error("Create knowledge document error:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update document
+  app.patch("/api/conhecimento/:id", async (req, res) => {
+    try {
+      const { userId, ...updateData } = req.body;
+      
+      const updated = await storage.updateKnowledgeDocument(req.params.id, {
+        ...updateData,
+        ultimaEdicaoPor: userId,
+        ultimaEdicaoEm: new Date(),
+      });
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      // Log edit action
+      if (userId) {
+        await storage.createKnowledgeAuditLog({
+          documentId: req.params.id,
+          userId,
+          acao: "editou",
+        });
+      }
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update knowledge document error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Send document for approval
+  app.post("/api/conhecimento/:id/enviar-aprovacao", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      const updated = await storage.updateKnowledgeDocument(req.params.id, {
+        status: "em_analise",
+      });
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await storage.createKnowledgeAuditLog({
+        documentId: req.params.id,
+        userId,
+        acao: "enviou_aprovacao",
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Send for approval error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Approve document (Admin only)
+  app.post("/api/conhecimento/:id/aprovar", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      const updated = await storage.updateKnowledgeDocument(req.params.id, {
+        status: "aprovado",
+        aprovadoPor: userId,
+        aprovadoEm: new Date(),
+      });
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await storage.createKnowledgeAuditLog({
+        documentId: req.params.id,
+        userId,
+        acao: "aprovou",
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Approve document error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Reject document (Admin only)
+  app.post("/api/conhecimento/:id/rejeitar", async (req, res) => {
+    try {
+      const { userId, motivo } = req.body;
+      
+      const updated = await storage.updateKnowledgeDocument(req.params.id, {
+        status: "rascunho",
+        rejeitadoPor: userId,
+        rejeitadoEm: new Date(),
+        motivoRejeicao: motivo,
+      });
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await storage.createKnowledgeAuditLog({
+        documentId: req.params.id,
+        userId,
+        acao: "rejeitou",
+        detalhes: motivo,
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Reject document error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Archive document
+  app.post("/api/conhecimento/:id/arquivar", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      const updated = await storage.updateKnowledgeDocument(req.params.id, {
+        status: "arquivado",
+      });
+      
+      if (!updated) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      
+      await storage.createKnowledgeAuditLog({
+        documentId: req.params.id,
+        userId,
+        acao: "arquivou",
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Archive document error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete document
+  app.delete("/api/conhecimento/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteKnowledgeDocument(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Document not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete knowledge document error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get document versions
+  app.get("/api/conhecimento/:id/versoes", async (req, res) => {
+    try {
+      const versions = await storage.getKnowledgeDocumentVersions(req.params.id);
+      res.json(versions);
+    } catch (error: any) {
+      console.error("Get document versions error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create new version
+  app.post("/api/conhecimento/:id/versoes", async (req, res) => {
+    try {
+      const parsed = insertKnowledgeDocumentVersionSchema.parse({
+        ...req.body,
+        documentId: req.params.id,
+      });
+      
+      const version = await storage.createKnowledgeDocumentVersion(parsed);
+      
+      // Update document's current version
+      await storage.updateKnowledgeDocument(req.params.id, {
+        versao: parsed.versao,
+        conteudo: parsed.conteudo,
+        anexos: parsed.anexos,
+        ultimaEdicaoPor: parsed.alteradoPor,
+        ultimaEdicaoEm: new Date(),
+      });
+      
+      await storage.createKnowledgeAuditLog({
+        documentId: req.params.id,
+        userId: parsed.alteradoPor,
+        acao: "editou",
+        detalhes: `Nova versão: ${parsed.versao}`,
+      });
+      
+      res.status(201).json(version);
+    } catch (error: any) {
+      console.error("Create document version error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Restore version (Admin only)
+  app.post("/api/conhecimento/:id/versoes/:versionId/restaurar", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      const versions = await storage.getKnowledgeDocumentVersions(req.params.id);
+      const version = versions.find(v => v.id === req.params.versionId);
+      
+      if (!version) {
+        return res.status(404).json({ error: "Version not found" });
+      }
+      
+      // Update document to this version
+      const updated = await storage.updateKnowledgeDocument(req.params.id, {
+        versao: version.versao,
+        conteudo: version.conteudo,
+        anexos: version.anexos,
+        ultimaEdicaoPor: userId,
+        ultimaEdicaoEm: new Date(),
+      });
+      
+      await storage.createKnowledgeAuditLog({
+        documentId: req.params.id,
+        userId,
+        acao: "restaurou",
+        detalhes: `Restaurado para versão ${version.versao}`,
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Restore version error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get audit logs
+  app.get("/api/conhecimento/:id/auditoria", async (req, res) => {
+    try {
+      const logs = await storage.getKnowledgeAuditLogs(req.params.id);
+      res.json(logs);
+    } catch (error: any) {
+      console.error("Get audit logs error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get user favorites
+  app.get("/api/conhecimento/favoritos/:userId", async (req, res) => {
+    try {
+      const favorites = await storage.getKnowledgeFavorites(req.params.userId);
+      res.json(favorites);
+    } catch (error: any) {
+      console.error("Get favorites error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add favorite
+  app.post("/api/conhecimento/:id/favoritar", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      // Check if already favorited
+      const existing = await storage.getKnowledgeFavorite(userId, req.params.id);
+      if (existing) {
+        return res.status(400).json({ error: "Already favorited" });
+      }
+      
+      const favorite = await storage.createKnowledgeFavorite({
+        userId,
+        documentId: req.params.id,
+      });
+      
+      res.status(201).json(favorite);
+    } catch (error: any) {
+      console.error("Add favorite error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Remove favorite
+  app.delete("/api/conhecimento/:docId/favoritar/:userId", async (req, res) => {
+    try {
+      const favorite = await storage.getKnowledgeFavorite(req.params.userId, req.params.docId);
+      if (!favorite) {
+        return res.status(404).json({ error: "Favorite not found" });
+      }
+      
+      await storage.deleteKnowledgeFavorite(favorite.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Remove favorite error:", error);
       res.status(500).json({ error: error.message });
     }
   });
