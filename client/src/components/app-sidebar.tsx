@@ -254,7 +254,14 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
               {menuItems.map((item) => {
-                const isActive = location === item.url || location.startsWith(item.url + "/");
+                const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url + "/"));
+                
+                const handleClick = () => {
+                  if (item.url === "/" && location === "/") {
+                    window.location.reload();
+                  }
+                };
+
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton 
@@ -262,7 +269,7 @@ export function AppSidebar() {
                       isActive={isActive}
                       className={`h-11 px-3 transition-all duration-200 rounded-lg ${isActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                     >
-                      <Link href={item.url} data-testid={`link-${item.url.slice(1)}`}>
+                      <Link href={item.url} data-testid={`link-${item.url.slice(1)}`} onClick={handleClick}>
                         <item.icon className={`h-[20px] w-[20px] ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
                         <span className="text-[14px]">{item.title}</span>
                       </Link>

@@ -267,33 +267,34 @@ export default function Home() {
                 
                 <div className="space-y-2">
                   <h1 className="text-3xl font-bold tracking-tight">
-                    Assistente Renov Home
+                    Macgyver IA Renov
                   </h1>
-                  <p className="text-muted-foreground max-w-md">
-                    Olá{user?.name ? `, ${user.name.split(" ")[0]}` : ""}! Sou seu assistente virtual. 
-                    Posso ajudar com informações sobre tickets, projetos, tarefas, metas, documentos e muito mais.
+                  <p className="text-muted-foreground max-w-xl">
+                    Inspirado no agente que resolvia o impossível com o mínimo, estou aqui para transformar suas dúvidas em soluções práticas. Sem clipes de papel, só respostas inteligentes!
+                    <br />
+                    Como posso te ajudar hoje?
                   </p>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-2 w-full max-w-lg mt-4">
+                <div className="flex flex-col w-full max-w-lg mt-4 space-y-2">
                   {[
                     "Quais são os tickets em aberto?",
                     "Resumo das metas deste mês",
                     "Documentos aprovados recentes",
                     "Como criar um novo projeto?"
                   ].map((suggestion) => (
-                    <Button
+                    <button
                       key={suggestion}
-                      variant="outline"
-                      className="text-left h-auto py-3 px-4 justify-start text-sm"
+                      className="text-left py-2 px-0 hover:text-primary transition-colors text-sm font-medium border-none bg-transparent cursor-pointer flex items-center gap-2 group"
                       onClick={() => {
                         setInputMessage(suggestion);
                         textareaRef.current?.focus();
                       }}
                       data-testid={`button-suggestion-${suggestion.slice(0, 20)}`}
                     >
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary/40 group-hover:bg-primary transition-colors" />
                       {suggestion}
-                    </Button>
+                    </button>
                   ))}
                 </div>
               </div>
