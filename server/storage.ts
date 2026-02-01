@@ -36,13 +36,16 @@ import {
   type KnowledgeDocumentVersion, type InsertKnowledgeDocumentVersion,
   type KnowledgeAuditLog, type InsertKnowledgeAuditLog,
   type KnowledgeFavorite, type InsertKnowledgeFavorite,
+  type AiConversation, type InsertAiConversation,
+  type AiMessage, type InsertAiMessage,
   users, tickets, ticketResponsaveis, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
   collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules,
   pricingDevices, pricingPriceHistory, pricingAlerts,
   metaAreas, metas, metaCheckins,
-  knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites
+  knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
+  aiConversations, aiMessages
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql } from "drizzle-orm";
@@ -270,6 +273,17 @@ export interface IStorage {
   getKnowledgeFavorite(userId: string, documentId: string): Promise<KnowledgeFavorite | undefined>;
   createKnowledgeFavorite(favorite: InsertKnowledgeFavorite): Promise<KnowledgeFavorite>;
   deleteKnowledgeFavorite(id: string): Promise<boolean>;
+
+  // AI Conversations
+  getAiConversations(userId: string): Promise<AiConversation[]>;
+  getAiConversation(id: string): Promise<AiConversation | undefined>;
+  createAiConversation(conversation: InsertAiConversation): Promise<AiConversation>;
+  updateAiConversation(id: string, data: Partial<AiConversation>): Promise<AiConversation | undefined>;
+  deleteAiConversation(id: string): Promise<boolean>;
+
+  // AI Messages
+  getAiMessages(conversationId: string): Promise<AiMessage[]>;
+  createAiMessage(message: InsertAiMessage): Promise<AiMessage>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1066,6 +1080,42 @@ export class DatabaseStorage implements IStorage {
   async deleteKnowledgeFavorite(id: string): Promise<boolean> {
     const result = await db.delete(knowledgeFavorites).where(eq(knowledgeFavorites.id, id)).returning();
     return result.length > 0;
+  }
+
+  // AI Conversations
+  async getAiConversations(userId: string): Promise<AiConversation[]> {
+    return await db.select().from(aiConversations).where(eq(aiConversations.userId, userId)).orderBy(sql`${aiConversations.updatedAt} DESC`);
+  }
+
+  async getAiConversation(id: string): Promise<AiConversation | undefined> {
+    const [conv] = await db.select().from(aiConversations).where(eq(aiConversations.id, id));
+    return conv;
+  }
+
+  async createAiConversation(conversation: InsertAiConversation): Promise<AiConversation> {
+    const [created] = await db.insert(aiConversations).values(conversation).returning();
+    return created;
+  }
+
+  async updateAiConversation(id: string, data: Partial<AiConversation>): Promise<AiConversation | undefined> {
+    const [updated] = await db.update(aiConversations).set({ ...data, updatedAt: new Date() }).where(eq(aiConversations.id, id)).returning();
+    return updated;
+  }
+
+  async deleteAiConversation(id: string): Promise<boolean> {
+    await db.delete(aiMessages).where(eq(aiMessages.conversationId, id));
+    const result = await db.delete(aiConversations).where(eq(aiConversations.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // AI Messages
+  async getAiMessages(conversationId: string): Promise<AiMessage[]> {
+    return await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conversationId)).orderBy(sql`${aiMessages.createdAt} ASC`);
+  }
+
+  async createAiMessage(message: InsertAiMessage): Promise<AiMessage> {
+    const [created] = await db.insert(aiMessages).values(message).returning();
+    return created;
   }
 }
 
