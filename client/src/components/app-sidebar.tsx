@@ -87,6 +87,10 @@ const allMenuItems = [
   },
 ];
 
+const metasSubItems = [
+  { title: "Visão Geral", url: "/metas", icon: LayoutDashboard },
+  { title: "Gestão de Metas", url: "/metas/gestao", icon: Target },
+];
 
 const logisticaSubItems = [
   { title: "Visão Geral", url: "/logistica/dashboard", icon: LayoutDashboard },
@@ -145,10 +149,12 @@ export function AppSidebar() {
     };
   }, []);
 
+  const [metasOpen, setMetasOpen] = useState(location.startsWith("/metas"));
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
   
+  const isMetasActive = location.startsWith("/metas");
   const isLogisticaActive = location.startsWith("/logistica");
   const isApisActive = location.startsWith("/apis");
   const isPricingActive = location.startsWith("/pricing");
@@ -253,18 +259,42 @@ export function AppSidebar() {
               })}
 
               {hasMetasAccess && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild
-                    isActive={location === "/metas"}
-                    className={`h-11 px-3 transition-all duration-200 rounded-lg ${location === "/metas" ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
-                  >
-                    <Link href="/metas" data-testid="link-metas">
-                      <BarChart3 className={`h-[20px] w-[20px] ${location === "/metas" ? 'text-primary' : 'text-muted-foreground'}`} />
-                      <span className="text-[14px]">Metas</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <Collapsible open={metasOpen} onOpenChange={setMetasOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton 
+                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isMetasActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        isActive={isMetasActive}
+                        data-testid="link-metas"
+                      >
+                        <BarChart3 className={`h-[20px] w-[20px] ${isMetasActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">Metas</span>
+                        {metasOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                        {metasSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-metas-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
               )}
 
               <SidebarMenuItem>

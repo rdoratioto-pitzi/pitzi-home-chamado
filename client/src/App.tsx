@@ -36,6 +36,7 @@ import PricingIndicadoresPage from "@/pages/pricing/indicadores";
 import PricingAlertasPage from "@/pages/pricing/alertas";
 import PricingDashboardPage from "@/pages/pricing/dashboard";
 import MetasVisaoGeralPage from "@/pages/metas/index";
+import MetasGestaoPage from "@/pages/metas/gestao";
 
 function Router() {
   return (
@@ -79,6 +80,11 @@ function Router() {
       <Route path="/metas">
         <ProtectedRoute requiredPermission="okrs">
           <MetasVisaoGeralPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/metas/gestao">
+        <ProtectedRoute requiredPermission="okrs">
+          <MetasGestaoPage />
         </ProtectedRoute>
       </Route>
       <Route path="/okrs">

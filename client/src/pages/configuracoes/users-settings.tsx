@@ -52,11 +52,8 @@ const MODULES = [
   { key: "chamados", label: "Chamados" },
   { key: "projetos", label: "Projetos" },
   { key: "tarefas", label: "Tarefas" },
-  { key: "reunioes", label: "Reuniões" },
-  { key: "metas", label: "Metas" },
   { key: "okrs", label: "OKRs" },
   { key: "logistica", label: "Logística" },
-  { key: "pricing", label: "Pricing" },
   { key: "apis", label: "Integrações" },
   { key: "configuracoes", label: "Configurações" },
 ] as const;
@@ -70,11 +67,8 @@ const formSchema = z.object({
     chamados: z.boolean(),
     projetos: z.boolean(),
     tarefas: z.boolean(),
-    reunioes: z.boolean(),
-    metas: z.boolean(),
     okrs: z.boolean(),
     logistica: z.boolean(),
-    pricing: z.boolean(),
     apis: z.boolean(),
     configuracoes: z.boolean(),
   }),
@@ -116,11 +110,8 @@ export function UsersSettings() {
         chamados: true,
         projetos: true,
         tarefas: true,
-        reunioes: true,
-        metas: true,
         okrs: true,
         logistica: true,
-        pricing: true,
         apis: false,
         configuracoes: false,
       },
@@ -183,18 +174,15 @@ export function UsersSettings() {
       chamados: true,
       projetos: true,
       tarefas: true,
-      reunioes: true,
-      metas: true,
       okrs: true,
       logistica: true,
-      pricing: true,
       apis: false,
       configuracoes: false,
     };
 
     try {
       if (user.modulePermissions) {
-        perms = { ...perms, ...JSON.parse(user.modulePermissions) };
+        perms = JSON.parse(user.modulePermissions);
       }
     } catch (e) {
       console.error("Error parsing permissions", e);
@@ -221,11 +209,8 @@ export function UsersSettings() {
         chamados: true,
         projetos: true,
         tarefas: true,
-        reunioes: true,
-        metas: true,
         okrs: true,
         logistica: true,
-        pricing: true,
         apis: false,
         configuracoes: false,
       },
