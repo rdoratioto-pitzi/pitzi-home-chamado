@@ -80,3 +80,28 @@ Renov Home adopts a client-server architecture with a clear separation of concer
 - **xlsx:** Library for Excel file generation and export.
 - **html2canvas:** Library for capturing screenshots of web pages (used for graphic downloads).
 - **date-fns-tz:** Library for timezone-aware date manipulation.
+- **OpenRouter API:** Used by the AI Chat module for LLM-powered conversations (model: google/gemini-2.0-flash-001).
+- **react-markdown:** Library for rendering markdown content in AI chat responses.
+
+## AI Chat Module
+
+The home page features a ChatGPT/Gemini-style AI assistant interface that integrates with all platform data:
+
+**Architecture:**
+- **Database:** `aiConversations` and `aiMessages` tables store chat history
+- **Backend:** `/api/ai/chat` endpoint with Server-Sent Events (SSE) for streaming responses
+- **Frontend:** Modern chat UI with sidebar for conversation history, markdown rendering for responses
+- **Integration:** System prompt includes context from all modules (tickets, projects, tasks, metas, OKRs, pricing, logistics, knowledge base)
+
+**Key Files:**
+- `server/openrouter.ts` - OpenRouter API integration with context building
+- `server/routes.ts` - AI chat API endpoints
+- `client/src/pages/home.tsx` - Chat interface UI
+- `shared/schema.ts` - AI conversation and message schemas
+
+**Security:**
+- Conversation ownership verification (userId must match)
+- Zod validation for request bodies
+- API key stored as environment secret (OPENROUTER_API_KEY)
+
+**Note:** Platform data context is loaded globally for AI responses. For multi-tenant deployments, tenant-scoped queries would be needed in `getSystemPrompt()`.

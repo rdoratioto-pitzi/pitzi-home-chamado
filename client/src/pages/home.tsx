@@ -1,186 +1,408 @@
-import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Link } from "wouter";
-import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2, Video, BarChart3, Smartphone, BookOpen } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { getCurrentUser, getUserPermissions, type UserPermissions } from "@/lib/permissions";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { getCurrentUser } from "@/lib/permissions";
+import { 
+  MessageSquare, 
+  Send, 
+  Plus, 
+  Trash2, 
+  Loader2, 
+  Bot, 
+  User,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
+import type { AiConversation, AiMessage } from "@shared/schema";
+import ReactMarkdown from "react-markdown";
+
+function formatDate(date: Date | string | null): string {
+  if (!date) return "";
+  const d = new Date(date);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  
+  if (days === 0) return "Hoje";
+  if (days === 1) return "Ontem";
+  if (days < 7) return `${days} dias atrás`;
+  return d.toLocaleDateString("pt-BR");
+}
 
 export default function Home() {
-  const [permissions, setPermissions] = useState<UserPermissions | null>(null);
-  const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const queryClient = useQueryClient();
+  const user = getCurrentUser();
+  const userId = user?.id || "default-user";
+  
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [inputMessage, setInputMessage] = useState("");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    const updatePermissions = () => {
-      const user = getCurrentUser();
-      if (user) {
-        setPermissions(getUserPermissions(user));
-        setIsUserAdmin(user.isAdmin === true);
-      }
-    };
-    updatePermissions();
-    const interval = setInterval(updatePermissions, 500);
-    return () => clearInterval(interval);
+  const { data: conversations = [], isLoading: conversationsLoading } = useQuery<AiConversation[]>({
+    queryKey: ["/api/ai/conversations", userId],
+  });
+
+  const { data: messages = [], isLoading: messagesLoading } = useQuery<AiMessage[]>({
+    queryKey: ["/api/ai/conversations", selectedConversationId, "messages"],
+    enabled: !!selectedConversationId,
+  });
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  const { data: stats, isLoading } = useQuery<{
-    tickets: number;
-    projects: number;
-    tasks: number;
-    meetings: number;
-    objectives: number;
-    metas: number;
-    pricing: number;
-    logistica: number;
-    conhecimento: number;
-  }>({
-    queryKey: ["/api/dashboard/stats"],
-  });
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, streamingContent, scrollToBottom]);
 
-  const allModules = [
-    {
-      title: "Chamados",
-      description: "Gerencie tickets de suporte interno, acompanhe status e prioridades",
-      icon: Ticket,
-      href: "/chamados",
-      stats: { label: "Chamados abertos", value: stats?.tickets ?? 0 },
-      color: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-      permissionKey: "chamados" as keyof UserPermissions,
-    },
-    {
-      title: "Projetos",
-      description: "Planeje e execute projetos com visualização Kanban",
-      icon: FolderKanban,
-      href: "/projetos",
-      stats: { label: "Projetos ativos", value: stats?.projects ?? 0 },
-      color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-      permissionKey: "projetos" as keyof UserPermissions,
-    },
-    {
-      title: "Tarefas",
-      description: "Gerencie tarefas individuais por áreas",
-      icon: CheckSquare,
-      href: "/tarefas",
-      stats: { label: "Tarefas pendentes", value: stats?.tasks ?? 0 },
-      color: "bg-green-500/10 text-green-600 dark:text-green-400",
-      permissionKey: "tarefas" as keyof UserPermissions,
-    },
-    {
-      title: "Reuniões",
-      description: "Gestão de reuniões com pauta e participantes",
-      icon: Video,
-      href: "/reunioes",
-      stats: { label: "Reuniões agendadas", value: stats?.meetings ?? 0 },
-      color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
-      permissionKey: "reunioes" as keyof UserPermissions,
-    },
-    {
-      title: "Metas",
-      description: "Acompanhe suas metas e progresso mensal",
-      icon: BarChart3,
-      href: "/metas",
-      stats: { label: "Metas ativas", value: stats?.metas ?? 0 },
-      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-      permissionKey: "metas" as keyof UserPermissions,
-    },
-    {
-      title: "OKRs",
-      description: "Defina objetivos e acompanhe resultados-chave",
-      icon: Target,
-      href: "/okrs",
-      stats: { label: "Objetivos ativos", value: stats?.objectives ?? 0 },
-      color: "bg-primary/10 text-primary",
-      permissionKey: "okrs" as keyof UserPermissions,
-    },
-    {
-      title: "Logística",
-      description: "Rastreie envios e gerencie entregas",
-      icon: Truck,
-      href: "/logistica",
-      stats: { label: "Em trânsito", value: stats?.logistica ?? 0 },
-      color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-      permissionKey: "logistica" as keyof UserPermissions,
-    },
-    {
-      title: "Pricing",
-      description: "Monitoramento de preços RenovSmart",
-      icon: Smartphone,
-      href: "/pricing",
-      stats: { label: "Alertas ativos", value: stats?.pricing ?? 0 },
-      color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-      permissionKey: "pricing" as keyof UserPermissions,
-    },
-    {
-      title: "Base de Conhecimento",
-      description: "Documentos, políticas, POPs e materiais internos",
-      icon: BookOpen,
-      href: "/conhecimento",
-      stats: { label: "Documentos aprovados", value: stats?.conhecimento ?? 0 },
-      color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
-      permissionKey: "conhecimento" as keyof UserPermissions,
-    },
-  ];
+  const handleNewConversation = () => {
+    setSelectedConversationId(null);
+    setInputMessage("");
+    setStreamingContent("");
+  };
 
-  const modules = allModules.filter(module => {
-    if (isUserAdmin) return true;
-    if (!permissions) return false;
-    return permissions[module.permissionKey];
-  });
+  const handleDeleteConversation = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await apiRequest("DELETE", `/api/ai/conversations/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/conversations", userId] });
+      if (selectedConversationId === id) {
+        setSelectedConversationId(null);
+      }
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputMessage.trim() || isStreaming) return;
+
+    const message = inputMessage.trim();
+    setInputMessage("");
+    setIsStreaming(true);
+    setStreamingContent("");
+
+    const isNewConversation = !selectedConversationId;
+    const tempConversationId = selectedConversationId || "temp-" + Date.now();
+
+    if (isNewConversation) {
+      queryClient.setQueryData<AiMessage[]>(["/api/ai/conversations", tempConversationId, "messages"], [
+        { id: "temp-user", conversationId: tempConversationId, role: "user", content: message, createdAt: new Date(), tenantId: null }
+      ]);
+    } else {
+      queryClient.setQueryData<AiMessage[]>(["/api/ai/conversations", selectedConversationId, "messages"], (old = []) => [
+        ...old,
+        { id: "temp-user-" + Date.now(), conversationId: selectedConversationId!, role: "user", content: message, createdAt: new Date(), tenantId: null }
+      ]);
+    }
+
+    try {
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: selectedConversationId || "new",
+          userId,
+          message,
+          isNewConversation,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to send message");
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+      let actualConversationId = selectedConversationId;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === "conversation_id") {
+                actualConversationId = data.id;
+                setSelectedConversationId(data.id);
+              } else if (data.type === "chunk") {
+                fullContent += data.content;
+                setStreamingContent(fullContent);
+              } else if (data.type === "title") {
+                queryClient.invalidateQueries({ queryKey: ["/api/ai/conversations", userId] });
+              } else if (data.type === "done") {
+                if (actualConversationId) {
+                  queryClient.invalidateQueries({ queryKey: ["/api/ai/conversations", actualConversationId, "messages"] });
+                }
+              } else if (data.type === "error") {
+                console.error("Stream error:", data.error);
+              }
+            } catch {
+              // Skip invalid JSON
+            }
+          }
+        }
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/conversations", userId] });
+    } catch (error) {
+      console.error("Failed to send message:", error);
+    } finally {
+      setIsStreaming(false);
+      setStreamingContent("");
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const displayMessages = selectedConversationId ? messages : [];
+  const showWelcome = !selectedConversationId && displayMessages.length === 0 && !isStreaming;
 
   return (
-    <div className="flex flex-col min-h-full">
-      <PageHeader title="Início" />
-      
-      <main className="flex-1 p-6">
-        <div className="max-w-6xl mx-auto space-y-8">
-          <div>
-            <h2 className="text-[28px] font-bold tracking-tight">Bem-vindo ao Renov Home</h2>
-            <p className="text-[16px] text-muted-foreground mt-1">
-              Plataforma interna de gestão da Renov
+    <div className="flex h-screen overflow-hidden bg-background">
+      <div 
+        className={cn(
+          "border-r bg-muted/30 flex flex-col transition-all duration-300",
+          sidebarCollapsed ? "w-0 overflow-hidden" : "w-72"
+        )}
+      >
+        <div className="p-3 border-b">
+          <Button 
+            className="w-full justify-start gap-2" 
+            variant="outline"
+            onClick={handleNewConversation}
+            data-testid="button-new-conversation"
+          >
+            <Plus className="h-4 w-4" />
+            Nova conversa
+          </Button>
+        </div>
+        
+        <ScrollArea className="flex-1">
+          <div className="p-2 space-y-1">
+            {conversationsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                Nenhuma conversa ainda
+              </div>
+            ) : (
+              conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  className={cn(
+                    "group flex items-center gap-2 rounded-lg px-3 py-2.5 cursor-pointer transition-colors hover-elevate",
+                    selectedConversationId === conv.id 
+                      ? "bg-accent text-accent-foreground" 
+                      : "hover:bg-muted"
+                  )}
+                  onClick={() => setSelectedConversationId(conv.id)}
+                  data-testid={`conversation-item-${conv.id}`}
+                >
+                  <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{conv.title || "Nova conversa"}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(conv.updatedAt)}</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    onClick={(e) => handleDeleteConversation(conv.id, e)}
+                    data-testid={`button-delete-conversation-${conv.id}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-6 w-6 rounded-r-full bg-muted border-r border-t border-b"
+        style={{ left: sidebarCollapsed ? 0 : "286px" }}
+        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+        data-testid="button-toggle-sidebar"
+      >
+        {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+      </Button>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <ScrollArea className="flex-1 px-4">
+          <div className="max-w-3xl mx-auto py-8 space-y-6">
+            {showWelcome && (
+              <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6">
+                <div className="relative">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg">
+                    <Sparkles className="h-10 w-10 text-primary-foreground" />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-bold tracking-tight">
+                    Assistente Renov Home
+                  </h1>
+                  <p className="text-muted-foreground max-w-md">
+                    Olá{user?.name ? `, ${user.name.split(" ")[0]}` : ""}! Sou seu assistente virtual. 
+                    Posso ajudar com informações sobre tickets, projetos, tarefas, metas, documentos e muito mais.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 w-full max-w-lg mt-4">
+                  {[
+                    "Quais são os tickets em aberto?",
+                    "Resumo das metas deste mês",
+                    "Documentos aprovados recentes",
+                    "Como criar um novo projeto?"
+                  ].map((suggestion) => (
+                    <Button
+                      key={suggestion}
+                      variant="outline"
+                      className="text-left h-auto py-3 px-4 justify-start text-sm"
+                      onClick={() => {
+                        setInputMessage(suggestion);
+                        textareaRef.current?.focus();
+                      }}
+                      data-testid={`button-suggestion-${suggestion.slice(0, 20)}`}
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {displayMessages.map((msg) => (
+              <div
+                key={msg.id}
+                className={cn(
+                  "flex gap-4",
+                  msg.role === "user" ? "justify-end" : "justify-start"
+                )}
+                data-testid={`message-${msg.role}-${msg.id}`}
+              >
+                {msg.role === "assistant" && (
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Bot className="h-5 w-5 text-primary" />
+                  </div>
+                )}
+                <div
+                  className={cn(
+                    "rounded-2xl px-4 py-3 max-w-[80%]",
+                    msg.role === "user"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted"
+                  )}
+                >
+                  {msg.role === "assistant" ? (
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                  )}
+                </div>
+                {msg.role === "user" && (
+                  <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+                    <User className="h-5 w-5 text-primary-foreground" />
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {isStreaming && streamingContent && (
+              <div className="flex gap-4 justify-start">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Bot className="h-5 w-5 text-primary" />
+                </div>
+                <div className="rounded-2xl px-4 py-3 max-w-[80%] bg-muted">
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {isStreaming && !streamingContent && (
+              <div className="flex gap-4 justify-start">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Bot className="h-5 w-5 text-primary" />
+                </div>
+                <div className="rounded-2xl px-4 py-3 bg-muted">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+
+        <div className="border-t p-4 bg-background">
+          <div className="max-w-3xl mx-auto">
+            <div className="relative flex items-end gap-2">
+              <Textarea
+                ref={textareaRef}
+                placeholder="Digite sua mensagem..."
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isStreaming}
+                className="min-h-[52px] max-h-[200px] resize-none pr-12"
+                rows={1}
+                data-testid="input-chat-message"
+              />
+              <Button
+                size="icon"
+                className="absolute right-2 bottom-2 h-8 w-8"
+                disabled={!inputMessage.trim() || isStreaming}
+                onClick={handleSendMessage}
+                data-testid="button-send-message"
+              >
+                {isStreaming ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-center text-muted-foreground mt-2">
+              Assistente alimentado por IA • Renov Home
             </p>
           </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {modules.map((module) => (
-              <Link key={module.href} href={module.href}>
-                <Card 
-                  className="group cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 shadow-sm border-border/60"
-                  data-testid={`card-module-${module.href.slice(1)}`}
-                >
-                  <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${module.color}`}>
-                        <module.icon className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-[18px] font-bold leading-tight">
-                          {module.title}
-                        </CardTitle>
-                        <CardDescription className="text-[13px] mt-1.5 leading-relaxed">
-                          {module.description}
-                        </CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        {isLoading ? (
-                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        ) : (
-                          <p className="text-2xl font-bold">{module.stats.value}</p>
-                        )}
-                        <p className="text-sm text-muted-foreground">{module.stats.label}</p>
-                      </div>
-                      <ArrowRight className="h-5 w-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
-          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

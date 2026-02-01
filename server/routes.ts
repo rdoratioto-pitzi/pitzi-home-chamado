@@ -13,6 +13,7 @@ import {
 } from "./email-service";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import * as correiosService from "./correios-service";
+import { streamChatCompletion, generateTitle } from "./openrouter";
 import { 
   insertUserSchema, 
   insertTicketSchema, 
@@ -46,6 +47,8 @@ import {
   insertKnowledgeDocumentVersionSchema,
   insertKnowledgeAuditLogSchema,
   insertKnowledgeFavoriteSchema,
+  insertAiConversationSchema,
+  insertAiMessageSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -2583,6 +2586,175 @@ export async function registerRoutes(
 
   // Register object storage routes for file uploads
   registerObjectStorageRoutes(app);
+
+  // ============== AI CHAT ROUTES ==============
+  
+  // Get all conversations for a user
+  app.get("/api/ai/conversations/:userId", async (req, res) => {
+    try {
+      const conversations = await storage.getAiConversations(req.params.userId);
+      res.json(conversations);
+    } catch (error: any) {
+      console.error("Get AI conversations error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create a new conversation
+  app.post("/api/ai/conversations", async (req, res) => {
+    try {
+      const data = insertAiConversationSchema.parse(req.body);
+      const conversation = await storage.createAiConversation(data);
+      res.status(201).json(conversation);
+    } catch (error: any) {
+      console.error("Create AI conversation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update conversation (e.g., title)
+  app.patch("/api/ai/conversations/:id", async (req, res) => {
+    try {
+      const conversation = await storage.updateAiConversation(req.params.id, req.body);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      res.json(conversation);
+    } catch (error: any) {
+      console.error("Update AI conversation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete conversation
+  app.delete("/api/ai/conversations/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAiConversation(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete AI conversation error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get messages for a conversation
+  app.get("/api/ai/conversations/:id/messages", async (req, res) => {
+    try {
+      const messages = await storage.getAiMessages(req.params.id);
+      res.json(messages);
+    } catch (error: any) {
+      console.error("Get AI messages error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Stream chat completion
+  app.post("/api/ai/chat", async (req, res) => {
+    try {
+      const chatSchema = z.object({
+        conversationId: z.string(),
+        userId: z.string(),
+        message: z.string().min(1).max(10000),
+        isNewConversation: z.boolean().optional(),
+        tenantId: z.string().optional(),
+      });
+
+      const parsed = chatSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid request body", details: parsed.error.errors });
+      }
+
+      const { conversationId, userId, message, isNewConversation, tenantId } = parsed.data;
+
+      // Create conversation if new
+      let conversation;
+      if (isNewConversation) {
+        conversation = await storage.createAiConversation({
+          userId,
+          tenantId,
+          title: "Nova conversa",
+        });
+      } else {
+        conversation = await storage.getAiConversation(conversationId);
+        if (!conversation) {
+          return res.status(404).json({ error: "Conversation not found" });
+        }
+        // Verify conversation ownership
+        if (conversation.userId !== userId) {
+          return res.status(403).json({ error: "Access denied to this conversation" });
+        }
+      }
+
+      const actualConversationId = isNewConversation ? conversation.id : conversationId;
+
+      // Save user message
+      await storage.createAiMessage({
+        conversationId: actualConversationId,
+        role: "user",
+        content: message,
+      });
+
+      // Get conversation history
+      const history = await storage.getAiMessages(actualConversationId);
+      const messages = history.map(m => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+      // Set up SSE
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+
+      // Send conversation ID for new conversations
+      if (isNewConversation) {
+        res.write(`data: ${JSON.stringify({ type: "conversation_id", id: actualConversationId })}\n\n`);
+      }
+
+      let fullResponse = "";
+
+      // Stream the response with user context for personalized responses
+      try {
+        for await (const chunk of streamChatCompletion(messages, { userId, tenantId })) {
+          fullResponse += chunk;
+          res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`);
+        }
+      } catch (streamError: any) {
+        console.error("Stream error:", streamError);
+        res.write(`data: ${JSON.stringify({ type: "error", error: streamError.message })}\n\n`);
+        res.end();
+        return;
+      }
+
+      // Save assistant message
+      await storage.createAiMessage({
+        conversationId: actualConversationId,
+        role: "assistant",
+        content: fullResponse,
+      });
+
+      // Generate title for new conversations
+      if (isNewConversation) {
+        const title = await generateTitle(message);
+        await storage.updateAiConversation(actualConversationId, { title });
+        res.write(`data: ${JSON.stringify({ type: "title", title })}\n\n`);
+      }
+
+      res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+      res.end();
+    } catch (error: any) {
+      console.error("AI chat error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.write(`data: ${JSON.stringify({ type: "error", error: error.message })}\n\n`);
+        res.end();
+      }
+    }
+  });
 
   return httpServer;
 }
