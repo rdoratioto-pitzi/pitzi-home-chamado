@@ -304,6 +304,48 @@ export default function DocumentoPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Anexos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {document.anexos ? (
+                <div className="space-y-2">
+                  {JSON.parse(document.anexos).map((anexo: any, index: number) => {
+                    const IconComponent = FileText; // Simplificado para o exemplo, pode-se usar a lógica de ícone
+                    return (
+                      <div key={index} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                        <IconComponent className="h-8 w-8 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{anexo.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {anexo.size < 1024 ? `${anexo.size} B` : 
+                             anexo.size < 1024 * 1024 ? `${(anexo.size / 1024).toFixed(1)} KB` : 
+                             `${(anexo.size / (1024 * 1024)).toFixed(1)} MB`}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                        >
+                          <a href={anexo.dataUrl} download={anexo.name}>
+                            <Download className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-sm">Nenhum anexo disponível.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
                 <History className="h-5 w-5" />
                 Histórico de Versões
               </CardTitle>
