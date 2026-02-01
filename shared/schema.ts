@@ -45,8 +45,10 @@ export type ModulePermissions = {
   projetos: boolean;
   tarefas: boolean;
   okrs: boolean;
+  metas: boolean;
   logistica: boolean;
   pricing: boolean;
+  conhecimento: boolean;
   apis: boolean;
   configuracoes: boolean;
 };
@@ -775,3 +777,104 @@ export const insertMetaCheckinSchema = baseInsertMetaCheckinSchema.extend({
 });
 export type InsertMetaCheckin = z.infer<typeof insertMetaCheckinSchema>;
 export type MetaCheckin = typeof metaCheckins.$inferSelect;
+
+// ============== KNOWLEDGE BASE (Base de Conhecimento) ==============
+
+// Main documents table
+export const knowledgeDocuments = pgTable("knowledge_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  // Naming convention fields: [Area][Tipo][Titulo][Versao][Data]
+  area: text("area").notNull(), // LAB, RH, COM, FIN, MKT, OPS, TI, etc.
+  tipo: text("tipo").notNull(), // politica, pop, fluxograma, mapa_cargo, template, checklist, faq
+  titulo: text("titulo").notNull(), // Sem acentos/caracteres especiais
+  versao: text("versao").notNull().default("V1"), // V1, V2, V3...
+  dataMesAno: text("data_mes_ano").notNull(), // YYYY-MM format
+  // Auto-generated standardized name
+  nomeArquivo: text("nome_arquivo").notNull(), // LAB_POP104_Titulo_V1_2025-12
+  // Content and metadata
+  conteudo: text("conteudo"), // Rich text content
+  tags: text("tags"), // JSON array of tags for search
+  // Attachments stored as JSON array
+  anexos: text("anexos"), // JSON: [{fileName, fileUrl, fileSize, fileType}]
+  // Status workflow
+  status: text("status").notNull().default("rascunho"), // rascunho, em_analise, aprovado, arquivado
+  // Approval tracking
+  aprovadoPor: varchar("aprovado_por"),
+  aprovadoEm: timestamp("aprovado_em"),
+  rejeitadoPor: varchar("rejeitado_por"),
+  rejeitadoEm: timestamp("rejeitado_em"),
+  motivoRejeicao: text("motivo_rejeicao"),
+  // Permissions
+  visibilidade: text("visibilidade").notNull().default("todos"), // todos, departamento, funcoes
+  permissoesVisualizacao: text("permissoes_visualizacao"), // JSON: departamentos ou funções específicas
+  // Owner and tracking
+  criadorId: varchar("criador_id").notNull(),
+  ultimaEdicaoPor: varchar("ultima_edicao_por"),
+  ultimaEdicaoEm: timestamp("ultima_edicao_em"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertKnowledgeDocumentSchema = createInsertSchema(knowledgeDocuments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertKnowledgeDocument = z.infer<typeof insertKnowledgeDocumentSchema>;
+export type KnowledgeDocument = typeof knowledgeDocuments.$inferSelect;
+
+// Version history for documents
+export const knowledgeDocumentVersions = pgTable("knowledge_document_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  documentId: varchar("document_id").notNull(),
+  versao: text("versao").notNull(), // V1, V2, etc
+  conteudo: text("conteudo"),
+  anexos: text("anexos"),
+  alteradoPor: varchar("alterado_por").notNull(),
+  resumoAlteracoes: text("resumo_alteracoes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKnowledgeDocumentVersionSchema = createInsertSchema(knowledgeDocumentVersions).omit({ id: true, createdAt: true });
+export type InsertKnowledgeDocumentVersion = z.infer<typeof insertKnowledgeDocumentVersionSchema>;
+export type KnowledgeDocumentVersion = typeof knowledgeDocumentVersions.$inferSelect;
+
+// Audit trail for all document actions
+export const knowledgeAuditLogs = pgTable("knowledge_audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  documentId: varchar("document_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  acao: text("acao").notNull(), // criou, editou, visualizou, enviou_aprovacao, aprovou, rejeitou, restaurou
+  detalhes: text("detalhes"), // Optional additional info
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKnowledgeAuditLogSchema = createInsertSchema(knowledgeAuditLogs).omit({ id: true, createdAt: true });
+export type InsertKnowledgeAuditLog = z.infer<typeof insertKnowledgeAuditLogSchema>;
+export type KnowledgeAuditLog = typeof knowledgeAuditLogs.$inferSelect;
+
+// User favorites
+export const knowledgeFavorites = pgTable("knowledge_favorites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  userId: varchar("user_id").notNull(),
+  documentId: varchar("document_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKnowledgeFavoriteSchema = createInsertSchema(knowledgeFavorites).omit({ id: true, createdAt: true });
+export type InsertKnowledgeFavorite = z.infer<typeof insertKnowledgeFavoriteSchema>;
+export type KnowledgeFavorite = typeof knowledgeFavorites.$inferSelect;
+
+// Helper types for Knowledge Base
+export type KnowledgeDocumentAnexo = {
+  fileName: string;
+  fileUrl: string;
+  fileSize: number;
+  fileType: string;
+};
+
+export type KnowledgeDocumentWithDetails = KnowledgeDocument & {
+  criador?: User;
+  aprovador?: User;
+  favorito?: boolean;
+};

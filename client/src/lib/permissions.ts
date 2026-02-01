@@ -3,8 +3,11 @@ export interface UserPermissions {
   projetos: boolean;
   tarefas: boolean;
   okrs: boolean;
+  metas: boolean;
+  reunioes: boolean;
   logistica: boolean;
   pricing: boolean;
+  conhecimento: boolean;
   apis: boolean;
   configuracoes: boolean;
 }
@@ -41,8 +44,11 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     projetos: false,
     tarefas: false,
     okrs: false,
+    metas: false,
+    reunioes: false,
     logistica: false,
     pricing: false,
+    conhecimento: false,
     apis: false,
     configuracoes: false,
   };
@@ -55,8 +61,11 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       projetos: true,
       tarefas: true,
       okrs: true,
+      metas: true,
+      reunioes: true,
       logistica: true,
       pricing: true,
+      conhecimento: true,
       apis: true,
       configuracoes: true,
     };

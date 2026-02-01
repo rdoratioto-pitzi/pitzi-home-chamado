@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2, Video, BarChart3, Smartphone } from "lucide-react";
+import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2, Video, BarChart3, Smartphone, BookOpen } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getCurrentUser, getUserPermissions, type UserPermissions } from "@/lib/permissions";
 import { useState, useEffect } from "react";
@@ -32,6 +32,7 @@ export default function Home() {
     metas: number;
     pricing: number;
     logistica: number;
+    conhecimento: number;
   }>({
     queryKey: ["/api/dashboard/stats"],
   });
@@ -108,6 +109,15 @@ export default function Home() {
       stats: { label: "Alertas ativos", value: stats?.pricing ?? 0 },
       color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
       permissionKey: "pricing" as keyof UserPermissions,
+    },
+    {
+      title: "Base de Conhecimento",
+      description: "Documentos, políticas, POPs e materiais internos",
+      icon: BookOpen,
+      href: "/conhecimento",
+      stats: { label: "Documentos aprovados", value: stats?.conhecimento ?? 0 },
+      color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+      permissionKey: "conhecimento" as keyof UserPermissions,
     },
   ];
 
