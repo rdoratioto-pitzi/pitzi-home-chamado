@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2, Video } from "lucide-react";
+import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2, Video, BarChart3, DollarSign } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getCurrentUser, getUserPermissions, type UserPermissions } from "@/lib/permissions";
 import { useState, useEffect } from "react";
@@ -28,8 +28,10 @@ export default function Home() {
     projects: number;
     tasks: number;
     meetings: number;
+    metas: number;
     objectives: number;
     logistica: number;
+    pricing: number;
   }>({
     queryKey: ["/api/dashboard/stats"],
   });
@@ -72,6 +74,15 @@ export default function Home() {
       permissionKey: "tarefas" as keyof UserPermissions,
     },
     {
+      title: "Metas",
+      description: "Acompanhe metas mensais por área de negócio",
+      icon: BarChart3,
+      href: "/metas",
+      stats: { label: "Metas ativas", value: stats?.metas ?? 0 },
+      color: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+      permissionKey: "okrs" as keyof UserPermissions,
+    },
+    {
       title: "OKRs",
       description: "Defina objetivos e acompanhe resultados-chave",
       icon: Target,
@@ -88,6 +99,15 @@ export default function Home() {
       stats: { label: "Em trânsito", value: stats?.logistica ?? 0 },
       color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
       permissionKey: "logistica" as keyof UserPermissions,
+    },
+    {
+      title: "Pricing",
+      description: "Monitore preços de smartphones e iPhones",
+      icon: DollarSign,
+      href: "/pricing",
+      stats: { label: "Produtos monitorados", value: stats?.pricing ?? 0 },
+      color: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+      permissionKey: "pricing" as keyof UserPermissions,
     },
   ];
 

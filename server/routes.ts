@@ -102,12 +102,15 @@ export async function registerRoutes(
   // ============== DASHBOARD STATS ==============
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
-      const [tickets, projects, tasks, objectives, shipments] = await Promise.all([
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      const [tickets, projects, tasks, objectives, shipments, metas, pricingDevices] = await Promise.all([
         storage.getTickets(),
         storage.getProjects(),
         storage.getTasks({}),
         storage.getObjectives(),
         storage.getShipments(),
+        storage.getMetas({ month: currentMonth }),
+        storage.getPricingDevices({ isActive: true }),
       ]);
 
       const openTickets = tickets.filter(t => t.status !== "closed").length;
@@ -116,14 +119,18 @@ export async function registerRoutes(
       const scheduledMeetings = tasks.filter(t => t.type === "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
       const activeObjectives = objectives.length;
       const inTransitShipments = shipments.filter(s => s.status === "in_transit").length;
+      const activeMetas = metas.filter(m => m.status !== "completed").length;
+      const activePricingDevices = pricingDevices.length;
 
       res.json({
         tickets: openTickets,
         projects: activeProjects,
         tasks: pendingTasks,
         meetings: scheduledMeetings,
+        metas: activeMetas,
         objectives: activeObjectives,
         logistica: inTransitShipments,
+        pricing: activePricingDevices,
       });
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
