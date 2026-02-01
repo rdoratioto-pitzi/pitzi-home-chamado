@@ -37,6 +37,10 @@ import PricingAlertasPage from "@/pages/pricing/alertas";
 import PricingDashboardPage from "@/pages/pricing/dashboard";
 import MetasVisaoGeralPage from "@/pages/metas/index";
 import MetasGestaoPage from "@/pages/metas/gestao";
+import ConhecimentoPage from "@/pages/conhecimento/index";
+import ConhecimentoNovoPage from "@/pages/conhecimento/novo";
+import ConhecimentoDocumentoPage from "@/pages/conhecimento/documento";
+import ConhecimentoFavoritosPage from "@/pages/conhecimento/favoritos";
 
 function Router() {
   return (
@@ -170,6 +174,31 @@ function Router() {
       <Route path="/pricing/dashboard">
         <ProtectedRoute requiredPermission="pricing">
           <PricingDashboardPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/conhecimento">
+        <ProtectedRoute requiredPermission="conhecimento">
+          <ConhecimentoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/conhecimento/novo">
+        <ProtectedRoute requiredPermission="conhecimento">
+          <ConhecimentoNovoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/conhecimento/documentos">
+        <ProtectedRoute requiredPermission="conhecimento">
+          <ConhecimentoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/conhecimento/favoritos">
+        <ProtectedRoute requiredPermission="conhecimento">
+          <ConhecimentoFavoritosPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/conhecimento/:id">
+        <ProtectedRoute requiredPermission="conhecimento">
+          <ConhecimentoDocumentoPage />
         </ProtectedRoute>
       </Route>
       <Route path="/login" component={LoginPage} />

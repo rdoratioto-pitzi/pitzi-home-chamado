@@ -25,6 +25,9 @@ import {
   LineChart,
   TrendingDown,
   Bell,
+  BookOpen,
+  FileText,
+  Star,
 } from "lucide-react";
 import {
   Sidebar,
@@ -116,6 +119,12 @@ const pricingSubItems = [
   { title: "Relatórios", url: "/pricing/relatorios", icon: FileSpreadsheet },
 ];
 
+const conhecimentoSubItems = [
+  { title: "Visão Geral", url: "/conhecimento", icon: LayoutDashboard },
+  { title: "Todos os Documentos", url: "/conhecimento/documentos", icon: FileText },
+  { title: "Meus Favoritos", url: "/conhecimento/favoritos", icon: Star },
+];
+
 function getCurrentUser() {
   try {
     const userStr = sessionStorage.getItem("user");
@@ -153,11 +162,13 @@ export function AppSidebar() {
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
+  const [conhecimentoOpen, setConhecimentoOpen] = useState(location.startsWith("/conhecimento"));
   
   const isMetasActive = location.startsWith("/metas");
   const isLogisticaActive = location.startsWith("/logistica");
   const isApisActive = location.startsWith("/apis");
   const isPricingActive = location.startsWith("/pricing");
+  const isConhecimentoActive = location.startsWith("/conhecimento");
   
   const permissions = useMemo(() => {
     try {
@@ -169,6 +180,7 @@ export function AppSidebar() {
           okrs: true,
           logistica: true,
           pricing: true,
+          conhecimento: true,
           apis: true,
           configuracoes: true,
         };
@@ -188,6 +200,7 @@ export function AppSidebar() {
       okrs: false,
       logistica: false,
       pricing: false,
+      conhecimento: false,
       apis: false,
       configuracoes: false,
     };
@@ -203,6 +216,7 @@ export function AppSidebar() {
   const hasMetasAccess = permissions.okrs === true;
   const hasLogisticaAccess = permissions.logistica === true;
   const hasPricingAccess = permissions.pricing === true;
+  const hasConhecimentoAccess = permissions.conhecimento === true;
   const hasApisAccess = permissions.apis === true;
   const hasConfiguracoesAccess = permissions.configuracoes === true;
 
@@ -375,6 +389,45 @@ export function AppSidebar() {
                             <SidebarMenuSubItem key={subItem.url}>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {hasConhecimentoAccess && (
+                <Collapsible open={conhecimentoOpen} onOpenChange={setConhecimentoOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton 
+                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isConhecimentoActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        isActive={isConhecimentoActive}
+                        data-testid="link-conhecimento"
+                      >
+                        <BookOpen className={`h-[20px] w-[20px] ${isConhecimentoActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">Base de Conhecimento</span>
+                        {conhecimentoOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                        {conhecimentoSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-conhecimento-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[13.5px]">{subItem.title}</span>
                                 </Link>
