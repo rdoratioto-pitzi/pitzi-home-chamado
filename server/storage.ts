@@ -1010,7 +1010,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createKnowledgeDocument(doc: InsertKnowledgeDocument): Promise<KnowledgeDocument> {
-    const [created] = await db.insert(knowledgeDocuments).values(doc).returning();
+    const { id, ...data } = doc as any;
+    const [created] = await db.insert(knowledgeDocuments).values(data).returning();
     return created;
   }
 
