@@ -183,8 +183,7 @@ export default function Home() {
     <div className="flex h-screen overflow-hidden bg-background">
       <div 
         className={cn(
-          "border-r bg-muted/30 flex flex-col transition-all duration-300",
-          sidebarCollapsed ? "w-0 overflow-hidden" : "w-72"
+          "border-r bg-muted/30 flex flex-col transition-all duration-300 w-72"
         )}
       >
         <div className="p-3 border-b">
@@ -243,16 +242,6 @@ export default function Home() {
         </ScrollArea>
       </div>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 h-6 w-6 rounded-r-full bg-muted border-r border-t border-b"
-        style={{ left: sidebarCollapsed ? 0 : "286px" }}
-        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-        data-testid="button-toggle-sidebar"
-      >
-        {sidebarCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-      </Button>
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <ScrollArea className="flex-1 px-4">
