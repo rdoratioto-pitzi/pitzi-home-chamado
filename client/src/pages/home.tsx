@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "wouter";
-import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2, Video } from "lucide-react";
+import { Ticket, FolderKanban, Target, Truck, ArrowRight, CheckSquare, Loader2, Video, BarChart3, Smartphone } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { getCurrentUser, getUserPermissions, type UserPermissions } from "@/lib/permissions";
 import { useState, useEffect } from "react";
@@ -29,6 +29,8 @@ export default function Home() {
     tasks: number;
     meetings: number;
     objectives: number;
+    metas: number;
+    pricing: number;
     logistica: number;
   }>({
     queryKey: ["/api/dashboard/stats"],
@@ -69,7 +71,16 @@ export default function Home() {
       href: "/reunioes",
       stats: { label: "Reuniões agendadas", value: stats?.meetings ?? 0 },
       color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
-      permissionKey: "tarefas" as keyof UserPermissions,
+      permissionKey: "reunioes" as keyof UserPermissions,
+    },
+    {
+      title: "Metas",
+      description: "Acompanhe suas metas e progresso mensal",
+      icon: BarChart3,
+      href: "/metas",
+      stats: { label: "Metas ativas", value: stats?.metas ?? 0 },
+      color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+      permissionKey: "metas" as keyof UserPermissions,
     },
     {
       title: "OKRs",
@@ -88,6 +99,15 @@ export default function Home() {
       stats: { label: "Em trânsito", value: stats?.logistica ?? 0 },
       color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
       permissionKey: "logistica" as keyof UserPermissions,
+    },
+    {
+      title: "Pricing",
+      description: "Monitoramento de preços RenovSmart",
+      icon: Smartphone,
+      href: "/pricing",
+      stats: { label: "Alertas ativos", value: stats?.pricing ?? 0 },
+      color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+      permissionKey: "pricing" as keyof UserPermissions,
     },
   ];
 
