@@ -53,8 +53,7 @@ export default function Home() {
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    sessionStorage.removeItem("user");
-    window.location.href = "/login";
+    window.location.href = "/auth";
   };
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<AiConversation[]>({
