@@ -8,7 +8,6 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ProtectedRoute } from "@/components/protected-route";
 import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/dashboard";
 import Home from "@/pages/home";
 import ChamadosPage from "@/pages/chamados/index";
 import ProjetosPage from "@/pages/projetos/index";
@@ -46,8 +45,7 @@ import ConhecimentoFavoritosPage from "@/pages/conhecimento/favoritos";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/macgyver" component={Home} />
+      <Route path="/" component={Home} />
       <Route path="/chamados">
         <ProtectedRoute requiredPermission="chamados">
           <ChamadosPage />

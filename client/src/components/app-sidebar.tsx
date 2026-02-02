@@ -28,7 +28,6 @@ import {
   BookOpen,
   FileText,
   Star,
-  Bot,
 } from "lucide-react";
 import {
   Sidebar,
@@ -63,12 +62,6 @@ const allMenuItems = [
     title: "Início",
     url: "/",
     icon: LayoutDashboard,
-    module: null,
-  },
-  {
-    title: "Macgyver IA",
-    url: "/macgyver",
-    icon: Bot,
     module: null,
   },
   {
