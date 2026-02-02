@@ -1702,12 +1702,22 @@ export async function registerRoutes(
       if (!categoryId) {
         return res.json({ items: [], currentPage: 1, hasNextPage: false });
       }
-      const url = `${RENOVSMART_API_BASE}/eligible-devices?categoryId=${categoryId}&pageNumber=${pageNumber}&pageSize=${pageSize}`;
+      // Ensure we don't send undefined/null values in query string
+      const params = new URLSearchParams();
+      params.append("categoryId", String(categoryId));
+      params.append("pageNumber", String(pageNumber));
+      params.append("pageSize", String(pageSize));
+
+      const url = `${RENOVSMART_API_BASE}/eligible-devices?${params.toString()}`;
+      console.log(`Fetching RenovSmart API: ${url}`);
       const response = await fetch(url);
+      
       if (!response.ok) {
-        console.warn(`RenovSmart eligible-devices returned ${response.status}, returning empty result`);
+        const errorText = await response.text();
+        console.warn(`RenovSmart eligible-devices returned ${response.status}: ${errorText}`);
         return res.json({ items: [], currentPage: 1, hasNextPage: false });
       }
+      
       const data = await response.json();
       res.json(data);
     } catch (error: any) {
