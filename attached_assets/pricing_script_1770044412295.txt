@@ -1,0 +1,99 @@
+
+A integração do pricing, fucniona da seguinte forma.
+Primeiro carregamos todos os dispositivos elegiveis à partir do endpoint:
+https://rp.renovsmart.com.br/api/eligible-devices?categoryId=d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345&pageNumber=1&pageSize=200
+Onde, a categoria "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345" está para iphone e a categoria f16906d8-f052-4738-a56e-6b57246436f9 está para android.
+
+O modelo de resposta para esta requisição é:
+ public class Item
+    {
+        public string categoryId { get; set; }
+        public string manufacturerName { get; set; }
+        public string modelName { get; set; }
+        public int storage { get; set; }
+    }
+
+    public class Root
+    {
+        public List<Item> items { get; set; }
+        public int currentPage { get; set; }
+        public bool hasNextPage { get; set; }
+    }
+
+Onde o máximo de items por página é 200, caso tenha uma próxima página o hasNextPage retornará true, caso contrário é a última página e retorna a resposta assim:
+{"items":[],"currentPage":2,"hasNextPage":false}
+
+uma vez que a requisição elegible devices foi realizada, podemos solicitar a requisição:
+https://rp.renovsmart.com.br/api/search?categoryId=d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345&manufacturer=APPLE&model=IPHONE 11&storage=64&ignoreLastUpdateDate=false
+
+Onde à partir dos dados dos elegible devices, deve preencher as requisições item a item quando necessário. Passando o manufacurer, model, storage e por padrão ignoreLastUpdateDate será sempre false(true somente para forçar um novo scraping).
+Quando esta requisição for solicitada, então irá realizar um novo scraping caso nunca tenha sido feito 1, ou caso tenha passado 7 dias desde a  última solicitação. E o resultado sempre será:
+// Root myDeserializedClass = JsonConvert.DeserializeObject<Root>(myJsonResponse);
+    public class Price
+    {
+        public string id { get; set; }
+        public string rawId { get; set; }
+        public string productId { get; set; }
+        public string productUrl { get; set; }
+        public string title { get; set; }
+        public string source { get; set; }
+        public string priceText { get; set; }
+        public double extractedPrice { get; set; }
+        public int? rating { get; set; }
+        public int? reviews { get; set; }
+        public int position { get; set; }
+        public string oldPriceText { get; set; }
+        public double? oldPriceExtracted { get; set; }
+        public string thumbnail { get; set; }
+        public List<string> extensions { get; set; }
+        public string pageToken { get; set; }
+        public string immersiveUrl { get; set; }
+        public string scrapingdogImmersiveProductLink { get; set; }
+        public bool ignorePrice { get; set; }
+        public DateTime createdAt { get; set; }
+    }
+
+    public class Raw
+    {
+        public string id { get; set; }
+        public DateTime searchedAt { get; set; }
+        public string categoryId { get; set; }
+        public string manufacturer { get; set; }
+        public string model { get; set; }
+        public int storage { get; set; }
+        public string query { get; set; }
+        public string rawJson { get; set; }
+    }
+
+    public class Root
+    {
+        public string rawId { get; set; }
+        public bool fromCache { get; set; }
+        public DateTime searchedAt { get; set; }
+        public Raw raw { get; set; }
+        public List<Price> prices { get; set; }
+    }
+
+
+Os dados do scraping acima é relacionado aos anúncios retornados do google_shopping.
+
+Além dos dados de anúncios citados acima. No banco de dados temos um controle de agragados dos scrapings... Que a gente busca pela requisição:
+https://rp.renovsmart.com.br/api/agg/by-device?manufacturer=APPLE&model=IPHONE 11&storage=64&months=12&page=1&pageSize=1000 (por padrão months 12 e pagesize 1000)
+Nesse caso ele estará retornando os scrapings agregados que foram realizados:
+[{"manufacturer":"APPLE","model":"IPHONE 11","storage":64,"minPrice":1098.00,"avgPrice":1529.1623809523809524,"maxPrice":2200.00,"itemsCount":21,"updatedAt":"2026-01-20T18:33:56.179835+00:00"},{"manufacturer":"APPLE","model":"IPHONE 11","storage":64,"minPrice":1069.00,"avgPrice":1538.6663636363636364,"maxPrice":2200.00,"itemsCount":22,"updatedAt":"2026-01-29T19:08:18.106703+00:00"}]
+
+Ele leva em consideração os anúncios utilizados para fazer o scraping daquele agregado, seria o relacionamento do rawId.
+
+Onde os preços dessa requisição pode variar de acordo com os anúncios utilizados para contabilizar... Pois existe uma flag a ser marcada na requisição abaixo:
+(PATCH)https://rp.renovsmart.com.br/api/result-price/:id/ignore
+onde o ignore pode ser true ou false.
+Onde o id, é o id do item do anúncio " public string id { get; set; }"
+
+Um outro endpoint seria para buscar o valor utilizado pelo sistema renov smart, este valor é valor máximo de compra pela renov:
+https://rp.renovsmart.com.br/api/eligible-devices/price?categoryId=d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345&manufacturerName=APPLE&modelName=IPHONE 11&storage=64
+Resposta da requisição: {"id":"648360a0-f527-461a-abe6-7344fd846cd6","categoryId":null,"maximumDeviceValue":550,"maximumDeviceValueCurrencyCode":"BRL","erpCode":null,"storage":0}
+
+Sabendo de todas essas informações, gostaria de implementar minha integração com o pricing api no renov home.
+
+
+
