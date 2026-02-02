@@ -92,7 +92,7 @@ export default function PricingAnalysisPage() {
     queryKey: ["pricing-devices", selectedCategory],
     queryFn: async () => {
       const response = await fetch(
-        `${PRICING_API_BASE}/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=500`
+        `${PRICING_API_BASE}/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=200`
       );
       if (!response.ok) throw new Error("Erro ao carregar dispositivos");
       return response.json();

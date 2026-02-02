@@ -95,7 +95,7 @@ export default function GraficosPage() {
     queryKey: ["pricing-devices", selectedCategory],
     queryFn: async () => {
       const response = await fetch(
-        `/api/pricing/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=500`
+        `/api/pricing/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=200`
       );
       if (!response.ok) throw new Error("Erro ao carregar dispositivos");
       return response.json();
