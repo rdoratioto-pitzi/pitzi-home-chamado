@@ -46,6 +46,7 @@ import {
   BarChart3,
   Building2,
   CalendarClock,
+  Loader2,
 } from "lucide-react";
 import type { Meta, MetaArea, User, MetaCheckin } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
