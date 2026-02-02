@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2, Edit2, Check, X } from "lucide-react";
+import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2, Edit2, Check, X, Video } from "lucide-react";
 import type { Ticket, TicketComment, User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -172,6 +172,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   };
 
   const handleSaveDescription = () => {
+    if (!ticket) return;
     console.log("Saving description:", editedDescription);
     updateMutation.mutate({ 
       description: editedDescription,
