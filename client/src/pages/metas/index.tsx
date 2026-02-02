@@ -564,10 +564,10 @@ export default function MetasVisaoGeralPage() {
                                             <span>{user.name}</span>
                                           </div>
                                         )}
-                                        <div className="flex items-center gap-1" data-testid={`text-meta-month-${meta.id}`}>
+                                        <div className="flex items-center gap-1" data-testid={`text-meta-updated-${meta.id}`}>
                                           <Clock className="h-3 w-3" />
                                           <span>
-                                            {format(parseISO(`${meta.month}-01`), "MMM yyyy", { locale: ptBR })}
+                                            {meta.updatedAt ? format(parseISO(meta.updatedAt.toString()), "dd 'de' MMM yyyy", { locale: ptBR }) : format(parseISO(`${meta.month}-01`), "MMM yyyy", { locale: ptBR })}
                                           </span>
                                         </div>
                                       </div>
