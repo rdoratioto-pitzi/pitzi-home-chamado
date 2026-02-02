@@ -140,6 +140,21 @@ export default function MetasVisaoGeralPage() {
     enabled: !!checkinMeta,
   });
 
+  const formatCurrencyInput = (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    const numberValue = parseInt(digits) / 100;
+    if (isNaN(numberValue)) return "";
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(numberValue);
+  };
+
+  const parseCurrencyValue = (formattedValue: string) => {
+    const digits = formattedValue.replace(/\D/g, "");
+    return (parseInt(digits) / 100).toString();
+  };
+
   const handlePrevMonth = () => {
     const prev = subMonths(parseISO(`${selectedMonth}-01`), 1);
     setSelectedMonth(format(prev, "yyyy-MM"));
@@ -724,10 +739,21 @@ export default function MetasVisaoGeralPage() {
                 <div className="space-y-2">
                   <Label>Valor Alvo *</Label>
                   <Input
-                    type="number"
-                    value={metaForm.targetValue}
-                    onChange={e => setMetaForm(prev => ({ ...prev, targetValue: e.target.value }))}
-                    placeholder={metaForm.measurementType === "percentage" ? "100" : "0"}
+                    type={metaForm.measurementType === "monetary" ? "text" : "number"}
+                    step="any"
+                    value={metaForm.measurementType === "monetary" 
+                      ? (metaForm.targetValue ? formatCurrencyInput((parseFloat(metaForm.targetValue) * 100).toFixed(0)) : "") 
+                      : metaForm.targetValue
+                    }
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (metaForm.measurementType === "monetary") {
+                        setMetaForm(prev => ({ ...prev, targetValue: parseCurrencyValue(val) }));
+                      } else {
+                        setMetaForm(prev => ({ ...prev, targetValue: val }));
+                      }
+                    }}
+                    placeholder={metaForm.measurementType === "monetary" ? "R$ 0,00" : (metaForm.measurementType === "percentage" ? "100" : "0")}
                     data-testid="input-meta-target"
                   />
                 </div>
@@ -789,11 +815,21 @@ export default function MetasVisaoGeralPage() {
                 <div className="space-y-2">
                   <Label>Novo Valor *</Label>
                   <Input
-                    type="number"
+                    type={checkinMeta.measurementType === "monetary" ? "text" : "number"}
                     step="any"
-                    value={checkinForm.newValue}
-                    onChange={e => setCheckinForm(prev => ({ ...prev, newValue: e.target.value }))}
-                    placeholder="Informe o valor atual"
+                    value={checkinMeta.measurementType === "monetary"
+                      ? (checkinForm.newValue ? formatCurrencyInput((parseFloat(checkinForm.newValue) * 100).toFixed(0)) : "")
+                      : checkinForm.newValue
+                    }
+                    onChange={e => {
+                      const val = e.target.value;
+                      if (checkinMeta.measurementType === "monetary") {
+                        setCheckinForm(prev => ({ ...prev, newValue: parseCurrencyValue(val) }));
+                      } else {
+                        setCheckinForm(prev => ({ ...prev, newValue: val }));
+                      }
+                    }}
+                    placeholder={checkinMeta.measurementType === "monetary" ? "R$ 0,00" : "Informe o valor atual"}
                     data-testid="input-checkin-value"
                   />
                   {checkinMeta.measurementType === "binary" && (
