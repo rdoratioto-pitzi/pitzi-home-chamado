@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
-import { PageHeader } from "@/components/page-header";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -13,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/page-header";
 import {
   Table,
   TableBody,
@@ -28,35 +28,27 @@ import {
   Activity,
   BarChart3,
   RefreshCw,
-  ArrowDown,
-  ArrowUp,
-  ArrowRight,
-  Percent,
-  Target,
+  Smartphone,
+  Info,
 } from "lucide-react";
+import { Link } from "wouter";
 
-interface DeflationDevice {
-  deviceId: string;
-  deviceName: string;
+const CATEGORIES = [
+  { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
+  { id: "f16906d8-f052-4738-a56e-6b57246436f9", name: "Android" },
+];
+
+interface EligibleDevice {
+  categoryId: string;
   manufacturerName: string;
-  categoryName: string;
-  currentPrice: number;
-  priceChange30d: number;
-  weeklyVariation: number;
+  modelName: string;
+  storage: number;
 }
 
-interface BrandDeflation {
-  brand: string;
-  avgDeflation: number;
-}
-
-interface DeflationData {
-  avgMonthlyDeflation: number;
-  avgWeeklyVariation: number;
-  top10Drops: DeflationDevice[];
-  top10Rises: DeflationDevice[];
-  deflationByBrand: BrandDeflation[];
-  totalDevices: number;
+interface EligibleDevicesResponse {
+  items: EligibleDevice[];
+  currentPage: number;
+  hasNextPage: boolean;
 }
 
 function formatCurrency(value: number): string {
@@ -66,316 +58,267 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-function formatPercent(value: number): string {
-  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
-}
-
-function TrendIcon({ value }: { value: number }) {
-  if (value < -1) {
-    return <ArrowDown className="h-4 w-4 text-green-600" />;
-  } else if (value > 1) {
-    return <ArrowUp className="h-4 w-4 text-red-600" />;
-  }
-  return <ArrowRight className="h-4 w-4 text-gray-400" />;
-}
-
-function TrendBadge({ value, inverted = false }: { value: number; inverted?: boolean }) {
-  const isPositive = inverted ? value > 0 : value < 0;
-  const isNegative = inverted ? value < 0 : value > 0;
-  
-  return (
-    <Badge 
-      variant="outline"
-      className={`gap-1 ${
-        isPositive ? "border-green-500 text-green-600 bg-green-50 dark:bg-green-950" :
-        isNegative ? "border-red-500 text-red-600 bg-red-50 dark:bg-red-950" :
-        "border-gray-300 text-gray-500"
-      }`}
-    >
-      <TrendIcon value={value} />
-      {formatPercent(value)}
-    </Badge>
-  );
-}
-
 export default function IndicadoresPage() {
-  const [selectedCategory, setSelectedCategory] = useState<string>("__all__");
+  const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0].id);
 
-  const { data: deflationData, isLoading, refetch } = useQuery<DeflationData>({
-    queryKey: ["pricing-deflation"],
+  const { data: devicesData, isLoading, refetch } = useQuery<EligibleDevicesResponse>({
+    queryKey: ["pricing-devices", selectedCategory],
     queryFn: async () => {
-      const response = await fetch("/api/pricing/analytics/deflation");
-      if (!response.ok) throw new Error("Erro ao carregar indicadores");
+      const response = await fetch(
+        `/api/pricing/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=500`
+      );
+      if (!response.ok) throw new Error("Erro ao carregar dispositivos");
       return response.json();
     },
     staleTime: 5 * 60 * 1000,
   });
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col h-full">
-        <PageHeader
-          title="Indicadores de Deflação"
-          description="Métricas e tendências de preços do mercado"
-        />
-        <main className="flex-1 p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <Skeleton key={i} className="h-[120px]" />
-            ))}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Skeleton className="h-[400px]" />
-            <Skeleton className="h-[400px]" />
-          </div>
-        </main>
-      </div>
-    );
-  }
+  const devices = devicesData?.items || [];
 
-  const {
-    avgMonthlyDeflation = 0,
-    avgWeeklyVariation = 0,
-    top10Drops = [],
-    top10Rises = [],
-    deflationByBrand = [],
-    totalDevices = 0,
-  } = deflationData || {};
+  const brandStats = useMemo(() => {
+    const stats: Record<string, { count: number; storages: Set<number>; models: Set<string> }> = {};
+    devices.forEach((d) => {
+      if (!stats[d.manufacturerName]) {
+        stats[d.manufacturerName] = { count: 0, storages: new Set(), models: new Set() };
+      }
+      stats[d.manufacturerName].count++;
+      stats[d.manufacturerName].storages.add(d.storage);
+      stats[d.manufacturerName].models.add(d.modelName);
+    });
+    return Object.entries(stats)
+      .map(([brand, data]) => ({
+        brand,
+        variants: data.count,
+        models: data.models.size,
+        storages: data.storages.size,
+      }))
+      .sort((a, b) => b.variants - a.variants);
+  }, [devices]);
 
-  const maxDeflation = Math.max(
-    ...deflationByBrand.map(b => Math.abs(b.avgDeflation)),
-    10
-  );
+  const storageStats = useMemo(() => {
+    const stats: Record<number, number> = {};
+    devices.forEach((d) => {
+      stats[d.storage] = (stats[d.storage] || 0) + 1;
+    });
+    return Object.entries(stats)
+      .map(([storage, count]) => ({
+        storage: parseInt(storage),
+        count,
+        percentage: devices.length > 0 ? ((count / devices.length) * 100).toFixed(1) : "0",
+      }))
+      .sort((a, b) => a.storage - b.storage);
+  }, [devices]);
+
+  const categoryName = CATEGORIES.find((c) => c.id === selectedCategory)?.name || "";
 
   return (
     <div className="flex flex-col h-full">
       <PageHeader
-        title="Indicadores de Deflação"
-        description="Métricas e tendências de preços do mercado"
+        title="Indicadores"
+        description="Análise de distribuição de dispositivos monitorados"
       />
-      <main className="flex-1 p-6 space-y-6 overflow-auto">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-[200px]" data-testid="select-category-filter">
-                <SelectValue placeholder="Todas as categorias" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todas as categorias</SelectItem>
-                <SelectItem value="iphone">iPhone</SelectItem>
-                <SelectItem value="smartphone">Smartphone</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-indicators">
-            <RefreshCw className="h-4 w-4 mr-2" />
+
+      <div className="flex-1 p-6 space-y-6 overflow-auto">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+            <SelectTrigger className="w-48" data-testid="select-category">
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {CATEGORIES.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  {cat.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoading}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
             Atualizar
           </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Deflação Média Mensal
-              </CardTitle>
-              <Percent className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold">
-                  {formatPercent(avgMonthlyDeflation)}
-                </span>
-                <TrendIcon value={avgMonthlyDeflation} />
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-primary/10">
+                  <Smartphone className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Variantes</p>
+                  <p className="text-2xl font-bold">{devices.length}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Variação média nos últimos 30 dias
-              </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Variação Semanal
-              </CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold">
-                  {formatPercent(avgWeeklyVariation)}
-                </span>
-                <TrendIcon value={avgWeeklyVariation} />
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-blue-500/10">
+                  <BarChart3 className="h-6 w-6 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Marcas</p>
+                  <p className="text-2xl font-bold">{brandStats.length}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Variação média nos últimos 7 dias
-              </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Dispositivos Monitorados
-              </CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalDevices}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Total de dispositivos ativos
-              </p>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-green-500/10">
+                  <Activity className="h-6 w-6 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Modelos Únicos</p>
+                  <p className="text-2xl font-bold">
+                    {new Set(devices.map((d) => `${d.manufacturerName} ${d.modelName}`)).size}
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Marcas Analisadas
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-lg bg-purple-500/10">
+                  <Info className="h-6 w-6 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Capacidades</p>
+                  <p className="text-2xl font-bold">{storageStats.length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Dispositivos por Marca - {categoryName}
               </CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{deflationByBrand.length}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Fabricantes com dados
-              </p>
+              {isLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10" />
+                  ))}
+                </div>
+              ) : brandStats.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum dado disponível
+                </div>
+              ) : (
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Marca</TableHead>
+                        <TableHead className="text-right">Modelos</TableHead>
+                        <TableHead className="text-right">Variantes</TableHead>
+                        <TableHead className="text-right">Capacidades</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {brandStats.map((stat) => (
+                        <TableRow key={stat.brand}>
+                          <TableCell className="font-medium">{stat.brand}</TableCell>
+                          <TableCell className="text-right">{stat.models}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="secondary">{stat.variants}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{stat.storages}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                Distribuição por Capacidade - {categoryName}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10" />
+                  ))}
+                </div>
+              ) : storageStats.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum dado disponível
+                </div>
+              ) : (
+                <div className="rounded-md border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Capacidade</TableHead>
+                        <TableHead className="text-right">Quantidade</TableHead>
+                        <TableHead className="text-right">Percentual</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {storageStats.map((stat) => (
+                        <TableRow key={stat.storage}>
+                          <TableCell className="font-medium">{stat.storage}GB</TableCell>
+                          <TableCell className="text-right">{stat.count}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="outline">{stat.percentage}%</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Percent className="h-5 w-5 text-primary" />
-              Deflação Média por Marca
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {deflationByBrand.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  Nenhum dado disponível
+          <CardContent className="py-8">
+            <div className="flex flex-col items-center text-center gap-4">
+              <Info className="h-10 w-10 text-muted-foreground" />
+              <div className="max-w-md">
+                <h3 className="font-semibold mb-2">Indicadores de Deflação</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Para análise de deflação e variação de preços, acesse os detalhes de um dispositivo específico.
+                  Os dados históricos de preços são obtidos diretamente da API RenovSmart.
                 </p>
-              ) : (
-                deflationByBrand.map((brand) => (
-                  <div key={brand.brand} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">{brand.brand}</span>
-                      <TrendBadge value={brand.avgDeflation} />
-                    </div>
-                    <Progress 
-                      value={Math.min(Math.abs(brand.avgDeflation) / maxDeflation * 100, 100)} 
-                      className={`h-2 ${brand.avgDeflation < 0 ? "[&>div]:bg-green-500" : "[&>div]:bg-red-500"}`}
-                    />
-                  </div>
-                ))
-              )}
+                <Link href="/pricing">
+                  <Button data-testid="button-go-pricing">
+                    <BarChart3 className="h-4 w-4 mr-2" />
+                    Ver Dispositivos
+                  </Button>
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingDown className="h-5 w-5 text-green-600" />
-                Top 10 Maiores Quedas (30 dias)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {top10Drops.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  Nenhum dado disponível
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Dispositivo</TableHead>
-                      <TableHead className="text-right">Preço Atual</TableHead>
-                      <TableHead className="text-right">Variação</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {top10Drops.map((device, index) => (
-                      <TableRow key={device.deviceId}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="w-6 h-6 flex items-center justify-center p-0 text-xs">
-                              {index + 1}
-                            </Badge>
-                            <div>
-                              <div className="font-medium">{device.deviceName}</div>
-                              <div className="text-xs text-muted-foreground">{device.categoryName}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(device.currentPrice)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <TrendBadge value={device.priceChange30d} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-red-600" />
-                Top 10 Maiores Altas (30 dias)
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {top10Rises.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  Nenhum dado disponível
-                </p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Dispositivo</TableHead>
-                      <TableHead className="text-right">Preço Atual</TableHead>
-                      <TableHead className="text-right">Variação</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {top10Rises.map((device, index) => (
-                      <TableRow key={device.deviceId}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="w-6 h-6 flex items-center justify-center p-0 text-xs">
-                              {index + 1}
-                            </Badge>
-                            <div>
-                              <div className="font-medium">{device.deviceName}</div>
-                              <div className="text-xs text-muted-foreground">{device.categoryName}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(device.currentPrice)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <TrendBadge value={device.priceChange30d} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

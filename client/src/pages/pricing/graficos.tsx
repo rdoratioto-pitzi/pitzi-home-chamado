@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -28,61 +28,47 @@ import {
   Area,
 } from "recharts";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  TrendingDown,
-  TrendingUp,
-  Minus,
   Download,
   BarChart3,
   LineChartIcon,
-  TableIcon,
   RefreshCw,
 } from "lucide-react";
 import html2canvas from "html2canvas";
 
-interface PricingDevice {
-  id: string;
+const CATEGORIES = [
+  { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
+  { id: "f16906d8-f052-4738-a56e-6b57246436f9", name: "Android" },
+];
+
+interface EligibleDevice {
   categoryId: string;
-  categoryName: string;
   manufacturerName: string;
   modelName: string;
   storage: number;
-  condition: string;
-  specs: string | null;
-  imageUrl: string | null;
-  releaseDate: string | null;
-  isActive: boolean;
 }
 
-interface PriceHistory {
-  id: string;
-  deviceId: string;
-  date: string;
-  minPrice: string;
-  avgPrice: string;
-  maxPrice: string;
-  sampleCount: number;
+interface EligibleDevicesResponse {
+  items: EligibleDevice[];
+  currentPage: number;
+  hasNextPage: boolean;
+}
+
+interface AggregatedData {
+  manufacturer: string;
+  model: string;
+  storage: number;
+  minPrice: number;
+  avgPrice: number;
+  maxPrice: number;
+  itemsCount: number;
+  updatedAt: string;
 }
 
 const PERIOD_OPTIONS = [
-  { value: "7", label: "7 dias" },
-  { value: "30", label: "30 dias" },
-  { value: "90", label: "90 dias" },
-  { value: "365", label: "12 meses" },
-];
-
-const AGGREGATION_OPTIONS = [
-  { value: "device", label: "Por Dispositivo" },
-  { value: "brand", label: "Por Marca" },
-  { value: "category", label: "Por Categoria" },
-  { value: "storage", label: "Por Capacidade" },
+  { value: "1", label: "1 mês" },
+  { value: "3", label: "3 meses" },
+  { value: "6", label: "6 meses" },
+  { value: "12", label: "12 meses" },
 ];
 
 const COLORS = [
@@ -97,441 +83,377 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-  });
-}
-
 export default function GraficosPage() {
-  const [selectedPeriod, setSelectedPeriod] = useState("30");
-  const [selectedAggregation, setSelectedAggregation] = useState("device");
-  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0].id);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedStorage, setSelectedStorage] = useState<string>("");
+  const [months, setMonths] = useState("6");
   const chartRef = useRef<HTMLDivElement>(null);
 
-  const { data: devices = [], isLoading: isLoadingDevices, refetch } = useQuery<PricingDevice[]>({
-    queryKey: ["pricing-local-devices"],
+  const { data: devicesData, isLoading: isLoadingDevices, refetch } = useQuery<EligibleDevicesResponse>({
+    queryKey: ["pricing-devices", selectedCategory],
     queryFn: async () => {
-      const response = await fetch("/api/pricing/devices");
+      const response = await fetch(
+        `/api/pricing/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=500`
+      );
       if (!response.ok) throw new Error("Erro ao carregar dispositivos");
       return response.json();
     },
     staleTime: 5 * 60 * 1000,
   });
 
-  const deviceHistoryQueries = useQuery({
-    queryKey: ["pricing-all-history", devices.map(d => d.id)],
+  const devices = devicesData?.items || [];
+
+  const brands = useMemo(() => {
+    return Array.from(new Set(devices.map(d => d.manufacturerName))).sort();
+  }, [devices]);
+
+  const models = useMemo(() => {
+    if (!selectedBrand) return [];
+    return Array.from(new Set(
+      devices.filter(d => d.manufacturerName === selectedBrand).map(d => d.modelName)
+    )).sort();
+  }, [devices, selectedBrand]);
+
+  const storages = useMemo(() => {
+    if (!selectedModel) return [];
+    return Array.from(new Set(
+      devices
+        .filter(d => d.manufacturerName === selectedBrand && d.modelName === selectedModel)
+        .map(d => d.storage)
+    )).sort((a, b) => a - b);
+  }, [devices, selectedBrand, selectedModel]);
+
+  const canFetchAgg = !!selectedBrand && !!selectedModel && !!selectedStorage;
+
+  const { data: aggData, isLoading: isLoadingAgg } = useQuery<AggregatedData[]>({
+    queryKey: ["pricing-agg", selectedBrand, selectedModel, selectedStorage, months],
     queryFn: async () => {
-      const allHistory: Record<string, PriceHistory[]> = {};
-      for (const device of devices) {
-        const response = await fetch(`/api/pricing/devices/${device.id}/history`);
-        if (response.ok) {
-          allHistory[device.id] = await response.json();
-        }
-      }
-      return allHistory;
+      const url = `/api/pricing/agg/by-device?manufacturer=${encodeURIComponent(selectedBrand)}&model=${encodeURIComponent(selectedModel)}&storage=${selectedStorage}&months=${months}&page=1&pageSize=1000`;
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Erro ao carregar dados agregados");
+      return response.json();
     },
-    enabled: devices.length > 0,
+    enabled: canFetchAgg,
     staleTime: 5 * 60 * 1000,
   });
 
-  const allHistory = deviceHistoryQueries.data || {};
-
-  const filteredData = useMemo(() => {
-    const now = new Date();
-    const periodDays = parseInt(selectedPeriod);
-    const cutoffDate = new Date(now);
-    cutoffDate.setDate(cutoffDate.getDate() - periodDays);
-
-    const activeDevices = selectedDevices.length > 0 
-      ? devices.filter(d => selectedDevices.includes(d.id))
-      : devices;
-
-    const dateMap: Record<string, Record<string, number>> = {};
-
-    for (const device of activeDevices) {
-      const history = allHistory[device.id] || [];
-      const filtered = history.filter(h => new Date(h.date) >= cutoffDate);
-      
-      for (const entry of filtered) {
-        const dateKey = formatDate(entry.date);
-        if (!dateMap[dateKey]) dateMap[dateKey] = {};
-        
-        const deviceKey = `${device.manufacturerName} ${device.modelName} ${device.storage}GB`;
-        dateMap[dateKey][deviceKey] = parseFloat(entry.avgPrice || "0");
-      }
-    }
-
-    return Object.entries(dateMap)
-      .map(([date, values]) => ({ date, ...values }))
+  const chartData = useMemo(() => {
+    if (!aggData || aggData.length === 0) return [];
+    return aggData
+      .map((item) => ({
+        date: new Date(item.updatedAt).toLocaleDateString("pt-BR"),
+        avgPrice: Number(item.avgPrice.toFixed(2)),
+        minPrice: Number(item.minPrice.toFixed(2)),
+        maxPrice: Number(item.maxPrice.toFixed(2)),
+        itemsCount: item.itemsCount,
+      }))
       .sort((a, b) => {
-        const [dayA, monthA] = a.date.split("/").map(Number);
-        const [dayB, monthB] = b.date.split("/").map(Number);
-        return monthA - monthB || dayA - dayB;
+        const [dayA, monthA, yearA] = a.date.split("/").map(Number);
+        const [dayB, monthB, yearB] = b.date.split("/").map(Number);
+        return new Date(yearA, monthA - 1, dayA).getTime() - new Date(yearB, monthB - 1, dayB).getTime();
       });
-  }, [devices, allHistory, selectedPeriod, selectedDevices]);
-
-  const aggregatedData = useMemo(() => {
-    if (selectedAggregation === "device") return null;
-
-    const now = new Date();
-    const periodDays = parseInt(selectedPeriod);
-    const cutoffDate = new Date(now);
-    cutoffDate.setDate(cutoffDate.getDate() - periodDays);
-
-    const groups: Record<string, { prices: number[]; name: string }> = {};
-
-    for (const device of devices) {
-      let groupKey: string;
-      let groupName: string;
-      
-      switch (selectedAggregation) {
-        case "brand":
-          groupKey = device.manufacturerName;
-          groupName = device.manufacturerName;
-          break;
-        case "category":
-          groupKey = device.categoryName;
-          groupName = device.categoryName;
-          break;
-        case "storage":
-          groupKey = `${device.storage}GB`;
-          groupName = `${device.storage}GB`;
-          break;
-        default:
-          groupKey = device.id;
-          groupName = `${device.manufacturerName} ${device.modelName}`;
-      }
-
-      if (!groups[groupKey]) {
-        groups[groupKey] = { prices: [], name: groupName };
-      }
-
-      const history = allHistory[device.id] || [];
-      const filtered = history.filter(h => new Date(h.date) >= cutoffDate);
-      
-      for (const entry of filtered) {
-        groups[groupKey].prices.push(parseFloat(entry.avgPrice || "0"));
-      }
-    }
-
-    return Object.entries(groups).map(([key, data]) => ({
-      name: data.name,
-      avgPrice: data.prices.length > 0 
-        ? data.prices.reduce((a, b) => a + b, 0) / data.prices.length 
-        : 0,
-      minPrice: data.prices.length > 0 ? Math.min(...data.prices) : 0,
-      maxPrice: data.prices.length > 0 ? Math.max(...data.prices) : 0,
-    }));
-  }, [devices, allHistory, selectedPeriod, selectedAggregation]);
-
-  const tableData = useMemo(() => {
-    const now = new Date();
-    const periodDays = parseInt(selectedPeriod);
-    const cutoffDate = new Date(now);
-    cutoffDate.setDate(cutoffDate.getDate() - periodDays);
-
-    return devices.map(device => {
-      const history = allHistory[device.id] || [];
-      const filtered = history
-        .filter(h => new Date(h.date) >= cutoffDate)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-      const latestPrice = filtered.length > 0 ? parseFloat(filtered[0].avgPrice || "0") : 0;
-      const oldestPrice = filtered.length > 1 ? parseFloat(filtered[filtered.length - 1].avgPrice || "0") : latestPrice;
-      const priceChange = oldestPrice > 0 ? ((latestPrice - oldestPrice) / oldestPrice) * 100 : 0;
-      const avgPrice = filtered.length > 0 
-        ? filtered.reduce((acc, h) => acc + parseFloat(h.avgPrice || "0"), 0) / filtered.length 
-        : 0;
-
-      return {
-        id: device.id,
-        name: `${device.manufacturerName} ${device.modelName}`,
-        storage: device.storage,
-        category: device.categoryName,
-        brand: device.manufacturerName,
-        latestPrice,
-        avgPrice,
-        minPrice: filtered.length > 0 ? Math.min(...filtered.map(h => parseFloat(h.minPrice || "0"))) : 0,
-        maxPrice: filtered.length > 0 ? Math.max(...filtered.map(h => parseFloat(h.maxPrice || "0"))) : 0,
-        priceChange,
-        samples: filtered.reduce((acc, h) => acc + (h.sampleCount || 0), 0),
-      };
-    });
-  }, [devices, allHistory, selectedPeriod]);
-
-  const deviceNames = useMemo(() => {
-    return devices.map(d => `${d.manufacturerName} ${d.modelName} ${d.storage}GB`);
-  }, [devices]);
+  }, [aggData]);
 
   const handleDownloadChart = async () => {
     if (!chartRef.current) return;
     try {
-      const canvas = await html2canvas(chartRef.current);
+      const canvas = await html2canvas(chartRef.current, { backgroundColor: "#fff" });
       const link = document.createElement("a");
-      link.download = `pricing-chart-${new Date().toISOString().split("T")[0]}.png`;
-      link.href = canvas.toDataURL();
+      link.download = `grafico_${selectedBrand}_${selectedModel}_${selectedStorage}GB.png`;
+      link.href = canvas.toDataURL("image/png");
       link.click();
     } catch (error) {
       console.error("Error downloading chart:", error);
     }
   };
 
-  const toggleDeviceSelection = (deviceId: string) => {
-    setSelectedDevices(prev => 
-      prev.includes(deviceId) 
-        ? prev.filter(id => id !== deviceId)
-        : [...prev, deviceId]
-    );
-  };
-
-  if (isLoadingDevices) {
-    return (
-      <div className="flex flex-col h-full">
-        <PageHeader
-          title="Gráficos Evolutivos"
-          description="Visualização temporal de preços e tendências"
-        />
-        <main className="flex-1 p-6">
-          <Skeleton className="h-[500px] w-full" />
-        </main>
-      </div>
-    );
-  }
+  const categoryName = CATEGORIES.find(c => c.id === selectedCategory)?.name || "";
+  const isLoading = isLoadingDevices || isLoadingAgg;
 
   return (
     <div className="flex flex-col h-full">
       <PageHeader
-        title="Gráficos Evolutivos"
-        description="Visualização temporal de preços e tendências"
+        title="Gráficos de Preço"
+        description="Visualização histórica de preços por dispositivo"
       />
-      <main className="flex-1 p-6 space-y-6 overflow-auto">
+
+      <div className="flex-1 p-6 space-y-6 overflow-auto">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              Filtros
-            </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="button-refresh-charts">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Atualizar
-            </Button>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Selecionar Dispositivo
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetch()}
+                disabled={isLoading}
+                data-testid="button-refresh"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+                Atualizar
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Período</label>
-                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <SelectTrigger className="w-[150px]" data-testid="select-period">
+                <Label>Categoria</Label>
+                <Select
+                  value={selectedCategory}
+                  onValueChange={(val) => {
+                    setSelectedCategory(val);
+                    setSelectedBrand("");
+                    setSelectedModel("");
+                    setSelectedStorage("");
+                  }}
+                >
+                  <SelectTrigger data-testid="select-category">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {PERIOD_OPTIONS.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-medium">Agregação</label>
-                <Select value={selectedAggregation} onValueChange={setSelectedAggregation}>
-                  <SelectTrigger className="w-[180px]" data-testid="select-aggregation">
-                    <SelectValue />
+                <Label>Marca</Label>
+                <Select
+                  value={selectedBrand || "__none__"}
+                  onValueChange={(val) => {
+                    setSelectedBrand(val === "__none__" ? "" : val);
+                    setSelectedModel("");
+                    setSelectedStorage("");
+                  }}
+                  disabled={isLoadingDevices}
+                >
+                  <SelectTrigger data-testid="select-brand">
+                    <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {AGGREGATION_OPTIONS.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    <SelectItem value="__none__">Selecione...</SelectItem>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand} value={brand}>
+                        {brand}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 flex-1">
-                <label className="text-sm font-medium">Dispositivos</label>
-                <div className="flex flex-wrap gap-2">
-                  {devices.map(device => (
-                    <Badge
-                      key={device.id}
-                      variant={selectedDevices.includes(device.id) ? "default" : "outline"}
-                      className="cursor-pointer"
-                      onClick={() => toggleDeviceSelection(device.id)}
-                      data-testid={`badge-device-${device.id}`}
-                    >
-                      {device.manufacturerName} {device.modelName} {device.storage}GB
-                    </Badge>
-                  ))}
-                  {selectedDevices.length > 0 && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => setSelectedDevices([])}
-                      data-testid="button-clear-selection"
-                    >
-                      Limpar
-                    </Button>
-                  )}
-                </div>
+
+              <div className="space-y-2">
+                <Label>Modelo</Label>
+                <Select
+                  value={selectedModel || "__none__"}
+                  onValueChange={(val) => {
+                    setSelectedModel(val === "__none__" ? "" : val);
+                    setSelectedStorage("");
+                  }}
+                  disabled={!selectedBrand}
+                >
+                  <SelectTrigger data-testid="select-model">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Selecione...</SelectItem>
+                    {models.map((model) => (
+                      <SelectItem key={model} value={model}>
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Capacidade</Label>
+                <Select
+                  value={selectedStorage || "__none__"}
+                  onValueChange={(val) => setSelectedStorage(val === "__none__" ? "" : val)}
+                  disabled={!selectedModel}
+                >
+                  <SelectTrigger data-testid="select-storage">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Selecione...</SelectItem>
+                    {storages.map((storage) => (
+                      <SelectItem key={storage} value={storage.toString()}>
+                        {storage}GB
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Período</Label>
+                <Select value={months} onValueChange={setMonths}>
+                  <SelectTrigger data-testid="select-period">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PERIOD_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="line" className="w-full">
-          <div className="flex items-center justify-between mb-4">
-            <TabsList>
-              <TabsTrigger value="line" className="gap-2" data-testid="tab-line-chart">
-                <LineChartIcon className="h-4 w-4" />
-                Linha
-              </TabsTrigger>
-              <TabsTrigger value="bar" className="gap-2" data-testid="tab-bar-chart">
-                <BarChart3 className="h-4 w-4" />
-                Barras
-              </TabsTrigger>
-              <TabsTrigger value="table" className="gap-2" data-testid="tab-table">
-                <TableIcon className="h-4 w-4" />
-                Tabela
-              </TabsTrigger>
-            </TabsList>
-            <Button variant="outline" size="sm" onClick={handleDownloadChart} data-testid="button-download-chart">
-              <Download className="h-4 w-4 mr-2" />
-              Baixar Gráfico
-            </Button>
-          </div>
+        {!canFetchAgg ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <LineChartIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+              <p className="text-muted-foreground">
+                Selecione um dispositivo completo (marca, modelo e capacidade) para visualizar os gráficos de preço.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">{categoryName}</Badge>
+                <Badge variant="secondary">
+                  {selectedBrand} {selectedModel} {selectedStorage}GB
+                </Badge>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadChart}
+                disabled={chartData.length === 0}
+                data-testid="button-download-chart"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Baixar Gráfico
+              </Button>
+            </div>
 
-          <TabsContent value="line">
-            <Card ref={chartRef}>
-              <CardHeader>
-                <CardTitle>Evolução Temporal de Preços</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {filteredData.length === 0 ? (
-                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                    Nenhum dado disponível para o período selecionado
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={400}>
-                    <AreaChart data={filteredData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis 
-                        tickFormatter={(value) => formatCurrency(value).replace("R$", "")}
-                      />
-                      <Tooltip 
-                        formatter={(value: number) => formatCurrency(value)}
-                        labelFormatter={(label) => `Data: ${label}`}
-                      />
-                      <Legend />
-                      {deviceNames.map((name, index) => (
-                        <Area
-                          key={name}
-                          type="monotone"
-                          dataKey={name}
-                          stroke={COLORS[index % COLORS.length]}
-                          fill={COLORS[index % COLORS.length]}
-                          fillOpacity={0.3}
-                        />
-                      ))}
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+            <div ref={chartRef} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Evolução de Preços</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingAgg ? (
+                    <Skeleton className="h-64" />
+                  ) : chartData.length === 0 ? (
+                    <div className="h-64 flex items-center justify-center text-muted-foreground">
+                      Nenhum dado disponível para este período
+                    </div>
+                  ) : (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData}>
+                          <defs>
+                            <linearGradient id="colorAvgPrice" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="date" className="text-xs" />
+                          <YAxis 
+                            tickFormatter={(v) => `R$${v}`}
+                            className="text-xs"
+                            domain={['auto', 'auto']}
+                          />
+                          <Tooltip 
+                            formatter={(value: number) => [formatCurrency(value), ""]}
+                            contentStyle={{ 
+                              backgroundColor: "hsl(var(--card))",
+                              borderColor: "hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          <Legend />
+                          <Area
+                            type="monotone"
+                            dataKey="avgPrice"
+                            name="Preço Médio"
+                            stroke="hsl(var(--primary))"
+                            fillOpacity={1}
+                            fill="url(#colorAvgPrice)"
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="minPrice"
+                            name="Preço Mínimo"
+                            stroke="#22c55e"
+                            strokeDasharray="5 5"
+                            dot={false}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="maxPrice"
+                            name="Preço Máximo"
+                            stroke="#ef4444"
+                            strokeDasharray="5 5"
+                            dot={false}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-          <TabsContent value="bar">
-            <Card ref={chartRef}>
-              <CardHeader>
-                <CardTitle>
-                  Comparação {selectedAggregation === "device" ? "por Modelo" : 
-                    selectedAggregation === "brand" ? "por Marca" :
-                    selectedAggregation === "category" ? "por Categoria" : "por Capacidade"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {(aggregatedData || tableData).length === 0 ? (
-                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                    Nenhum dado disponível
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={aggregatedData || tableData.map(d => ({
-                      name: `${d.name} ${d.storage}GB`,
-                      avgPrice: d.avgPrice,
-                      minPrice: d.minPrice,
-                      maxPrice: d.maxPrice,
-                    }))}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} />
-                      <YAxis tickFormatter={(value) => formatCurrency(value).replace("R$", "")} />
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                      <Legend />
-                      <Bar dataKey="minPrice" name="Mínimo" fill="#10B981" />
-                      <Bar dataKey="avgPrice" name="Médio" fill="#3B82F6" />
-                      <Bar dataKey="maxPrice" name="Máximo" fill="#EF4444" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="table">
-            <Card>
-              <CardHeader>
-                <CardTitle>Tabela de Dados Completa</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Dispositivo</TableHead>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead>Capacidade</TableHead>
-                      <TableHead className="text-right">Preço Atual</TableHead>
-                      <TableHead className="text-right">Preço Médio</TableHead>
-                      <TableHead className="text-right">Mínimo</TableHead>
-                      <TableHead className="text-right">Máximo</TableHead>
-                      <TableHead className="text-right">Variação</TableHead>
-                      <TableHead className="text-right">Amostras</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tableData.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-medium">{row.name}</TableCell>
-                        <TableCell>{row.category}</TableCell>
-                        <TableCell>{row.storage}GB</TableCell>
-                        <TableCell className="text-right">{formatCurrency(row.latestPrice)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(row.avgPrice)}</TableCell>
-                        <TableCell className="text-right text-green-600">{formatCurrency(row.minPrice)}</TableCell>
-                        <TableCell className="text-right text-red-600">{formatCurrency(row.maxPrice)}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {row.priceChange < -1 ? (
-                              <TrendingDown className="h-4 w-4 text-green-600" />
-                            ) : row.priceChange > 1 ? (
-                              <TrendingUp className="h-4 w-4 text-red-600" />
-                            ) : (
-                              <Minus className="h-4 w-4 text-gray-400" />
-                            )}
-                            <span className={
-                              row.priceChange < -1 ? "text-green-600" :
-                              row.priceChange > 1 ? "text-red-600" : "text-gray-500"
-                            }>
-                              {row.priceChange.toFixed(1)}%
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">{row.samples}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Ofertas ao Longo do Tempo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingAgg ? (
+                    <Skeleton className="h-64" />
+                  ) : chartData.length === 0 ? (
+                    <div className="h-64 flex items-center justify-center text-muted-foreground">
+                      Nenhum dado disponível para este período
+                    </div>
+                  ) : (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="date" className="text-xs" />
+                          <YAxis className="text-xs" />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: "hsl(var(--card))",
+                              borderColor: "hsl(var(--border))",
+                              borderRadius: "8px",
+                            }}
+                          />
+                          <Bar 
+                            dataKey="itemsCount" 
+                            name="Ofertas" 
+                            fill="hsl(var(--primary))" 
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
