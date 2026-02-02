@@ -41,11 +41,13 @@ import ConhecimentoPage from "@/pages/conhecimento/index";
 import ConhecimentoNovoPage from "@/pages/conhecimento/novo";
 import ConhecimentoDocumentoPage from "@/pages/conhecimento/documento";
 import ConhecimentoFavoritosPage from "@/pages/conhecimento/favoritos";
+import MacgyverIAPage from "@/pages/macgyver-ia/index";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/macgyver-ia" component={MacgyverIAPage} />
       <Route path="/chamados">
         <ProtectedRoute requiredPermission="chamados">
           <ChamadosPage />
