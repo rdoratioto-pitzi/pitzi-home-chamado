@@ -811,6 +811,15 @@ export default function MetasVisaoGeralPage() {
                 <Progress value={getProgress(checkinMeta)} className="h-2 mt-2" data-testid="progress-checkin" />
               </div>
 
+              {checkinMeta.description && (
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
+                  <h4 className="text-[12px] font-bold text-primary uppercase tracking-wider mb-1">Descrição</h4>
+                  <p className="text-[13px] text-muted-foreground whitespace-pre-wrap">
+                    {checkinMeta.description}
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Novo Valor *</Label>
