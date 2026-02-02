@@ -41,7 +41,9 @@ import { HelpCircle, CheckCircle2, Plus, Eye } from "lucide-react";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
-  description: z.string().min(20, "Descrição deve ter no mínimo 20 caracteres"),
+  description: z.string()
+    .min(20, "Descrição deve ter no mínimo 20 caracteres")
+    .max(5000, "Descrição deve ter no máximo 5.000 caracteres"),
   category: z.string().min(1, "Selecione uma categoria"),
   type: z.string().min(1, "Selecione um tipo"),
   location: z.string().min(1, "Selecione um local"),
@@ -301,7 +303,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                       onChange={field.onChange}
                       images={attachments}
                       onImagesChange={setAttachments}
-                      maxLength={2000}
+                      maxLength={5000}
                       data-testid="input-ticket-description"
                     />
                   </FormControl>
