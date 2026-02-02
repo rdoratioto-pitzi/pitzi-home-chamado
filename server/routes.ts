@@ -1698,7 +1698,7 @@ export async function registerRoutes(
 
   app.get("/api/pricing/eligible-devices", async (req, res) => {
     try {
-      const { categoryId, pageNumber = "1", pageSize = "500" } = req.query;
+      const { categoryId, pageNumber = "1", pageSize = "100" } = req.query;
       if (!categoryId) {
         return res.json({ items: [], currentPage: 1, hasNextPage: false });
       }
