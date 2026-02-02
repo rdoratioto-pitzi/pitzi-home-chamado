@@ -241,29 +241,31 @@ export default function MacgyverIA() {
 
               {/* Input Box - Modern Design */}
               <div className="w-full">
-                <div className="relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden shadow-sm">
-                  <textarea
-                    ref={textareaRef}
-                    placeholder="Pergunte qualquer coisa..."
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    disabled={isStreaming}
-                    className="w-full bg-transparent border-0 resize-none px-4 py-4 pr-14 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-0 min-h-[56px] max-h-[200px]"
-                    rows={1}
-                    data-testid="input-chat-message"
-                  />
+                <div className="flex items-end gap-3">
+                  <div className="flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50">
+                    <textarea
+                      ref={textareaRef}
+                      placeholder="Pergunte qualquer coisa..."
+                      value={inputMessage}
+                      onChange={(e) => setInputMessage(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      disabled={isStreaming}
+                      className="w-full bg-transparent border-0 resize-none px-4 py-4 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-0 min-h-[56px] max-h-[200px]"
+                      rows={1}
+                      data-testid="input-chat-message"
+                    />
+                  </div>
                   <Button
                     size="icon"
-                    className="absolute right-3 bottom-3 h-9 w-9 rounded-xl bg-primary hover:bg-primary/90"
+                    className="h-[56px] w-[56px] rounded-2xl bg-primary hover:bg-primary/90 shrink-0 shadow-sm transition-all hover:scale-105 active:scale-95"
                     disabled={!inputMessage.trim() || isStreaming}
                     onClick={handleSendMessage}
                     data-testid="button-send-message"
                   >
                     {isStreaming ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-6 w-6 animate-spin" />
                     ) : (
-                      <Send className="h-4 w-4" />
+                      <Send className="h-6 w-6" />
                     )}
                   </Button>
                 </div>
@@ -428,21 +430,23 @@ export default function MacgyverIA() {
       {isInConversation && (
         <div className="border-t p-4 bg-background shrink-0">
           <div className="max-w-3xl mx-auto">
-            <div className="relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden">
-              <textarea
-                ref={textareaRef}
-                placeholder="Pergunte qualquer coisa..."
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={isStreaming}
-                className="w-full bg-transparent border-0 resize-none px-4 py-3 pr-14 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-0 min-h-[48px] max-h-[200px]"
-                rows={1}
-                data-testid="input-chat-message-bottom"
-              />
+            <div className="flex items-end gap-3">
+              <div className="flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden focus-within:border-primary/50">
+                <textarea
+                  ref={textareaRef}
+                  placeholder="Pergunte qualquer coisa..."
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={isStreaming}
+                  className="w-full bg-transparent border-0 resize-none px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-0 min-h-[48px] max-h-[200px]"
+                  rows={1}
+                  data-testid="input-chat-message-bottom"
+                />
+              </div>
               <Button
                 size="icon"
-                className="absolute right-2 bottom-2 h-8 w-8 rounded-xl bg-primary hover:bg-primary/90"
+                className="h-[48px] w-[48px] rounded-xl bg-primary hover:bg-primary/90 shrink-0 shadow-sm"
                 disabled={!inputMessage.trim() || isStreaming}
                 onClick={handleSendMessage}
                 data-testid="button-send-message-bottom"
