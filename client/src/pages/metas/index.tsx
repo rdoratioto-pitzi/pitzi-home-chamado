@@ -129,6 +129,16 @@ export default function MetasVisaoGeralPage() {
     queryKey: ["/api/users"],
   });
 
+  const { data: checkins = [], isLoading: checkinsLoading } = useQuery<MetaCheckin[]>({
+    queryKey: ["/api/metas", checkinMeta?.id, "checkins"],
+    queryFn: async () => {
+      if (!checkinMeta) return [];
+      const res = await fetch(`/api/metas/${checkinMeta.id}/checkins`);
+      return res.json();
+    },
+    enabled: !!checkinMeta,
+  });
+
   const handlePrevMonth = () => {
     const prev = subMonths(parseISO(`${selectedMonth}-01`), 1);
     setSelectedMonth(format(prev, "yyyy-MM"));
@@ -210,6 +220,20 @@ export default function MetasVisaoGeralPage() {
         comment: checkinForm.comment || null,
       },
     });
+  };
+
+  const formatValue = (value: string | number, type: string) => {
+    const num = typeof value === "string" ? parseFloat(value) : value;
+    if (isNaN(num)) return value.toString();
+    
+    if (type === "monetary") {
+      return new Intl.NumberFormat("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      }).format(num);
+    }
+    
+    return new Intl.NumberFormat("pt-BR").format(num);
   };
 
   const getProgress = (meta: Meta): number => {
@@ -550,7 +574,7 @@ export default function MetasVisaoGeralPage() {
                                         <span className="text-[11px] font-bold text-muted-foreground whitespace-nowrap" data-testid={`text-meta-value-${meta.id}`}>
                                           {meta.measurementType === "binary" 
                                             ? (current > 0 ? "1 / 1" : "0 / 1")
-                                            : `${current} / ${target} ${meta.unit || measurementUnits[meta.measurementType]}`
+                                            : `${formatValue(current, meta.measurementType)} / ${formatValue(target, meta.measurementType)} ${meta.unit || (meta.measurementType === "monetary" ? "" : measurementUnits[meta.measurementType])}`
                                           }
                                         </span>
                                       </div>
@@ -742,7 +766,7 @@ export default function MetasVisaoGeralPage() {
             <DialogTitle>Check-in de Progresso</DialogTitle>
           </DialogHeader>
           {checkinMeta && (
-            <div className="space-y-4 py-4">
+            <div className="space-y-6 py-4">
               <div className="p-4 bg-muted/30 rounded-lg" data-testid="card-checkin-info">
                 <h4 className="font-bold text-sm mb-1" data-testid="text-checkin-meta-title">{checkinMeta.title}</h4>
                 <p className="text-xs text-muted-foreground" data-testid="text-checkin-area">
@@ -751,36 +775,84 @@ export default function MetasVisaoGeralPage() {
                 <div className="flex justify-between items-center mt-3">
                   <span className="text-sm text-muted-foreground">Progresso atual:</span>
                   <span className="text-lg font-bold" data-testid="text-checkin-current-progress">
-                    {checkinMeta.currentValue || 0} / {checkinMeta.targetValue} 
-                    {checkinMeta.measurementType !== "binary" && ` ${checkinMeta.unit || measurementUnits[checkinMeta.measurementType]}`}
+                    {checkinMeta.measurementType === "binary"
+                      ? (parseFloat(checkinMeta.currentValue || "0") > 0 ? "Concluído" : "Pendente")
+                      : `${formatValue(checkinMeta.currentValue || "0", checkinMeta.measurementType)} / ${formatValue(checkinMeta.targetValue, checkinMeta.measurementType)} ${checkinMeta.unit || (checkinMeta.measurementType === "monetary" ? "" : measurementUnits[checkinMeta.measurementType])}`
+                    }
                   </span>
                 </div>
                 <Progress value={getProgress(checkinMeta)} className="h-2 mt-2" data-testid="progress-checkin" />
               </div>
 
-              <div className="space-y-2">
-                <Label>Novo Valor *</Label>
-                <Input
-                  type="number"
-                  value={checkinForm.newValue}
-                  onChange={e => setCheckinForm(prev => ({ ...prev, newValue: e.target.value }))}
-                  placeholder="Informe o valor atual"
-                  data-testid="input-checkin-value"
-                />
-                {checkinMeta.measurementType === "binary" && (
-                  <p className="text-xs text-muted-foreground">0 = Não concluído, 1 = Concluído</p>
-                )}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Novo Valor *</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    value={checkinForm.newValue}
+                    onChange={e => setCheckinForm(prev => ({ ...prev, newValue: e.target.value }))}
+                    placeholder="Informe o valor atual"
+                    data-testid="input-checkin-value"
+                  />
+                  {checkinMeta.measurementType === "binary" && (
+                    <p className="text-xs text-muted-foreground">0 = Não concluído, 1 = Concluído</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Comentário (opcional)</Label>
+                  <Textarea
+                    value={checkinForm.comment}
+                    onChange={e => setCheckinForm(prev => ({ ...prev, comment: e.target.value }))}
+                    placeholder="O que mudou? Obstáculos encontrados?"
+                    rows={3}
+                    data-testid="input-checkin-comment"
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Comentário (opcional)</Label>
-                <Textarea
-                  value={checkinForm.comment}
-                  onChange={e => setCheckinForm(prev => ({ ...prev, comment: e.target.value }))}
-                  placeholder="O que mudou? Obstáculos encontrados?"
-                  rows={3}
-                  data-testid="input-checkin-comment"
-                />
+              <div className="space-y-3 pt-2">
+                <h4 className="text-sm font-bold flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Histórico de Check-ins
+                </h4>
+                <ScrollArea className="h-[200px] rounded-md border p-4 bg-muted/5">
+                  {checkinsLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : checkins.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum check-in realizado ainda.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {checkins.sort((a, b) => new Date(b.createdAt || "").getTime() - new Date(a.createdAt || "").getTime()).map((c) => {
+                        const cUser = getUserById(c.userId);
+                        return (
+                          <div key={c.id} className="text-sm border-b pb-3 last:border-0 last:pb-0">
+                            <div className="flex justify-between items-start mb-1">
+                              <span className="font-bold text-primary">
+                                {formatValue(c.newValue, checkinMeta.measurementType)}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">
+                                {c.createdAt ? format(parseISO(c.createdAt.toString()), "dd 'de' MMM yyyy", { locale: ptBR }) : ""}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                              <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
+                                {cUser?.name?.charAt(0) || "U"}
+                              </div>
+                              <span>{cUser?.name || "Usuário"}</span>
+                            </div>
+                            {c.comment && (
+                              <p className="mt-1.5 text-xs text-muted-foreground italic leading-relaxed">"{c.comment}"</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ScrollArea>
               </div>
             </div>
           )}
