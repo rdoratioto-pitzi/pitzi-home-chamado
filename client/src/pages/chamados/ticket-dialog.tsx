@@ -192,6 +192,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
   const handleCloseSuccess = () => {
     setShowSuccess(false);
     setCreatedTicket(null);
+    setAttachments([]);
     form.reset();
     onOpenChange(false);
   };
@@ -199,6 +200,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
   const handleCreateAnother = () => {
     setShowSuccess(false);
     setCreatedTicket(null);
+    setAttachments([]);
     form.reset();
   };
 
@@ -206,8 +208,10 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
     if (!open) {
       setShowSuccess(false);
       setCreatedTicket(null);
+      setAttachments([]);
+      form.reset();
     }
-  }, [open]);
+  }, [open, form]);
 
   if (showSuccess && createdTicket) {
     return (

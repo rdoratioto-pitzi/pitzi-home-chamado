@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, X, Loader2, Maximize2 } from "lucide-react";
+import { ImageIcon, X, Loader2, Maximize2, Video, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -38,20 +38,24 @@ export function RichTextarea({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadImage = useCallback(async (file: File): Promise<string | null> => {
-    if (!file.type.startsWith("image/")) {
+  const uploadFile = useCallback(async (file: File): Promise<string | null> => {
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+
+    if (!isImage && !isVideo) {
       toast({
         title: "Formato inválido",
-        description: "Por favor, envie apenas arquivos de imagem.",
+        description: "Por favor, envie apenas arquivos de imagem ou vídeo.",
         variant: "destructive",
       });
       return null;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024; // 50MB for video, 10MB for image
+    if (file.size > maxSize) {
       toast({
         title: "Arquivo muito grande",
-        description: "O tamanho máximo é 5MB.",
+        description: `O tamanho máximo é ${isVideo ? "50MB" : "10MB"}.`,
         variant: "destructive",
       });
       return null;
@@ -63,7 +67,7 @@ export function RichTextarea({
       reader.onerror = () => {
         toast({
           title: "Erro na leitura",
-          description: "Não foi possível ler o arquivo de imagem.",
+          description: "Não foi possível ler o arquivo.",
           variant: "destructive",
         });
         resolve(null);
@@ -77,20 +81,20 @@ export function RichTextarea({
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
-    const newImages: string[] = [];
+    const newAttachments: string[] = [];
 
     for (const file of Array.from(files)) {
-      const url = await uploadImage(file);
+      const url = await uploadFile(file);
       if (url) {
-        newImages.push(url);
+        newAttachments.push(url);
       }
     }
 
-    if (newImages.length > 0 && onImagesChange) {
-      onImagesChange([...images, ...newImages]);
+    if (newAttachments.length > 0 && onImagesChange) {
+      onImagesChange([...images, ...newAttachments]);
       toast({
-        title: "Imagem adicionada",
-        description: `${newImages.length} imagem(ns) adicionada(s) com sucesso.`,
+        title: "Anexo adicionado",
+        description: `${newAttachments.length} arquivo(s) adicionado(s) com sucesso.`,
       });
     }
 
@@ -98,14 +102,14 @@ export function RichTextarea({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [images, onImagesChange, uploadImage, toast]);
+  }, [images, onImagesChange, uploadFile, toast]);
 
   const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
     const files: File[] = [];
     
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") !== -1) {
+      if (items[i].type.indexOf("image") !== -1 || items[i].type.indexOf("video") !== -1) {
         const file = items[i].getAsFile();
         if (file) files.push(file);
       }
@@ -117,7 +121,7 @@ export function RichTextarea({
     const uploadedUrls: string[] = [];
 
     for (const file of files) {
-      const url = await uploadImage(file);
+      const url = await uploadFile(file);
       if (url) {
         uploadedUrls.push(url);
       }
@@ -126,21 +130,23 @@ export function RichTextarea({
     if (uploadedUrls.length > 0 && onImagesChange) {
       onImagesChange([...images, ...uploadedUrls]);
       toast({
-        title: "Imagem colada",
-        description: `${uploadedUrls.length} imagem(ns) adicionada(s) via área de transferência.`,
+        title: "Arquivo colado",
+        description: `${uploadedUrls.length} arquivo(s) adicionado(s) via área de transferência.`,
       });
     }
 
     setIsUploading(false);
-  }, [images, onImagesChange, uploadImage, toast]);
+  }, [images, onImagesChange, uploadFile, toast]);
 
-  const removeImage = useCallback((index: number) => {
+  const removeAttachment = useCallback((index: number) => {
     if (onImagesChange) {
       const newImages = [...images];
       newImages.splice(index, 1);
       onImagesChange(newImages);
     }
   }, [images, onImagesChange]);
+
+  const isVideoUrl = (url: string) => url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
 
   return (
     <div className="space-y-2">
@@ -159,7 +165,7 @@ export function RichTextarea({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
           className="hidden"
           onChange={handleFileSelect}
@@ -179,12 +185,15 @@ export function RichTextarea({
             {isUploading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-1" />
             ) : (
-              <ImageIcon className="h-4 w-4 mr-1" />
+              <div className="flex items-center gap-1">
+                <ImageIcon className="h-4 w-4" />
+                <Video className="h-4 w-4" />
+              </div>
             )}
-            Adicionar Imagem
+            <span className="ml-1">Adicionar Imagem/Vídeo</span>
           </Button>
           <span className="text-[10px] text-muted-foreground">
-            Você também pode colar imagens (Ctrl+V)
+            Suporta Colar (Ctrl+V)
           </span>
         </div>
         <span className="text-[10px] text-muted-foreground">
@@ -194,43 +203,67 @@ export function RichTextarea({
 
       {images.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
-          {images.map((url, index) => (
-            <div key={index} className="relative group rounded-lg overflow-hidden border bg-muted/50 aspect-video flex items-center justify-center">
-              <img
-                src={url}
-                alt={`Anexo ${index + 1}`}
-                className="max-w-full max-h-full object-contain cursor-pointer"
-              />
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button size="icon" variant="secondary" className="h-8 w-8">
-                      <Maximize2 className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
-                    <VisuallyHidden>
-                      <DialogTitle>Visualização de Imagem</DialogTitle>
-                    </VisuallyHidden>
-                    <img 
-                      src={url} 
-                      alt="Preview" 
-                      className="max-w-full max-h-full object-contain" 
-                    />
-                  </DialogContent>
-                </Dialog>
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  className="h-8 w-8"
-                  onClick={() => removeImage(index)}
-                  data-testid={dataTestId ? `${dataTestId}-remove-image-${index}` : undefined}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+          {images.map((url, index) => {
+            const isVideo = isVideoUrl(url);
+            return (
+              <div key={index} className="relative group rounded-lg overflow-hidden border bg-muted/50 aspect-video flex items-center justify-center">
+                {isVideo ? (
+                  <video
+                    src={url}
+                    className="max-w-full max-h-full object-contain"
+                  />
+                ) : (
+                  <img
+                    src={url}
+                    alt={`Anexo ${index + 1}`}
+                    className="max-w-full max-h-full object-contain cursor-pointer"
+                  />
+                )}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button size="icon" variant="secondary" className="h-8 w-8">
+                        {isVideo ? <Video className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                      <VisuallyHidden>
+                        <DialogTitle>Visualização de {isVideo ? "Vídeo" : "Imagem"}</DialogTitle>
+                      </VisuallyHidden>
+                      {isVideo ? (
+                        <video 
+                          src={url} 
+                          controls
+                          autoPlay
+                          className="max-w-full max-h-full" 
+                        />
+                      ) : (
+                        <img 
+                          src={url} 
+                          alt="Preview" 
+                          className="max-w-full max-h-full object-contain" 
+                        />
+                      )}
+                    </DialogContent>
+                  </Dialog>
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="h-8 w-8"
+                    onClick={() => removeAttachment(index)}
+                    data-testid={dataTestId ? `${dataTestId}-remove-attachment-${index}` : undefined}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                {isVideo && (
+                  <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded-md">
+                    <Video className="h-3 w-3" />
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

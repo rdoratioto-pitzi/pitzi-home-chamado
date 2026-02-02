@@ -175,6 +175,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     console.log("Saving description:", editedDescription);
     updateMutation.mutate({ 
       description: editedDescription,
+      attachments: ticket.attachments, // Preserve existing attachments unless we decide to allow editing them here
       descriptionLastEditedBy: "admin", 
       descriptionLastEditedAt: new Date().toISOString() as any
     });
@@ -306,28 +307,44 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                   try {
                     const attachments = JSON.parse(ticket.attachments);
                     if (Array.isArray(attachments)) {
-                      return attachments.map((url, i) => (
-                        <Dialog key={i}>
-                          <DialogTrigger asChild>
-                            <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer">
-                              <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
-                              <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Maximize2 className="h-6 w-6 text-white" />
+                      return attachments.map((url, i) => {
+                        const isVideo = url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
+                        return (
+                          <Dialog key={i}>
+                            <DialogTrigger asChild>
+                              <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer">
+                                {isVideo ? (
+                                  <video src={url} className="max-w-full max-h-full object-contain" />
+                                ) : (
+                                  <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
+                                )}
+                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  {isVideo ? <Video className="h-6 w-6 text-white" /> : <Maximize2 className="h-6 w-6 text-white" />}
+                                </div>
+                                {isVideo && (
+                                  <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded-md">
+                                    <Video className="h-3 w-3" />
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          </DialogTrigger>
-                                      <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
-                                        <VisuallyHidden>
-                                          <DialogTitle>Visualização de Imagem</DialogTitle>
-                                        </VisuallyHidden>
-                                        <img 
-                                          src={url} 
-                                          alt="Preview" 
-                                          className="max-w-full max-h-full object-contain" 
-                                        />
-                                      </DialogContent>
-                        </Dialog>
-                      ));
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                              <VisuallyHidden>
+                                <DialogTitle>Visualização de {isVideo ? "Vídeo" : "Imagem"}</DialogTitle>
+                              </VisuallyHidden>
+                              {isVideo ? (
+                                <video src={url} controls autoPlay className="max-w-full max-h-full" />
+                              ) : (
+                                <img 
+                                  src={url} 
+                                  alt="Preview" 
+                                  className="max-w-full max-h-full object-contain" 
+                                />
+                              )}
+                            </DialogContent>
+                          </Dialog>
+                        );
+                      });
                     }
                   } catch (e) {
                     return null;
@@ -470,28 +487,44 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                             try {
                               const attachments = JSON.parse(c.attachments);
                               if (Array.isArray(attachments)) {
-                                return attachments.map((url, i) => (
-                                  <Dialog key={i}>
-                                    <DialogTrigger asChild>
-                                      <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer">
-                                        <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
-                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                          <Maximize2 className="h-6 w-6 text-white" />
+                                return attachments.map((url, i) => {
+                                  const isVideo = url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
+                                  return (
+                                    <Dialog key={i}>
+                                      <DialogTrigger asChild>
+                                        <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer">
+                                          {isVideo ? (
+                                            <video src={url} className="max-w-full max-h-full object-contain" />
+                                          ) : (
+                                            <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
+                                          )}
+                                          <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            {isVideo ? <Video className="h-6 w-6 text-white" /> : <Maximize2 className="h-6 w-6 text-white" />}
+                                          </div>
+                                          {isVideo && (
+                                            <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded-md">
+                                              <Video className="h-3 w-3" />
+                                            </div>
+                                          )}
                                         </div>
-                                      </div>
-                                    </DialogTrigger>
-                                  <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
-                                    <VisuallyHidden>
-                                      <DialogTitle>Visualização de Imagem</DialogTitle>
-                                    </VisuallyHidden>
-                                    <img 
-                                      src={url} 
-                                      alt="Preview" 
-                                      className="max-w-full max-h-full object-contain" 
-                                    />
-                                  </DialogContent>
-                                  </Dialog>
-                                ));
+                                      </DialogTrigger>
+                                      <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                                        <VisuallyHidden>
+                                          <DialogTitle>Visualização de {isVideo ? "Vídeo" : "Imagem"}</DialogTitle>
+                                        </VisuallyHidden>
+                                        {isVideo ? (
+                                          <video src={url} controls autoPlay className="max-w-full max-h-full" />
+                                        ) : (
+                                          <img 
+                                            src={url} 
+                                            alt="Preview" 
+                                            className="max-w-full max-h-full object-contain" 
+                                          />
+                                        )}
+                                      </DialogContent>
+                                    </Dialog>
+                                  );
+                                });
                               }
                             } catch (e) {
                               return null;
