@@ -14,7 +14,10 @@ import {
   User,
   Sparkles,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Menu,
+  X,
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -44,9 +47,14 @@ export default function Home() {
   const [inputMessage, setInputMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    window.location.href = "/auth";
+  };
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<AiConversation[]>({
     queryKey: ["/api/ai/conversations", userId],
@@ -181,21 +189,41 @@ export default function Home() {
   const showWelcome = !selectedConversationId && displayMessages.length === 0 && !isStreaming;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background relative">
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <div 
         className={cn(
-          "border-r bg-muted/30 flex flex-col transition-all duration-300 w-72"
+          "fixed inset-y-0 left-0 z-50 w-72 border-r bg-muted/30 flex flex-col transition-transform duration-300 lg:relative lg:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="p-3 border-b">
+        <div className="p-3 border-b flex items-center justify-between">
           <Button 
-            className="w-full justify-start gap-2" 
+            className="flex-1 justify-start gap-2" 
             variant="outline"
-            onClick={handleNewConversation}
+            onClick={() => {
+              handleNewConversation();
+              setSidebarOpen(false);
+            }}
             data-testid="button-new-conversation"
           >
             <Plus className="h-4 w-4" />
             Nova conversa
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden ml-2"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="h-5 w-5" />
           </Button>
         </div>
         
@@ -219,7 +247,10 @@ export default function Home() {
                       ? "bg-accent text-accent-foreground" 
                       : "hover:bg-muted"
                   )}
-                  onClick={() => setSelectedConversationId(conv.id)}
+                  onClick={() => {
+                    setSelectedConversationId(conv.id);
+                    setSidebarOpen(false);
+                  }}
                   data-testid={`conversation-item-${conv.id}`}
                 >
                   <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -241,10 +272,37 @@ export default function Home() {
             )}
           </div>
         </ScrollArea>
+
+        {/* Sidebar Footer with Logout for Mobile */}
+        <div className="p-3 border-t lg:hidden">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4" />
+            Sair da conta
+          </Button>
+        </div>
       </div>
 
-
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Header with mobile menu trigger */}
+        <header className="h-14 border-b flex items-center justify-between px-4 bg-background z-30 lg:hidden">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <MacGyverIcon size={24} />
+            <span className="font-semibold text-sm">Macgyver IA</span>
+          </div>
+          <div className="w-9" /> {/* Spacer for centering */}
+        </header>
+
         <ScrollArea className="flex-1 px-4">
           <div className="max-w-3xl mx-auto py-8 space-y-6">
             {showWelcome && (
