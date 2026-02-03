@@ -469,20 +469,130 @@ export default function TarefasPage() {
 
   return (
     <div className="flex h-full">
+      {/* Áreas Sidebar (Left) */}
+      {isAreasSidebarOpen && (
+        <div className="w-64 border-r border-border bg-muted/30 flex flex-col animate-in slide-in-from-left duration-200">
+          <div className="p-4 border-b border-border flex items-center justify-between">
+            <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+              Áreas
+            </h2>
+            <div className="flex items-center gap-1">
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                className="h-6 w-6"
+                onClick={() => handleOpenAreaDialog()}
+                data-testid="button-new-area"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button 
+                size="icon" 
+                variant="ghost" 
+                className="h-6 w-6"
+                onClick={() => setIsAreasSidebarOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-auto p-2">
+            <button
+              onClick={() => setSelectedAreaId(null)}
+              className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                selectedAreaId === null 
+                  ? "bg-primary/10 text-primary" 
+                  : "hover:bg-muted"
+              }`}
+              data-testid="button-all-tasks"
+            >
+              <Folder className="h-4 w-4" />
+              <span>Todas as Tarefas</span>
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {tasksOnly.length}
+              </Badge>
+            </button>
+
+            <div className="mt-4 space-y-1">
+              {areasLoading ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
+              ) : (
+                areas.map((area) => {
+                  const areaTaskCount = tasksOnly.filter(t => t.areaId === area.id).length;
+                  return (
+                    <div 
+                      key={area.id}
+                      className={`group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+                        selectedAreaId === area.id 
+                          ? "bg-primary/10 text-primary" 
+                          : "hover:bg-muted"
+                      }`}
+                      onClick={() => setSelectedAreaId(area.id)}
+                      data-testid={`button-area-${area.id}`}
+                    >
+                      <div 
+                        className="h-3 w-3 rounded-full" 
+                        style={{ backgroundColor: area.color || "#00A137" }}
+                      />
+                      {area.visibility === "shared" ? (
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="flex-1 truncate">{area.name}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {areaTaskCount}
+                      </Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button 
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded"
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`button-area-menu-${area.id}`}
+                          >
+                            <MoreHorizontal className="h-3 w-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenAreaDialog(area)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-destructive"
+                            onClick={() => deleteAreaMutation.mutate(area.id)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col">
         <PageHeader
           title={selectedArea ? selectedArea.name : "Todas as Tarefas"}
           actions={
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsAreasSidebarOpen(!isAreasSidebarOpen)}
-                className={`flex items-center gap-2 ${isAreasSidebarOpen ? 'bg-primary/10 text-primary' : ''}`}
-              >
-                <Folder className="h-4 w-4" />
-                <span>Áreas</span>
-              </Button>
+              {!isAreasSidebarOpen && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsAreasSidebarOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Folder className="h-4 w-4" />
+                  <span>Áreas</span>
+                </Button>
+              )}
               <Button onClick={handleOpenNormalTaskDialog} data-testid="button-new-task">
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Tarefa
