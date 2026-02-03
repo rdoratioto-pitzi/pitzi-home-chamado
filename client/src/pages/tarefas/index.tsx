@@ -289,7 +289,9 @@ export default function TarefasPage() {
     },
   });
 
-  const [sortBy, setSortBy] = useState<"priority" | "date" | "custom">("priority");
+  const [sortBy, setSortBy] = useState<"priority" | "date" | "custom">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [isAreasSidebarOpen, setIsAreasSidebarOpen] = useState(false);
 
   const priorityOrder = { high: 0, medium: 1, low: 2 };
 
@@ -303,6 +305,12 @@ export default function TarefasPage() {
       if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase())) {
         return false;
       }
+      
+      // Default filter for main screen: only todo and doing
+      if (statusFilter === "all") {
+        return task.status === "todo" || task.status === "doing";
+      }
+
       if (statusFilter !== "all" && task.status !== statusFilter) {
         return false;
       }
@@ -316,31 +324,43 @@ export default function TarefasPage() {
       result = [...result].sort((a, b) => {
         const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 1;
         const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 1;
-        if (priorityA !== priorityB) return priorityA - priorityB;
-        if (a.dueDate && b.dueDate) {
-          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        
+        let comparison = 0;
+        if (priorityA !== priorityB) {
+          comparison = priorityA - priorityB;
+        } else if (a.dueDate && b.dueDate) {
+          comparison = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        } else if (a.dueDate) {
+          comparison = -1;
+        } else if (b.dueDate) {
+          comparison = 1;
         }
-        if (a.dueDate) return -1;
-        if (b.dueDate) return 1;
-        return 0;
+        
+        return sortOrder === "asc" ? comparison : -comparison;
       });
     } else if (sortBy === "date") {
       result = [...result].sort((a, b) => {
+        let comparison = 0;
         if (a.dueDate && b.dueDate) {
-          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+          comparison = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        } else if (a.dueDate) {
+          comparison = -1;
+        } else if (b.dueDate) {
+          comparison = 1;
+        } else {
+          const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 1;
+          const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 1;
+          comparison = priorityA - priorityB;
         }
-        if (a.dueDate) return -1;
-        if (b.dueDate) return 1;
-        const priorityA = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 1;
-        const priorityB = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 1;
-        return priorityA - priorityB;
+        
+        return sortOrder === "asc" ? comparison : -comparison;
       });
     } else {
       result = [...result].sort((a, b) => (a.order || 0) - (b.order || 0));
     }
 
     return result;
-  }, [tasksOnly, searchQuery, statusFilter, typeFilter, sortBy]);
+  }, [tasksOnly, searchQuery, statusFilter, typeFilter, sortBy, sortOrder]);
 
   const selectedArea = areas.find(a => a.id === selectedAreaId);
 
@@ -449,118 +469,32 @@ export default function TarefasPage() {
 
   return (
     <div className="flex h-full">
-      <div className="w-64 border-r border-border bg-muted/30 flex flex-col">
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
-              Áreas
-            </h2>
-            <Button 
-              size="icon" 
-              variant="ghost" 
-              className="h-6 w-6"
-              onClick={() => handleOpenAreaDialog()}
-              data-testid="button-new-area"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-auto p-2">
-          <button
-            onClick={() => setSelectedAreaId(null)}
-            className={`w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              selectedAreaId === null 
-                ? "bg-primary/10 text-primary" 
-                : "hover:bg-muted"
-            }`}
-            data-testid="button-all-tasks"
-          >
-            <Folder className="h-4 w-4" />
-            <span>Todas as Tarefas</span>
-            <Badge variant="secondary" className="ml-auto text-xs">
-              {tasksOnly.length}
-            </Badge>
-          </button>
-
-          <div className="mt-4 space-y-1">
-            {areasLoading ? (
-              <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
-            ) : (
-              areas.map((area) => {
-                const areaTaskCount = tasksOnly.filter(t => t.areaId === area.id).length;
-                return (
-                  <div 
-                    key={area.id}
-                    className={`group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                      selectedAreaId === area.id 
-                        ? "bg-primary/10 text-primary" 
-                        : "hover:bg-muted"
-                    }`}
-                    onClick={() => setSelectedAreaId(area.id)}
-                    data-testid={`button-area-${area.id}`}
-                  >
-                    <div 
-                      className="h-3 w-3 rounded-full" 
-                      style={{ backgroundColor: area.color || "#00A137" }}
-                    />
-                    {area.visibility === "shared" ? (
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <User className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span className="flex-1 truncate">{area.name}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {areaTaskCount}
-                    </Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button 
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded"
-                          onClick={(e) => e.stopPropagation()}
-                          data-testid={`button-area-menu-${area.id}`}
-                        >
-                          <MoreHorizontal className="h-3 w-3" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenAreaDialog(area)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-destructive"
-                          onClick={() => deleteAreaMutation.mutate(area.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
-
       <div className="flex-1 flex flex-col">
         <PageHeader
           title={selectedArea ? selectedArea.name : "Todas as Tarefas"}
           actions={
-            <Button onClick={handleOpenNormalTaskDialog} data-testid="button-new-task">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Tarefa
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsAreasSidebarOpen(!isAreasSidebarOpen)}
+                className={`flex items-center gap-2 ${isAreasSidebarOpen ? 'bg-primary/10 text-primary' : ''}`}
+              >
+                <Folder className="h-4 w-4" />
+                <span>Áreas</span>
+              </Button>
+              <Button onClick={handleOpenNormalTaskDialog} data-testid="button-new-task">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Tarefa
+              </Button>
+            </div>
           }
         />
 
         <div className="p-6 flex-1 overflow-auto">
           <Card className="shadow-sm border-border/60 p-6 mb-6">
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1 max-w-md">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="relative flex-1 min-w-[200px] max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Buscar tarefas..."
@@ -576,35 +510,44 @@ export default function TarefasPage() {
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">Em Aberto</SelectItem>
                   <SelectItem value="todo">A Fazer</SelectItem>
                   <SelectItem value="doing">Em Andamento</SelectItem>
-                  <SelectItem value="done">Concluído</SelectItem>
+                  <SelectItem value="done">Concluídas</SelectItem>
                   <SelectItem value="archived">Arquivado</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-40" data-testid="select-type-filter">
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="task">Tarefas</SelectItem>
-                                  </SelectContent>
-              </Select>
+              
+              <div className="flex items-center gap-2">
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as "priority" | "date" | "custom")}>
+                  <SelectTrigger className="w-40" data-testid="select-sort-by">
+                    <SelectValue placeholder="Ordenar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="priority">Por Prioridade</SelectItem>
+                    <SelectItem value="date">Por Data</SelectItem>
+                    <SelectItem value="custom">Ordem Manual</SelectItem>
+                  </SelectContent>
+                </Select>
 
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as "priority" | "date" | "custom")}>
-                <SelectTrigger className="w-40" data-testid="select-sort-by">
-                  <SelectValue placeholder="Ordenar" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="priority">Por Prioridade</SelectItem>
-                  <SelectItem value="date">Por Data</SelectItem>
-                  <SelectItem value="custom">Ordem Manual</SelectItem>
-                </SelectContent>
-              </Select>
+                {sortBy !== "custom" && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                    title={sortOrder === "asc" ? "Crescente" : "Decrescente"}
+                  >
+                    {sortOrder === "asc" ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/></svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M11 12h4"/><path d="M11 16h7"/><path d="M11 20h10"/></svg>
+                    )}
+                  </Button>
+                )}
+              </div>
 
-              <div className="flex items-center border rounded-md p-1 bg-muted/50">
+              <div className="flex items-center border rounded-md p-1 bg-muted/50 ml-auto">
                 <Button
                   variant={viewMode === "grid" ? "secondary" : "ghost"}
                   size="sm"
