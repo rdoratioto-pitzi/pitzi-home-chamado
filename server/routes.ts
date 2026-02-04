@@ -1586,10 +1586,8 @@ export async function registerRoutes(
   app.get("/api/logistica-reversa/servicos", async (req, res) => {
     res.json({
       servicos: [
-        { codigo: "41076", nome: "PAC Reversa" },
-        { codigo: "40010", nome: "SEDEX Reversa" },
-        { codigo: "40215", nome: "SEDEX 10 Reversa" },
-        { codigo: "40290", nome: "SEDEX 12 Reversa" },
+        { codigo: "03301", nome: "PAC Reversa" },
+        { codigo: "03247", nome: "SEDEX Reversa" },
       ],
       tipos: [
         { codigo: "A", nome: "Autorização de Postagem" },
