@@ -1,7 +1,8 @@
 import { parseStringPromise, Builder } from 'xml2js';
 
-// URL corrigida do Web Service de Logística Reversa dos Correios (Produção)
-const CORREIOS_PRODUCTION_URL = 'https://cws.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS';
+// URL oficial do Web Service SCOL de Logística Reversa dos Correios (Produção)
+// Documentação: https://www.correios.com.br/atendimento/developers/arquivos/manual-de-implementacao-do-web-service-logistica-reversa.pdf
+const CORREIOS_PRODUCTION_URL = 'https://webservicescol.correios.com.br/ScolWeb/WebServiceScol';
 
 interface CorreiosCredentials {
   usuario: string;
@@ -41,12 +42,12 @@ function getSoapPassword(credentials: CorreiosCredentials): string {
 }
 
 async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<any> {
-  // O Web Service SOAP de Logística Reversa NÃO usa autenticação no header HTTP
-  // As credenciais são passadas dentro do corpo XML da requisição SOAP
+  // Web Service SCOL de Logística Reversa dos Correios
+  // Namespace correto conforme documentação oficial
   
   const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
-                  xmlns:ser="http://service.logisticareversa.correios.com.br/">
+                  xmlns:log="http://www.correios.com.br/logisticaReversaWS">
   <soapenv:Header/>
   <soapenv:Body>
     ${soapBody}
@@ -57,6 +58,7 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
   const credentials = getCredentials();
   const senhaUsada = getSoapPassword(credentials);
   console.log('=== DEBUG Correios SOAP ===');
+  console.log('URL:', CORREIOS_PRODUCTION_URL);
   console.log('Usuario:', credentials.usuario);
   console.log('Senha length:', senhaUsada.length, 'chars');
   console.log('Senha primeiros 6 chars:', senhaUsada.substring(0, 6) + '...');
@@ -64,6 +66,7 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
   console.log('CartaoPostagem:', credentials.cartaoPostagem);
   console.log('SOAPAction:', soapAction);
   console.log('===========================');
+  console.log('Request XML (primeiros 500 chars):', soapEnvelope.substring(0, 500));
   
   console.log('Enviando requisição SOAP para Correios Logística Reversa...');
 
@@ -71,21 +74,22 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
     // Autenticação HTTP Basic (usuário:senha em base64)
     const authString = Buffer.from(`${credentials.usuario}:${senhaUsada}`).toString('base64');
     
-    // SOAPAction vazio com aspas é o padrão para muitos serviços SOAP
-    // O servidor deve determinar a operação pelo conteúdo do Body
-    console.log('SOAPAction: ""');
-    
     const response = await fetch(CORREIOS_PRODUCTION_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': '""',
+        'SOAPAction': soapAction,
         'Authorization': `Basic ${authString}`,
       },
       body: soapEnvelope,
     });
 
     const responseText = await response.text();
+    
+    console.log('=== RESPOSTA CORREIOS ===');
+    console.log('HTTP Status:', response.status);
+    console.log('Response XML (primeiros 1000 chars):', responseText.substring(0, 1000));
+    console.log('=========================');
     
     if (!response.ok) {
       console.error('SOAP HTTP Error:', response.status, responseText);
@@ -118,7 +122,12 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
     
     const result = await parseStringPromise(responseText, { explicitArray: false, ignoreAttrs: true });
     
-    const soapFault = result['soap:Envelope']?.['soap:Body']?.['soap:Fault'];
+    console.log('Parsed SOAP response:', JSON.stringify(result, null, 2).substring(0, 2000));
+    
+    // Verifica SOAP Fault em diferentes formatos
+    const soapFault = result['soap:Envelope']?.['soap:Body']?.['soap:Fault'] 
+                   || result['S:Envelope']?.['S:Body']?.['S:Fault']
+                   || result['SOAP-ENV:Envelope']?.['SOAP-ENV:Body']?.['SOAP-ENV:Fault'];
     if (soapFault) {
       const faultString = soapFault.faultstring || soapFault['faultstring'] || 'Unknown SOAP Fault';
       throw new Error(`SOAP Fault: ${faultString}`);
@@ -277,7 +286,7 @@ export async function solicitarPostagemReversa(params: SolicitarPostagemReversaP
   const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
-    <ser:solicitarPostagemReversa>
+    <log:solicitarPostagemReversa>
       <usuario>${credentials.usuario}</usuario>
       <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
@@ -302,11 +311,22 @@ export async function solicitarPostagemReversa(params: SolicitarPostagemReversaP
         <ciencia_conteudo_proibido>${params.destinatario.ciencia_conteudo_proibido}</ciencia_conteudo_proibido>
       </destinatario>
       ${coletasXML}
-    </ser:solicitarPostagemReversa>
+    </log:solicitarPostagemReversa>
   `;
 
   const result = await makeSOAPRequest(soapBody, 'solicitarPostagemReversa');
-  const response = result['soap:Envelope']?.['soap:Body']?.['ns2:solicitarPostagemReversaResponse']?.solicitarPostagemReversa;
+  
+  // Tenta extrair resposta em diferentes formatos de namespace
+  const soapBodyRes = result['soap:Envelope']?.['soap:Body'] 
+                   || result['S:Envelope']?.['S:Body']
+                   || result['SOAP-ENV:Envelope']?.['SOAP-ENV:Body'];
+  
+  // Procura resposta em diferentes namespaces
+  const response = soapBodyRes?.['ns2:solicitarPostagemReversaResponse']?.solicitarPostagemReversa
+                || soapBodyRes?.['solicitarPostagemReversaResponse']?.solicitarPostagemReversa
+                || soapBodyRes?.['log:solicitarPostagemReversaResponse']?.solicitarPostagemReversa;
+  
+  console.log('SOAP Body parsed:', JSON.stringify(soapBodyRes, null, 2).substring(0, 1500));
   
   if (!response) {
     throw new Error('Invalid response from Correios API');
@@ -345,13 +365,13 @@ export async function cancelarPedido(params: CancelarPedidoParams): Promise<Canc
   const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
-    <ser:cancelarPedido>
+    <log:cancelarPedido>
       <usuario>${credentials.usuario}</usuario>
       <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
       <numeroPedido>${params.numeroPedido}</numeroPedido>
       <tipo>${params.tipo}</tipo>
-    </ser:cancelarPedido>
+    </log:cancelarPedido>
   `;
 
   const result = await makeSOAPRequest(soapBody, 'cancelarPedido');
@@ -410,14 +430,14 @@ export async function acompanharPedido(params: AcompanharPedidoParams): Promise<
   const senhaAPI = getSoapPassword(credentials);
   
   const soapBody = `
-    <ser:acompanharPedido>
+    <log:acompanharPedido>
       <usuario>${credentials.usuario}</usuario>
       <senha>${senhaAPI}</senha>
       <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
       <tipoBusca>${params.tipoBusca}</tipoBusca>
       <tipoSolicitacao>${params.tipoSolicitacao}</tipoSolicitacao>
       <numeroPedido>${params.numeroPedido}</numeroPedido>
-    </ser:acompanharPedido>
+    </log:acompanharPedido>
   `;
 
   const result = await makeSOAPRequest(soapBody, 'acompanharPedido');

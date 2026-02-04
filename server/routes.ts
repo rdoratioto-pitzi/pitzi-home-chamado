@@ -1390,8 +1390,100 @@ export async function registerRoutes(
     try {
       const { tipo, codigoServico, remetente, destinatario, observacao } = req.body;
       
-      const numeroPedido = `LR${Date.now()}`;
-      const numeroEtiqueta = `SV${Math.random().toString(36).substring(2, 11).toUpperCase()}BR`;
+      // Chama a API real dos Correios
+      console.log('=== Solicitando Logística Reversa nos Correios ===');
+      console.log('Tipo:', tipo);
+      console.log('Serviço:', codigoServico);
+      console.log('Remetente:', remetente?.nome);
+      console.log('Destinatário:', destinatario?.nome);
+      
+      const correiosParams: correiosService.SolicitarPostagemReversaParams = {
+        codigo_servico: codigoServico,
+        destinatario: {
+          nome: destinatario?.nome || 'RENOV SOLUCOES E SERVICOS LTDA',
+          logradouro: destinatario?.logradouro || 'R LUIGI GALVANI',
+          numero: destinatario?.numero || '200',
+          complemento: destinatario?.complemento,
+          bairro: destinatario?.bairro || 'CIDADE MONCOES',
+          referencia: destinatario?.referencia,
+          cidade: destinatario?.cidade || 'SAO PAULO',
+          uf: destinatario?.uf || 'SP',
+          cep: (destinatario?.cep || '04575020').replace(/\D/g, ''),
+          ddd: destinatario?.ddd,
+          telefone: destinatario?.telefone,
+          email: destinatario?.email,
+          ciencia_conteudo_proibido: 'S',
+        },
+        coletas_solicitadas: [{
+          tipo: tipo as 'A' | 'C' | 'CA',
+          remetente: {
+            nome: remetente?.nome || '',
+            logradouro: remetente?.logradouro || '',
+            numero: remetente?.numero || 'S/N',
+            complemento: remetente?.complemento,
+            bairro: remetente?.bairro || '',
+            cidade: remetente?.cidade || '',
+            uf: remetente?.uf || '',
+            cep: (remetente?.cep || '').replace(/\D/g, ''),
+            referencia: remetente?.referencia,
+            ddd: remetente?.ddd || '47',
+            telefone: remetente?.telefone || '',
+            email: remetente?.email || '',
+            restricao_anac: 'N',
+          },
+          obj_col: [{
+            item: 1,
+            desc: observacao || 'Devolução de produto',
+          }],
+        }],
+      };
+      
+      let numeroPedido: string;
+      let numeroEtiqueta: string;
+      let prazo: string;
+      let correiosResponse: correiosService.SolicitarPostagemReversaResponse | null = null;
+      
+      try {
+        correiosResponse = await correiosService.solicitarPostagemReversa(correiosParams);
+        console.log('=== Resposta dos Correios ===');
+        console.log('Status:', correiosResponse.status_processamento);
+        console.log('Erro:', correiosResponse.cod_erro, correiosResponse.msg_erro);
+        console.log('Resultados:', JSON.stringify(correiosResponse.resultado_solicitacao, null, 2));
+        
+        // Verifica se houve erro
+        if (correiosResponse.cod_erro && correiosResponse.cod_erro !== '0' && correiosResponse.cod_erro !== '') {
+          throw new Error(`Correios: ${correiosResponse.msg_erro || correiosResponse.cod_erro}`);
+        }
+        
+        const resultado = correiosResponse.resultado_solicitacao[0];
+        if (!resultado) {
+          throw new Error('Correios: Nenhum resultado retornado');
+        }
+        
+        // Verifica erro no resultado individual
+        if (resultado.codigo_erro && resultado.codigo_erro !== '0' && resultado.codigo_erro !== '') {
+          throw new Error(`Correios: ${resultado.descricao_erro || resultado.codigo_erro}`);
+        }
+        
+        // Usa os valores reais retornados pelos Correios
+        numeroPedido = resultado.numero_coleta || `LR${Date.now()}`;
+        numeroEtiqueta = resultado.numero_etiqueta || '';
+        prazo = resultado.prazo || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+        
+        console.log('Número do Pedido:', numeroPedido);
+        console.log('Número da Etiqueta:', numeroEtiqueta);
+        console.log('Prazo:', prazo);
+        
+      } catch (correiosError: any) {
+        console.error('=== Erro na API dos Correios ===');
+        console.error(correiosError.message);
+        
+        // Retorna o erro para o usuário em vez de criar pedido falso
+        return res.status(400).json({ 
+          error: correiosError.message || 'Erro ao comunicar com os Correios',
+          details: 'Verifique as credenciais e tente novamente'
+        });
+      }
       
       const pedidoData = {
         numeroPedido,
@@ -1400,7 +1492,7 @@ export async function registerRoutes(
         codigoServico,
         status: "solicitado",
         idCliente: null,
-        prazo: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        prazo,
         remetenteNome: remetente?.nome || null,
         remetenteCep: remetente?.cep || null,
         remetenteEndereco: remetente?.logradouro ? `${remetente.logradouro}, ${remetente.numero}` : null,
@@ -1418,19 +1510,28 @@ export async function registerRoutes(
 
       const pedido = await storage.createLogisticaReversaPedido(pedidoData);
       
-      // Create initial event
+      // Create initial event with Correios response info
       await storage.createLogisticaReversaEvento({
         pedidoId: pedido.id,
         status: "solicitado",
-        descricao: "Pedido de logística reversa criado com sucesso",
+        descricao: `Pedido de logística reversa criado nos Correios. Etiqueta: ${numeroEtiqueta}`,
       });
 
-      res.status(201).json({ pedido, success: true });
-    } catch (error) {
+      res.status(201).json({ 
+        pedido, 
+        success: true,
+        correiosResponse: correiosResponse ? {
+          status: correiosResponse.status_processamento,
+          dataProcessamento: correiosResponse.data_processamento,
+          horaProcessamento: correiosResponse.hora_processamento,
+        } : null
+      });
+    } catch (error: any) {
+      console.error('Erro ao criar pedido de logística reversa:', error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation failed", details: error.errors });
       }
-      res.status(400).json({ error: "Failed to create reverse logistics request" });
+      res.status(400).json({ error: error.message || "Failed to create reverse logistics request" });
     }
   });
 
