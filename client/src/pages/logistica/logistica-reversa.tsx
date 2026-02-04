@@ -223,6 +223,26 @@ export default function LogisticaReversaPage() {
   const valorTotalItens = itensWatch.reduce((acc, item) => acc + (item.quantidade * item.valorUnitario), 0);
   const custoEstimado = 23.90; // Mock calculation
 
+  const handleFinalizarItens = () => {
+    const itens = form.getValues("itens");
+    if (!itens || itens.length === 0) return;
+
+    const observacaoAtual = form.getValues("observacao") || "";
+    const listaItens = itens
+      .map((item) => `${item.descricao}${item.imei ? ` (IMEI: ${item.imei})` : ""}`)
+      .join("\n");
+
+    const novaObservacao = observacaoAtual 
+      ? `${observacaoAtual}\n\nItens:\n${listaItens}`
+      : `Itens:\n${listaItens}`;
+
+    form.setValue("observacao", novaObservacao);
+    toast({
+      title: "Itens finalizados",
+      description: "As informações dos itens foram adicionadas às observações.",
+    });
+  };
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader 
@@ -594,6 +614,7 @@ export default function LogisticaReversaPage() {
                             type="button" 
                             variant="outline" 
                             size="sm"
+                            onClick={handleFinalizarItens}
                             data-testid="button-finalizar-itens"
                           >
                             <CheckCircle className="h-4 w-4 mr-2" />
