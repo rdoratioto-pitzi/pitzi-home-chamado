@@ -1,8 +1,11 @@
 import { parseStringPromise, Builder } from 'xml2js';
 
-// URL oficial do Web Service SCOL de Logística Reversa dos Correios (Produção)
-// Documentação: https://www.correios.com.br/atendimento/developers/arquivos/manual-de-implementacao-do-web-service-logistica-reversa.pdf
-const CORREIOS_PRODUCTION_URL = 'https://webservicescol.correios.com.br/ScolWeb/WebServiceScol';
+// URLs da API CWS (Correios Web Services) - REST
+const CWS_PRODUCTION_URL = 'https://api.correios.com.br';
+const CWS_TOKEN_URL = 'https://api.correios.com.br/token/v1/autentica/cartaopostagem';
+
+// Fallback: URL do Web Service SOAP (pode estar bloqueado em ambientes cloud)
+const CORREIOS_SOAP_URL = 'https://webservicescol.correios.com.br/ScolWeb/WebServiceScol';
 
 interface CorreiosCredentials {
   usuario: string;
@@ -11,6 +14,12 @@ interface CorreiosCredentials {
   codAdministrativo: string;
   token: string;
 }
+
+// Cache do token JWT para evitar múltiplas autenticações
+let cachedToken: { token: string; expiration: Date; apis: number[] } | null = null;
+
+// API 250 = Logística Reversa
+const API_LOGISTICA_REVERSA = 250;
 
 function getCredentials(): CorreiosCredentials {
   return {
@@ -22,10 +31,8 @@ function getCredentials(): CorreiosCredentials {
   };
 }
 
-// Obtém a senha correta para o Web Service SOAP (código de 40 caracteres)
-// CORREIOS_SENHA deve conter o "Código de acesso a(s) API(s)" de 40 caracteres
-// CORREIOS_TOKEN pode conter o Token JWT (para APIs REST) que NÃO funciona com SOAP
-function getSoapPassword(credentials: CorreiosCredentials): string {
+// Obtém o código de acesso (40 caracteres) para autenticação
+function getAccessCode(credentials: CorreiosCredentials): string {
   const senha = credentials.senha;
   const token = credentials.token;
   
@@ -33,7 +40,7 @@ function getSoapPassword(credentials: CorreiosCredentials): string {
   if (senha && senha.length === 40) {
     return senha;
   }
-  // Se token tem 40 caracteres, pode ser o código de acesso colocado ali por engano
+  // Se token tem 40 caracteres, pode ser o código de acesso
   if (token && token.length === 40) {
     return token;
   }
@@ -41,10 +48,137 @@ function getSoapPassword(credentials: CorreiosCredentials): string {
   return senha || '';
 }
 
-async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<any> {
-  // Web Service SCOL de Logística Reversa dos Correios
-  // Namespace correto conforme documentação oficial
+// Autenticação via API CWS REST - obtém token JWT
+async function getAuthToken(): Promise<string> {
+  // Verifica se há token em cache e ainda é válido (com margem de 5 min)
+  if (cachedToken && cachedToken.expiration > new Date(Date.now() + 5 * 60 * 1000)) {
+    console.log('Usando token JWT em cache');
+    return cachedToken.token;
+  }
+
+  const credentials = getCredentials();
+  const accessCode = getAccessCode(credentials);
   
+  console.log('=== Autenticando na API CWS Correios ===');
+  console.log('URL:', CWS_TOKEN_URL);
+  console.log('Usuario:', credentials.usuario);
+  console.log('Código de Acesso length:', accessCode.length, 'chars');
+  console.log('Cartão Postagem:', credentials.cartaoPostagem);
+  
+  try {
+    // Basic Auth: usuario:codigo_de_acesso
+    const authString = Buffer.from(`${credentials.usuario}:${accessCode}`).toString('base64');
+    
+    const response = await fetch(CWS_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${authString}`,
+      },
+      body: JSON.stringify({
+        numero: credentials.cartaoPostagem
+      }),
+    });
+
+    const responseText = await response.text();
+    console.log('Auth Response Status:', response.status);
+    console.log('Auth Response (primeiros 500 chars):', responseText.substring(0, 500));
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Credenciais inválidas. Verifique CORREIOS_USUARIO (CNPJ) e CORREIOS_SENHA (código de acesso de 40 caracteres).');
+      } else if (response.status === 403) {
+        throw new Error('Acesso negado. Verifique se seu contrato possui acesso às APIs.');
+      }
+      throw new Error(`Erro de autenticação: ${response.status} - ${responseText}`);
+    }
+
+    const data = JSON.parse(responseText);
+    
+    // Cache do token (expira em 1 hora por padrão, mas usamos a resposta da API)
+    const expirationTime = data.expiraEm ? new Date(data.expiraEm) : new Date(Date.now() + 60 * 60 * 1000);
+    
+    // Extrai as APIs disponíveis no cartão de postagem
+    const apisDisponiveis = data.cartaoPostagem?.api || [];
+    
+    cachedToken = {
+      token: data.token,
+      expiration: expirationTime,
+      apis: apisDisponiveis
+    };
+    
+    console.log('Token JWT obtido com sucesso. Expira em:', expirationTime);
+    console.log('APIs disponíveis:', apisDisponiveis);
+    
+    // Verifica se a API de Logística Reversa (250) está disponível
+    if (!apisDisponiveis.includes(API_LOGISTICA_REVERSA)) {
+      console.warn('ATENÇÃO: API de Logística Reversa (250) NÃO está habilitada no contrato.');
+    }
+    
+    return data.token;
+    
+  } catch (error: any) {
+    console.error('Erro na autenticação CWS:', error.message);
+    throw error;
+  }
+}
+
+// Função para fazer requisições REST autenticadas
+async function makeRESTRequest(endpoint: string, method: string = 'GET', body?: any): Promise<any> {
+  const token = await getAuthToken();
+  
+  const url = `${CWS_PRODUCTION_URL}${endpoint}`;
+  console.log(`=== REST Request: ${method} ${url} ===`);
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  };
+
+  const options: RequestInit = {
+    method,
+    headers,
+  };
+
+  if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+    options.body = JSON.stringify(body);
+    console.log('Request Body:', JSON.stringify(body, null, 2).substring(0, 1000));
+  }
+
+  try {
+    const response = await fetch(url, options);
+    const responseText = await response.text();
+    
+    console.log('Response Status:', response.status);
+    console.log('Response (primeiros 1000 chars):', responseText.substring(0, 1000));
+
+    if (!response.ok) {
+      let errorData;
+      try {
+        errorData = JSON.parse(responseText);
+      } catch {
+        errorData = { message: responseText };
+      }
+      
+      if (response.status === 401) {
+        // Token expirado, limpa cache e tenta novamente
+        cachedToken = null;
+        throw new Error('Token expirado. Por favor, tente novamente.');
+      }
+      
+      throw new Error(errorData.msgs?.[0]?.texto || errorData.message || `Erro HTTP ${response.status}`);
+    }
+
+    return responseText ? JSON.parse(responseText) : {};
+    
+  } catch (error: any) {
+    console.error('REST Request Error:', error.message);
+    throw error;
+  }
+}
+
+// Função legada para SOAP (mantida como fallback)
+async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<any> {
   const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
                   xmlns:log="http://www.correios.com.br/logisticaReversaWS">
@@ -54,27 +188,19 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
   </soapenv:Body>
 </soapenv:Envelope>`;
 
-  // Debug: Log credenciais usadas (mascaradas)
   const credentials = getCredentials();
-  const senhaUsada = getSoapPassword(credentials);
+  const senhaUsada = getAccessCode(credentials);
+  
   console.log('=== DEBUG Correios SOAP ===');
-  console.log('URL:', CORREIOS_PRODUCTION_URL);
+  console.log('URL:', CORREIOS_SOAP_URL);
   console.log('Usuario:', credentials.usuario);
-  console.log('Senha length:', senhaUsada.length, 'chars');
-  console.log('Senha primeiros 6 chars:', senhaUsada.substring(0, 6) + '...');
-  console.log('CodAdministrativo:', credentials.codAdministrativo);
-  console.log('CartaoPostagem:', credentials.cartaoPostagem);
   console.log('SOAPAction:', soapAction);
   console.log('===========================');
-  console.log('Request XML (primeiros 500 chars):', soapEnvelope.substring(0, 500));
-  
-  console.log('Enviando requisição SOAP para Correios Logística Reversa...');
 
   try {
-    // Autenticação HTTP Basic (usuário:senha em base64)
     const authString = Buffer.from(`${credentials.usuario}:${senhaUsada}`).toString('base64');
     
-    const response = await fetch(CORREIOS_PRODUCTION_URL, {
+    const response = await fetch(CORREIOS_SOAP_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
@@ -86,56 +212,24 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
 
     const responseText = await response.text();
     
-    console.log('=== RESPOSTA CORREIOS ===');
-    console.log('HTTP Status:', response.status);
-    console.log('Response XML (primeiros 1000 chars):', responseText.substring(0, 1000));
-    console.log('=========================');
+    console.log('SOAP Response Status:', response.status);
     
     if (!response.ok) {
-      console.error('SOAP HTTP Error:', response.status, responseText);
-      
-      // Tenta extrair mensagem de erro SOAP
       const soapFaultMatch = responseText.match(/<faultstring>([^<]+)<\/faultstring>/);
       const soapFaultMessage = soapFaultMatch ? soapFaultMatch[1] : null;
       
-      // Mensagens de erro mais claras para o usuário
       if (response.status === 401) {
-        throw new Error('Credenciais dos Correios inválidas. Verifique CORREIOS_USUARIO (seu CNPJ ou usuário CWS) e CORREIOS_SENHA (código de acesso de 40 caracteres).');
-      } else if (response.status === 403) {
-        throw new Error('Acesso negado pelo serviço dos Correios. Verifique se o contrato está ativo.');
-      } else if (response.status === 404) {
-        throw new Error('Serviço dos Correios não encontrado. O endpoint pode ter sido alterado.');
-      } else if (response.status === 500 && soapFaultMessage) {
-        // Erro SOAP com mensagem específica
-        if (soapFaultMessage.includes('IWS101')) {
-          throw new Error(`Correios: ${soapFaultMessage}. Seu contrato pode não ter permissão para o Web Service de Logística Reversa. Contate o representante comercial dos Correios.`);
-        }
+        throw new Error('Credenciais inválidas.');
+      } else if (soapFaultMessage) {
         throw new Error(`Correios: ${soapFaultMessage}`);
-      } else if (response.status === 500) {
-        throw new Error('Erro interno no servidor dos Correios. Tente novamente mais tarde.');
-      } else if (response.status === 503) {
-        throw new Error('Serviço dos Correios temporariamente indisponível. Tente novamente mais tarde.');
       }
-      
       throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
     }
     
-    const result = await parseStringPromise(responseText, { explicitArray: false, ignoreAttrs: true });
+    return await parseStringPromise(responseText, { explicitArray: false, ignoreAttrs: true });
     
-    console.log('Parsed SOAP response:', JSON.stringify(result, null, 2).substring(0, 2000));
-    
-    // Verifica SOAP Fault em diferentes formatos
-    const soapFault = result['soap:Envelope']?.['soap:Body']?.['soap:Fault'] 
-                   || result['S:Envelope']?.['S:Body']?.['S:Fault']
-                   || result['SOAP-ENV:Envelope']?.['SOAP-ENV:Body']?.['SOAP-ENV:Fault'];
-    if (soapFault) {
-      const faultString = soapFault.faultstring || soapFault['faultstring'] || 'Unknown SOAP Fault';
-      throw new Error(`SOAP Fault: ${faultString}`);
-    }
-    
-    return result;
-  } catch (error) {
-    console.error('SOAP Request Error:', error);
+  } catch (error: any) {
+    console.error('SOAP Request Error:', error.message);
     throw error;
   }
 }
@@ -234,6 +328,31 @@ export interface SolicitarPostagemReversaResponse {
 export async function solicitarPostagemReversa(params: SolicitarPostagemReversaParams): Promise<SolicitarPostagemReversaResponse> {
   const credentials = getCredentials();
   
+  // Primeiro, tenta autenticar para verificar se a API de Logística Reversa está disponível
+  console.log('=== Solicitando Logística Reversa ===');
+  
+  try {
+    // Autentica e verifica APIs disponíveis
+    await getAuthToken();
+    
+    // Verifica se a API 250 está habilitada
+    if (cachedToken && !cachedToken.apis.includes(API_LOGISTICA_REVERSA)) {
+      const apisDisponiveis = cachedToken.apis.join(', ');
+      throw new Error(
+        `API de Logística Reversa (250) não está habilitada no seu contrato dos Correios. ` +
+        `APIs disponíveis: ${apisDisponiveis}. ` +
+        `Para habilitar, solicite ao seu representante comercial dos Correios a liberação do serviço LR250 (Logística Reversa).`
+      );
+    }
+  } catch (error: any) {
+    // Se o erro for de API não habilitada, propaga
+    if (error.message.includes('API de Logística Reversa')) {
+      throw error;
+    }
+    // Para outros erros de autenticação, tenta continuar com SOAP legado
+    console.log('Autenticação REST falhou, tentando SOAP legado...');
+  }
+  
   const coletasXML = params.coletas_solicitadas.map(coleta => {
     const objColXML = coleta.obj_col?.map(obj => `
       <obj_col>
@@ -283,7 +402,7 @@ export async function solicitarPostagemReversa(params: SolicitarPostagemReversaP
   }).join('');
 
   // Determina a senha: prioriza o token JWT (código de acesso de 40 chars) se disponível
-  const senhaAPI = getSoapPassword(credentials);
+  const senhaAPI = getAccessCode(credentials);
   
   const soapBody = `
     <log:solicitarPostagemReversa>
@@ -362,7 +481,7 @@ export interface CancelarPedidoResponse {
 
 export async function cancelarPedido(params: CancelarPedidoParams): Promise<CancelarPedidoResponse> {
   const credentials = getCredentials();
-  const senhaAPI = getSoapPassword(credentials);
+  const senhaAPI = getAccessCode(credentials);
   
   const soapBody = `
     <log:cancelarPedido>
@@ -427,7 +546,7 @@ export interface AcompanharPedidoResponse {
 
 export async function acompanharPedido(params: AcompanharPedidoParams): Promise<AcompanharPedidoResponse> {
   const credentials = getCredentials();
-  const senhaAPI = getSoapPassword(credentials);
+  const senhaAPI = getAccessCode(credentials);
   
   const soapBody = `
     <log:acompanharPedido>
@@ -483,7 +602,7 @@ export interface AcompanharPedidoPorDataResponse {
 
 export async function acompanharPedidoPorData(params: AcompanharPedidoPorDataParams): Promise<AcompanharPedidoPorDataResponse> {
   const credentials = getCredentials();
-  const senhaAPI = getSoapPassword(credentials);
+  const senhaAPI = getAccessCode(credentials);
   
   const soapBody = `
     <ser:acompanharPedidoPorData>
@@ -530,7 +649,7 @@ export interface RevalidarPrazoResponse {
 
 export async function revalidarPrazoAutorizacaoPostagem(params: RevalidarPrazoParams): Promise<RevalidarPrazoResponse> {
   const credentials = getCredentials();
-  const senhaAPI = getSoapPassword(credentials);
+  const senhaAPI = getAccessCode(credentials);
   
   const soapBody = `
     <ser:revalidarPrazoAutorizacaoPostagem>
@@ -573,7 +692,7 @@ export interface SolicitarRangeResponse {
 
 export async function solicitarRange(params: SolicitarRangeParams): Promise<SolicitarRangeResponse> {
   const credentials = getCredentials();
-  const senhaAPI = getSoapPassword(credentials);
+  const senhaAPI = getAccessCode(credentials);
   
   const soapBody = `
     <ser:solicitarRange>
@@ -704,7 +823,7 @@ export async function solicitarPostagemSimultanea(params: SolicitarPostagemSimul
     </coletas_solicitadas>
   `).join('');
 
-  const senhaAPI = getSoapPassword(credentials);
+  const senhaAPI = getAccessCode(credentials);
   
   const soapBody = `
     <ser:solicitarPostagemSimultanea>

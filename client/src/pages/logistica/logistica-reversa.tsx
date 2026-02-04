@@ -164,9 +164,25 @@ export default function LogisticaReversaPage() {
       form.reset(defaultFormValues);
       setActiveTab("acompanhamento");
     } catch (error: any) {
+      let errorMessage = "Erro desconhecido";
+      
+      if (error.message) {
+        try {
+          const jsonMatch = error.message.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const errorData = JSON.parse(jsonMatch[0]);
+            errorMessage = errorData.error || errorData.message || errorData.details || error.message;
+          } else {
+            errorMessage = error.message;
+          }
+        } catch {
+          errorMessage = error.message;
+        }
+      }
+      
       toast({
         title: "Erro ao solicitar",
-        description: error.message || "Erro desconhecido",
+        description: errorMessage,
         variant: "destructive",
       });
     }
