@@ -495,7 +495,7 @@ export async function sendMeetingInviteEmail(
       isRecurring: task.isRecurring || false,
       recurrenceType: task.recurrenceType || undefined,
       recurrenceWeekdays,
-      recurrenceEndDate: task.recurrenceEndDate || undefined
+      recurrenceEndDate: meeting.recurrenceEndDate ? meeting.recurrenceEndDate : undefined
     },
     attendees
   );
@@ -696,7 +696,7 @@ export async function sendMentionNotificationEmail(
             </p>
           </div>
           
-          <a href="${BASE_URL}/tarefas/${taskId}" class="btn">Ver Tarefa</a>
+          <a href="${BASE_URL}/tarefas" class="btn">Ver Tarefa</a>
         </div>
         <div class="footer">
           <p>Renov Smart - Inovação em Gestão</p>
@@ -708,7 +708,7 @@ export async function sendMentionNotificationEmail(
 
   try {
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || '"Renov Home" <noreply@renovsmart.com.br>',
+      from: process.env.SMTP_FROM || `"Renov Home" <noreply@renovsmart.com.br>`,
       to: mentionedUser.email,
       subject: `Você foi mencionado em: ${taskTitle}`,
       html

@@ -71,6 +71,36 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState("");
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState("");
+
+  const activeUsers = users.filter(u => u.status === "active");
+  const filteredUsers = activeUsers.filter(u => 
+    u.name.toLowerCase().includes(mentionFilter.toLowerCase())
+  );
+
+  const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNewComment(value);
+    
+    const lastAtPos = value.lastIndexOf("@");
+    if (lastAtPos !== -1 && (lastAtPos === 0 || value[lastAtPos - 1] === " ")) {
+      const query = value.slice(lastAtPos + 1);
+      if (!query.includes(" ")) {
+        setMentionFilter(query);
+        setShowMentions(true);
+        return;
+      }
+    }
+    setShowMentions(false);
+  };
+
+  const insertMention = (userName: string) => {
+    const lastAtPos = newComment.lastIndexOf("@");
+    const prefix = newComment.slice(0, lastAtPos);
+    setNewComment(`${prefix}@${userName} `);
+    setShowMentions(false);
+  };
   const [availableTags, setAvailableTags] = useState(["Tech", "Design", "Bug", "Feature"]);
   const [newTag, setNewTag] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -172,7 +202,13 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
       const payload = {
-        ...data,
+        title: data.title,
+        objectives: data.objectives || "",
+        development: data.development || "",
+        assigneeId: data.assigneeId || "admin",
+        reporterId: data.reporterId || "admin",
+        priority: data.priority,
+        estimation: data.estimation || 0,
         projectId,
         columnId,
         code: cardData?.code || `REN-${Math.floor(Math.random() * 1000)}`,
@@ -358,20 +394,38 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                         <h4 className="font-semibold">Comentários</h4>
                       </div>
                       {!readOnly && (
-                        <div className="flex gap-2">
-                          <Input 
-                            placeholder="Adicionar um comentário..." 
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                          />
-                          <Button 
-                            type="button" 
-                            size="sm" 
-                            onClick={() => commentMutation.mutate(newComment)}
-                            disabled={!newComment || commentMutation.isPending}
-                          >
-                            Enviar
-                          </Button>
+                        <div className="space-y-2">
+                          <div className="flex gap-2 relative">
+                            <Input 
+                              placeholder="Adicionar um comentário... Use @ para mencionar" 
+                              value={newComment}
+                              onChange={handleCommentChange}
+                            />
+                            {showMentions && filteredUsers.length > 0 && (
+                              <div className="absolute bottom-full left-0 w-64 bg-popover border rounded-md shadow-md z-50 mb-1 max-h-48 overflow-y-auto">
+                                {filteredUsers.map(user => (
+                                  <button
+                                    key={user.id}
+                                    className="w-full text-left px-3 py-2 hover:bg-accent text-sm flex items-center gap-2"
+                                    onClick={() => insertMention(user.name)}
+                                  >
+                                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
+                                      <UserIcon className="h-3 w-3 text-primary" />
+                                    </div>
+                                    {user.name}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            <Button 
+                              type="button" 
+                              size="sm" 
+                              onClick={() => commentMutation.mutate(newComment)}
+                              disabled={!newComment || commentMutation.isPending}
+                            >
+                              Enviar
+                            </Button>
+                          </div>
                         </div>
                       )}
                       <div className="space-y-3 max-h-[200px] overflow-y-auto">

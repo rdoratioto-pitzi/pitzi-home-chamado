@@ -353,6 +353,29 @@ export async function registerRoutes(
         if (commenter && requester) {
           sendTicketCommentEmail(ticket, comment, commenter, requester, assignee || null).catch(console.error);
         }
+
+        // Process @mentions and send notifications
+        const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
+        if (mentionMatches) {
+          const users = await storage.getUsers();
+          
+          for (const mention of mentionMatches) {
+            const mentionedName = mention.slice(1).trim();
+            const mentionedUser = users.find(u => 
+              u.name.toLowerCase() === mentionedName.toLowerCase() && u.status === "active"
+            );
+            
+            if (mentionedUser && commenter) {
+              sendMentionNotificationEmail(
+                mentionedUser,
+                commenter.name,
+                ticket.title,
+                ticket.id,
+                validated.content
+              ).catch(console.error);
+            }
+          }
+        }
       }
       
       res.status(201).json(comment);
@@ -572,6 +595,32 @@ export async function registerRoutes(
         cardId: req.params.id,
       });
       const comment = await storage.createKanbanComment(validated);
+
+      // Process @mentions and send notifications
+      const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
+      if (mentionMatches) {
+        const card = await storage.getKanbanCard(req.params.id);
+        const users = await storage.getUsers();
+        const author = await storage.getUser(validated.userId);
+
+        for (const mention of mentionMatches) {
+          const mentionedName = mention.slice(1).trim();
+          const mentionedUser = users.find(u =>
+            u.name.toLowerCase() === mentionedName.toLowerCase() && u.status === "active"
+          );
+
+          if (mentionedUser && card && author) {
+            sendMentionNotificationEmail(
+              mentionedUser,
+              author.name,
+              card.title,
+              card.id,
+              validated.content
+            ).catch(console.error);
+          }
+        }
+      }
+
       res.status(201).json(comment);
     } catch (error) {
       if (error instanceof z.ZodError) {
