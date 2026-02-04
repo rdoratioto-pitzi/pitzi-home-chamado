@@ -1602,6 +1602,16 @@ export async function registerRoutes(
     });
   });
 
+  // Verifica status da API 250 (Logística Reversa) no contrato Correios
+  app.get("/api/logistica-reversa/check-api-status", async (req, res) => {
+    try {
+      const status = await correiosService.checkApi250Status();
+      res.json(status);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ============== SLA RULES ==============
   app.get("/api/slas", async (req, res) => {
     const rules = await storage.getSlaRules();

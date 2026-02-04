@@ -21,6 +21,47 @@ let cachedToken: { token: string; expiration: Date; apis: number[] } | null = nu
 // API 250 = Logística Reversa
 const API_LOGISTICA_REVERSA = 250;
 
+// Função para limpar o cache do token e forçar nova autenticação
+export function clearTokenCache(): void {
+  console.log('=== Limpando cache do token JWT ===');
+  cachedToken = null;
+}
+
+// Função para verificar status atual da API 250
+export async function checkApi250Status(): Promise<{
+  authenticated: boolean;
+  api250Enabled: boolean;
+  availableApis: number[];
+  message: string;
+}> {
+  try {
+    // Limpa cache para forçar nova autenticação
+    clearTokenCache();
+    
+    // Tenta autenticar
+    await getAuthToken();
+    
+    const api250Enabled = cachedToken?.apis?.includes(API_LOGISTICA_REVERSA) ?? false;
+    const availableApis = cachedToken?.apis ?? [];
+    
+    return {
+      authenticated: true,
+      api250Enabled,
+      availableApis,
+      message: api250Enabled 
+        ? 'API de Logística Reversa (250) está HABILITADA!'
+        : `API de Logística Reversa (250) NÃO está habilitada. APIs disponíveis: ${availableApis.join(', ')}`
+    };
+  } catch (error: any) {
+    return {
+      authenticated: false,
+      api250Enabled: false,
+      availableApis: [],
+      message: `Erro na autenticação: ${error.message}`
+    };
+  }
+}
+
 function getCredentials(): CorreiosCredentials {
   return {
     usuario: process.env.CORREIOS_USUARIO || '',
