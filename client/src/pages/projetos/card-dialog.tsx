@@ -74,6 +74,11 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
 
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
   const activeUsers = users.filter(u => u.status === "active");
   const filteredUsers = activeUsers.filter(u => 
     u.name.toLowerCase().includes(mentionFilter.toLowerCase())
@@ -120,9 +125,6 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
     },
   });
 
-  const { data: users = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
-  });
 
   const { data: cardData } = useQuery<KanbanCard>({
     queryKey: ["/api/cards", cardId],
