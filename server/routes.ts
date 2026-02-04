@@ -1388,7 +1388,11 @@ export async function registerRoutes(
 
   app.post("/api/logistica-reversa/solicitar", async (req, res) => {
     try {
-      const { tipo, codigoServico, remetente, destinatario, observacao } = req.body;
+      const { tipo: tipoInput, codigoServico: servicoInput, remetente, destinatario, observacao } = req.body;
+      
+      // Define valores padrão
+      const tipo = tipoInput || 'A'; // A = Autorização de Postagem (padrão)
+      const codigoServico = servicoInput || '04677'; // SEDEX Reversa (padrão)
       
       // Chama a API real dos Correios
       console.log('=== Solicitando Logística Reversa nos Correios ===');
@@ -1450,8 +1454,9 @@ export async function registerRoutes(
         console.log('Erro:', correiosResponse.cod_erro, correiosResponse.msg_erro);
         console.log('Resultados:', JSON.stringify(correiosResponse.resultado_solicitacao, null, 2));
         
-        // Verifica se houve erro
-        if (correiosResponse.cod_erro && correiosResponse.cod_erro !== '0' && correiosResponse.cod_erro !== '') {
+        // Verifica se houve erro geral (00 e 0 são sucesso)
+        const codErroGeral = correiosResponse.cod_erro?.trim();
+        if (codErroGeral && codErroGeral !== '0' && codErroGeral !== '00' && codErroGeral !== '') {
           throw new Error(`Correios: ${correiosResponse.msg_erro || correiosResponse.cod_erro}`);
         }
         
@@ -1460,8 +1465,9 @@ export async function registerRoutes(
           throw new Error('Correios: Nenhum resultado retornado');
         }
         
-        // Verifica erro no resultado individual
-        if (resultado.codigo_erro && resultado.codigo_erro !== '0' && resultado.codigo_erro !== '') {
+        // Verifica erro no resultado individual (0 e 00 são sucesso)
+        const codErroItem = resultado.codigo_erro?.toString().trim();
+        if (codErroItem && codErroItem !== '0' && codErroItem !== '00' && codErroItem !== '') {
           throw new Error(`Correios: ${resultado.descricao_erro || resultado.codigo_erro}`);
         }
         

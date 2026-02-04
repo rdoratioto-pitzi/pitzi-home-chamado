@@ -1,11 +1,31 @@
 import { parseStringPromise, Builder } from 'xml2js';
 
-// URLs da API CWS (Correios Web Services) - REST
+// URLs do Web Service SOAP de Logística Reversa (conforme manual oficial)
+// Homologação: https://apphom.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS
+// Produção: https://apps.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS
+const CORREIOS_LR_HOMOLOGACAO_URL = 'https://apphom.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS';
+const CORREIOS_LR_PRODUCAO_URL = 'https://apps.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS';
+
+// Credenciais de homologação (para testes)
+const HOMOLOGACAO_CREDENTIALS = {
+  usuario: 'empresacws',
+  senha: '123456',
+  codAdministrativo: '17000190',
+  contrato: '9992157880',
+  cartaoPostagem: '0011111111',
+  codigoServico: '04677' // SEDEX Reversa
+};
+
+// URLs da API CWS (Correios Web Services) - REST (para outras funcionalidades)
 const CWS_PRODUCTION_URL = 'https://api.correios.com.br';
 const CWS_TOKEN_URL = 'https://api.correios.com.br/token/v1/autentica/cartaopostagem';
 
-// Fallback: URL do Web Service SOAP (pode estar bloqueado em ambientes cloud)
-const CORREIOS_SOAP_URL = 'https://webservicescol.correios.com.br/ScolWeb/WebServiceScol';
+// Determina qual ambiente usar (pode ser configurado via env)
+const USE_HOMOLOGACAO = process.env.CORREIOS_HOMOLOGACAO === 'true';
+
+function getLogisticaReversaUrl(): string {
+  return USE_HOMOLOGACAO ? CORREIOS_LR_HOMOLOGACAO_URL : CORREIOS_LR_PRODUCAO_URL;
+}
 
 interface CorreiosCredentials {
   usuario: string;
@@ -218,34 +238,48 @@ async function makeRESTRequest(endpoint: string, method: string = 'GET', body?: 
   }
 }
 
-// Função legada para SOAP (mantida como fallback)
+// Função para requisições SOAP no Web Service de Logística Reversa
 async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<any> {
+  const soapUrl = getLogisticaReversaUrl();
+  
+  // Namespace correto conforme documentação oficial
   const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" 
-                  xmlns:log="http://www.correios.com.br/logisticaReversaWS">
+                  xmlns:ser="http://service.logisticareversa.correios.com.br/">
   <soapenv:Header/>
   <soapenv:Body>
     ${soapBody}
   </soapenv:Body>
 </soapenv:Envelope>`;
 
-  const credentials = getCredentials();
-  const senhaUsada = getAccessCode(credentials);
+  // Usa credenciais de homologação ou produção conforme configurado
+  const credentials = USE_HOMOLOGACAO ? {
+    usuario: HOMOLOGACAO_CREDENTIALS.usuario,
+    senha: HOMOLOGACAO_CREDENTIALS.senha,
+    cartaoPostagem: HOMOLOGACAO_CREDENTIALS.cartaoPostagem,
+    codAdministrativo: HOMOLOGACAO_CREDENTIALS.codAdministrativo,
+    token: ''
+  } : getCredentials();
   
-  console.log('=== DEBUG Correios SOAP ===');
-  console.log('URL:', CORREIOS_SOAP_URL);
+  const senhaUsada = USE_HOMOLOGACAO ? credentials.senha : getAccessCode(credentials);
+  
+  console.log('=== DEBUG Correios SOAP Logística Reversa ===');
+  console.log('Ambiente:', USE_HOMOLOGACAO ? 'HOMOLOGAÇÃO' : 'PRODUÇÃO');
+  console.log('URL:', soapUrl);
   console.log('Usuario:', credentials.usuario);
   console.log('SOAPAction:', soapAction);
-  console.log('===========================');
+  console.log('==============================================');
 
   try {
     const authString = Buffer.from(`${credentials.usuario}:${senhaUsada}`).toString('base64');
     
-    const response = await fetch(CORREIOS_SOAP_URL, {
+    // SOAPAction vazio conforme alguns serviços SOAP
+    // A operação é determinada pelo elemento no corpo da mensagem
+    const response = await fetch(soapUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': soapAction,
+        'SOAPAction': '',
         'Authorization': `Basic ${authString}`,
       },
       body: soapEnvelope,
@@ -367,32 +401,21 @@ export interface SolicitarPostagemReversaResponse {
 }
 
 export async function solicitarPostagemReversa(params: SolicitarPostagemReversaParams): Promise<SolicitarPostagemReversaResponse> {
-  const credentials = getCredentials();
+  console.log('=== Solicitando Logística Reversa via SOAP ===');
+  console.log('Ambiente:', USE_HOMOLOGACAO ? 'HOMOLOGAÇÃO' : 'PRODUÇÃO');
   
-  // Primeiro, tenta autenticar para verificar se a API de Logística Reversa está disponível
-  console.log('=== Solicitando Logística Reversa ===');
-  
-  try {
-    // Autentica e verifica APIs disponíveis
-    await getAuthToken();
-    
-    // Verifica se a API 250 está habilitada
-    if (cachedToken && !cachedToken.apis.includes(API_LOGISTICA_REVERSA)) {
-      const apisDisponiveis = cachedToken.apis.join(', ');
-      throw new Error(
-        `API de Logística Reversa (250) não está habilitada no seu contrato dos Correios. ` +
-        `APIs disponíveis: ${apisDisponiveis}. ` +
-        `Para habilitar, solicite ao seu representante comercial dos Correios a liberação do serviço LR250 (Logística Reversa).`
-      );
-    }
-  } catch (error: any) {
-    // Se o erro for de API não habilitada, propaga
-    if (error.message.includes('API de Logística Reversa')) {
-      throw error;
-    }
-    // Para outros erros de autenticação, tenta continuar com SOAP legado
-    console.log('Autenticação REST falhou, tentando SOAP legado...');
-  }
+  // Usa credenciais apropriadas conforme o ambiente
+  const creds = USE_HOMOLOGACAO ? {
+    usuario: HOMOLOGACAO_CREDENTIALS.usuario,
+    senha: HOMOLOGACAO_CREDENTIALS.senha,
+    cartaoPostagem: HOMOLOGACAO_CREDENTIALS.cartaoPostagem,
+    codAdministrativo: HOMOLOGACAO_CREDENTIALS.codAdministrativo,
+  } : {
+    usuario: getCredentials().usuario,
+    senha: getAccessCode(getCredentials()),
+    cartaoPostagem: getCredentials().cartaoPostagem,
+    codAdministrativo: getCredentials().codAdministrativo,
+  };
   
   const coletasXML = params.coletas_solicitadas.map(coleta => {
     const objColXML = coleta.obj_col?.map(obj => `
@@ -441,17 +464,15 @@ export async function solicitarPostagemReversa(params: SolicitarPostagemReversaP
     </coletas_solicitadas>
     `;
   }).join('');
-
-  // Determina a senha: prioriza o token JWT (código de acesso de 40 chars) se disponível
-  const senhaAPI = getAccessCode(credentials);
+  
+  // Usa o código de serviço correto conforme o ambiente
+  const codigoServico = USE_HOMOLOGACAO ? HOMOLOGACAO_CREDENTIALS.codigoServico : params.codigo_servico;
   
   const soapBody = `
-    <log:solicitarPostagemReversa>
-      <usuario>${credentials.usuario}</usuario>
-      <senha>${senhaAPI}</senha>
-      <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
-      <codigo_servico>${params.codigo_servico}</codigo_servico>
-      <cartao>${credentials.cartaoPostagem}</cartao>
+    <ser:solicitarPostagemReversa>
+      <codAdministrativo>${creds.codAdministrativo}</codAdministrativo>
+      <codigo_servico>${codigoServico}</codigo_servico>
+      <cartao>${creds.cartaoPostagem}</cartao>
       <destinatario>
         <nome>${params.destinatario.nome}</nome>
         <logradouro>${params.destinatario.logradouro}</logradouro>
@@ -471,7 +492,7 @@ export async function solicitarPostagemReversa(params: SolicitarPostagemReversaP
         <ciencia_conteudo_proibido>${params.destinatario.ciencia_conteudo_proibido}</ciencia_conteudo_proibido>
       </destinatario>
       ${coletasXML}
-    </log:solicitarPostagemReversa>
+    </ser:solicitarPostagemReversa>
   `;
 
   const result = await makeSOAPRequest(soapBody, 'solicitarPostagemReversa');
@@ -521,17 +542,19 @@ export interface CancelarPedidoResponse {
 }
 
 export async function cancelarPedido(params: CancelarPedidoParams): Promise<CancelarPedidoResponse> {
-  const credentials = getCredentials();
-  const senhaAPI = getAccessCode(credentials);
+  // Usa credenciais apropriadas conforme o ambiente
+  const creds = USE_HOMOLOGACAO ? {
+    codAdministrativo: HOMOLOGACAO_CREDENTIALS.codAdministrativo,
+  } : {
+    codAdministrativo: getCredentials().codAdministrativo,
+  };
   
   const soapBody = `
-    <log:cancelarPedido>
-      <usuario>${credentials.usuario}</usuario>
-      <senha>${senhaAPI}</senha>
-      <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
+    <ser:cancelarPedido>
+      <codAdministrativo>${creds.codAdministrativo}</codAdministrativo>
       <numeroPedido>${params.numeroPedido}</numeroPedido>
       <tipo>${params.tipo}</tipo>
-    </log:cancelarPedido>
+    </ser:cancelarPedido>
   `;
 
   const result = await makeSOAPRequest(soapBody, 'cancelarPedido');
@@ -586,18 +609,20 @@ export interface AcompanharPedidoResponse {
 }
 
 export async function acompanharPedido(params: AcompanharPedidoParams): Promise<AcompanharPedidoResponse> {
-  const credentials = getCredentials();
-  const senhaAPI = getAccessCode(credentials);
+  // Usa credenciais apropriadas conforme o ambiente
+  const creds = USE_HOMOLOGACAO ? {
+    codAdministrativo: HOMOLOGACAO_CREDENTIALS.codAdministrativo,
+  } : {
+    codAdministrativo: getCredentials().codAdministrativo,
+  };
   
   const soapBody = `
-    <log:acompanharPedido>
-      <usuario>${credentials.usuario}</usuario>
-      <senha>${senhaAPI}</senha>
-      <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
+    <ser:acompanharPedido>
+      <codAdministrativo>${creds.codAdministrativo}</codAdministrativo>
       <tipoBusca>${params.tipoBusca}</tipoBusca>
       <tipoSolicitacao>${params.tipoSolicitacao}</tipoSolicitacao>
       <numeroPedido>${params.numeroPedido}</numeroPedido>
-    </log:acompanharPedido>
+    </ser:acompanharPedido>
   `;
 
   const result = await makeSOAPRequest(soapBody, 'acompanharPedido');
@@ -642,14 +667,16 @@ export interface AcompanharPedidoPorDataResponse {
 }
 
 export async function acompanharPedidoPorData(params: AcompanharPedidoPorDataParams): Promise<AcompanharPedidoPorDataResponse> {
-  const credentials = getCredentials();
-  const senhaAPI = getAccessCode(credentials);
+  // Usa credenciais apropriadas conforme o ambiente
+  const creds = USE_HOMOLOGACAO ? {
+    codAdministrativo: HOMOLOGACAO_CREDENTIALS.codAdministrativo,
+  } : {
+    codAdministrativo: getCredentials().codAdministrativo,
+  };
   
   const soapBody = `
     <ser:acompanharPedidoPorData>
-      <usuario>${credentials.usuario}</usuario>
-      <senha>${senhaAPI}</senha>
-      <codAdministrativo>${credentials.codAdministrativo}</codAdministrativo>
+      <codAdministrativo>${creds.codAdministrativo}</codAdministrativo>
       <tipoSolicitacao>${params.tipoSolicitacao}</tipoSolicitacao>
       <data>${params.data}</data>
     </ser:acompanharPedidoPorData>

@@ -71,7 +71,7 @@ Renov Home adopts a client-server architecture with a clear separation of concer
 
 ## External Dependencies
 
-- **Correios API (SOAP/XML Web Service):** Integrated for reverse logistics functionalities, including requesting reverse postage authorization, canceling orders, tracking orders, revalidating deadlines, requesting label ranges, and calculating verification digits.
+- **Correios Logística Reversa (SOAP Web Service):** Integrated for reverse logistics functionalities via official SOAP API. See detailed documentation below.
 - **RenovSmart API:** Used by the Pricing module to fetch smartphone/iPhone pricing data.
 - **PostgreSQL Database:** Used for persistent storage in the Pricing module (pricingDevices, pricingPriceHistory, pricingAlerts).
 - **Shadcn/UI:** Component library for the frontend.
@@ -105,3 +105,53 @@ The home page features a ChatGPT/Gemini-style AI assistant interface that integr
 - API key stored as environment secret (OPENROUTER_API_KEY)
 
 **Note:** Platform data context is loaded globally for AI responses. For multi-tenant deployments, tenant-scoped queries would be needed in `getSystemPrompt()`.
+
+## Correios Logística Reversa Integration
+
+The system integrates with Correios' official SOAP Web Service for reverse logistics operations.
+
+**SOAP Endpoints:**
+- **Homologação (Testing):** `https://apphom.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS`
+- **Produção:** `https://apps.correios.com.br/logisticaReversaWS/logisticaReversaService/logisticaReversaWS`
+
+**SOAP Namespace:** `http://service.logisticareversa.correios.com.br/`
+
+**Environment Variables (Production):**
+- `CORREIOS_USUARIO` - CNPJ (14 digits)
+- `CORREIOS_SENHA` - Access code (40 characters)
+- `CORREIOS_CARTAO_POSTAGEM` - Posting card number
+- `CORREIOS_COD_ADMINISTRATIVO` - Administrative code
+- `CORREIOS_HOMOLOGACAO` - Set to "true" for testing mode
+
+**Homologation Credentials (Auto-configured when CORREIOS_HOMOLOGACAO=true):**
+- Usuario: `empresacws`
+- Senha: `123456`
+- Cartão: `0011111111`
+- Código Administrativo: `17000190`
+
+**Available Operations:**
+- `solicitarPostagemReversa` - Request reverse postage (Authorization or Collection)
+- `cancelarPedido` - Cancel an order
+- `acompanharPedido` - Track order status
+- `revalidarPrazoAutorizacaoPostagem` - Extend posting authorization deadline
+- `solicitarRange` - Request label range
+- `calcularDigitoVerificador` - Calculate verification digit
+
+**Service Types:**
+- Type `A` = Authorization (customer takes package to post office)
+- Type `C` = Collection (Correios collects from customer address)
+- Type `CA` = Collection with Authorization
+
+**Default Service Code:** `04677` (SEDEX Reversa)
+
+**Key Files:**
+- `server/correios-service.ts` - SOAP integration implementation
+- `server/routes.ts` - API endpoints for reverse logistics
+- `client/src/pages/logistica/logistica-reversa.tsx` - Frontend UI
+
+**Error Codes:**
+- `00` or `0` = Success
+- `111` = Home collection not available for location
+- Other codes indicate specific business or technical errors
+
+**Note:** The integration uses raw SOAP/XML requests (not the CWS REST API). SOAPAction header must be empty string for Correios compatibility.
