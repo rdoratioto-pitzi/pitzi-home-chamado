@@ -1392,7 +1392,7 @@ export async function registerRoutes(
       
       // Define valores padrão
       const tipo = tipoInput || 'A'; // A = Autorização de Postagem (padrão)
-      const codigoServico = servicoInput || '04677'; // SEDEX Reversa (padrão)
+      const codigoServico = servicoInput || '03247'; // SEDEX Reversa (padrão)
       
       // Chama a API real dos Correios
       console.log('=== Solicitando Logística Reversa nos Correios ===');

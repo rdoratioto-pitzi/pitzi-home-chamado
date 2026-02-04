@@ -55,10 +55,11 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 };
 
 const TIPO_SERVICO_LABEL: Record<string, string> = {
-  "41076": "PAC Reversa",
-  "40010": "SEDEX Reversa",
-  "40215": "SEDEX 10 Reversa",
-  "40290": "SEDEX 12 Reversa",
+  "03301": "PAC Reversa",
+  "03247": "SEDEX Reversa",
+  "04677": "SEDEX Reversa (Homolog)",
+  "41076": "PAC Reversa (Legado)",
+  "40010": "SEDEX Reversa (Legado)",
 };
 
 const itemSchema = z.object({
@@ -94,8 +95,8 @@ const logisticaReversaFormSchema = z.object({
 type LogisticaReversaFormData = z.infer<typeof logisticaReversaFormSchema>;
 
 const defaultFormValues: LogisticaReversaFormData = {
-  tipo: "C",
-  codigoServico: "41076",
+  tipo: "A",
+  codigoServico: "03247",
   remetente: {
     nome: "",
     email: "",
@@ -391,10 +392,8 @@ export default function LogisticaReversaPage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="41076" data-testid="option-servico-41076">PAC Reversa</SelectItem>
-                                <SelectItem value="40010" data-testid="option-servico-40010">SEDEX Reversa</SelectItem>
-                                <SelectItem value="40215" data-testid="option-servico-40215">SEDEX 10 Reversa</SelectItem>
-                                <SelectItem value="40290" data-testid="option-servico-40290">SEDEX 12 Reversa</SelectItem>
+                                <SelectItem value="03247" data-testid="option-servico-03247">SEDEX Reversa</SelectItem>
+                                <SelectItem value="03301" data-testid="option-servico-03301">PAC Reversa</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
