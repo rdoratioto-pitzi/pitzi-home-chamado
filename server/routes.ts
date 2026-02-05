@@ -13,6 +13,7 @@ import {
 } from "./email-service";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import * as correiosService from "./correios-service";
+import bwipjs from "bwip-js";
 import { streamChatCompletion, generateTitle } from "./openrouter";
 import { 
   insertUserSchema, 
@@ -1866,6 +1867,149 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("RS Logística logistica/geral error:", error);
       res.status(500).json({ error: error.message || "Falha ao buscar relatório geral" });
+    }
+  });
+
+  // ============== LABEL PRINTING (IMPRESSÃO DE ETIQUETAS) ==============
+  
+  // Generate PNG label with Code128 barcode
+  app.post("/api/etiquetas/gerar-png", async (req, res) => {
+    try {
+      const { imei, deviceDescription, deviceErpCode, triador } = req.body;
+      
+      if (!imei || !deviceDescription || !deviceErpCode || !triador) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
+      
+      // Generate Code128 barcode as PNG buffer
+      const barcodeBuffer = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: imei,
+        scale: 3,
+        height: 15,
+        includetext: true,
+        textxalign: "center",
+        textsize: 10,
+      });
+      
+      // Return barcode as base64 along with label data
+      const barcodeBase64 = barcodeBuffer.toString("base64");
+      
+      res.json({
+        success: true,
+        label: {
+          imei,
+          deviceDescription,
+          deviceErpCode,
+          grading,
+          triador,
+          barcodeBase64: `data:image/png;base64,${barcodeBase64}`,
+        },
+      });
+    } catch (error: any) {
+      console.error("Label generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate label" });
+    }
+  });
+  
+  // Generate ZPL and send to Zebra printer via web service
+  app.post("/api/etiquetas/imprimir", async (req, res) => {
+    try {
+      const { imei, deviceDescription, deviceErpCode, triador, printerUrl } = req.body;
+      
+      if (!imei || !deviceDescription || !deviceErpCode || !triador) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
+      
+      // Generate ZPL code for Zebra printer
+      const zpl = `^XA
+^CI28
+^PW800
+^LL400
+^LH10,10
+
+^FO600,20^A0N,80,80^FD${grading}^FS
+
+^FO30,110^A0N,32,32^FB740,2,0,C,0^FD${deviceDescription}^FS
+
+^FO30,180^A0N,28,28^FDCod: ${deviceErpCode}^FS
+
+^FO30,220^A0N,20,20^FDIMEI: ${imei}^FS
+
+^FO30,250^A0N,20,20^FDTriador: ${triador}^FS
+
+^FO150,290^BY2^BCN,70,Y,N,N^FD${imei}^FS
+
+^XZ`;
+      
+      // If printerUrl is provided, send to printer
+      if (printerUrl) {
+        try {
+          const printResponse = await fetch(printerUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-zpl",
+            },
+            body: zpl,
+          });
+          
+          if (!printResponse.ok) {
+            throw new Error(`Printer returned status ${printResponse.status}`);
+          }
+          
+          res.json({ 
+            success: true, 
+            message: "Label sent to printer successfully",
+            zpl 
+          });
+        } catch (printError: any) {
+          res.status(500).json({ 
+            error: `Failed to send to printer: ${printError.message}`,
+            zpl 
+          });
+        }
+      } else {
+        // Just return the ZPL for download or browser print
+        res.json({ 
+          success: true, 
+          zpl,
+          message: "ZPL generated successfully. Configure printer URL for direct printing." 
+        });
+      }
+    } catch (error: any) {
+      console.error("Print label error:", error);
+      res.status(500).json({ error: error.message || "Failed to print label" });
+    }
+  });
+  
+  // Get barcode image only (for preview)
+  app.get("/api/etiquetas/barcode/:imei", async (req, res) => {
+    try {
+      const { imei } = req.params;
+      
+      if (!imei || imei.length < 10) {
+        return res.status(400).json({ error: "Invalid IMEI" });
+      }
+      
+      const barcodeBuffer = await bwipjs.toBuffer({
+        bcid: "code128",
+        text: imei,
+        scale: 4,
+        height: 18,
+        includetext: true,
+        textxalign: "center",
+        textsize: 12,
+      });
+      
+      res.set("Content-Type", "image/png");
+      res.send(barcodeBuffer);
+    } catch (error: any) {
+      console.error("Barcode generation error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate barcode" });
     }
   });
 
