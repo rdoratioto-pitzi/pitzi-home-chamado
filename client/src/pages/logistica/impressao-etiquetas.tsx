@@ -39,7 +39,10 @@ const TRIADORES = [
 
 
 function generateZPL(deviceData: DeviceData, triador: string): string {
-  const { imei, deviceDescription, deviceErpCode, grading } = deviceData;
+  const { imei, deviceDescription, deviceErpCode } = deviceData;
+  
+  // Grading is the penultimate character, and we also want the last character
+  const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
   
   const zpl = `^XA
 ^CI28
@@ -47,7 +50,7 @@ function generateZPL(deviceData: DeviceData, triador: string): string {
 ^LL400
 ^LH10,10
 
-^FO650,20^A0N,80,80^FD${grading}^FS
+^FO600,20^A0N,80,80^FD${grading}^FS
 
 ^FO30,110^A0N,32,32^FB740,2,0,C,0^FD${deviceDescription}^FS
 
@@ -104,7 +107,8 @@ export default function ImpressaoEtiquetasPage() {
         const deviceDescription = [modelName, storage ? `${storage}GB` : "", color].filter(Boolean).join(" ") || "Dispositivo não identificado";
         
         const erpCode = order.DeviceErpCode || order.device_erp_code || order.deviceErpCode || order.SKU || "XXXXX00";
-        const grading = erpCode.length >= 2 ? erpCode.slice(-2, -1) : "?";
+        // Get both grading (penultimate) and last character
+        const grading = erpCode.length >= 2 ? erpCode.slice(-2) : "??";
         
         setDeviceData({
           imei: imei,
