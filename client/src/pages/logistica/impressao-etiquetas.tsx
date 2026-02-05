@@ -41,30 +41,23 @@ const TRIADORES = [
 function generateZPL(deviceData: DeviceData, triador: string): string {
   const { imei, deviceDescription, deviceErpCode, grading } = deviceData;
   
-  const erpCodeBeforeGrading = deviceErpCode.slice(0, -2);
-  const lastChar = deviceErpCode.slice(-1);
-  
   const zpl = `^XA
 ^CI28
 ^PW800
 ^LL400
 ^LH10,10
 
-^FO280,15^A0N,36,36^FDren^FS
-^FO360,15^A0N,36,36^FDv.^FS
-^FO300,50^A0N,20,20^FDhome^FS
+^FO650,20^A0N,80,80^FD${grading}^FS
 
-^FO30,90^A0N,28,28^FB740,2,0,C,0^FD${deviceDescription}^FS
+^FO30,110^A0N,32,32^FB740,2,0,C,0^FD${deviceDescription}^FS
 
-^FO180,145^A0N,22,22^FDCod: ${erpCodeBeforeGrading}^FS
-^FO340,135^A0N,44,44^FD${grading}^FS
-^FO380,145^A0N,22,22^FD${lastChar}^FS
+^FO30,180^A0N,28,28^FDCod: ${deviceErpCode}^FS
 
-^FO30,190^A0N,20,20^FDIMEI: ${imei}^FS
+^FO30,220^A0N,20,20^FDIMEI: ${imei}^FS
 
-^FO30,220^A0N,20,20^FDTriador: ${triador}^FS
+^FO30,250^A0N,20,20^FDTriador: ${triador}^FS
 
-^FO150,260^BY2^BCN,70,Y,N,N^FD${imei}^FS
+^FO150,290^BY2^BCN,70,Y,N,N^FD${imei}^FS
 
 ^XZ`;
   
@@ -326,62 +319,18 @@ export default function ImpressaoEtiquetasPage() {
             </CardHeader>
             <CardContent>
               <div 
-                className="mx-auto border-2 border-dashed border-border rounded-lg bg-white p-4 flex flex-col items-center justify-between"
+                className="mx-auto border-2 border-dashed border-border rounded-lg bg-white p-4 relative flex flex-col items-center justify-between"
                 style={{ width: "380px", height: "190px" }}
               >
                 {deviceData ? (
                   <>
-                    <div className="flex flex-col items-center gap-1">
-                      <svg 
-                        viewBox="0 0 180 50" 
-                        width={100}
-                        height={28}
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <text
-                          x="0"
-                          y="30"
-                          fontFamily="Montserrat, sans-serif"
-                          fontWeight="700"
-                          fontSize="28"
-                          fill="#000000"
-                          letterSpacing="-1"
-                        >
-                          ren
-                        </text>
-                        <g transform="translate(52, 5)">
-                          <circle
-                            cx="12"
-                            cy="17"
-                            r="10"
-                            fill="none"
-                            stroke="#00A137"
-                            strokeWidth="4"
-                          />
-                          <path
-                            d="M12 7 L12 2 L17 7"
-                            fill="none"
-                            stroke="#00A137"
-                            strokeWidth="3"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </g>
-                        <text
-                          x="78"
-                          y="30"
-                          fontFamily="Montserrat, sans-serif"
-                          fontWeight="700"
-                          fontSize="28"
-                          fill="#000000"
-                          letterSpacing="-1"
-                        >
-                          v.
-                        </text>
-                      </svg>
+                    <div className="absolute top-2 right-4">
+                      <span className="text-4xl font-bold text-green-700">
+                        {deviceData.grading}
+                      </span>
                     </div>
 
-                    <div className="text-center">
+                    <div className="text-center mt-8">
                       <p className="font-bold text-sm text-black leading-tight">
                         {deviceData.deviceDescription}
                       </p>
@@ -389,14 +338,8 @@ export default function ImpressaoEtiquetasPage() {
 
                     <div className="flex items-center gap-1 text-black">
                       <span className="text-xs">Cód:</span>
-                      <span className="text-xs font-mono">
-                        {deviceData.deviceErpCode.slice(0, -2)}
-                      </span>
-                      <span className="text-xl font-bold text-green-700 mx-1">
-                        {deviceData.grading}
-                      </span>
-                      <span className="text-xs font-mono">
-                        {deviceData.deviceErpCode.slice(-1)}
+                      <span className="text-xs font-mono font-bold">
+                        {deviceData.deviceErpCode}
                       </span>
                     </div>
 
