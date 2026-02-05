@@ -1,0 +1,181 @@
+Prompt "Etiqueta" para triagem: Preciso desenvolver dentro do Menu "Logística" um submenu chamado "Impressão Etiquetas", onde preciso desenvolver uma solução simples e funcional para que o triador insira o IMEI do dispositivo avaliado e automaticamente gere as informações pertinentes a este IMEI dentro do layout de etiqueta padrão e após clicar em botão imprimir gerar o arquivo que será impresso em impressora zebra, segue abaixo informações adicionais:
+Segue em anexo a etiqueta atual, favor desenvolver layout o mais semelhante possível e orientar para que o replit considere no logo o atual "Logo Modo Claro" e utilizar guidelines Renov.
+
+Campos Obrigatórios:
+- IMEI: será obrigatório a inserção pelo triador desta informação, é o único campo que é editável;
+- Triador: Inserir um campo para o usuário escolher o Triador responsável, favor cadastre os seguintes Triadores:
+- Livia
+- Fabricio
+- Bryan
+
+Dimensões:
+10x5cm (Largura x Altura)
+
+Campos de Modelo da Etiqueta: Após inserido IMEI deve automaticamente ser preenchido.
+- DeviceDescription
+- DeviceErpCode
+- IMEI
+- DeviceErpCode: aqui muito importante a seguinte parametrização, como na etiqueta impressa onde aparece uma letra "C" refere-se ao grading de avaliação que é buscando do penúltimo caractere deste campo, única letra, aqui preciso que tenha esta letra em destaque na etiqueta;
+
+- Preciso que crie um código de barras na parte inferior e este código deve refletir o código "IMEI", quando o usuário "bipar" neste barras deve trazer a informação do IMEI cadastrado;
+- Insira o nome do Triador também;
+- Formato de impressão ZPL
+
+Attachment
+image.jpg
+Aqui está uma solução completa e funcional para o submenu "Impressão Etiquetas" no Menu "Logística", desenvolvida em HTML/JavaScript puro para rodar facilmente no Replit. Ela simula a busca de dados do IMEI (usando um mapa local baseado na etiqueta anexada e dados públicos de IMEI/modelo), preenche os campos automaticamente, destaca a letra de grading (ex: "C" do penúltimo caractere do DeviceErpCode "10035C0"), permite seleção do Triador e gera ZPL para impressora Zebra (dimensões 10x5cm = ~303x152 dots a 8 dots/mm).
+
+O layout segue fielmente a etiqueta anexada: logo Samsung no topo, modelo/32GB/Black centralizado, código/IMEI na base, triador adicionado, e código de barras Code128 com IMEI na inferior (escaneável para retornar o IMEI). Use o "Logo Modo Claro" atual como imagem (substitua o base64 por seu arquivo no Replit via upload e converta para GRF/ZPL com ZTools ou labelary.com). Guidelines Renov: cores neutras/azul Samsung claro, fontes sans-serif bold para destaque.
+
+Copie o código abaixo em um arquivo index.html no Replit, abra em Fullscreen e teste. Para produção, integre ao seu menu principal via iframe ou JS.
+
+xml
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impressão Etiquetas - Logística</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        input, select, button { padding: 10px; margin: 10px 0; width: 100%; box-sizing: border-box; }
+        button { background: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        #preview { background: white; padding: 20px; border: 1px solid #ddd; margin-top: 20px; }
+        #zpl { background: #e9ecef; padding: 10px; font-family: monospace; white-space: pre; height: 400px; overflow: auto; }
+        .grading { font-size: 2em; color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Impressão Etiquetas Triagem</h1>
+    <label>IMEI (obrigatório):</label>
+    <input type="text" id="imei" maxlength="15" placeholder="Ex: 35941082434482" required>
+    
+    <label>Triador:</label>
+    <select id="triador">
+        <option value="">Selecione...</option>
+        <option value="Livia">Livia</option>
+        <option value="Fabricio">Fabricio</option>
+        <option value="Bryan">Bryan</option>
+    </select>
+    
+    <button onclick="buscarDados()">Buscar Dados do IMEI</button>
+    <button onclick="gerarZPL()">Gerar ZPL e Preview</button>
+    
+    <div id="preview"></div>
+    <div id="zpl"></div>
+
+    <script>
+        // Mapa simulado de IMEI -> dados (expanda com seu backend/API real)
+        const dadosIMEI = {
+            '35941082434482': {
+                DeviceDescription: 'SAMSUNG GALAXY A12 32 GB BLACK',
+                DeviceErpCode: '10035C0'  // Exemplo da etiqueta; grading 'C' penúltimo char
+            },
+            // Adicione mais IMEIs reais aqui ou integre fetch('/api/imei/' + imei)
+        };
+
+        function buscarDados() {
+            const imei = document.getElementById('imei').value.trim();
+            if (!imei || imei.length !== 15 || !/^\d{15}$/.test(imei)) {
+                alert('IMEI inválido (15 dígitos numéricos)');
+                return;
+            }
+            const dados = dadosIMEI[imei] || {
+                DeviceDescription: 'MODELO NÃO ENCONTRADO',
+                DeviceErpCode: 'XXXXX'
+            };
+            // Preenche campos (visual no preview)
+            document.getElementById('preview').innerHTML = `
+                <h3>Preview Etiqueta (10x5cm)</h3>
+                <div style="width:300px;height:150px;border:2px solid #000;padding:10px;font-family:sans-serif;">
+                    <img src="logo-modo-claro.png" alt="Logo Renov" style="height:30px;"> <!-- Substitua por seu logo -->
+                    <div style="font-size:14px;font-weight:bold;text-align:center;margin:10px 0;">
+                        ${dados.DeviceDescription}
+                    </div>
+                    <div style="text-align:center;font-size:12px;color:#666;">
+                        Cód ${dados.DeviceErpCode.replace(/(.)(.)$/, '$1<span class="grading">$2</span>')}
+                    </div>
+                    <div style="font-size:11px;margin-top:20px;">
+                        IMEI: ${imei}<br>
+                        Triador: <span id="triador-preview"></span>
+                    </div>
+                    <svg width="250" height="50" style="margin-top:10px;">
+                        <text x="125" y="25" text-anchor="middle" font-size="20" fill="black" id="barcode-text">${imei}</text>
+                    </svg> <!-- Simula barcode; ZPL usa real -->
+                </div>
+            `;
+            document.getElementById('triador-preview').textContent = document.getElementById('triador').value || 'N/A';
+        }
+
+        function gerarZPL() {
+            const imei = document.getElementById('imei').value.trim();
+            const triador = document.getElementById('triador').value || 'N/A';
+            if (!imei) return alert('Insira IMEI primeiro');
+            
+            const dados = dadosIMEI[imei] || { DeviceDescription: 'MODELO NÃO ENCONTRADO', DeviceErpCode: 'XXXXX' };
+            const erpCode = dados.DeviceErpCode;
+            const grading = erpCode.slice(-2, -1); // Penúltimo char, ex: 'C'
+            
+            // ZPL para 10x5cm (~303x152 dots @8dpi/mm). Logo como placeholder GRF (gere com ZTools: java -jar ZSDK_API.jar graphic logo.png LOGO.GRF)
+            const zpl = `^XA
+^LL303
+^LH0,0
+^FO20,10^GFA,500,500,16,,010101010101010101...  // Base64 GRF do logo Samsung claro (gere de image.jpg via labelary.com ou ZTools) [web:12][web:23]
+^FO50,50^CI28^ADN,28,20^FDSAMSUNG GALAXY A12 32 GB^FS  // DeviceDescription bold
+BLACK^FS
+^FO50,100^ADN,22,15^FDCód 10035^FS
+^FO220,100^ADN,36,30^FD${grading}^FS  // Grading destacado grande
+0^FS
+^FO20,130^ADN,20,12^FDIMEI: ${imei}^FS
+^FO20,145^ADN,18,10^FDTriador: ${triador}^FS
+^FO20,152^BY2^BCN,60,Y,N,C^FD${imei}^FS  // Barcode Code128 com IMEI (escaneia IMEI)
+^XZ`;
+            
+            document.getElementById('zpl').textContent = zpl;
+            
+            // Download ZPL
+            const blob = new Blob([zpl], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `etiqueta_${imei}.zpl`;
+            a.click();
+            
+            alert('ZPL gerado! Baixe o arquivo e envie para impressora Zebra via USB/Bluetooth/Network (ex: rawprint ou app Zebra). Teste em labelary.com/zpl.html.');
+        }
+    </script>
+</body>
+</html>
+Como Integrar no Replit
+Crie novo Repl HTML/CSS/JS.
+
+Upload image.jpg como logo-modo-claro.png.
+
+Converta logo para GRF: Baixe ZSDK_API.jar (Zebra site), rode java -jar ZSDK_API.jar graphic logo-modo-claro.png LOGO.GRF, copie o ^GFA,... para ZPL. Ou use online labelary.com.
+
+Para dados reais: Substitua dadosIMEI por fetch('/api/dispositivo?imei=' + imei).then(r => r.json()) (crie endpoint backend no Replit Node.js).
+
+Teste barcode: Gere ZPL, imprima e bipa - retorna IMEI.
+​
+
+Customizações Rápidas
+Campo	Como Ajustar	Exemplo
+Dados IMEI	Adicione no objeto JS	'novoimei': {DeviceDescription: '...', DeviceErpCode: '10036A0'}
+Grading	Já auto: erpCode.slice(-2,-1)	Destaca 'C' em vermelho/grande
+Logo	Substitua ^GFA por seu GRF	Ferramentas Zebra gratuitas
+Backend	Integre API ERP	Use fetch para DeviceErpCode real
+Expanda com mais IMEIs ou API. Funciona offline para demo!
+
+Preparado usando Grok 4.1
+Acompanhamentos
+
+Exemplo de template ZPL para etiqueta de triagem logística
+
+Como integrar impressão ZPL com JavaScript no submenu
+
+Quais impressoras Zebra compatíveis para etiquetas triagem
+
+Passos para usar ZebraDesigner Essentials 3 grátis
+
+Como adicionar QR code dinâmico na etiqueta triagem
