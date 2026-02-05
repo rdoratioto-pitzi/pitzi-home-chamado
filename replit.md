@@ -64,7 +64,7 @@ Renov Home adopts a client-server architecture with a clear separation of concer
     - **Tasks:** Kanban view with drag-and-drop, flexible sorting (priority, date, manual), support for private and shared areas.
     - **Meetings:** Standalone module, supports shared areas, recurring meetings (daily/weekly), multi-participant selection (internal/external), email invitations with ICS attachments, formatted agendas.
     - **Pricing:** Dashboard with KPIs and charts, detailed product analysis and comparison, historical price graphing, deflation indicators, customizable price alerts, comprehensive product details.
-    - **Logistics:** Freight simulation comparing multiple operators, reverse logistics request forms (individual and bulk via import), tracking and order management.
+    - **Logistics:** Freight simulation comparing multiple operators, reverse logistics request forms (individual and bulk via import), tracking and order management, label printing for device triage (ZPL format for Zebra printers).
 - **Email Notifications:** Implemented for key events in Ticket management (creation, assignment, status change, comments), utilizing professional HTML templates with Renov's branding.
 - **User Management:** Granular permissions per module (Tickets, Projects, Tasks, OKRs, Logistics, Pricing, Integrations, Configurations), user invitation system with welcome emails.
 - **Configuration Management:** Dynamic field configuration (categories, types, locations), automatic assignment rules for tickets.
@@ -72,6 +72,7 @@ Renov Home adopts a client-server architecture with a clear separation of concer
 ## External Dependencies
 
 - **Correios Logística Reversa (SOAP Web Service):** Integrated for reverse logistics functionalities via official SOAP API. See detailed documentation below.
+- **RS Logística API (Dashboard Renov):** Used by the Logistics module for orders lookup and logistics reports. Base URL: `https://dash.renovsmart.com.br/api`, Bearer token authentication.
 - **RenovSmart API:** Used by the Pricing module to fetch smartphone/iPhone pricing data.
 - **PostgreSQL Database:** Used for persistent storage in the Pricing module (pricingDevices, pricingPriceHistory, pricingAlerts).
 - **Shadcn/UI:** Component library for the frontend.
@@ -155,3 +156,58 @@ The system integrates with Correios' official SOAP Web Service for reverse logis
 - Other codes indicate specific business or technical errors
 
 **Note:** The integration uses raw SOAP/XML requests (not the CWS REST API). SOAPAction header must be empty string for Correios compatibility.
+
+## Label Printing Module (Impressão de Etiquetas)
+
+The Logistics module includes a label printing feature for device triage operations.
+
+**Path:** `/logistica/impressao-etiquetas`
+
+**Features:**
+- Triador selection (fixed list: Livia, Fabricio, Bryan)
+- IMEI input (15 digits, auto-search on completion)
+- Device data lookup via RS Logística API
+- Visual label preview (10x5cm format)
+- ZPL file generation with Code128 barcode
+- Grading highlight (penultimate character of DeviceErpCode)
+
+**Label Layout (10x5cm):**
+- Renov logo (text-based for ZPL compatibility)
+- Device description (centered)
+- ERP code with grading letter highlighted
+- IMEI number
+- Triador name
+- Code128 barcode (encodes IMEI, scannable)
+
+**Key Files:**
+- `client/src/pages/logistica/impressao-etiquetas.tsx` - Frontend UI and ZPL generation
+- `server/routes.ts` - RS Logística API endpoints
+
+**ZPL Output:**
+- Format compatible with Zebra printers
+- Download as `.zpl` file
+- Validate output at labelary.com/viewer.html
+
+## RS Logística API Integration
+
+Integration with the Renov Dashboard API for orders and logistics data.
+
+**Base URL:** `https://dash.renovsmart.com.br/api`
+**Authentication:** Bearer token (`Renov123`)
+
+**Available Endpoints:**
+- `GET /orders/advanced` - Advanced orders search with filters (imei, voucher_code, customer_cpf, dates, network, store_type, global_status)
+- `GET /logistica/coletas` - Collections report by date range
+- `GET /logistica/geral` - General logistics report
+
+**Internal API Routes:**
+- `POST /api/integrations/rs-logistica/test-connection` - Test API connectivity
+- `GET /api/integrations/rs-logistica/orders/advanced` - Proxy to orders search
+- `GET /api/integrations/rs-logistica/logistica/coletas` - Proxy to collections report
+- `GET /api/integrations/rs-logistica/logistica/geral` - Proxy to general report
+
+**Key Files:**
+- `client/src/pages/apis/api-rs-logistica.tsx` - API documentation and testing UI
+- `server/routes.ts` - Backend proxy endpoints
+
+**Documentation:** https://documenter.getpostman.com/view/49982216/2sBXc7Mk6f
