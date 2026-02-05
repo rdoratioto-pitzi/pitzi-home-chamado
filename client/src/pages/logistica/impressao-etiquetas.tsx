@@ -159,6 +159,101 @@ export default function ImpressaoEtiquetasPage() {
     },
   });
 
+  const triggerDirectPrint = useCallback(() => {
+    if (!deviceData || !triador) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Etiqueta - ${deviceData.imei}</title>
+        <style>
+          @page {
+            size: 10cm 5cm;
+            margin: 0;
+          }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: Arial, sans-serif; 
+            width: 10cm; 
+            height: 5cm; 
+            background: white;
+          }
+          .label { 
+            width: 10cm; 
+            height: 5cm; 
+            background: white; 
+            padding: 0.3cm;
+            position: relative;
+          }
+          .grading { 
+            position: absolute; 
+            top: 0.2cm; 
+            right: 0.3cm; 
+            font-size: 28pt; 
+            font-weight: bold; 
+            color: #00A137; 
+            line-height: 1;
+          }
+          .description { 
+            text-align: center; 
+            font-weight: bold; 
+            font-size: 12pt; 
+            margin-top: 0.8cm; 
+            margin-bottom: 0.15cm;
+          }
+          .code { text-align: center; font-size: 9pt; margin: 0.1cm 0; }
+          .info { font-size: 8pt; margin: 0.05cm 0; }
+          .barcode-container { 
+            text-align: center; 
+            margin-top: 0.2cm;
+            width: 100%;
+          }
+          .barcode-container img { 
+            width: 90%;
+            height: auto;
+            max-height: 1.5cm;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="label">
+          <div class="grading">${deviceData.grading}</div>
+          <div class="description">${deviceData.deviceDescription}</div>
+          <div class="code">Cód: <strong>${deviceData.deviceErpCode}</strong></div>
+          <div class="info">IMEI: ${deviceData.imei}</div>
+          <div class="info">Triador: ${triador}</div>
+          <div class="barcode-container">
+            <img id="barcode-img" src="/api/etiquetas/barcode/${deviceData.imei}" alt="Barcode" />
+          </div>
+        </div>
+        <script>
+          const img = document.getElementById('barcode-img');
+          if (img.complete) {
+            window.print();
+            setTimeout(() => window.close(), 500);
+          } else {
+            img.onload = function() {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+            img.onerror = function() {
+              window.print();
+              setTimeout(() => window.close(), 500);
+            };
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open("", "_blank", "width=400,height=250");
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+    }
+  }, [deviceData, triador]);
+
   const printMutation = useMutation({
     mutationFn: async () => {
       if (!deviceData || !triador) throw new Error("Dados incompletos");
@@ -172,97 +267,9 @@ export default function ImpressaoEtiquetasPage() {
       
       return response.json();
     },
-    onSuccess: (data) => {
-      if (data.zpl) {
-        const printWindow = window.open("", "_blank", "width=750,height=550");
-        if (printWindow) {
-          printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>Imprimir Etiqueta - ${deviceData?.imei}</title>
-              <style>
-                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; margin: 0; }
-                .label { 
-                  width: 650px; 
-                  min-height: 320px; 
-                  background: white; 
-                  border: 2px solid #000; 
-                  padding: 20px;
-                  margin: 20px auto;
-                  position: relative;
-                  box-sizing: border-box;
-                }
-                .grading { 
-                  position: absolute; 
-                  top: 10px; 
-                  right: 20px; 
-                  font-size: 80px; 
-                  font-weight: bold; 
-                  color: #00A137; 
-                  line-height: 1;
-                }
-                .description { 
-                  text-align: center; 
-                  font-weight: bold; 
-                  font-size: 24px; 
-                  margin-top: 50px; 
-                  margin-bottom: 10px;
-                }
-                .code { text-align: center; font-size: 18px; margin: 10px 0; }
-                .info { font-size: 16px; margin: 8px 0; }
-                .barcode-container { 
-                  text-align: center; 
-                  margin-top: 20px;
-                  width: 100%;
-                }
-                .barcode-container img { 
-                  width: 100%;
-                  max-width: 600px;
-                  height: auto;
-                  min-height: 80px;
-                }
-                .print-btn { 
-                  display: block; 
-                  margin: 20px auto; 
-                  padding: 14px 50px; 
-                  background: #00A137; 
-                  color: white; 
-                  border: none; 
-                  border-radius: 6px; 
-                  font-size: 18px; 
-                  cursor: pointer; 
-                }
-                .print-btn:hover { background: #008f30; }
-                @media print {
-                  body { background: white; padding: 0; margin: 0; }
-                  .print-btn { display: none; }
-                  .label { border: none; margin: 0; width: 100%; }
-                }
-              </style>
-            </head>
-            <body>
-              <div class="label">
-                <div class="grading">${deviceData?.grading}</div>
-                <div class="description">${deviceData?.deviceDescription}</div>
-                <div class="code">Cód: <strong>${deviceData?.deviceErpCode}</strong></div>
-                <div class="info">IMEI: ${deviceData?.imei}</div>
-                <div class="info">Triador: ${triador}</div>
-                <div class="barcode-container">
-                  <img src="/api/etiquetas/barcode/${deviceData?.imei}" alt="Barcode" />
-                </div>
-              </div>
-              <button class="print-btn" onclick="window.print()">Imprimir Etiqueta</button>
-              <p style="text-align: center; font-size: 12px; color: #666;">
-                Ao imprimir, uma nova janela será aberta com a etiqueta pronta para impressão.
-              </p>
-            </body>
-            </html>
-          `);
-          printWindow.document.close();
-        }
-      }
-      toast({ title: "Etiqueta gerada com sucesso!" });
+    onSuccess: () => {
+      triggerDirectPrint();
+      toast({ title: "Enviando para impressora..." });
     },
     onError: (err: any) => {
       toast({
