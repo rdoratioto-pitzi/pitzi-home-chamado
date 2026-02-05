@@ -113,6 +113,7 @@ const logisticaSubItems = [
 const apisSubItems = [
   { title: "Visão Geral", url: "/apis", icon: Code2 },
   { title: "Correios - Logística Reversa", url: "/apis/correios-reversa", icon: RotateCcw },
+  { title: "API RS - Logística", url: "/apis/rs-logistica", icon: Truck },
 ];
 
 const pricingSubItems = [

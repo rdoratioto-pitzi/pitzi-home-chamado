@@ -25,6 +25,7 @@ import LogisticaReversaPage from "@/pages/logistica/logistica-reversa";
 import SimularFretePage from "@/pages/logistica/simular-frete";
 import ApisPage from "@/pages/apis/index";
 import CorreiosReversaPage from "@/pages/apis/correios-reversa";
+import ApiRsLogisticaPage from "@/pages/apis/api-rs-logistica";
 import LoginPage from "@/pages/login";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
 import PricingOverviewPage from "@/pages/pricing/index";
@@ -136,6 +137,11 @@ function Router() {
       <Route path="/apis/correios-reversa">
         <ProtectedRoute requiredPermission="apis">
           <CorreiosReversaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/apis/rs-logistica">
+        <ProtectedRoute requiredPermission="apis">
+          <ApiRsLogisticaPage />
         </ProtectedRoute>
       </Route>
       <Route path="/pricing">

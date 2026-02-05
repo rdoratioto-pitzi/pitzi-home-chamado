@@ -1757,6 +1757,118 @@ export async function registerRoutes(
     }
   });
 
+  // ============== RS LOGISTICA API INTEGRATION ==============
+  
+  const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
+  const RS_API_TOKEN = "Renov123";
+
+  // Test connection to RS Logística API
+  app.post("/api/integrations/rs-logistica/test-connection", async (req, res) => {
+    try {
+      const response = await fetch(`${RS_API_BASE_URL}/logistica/geral?start_date=2024-01-01&end_date=2024-01-01`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (response.ok) {
+        res.json({ connected: true, message: "Conexão estabelecida com sucesso" });
+      } else {
+        res.json({ connected: false, message: `Erro: ${response.status} ${response.statusText}` });
+      }
+    } catch (error: any) {
+      res.json({ connected: false, message: error.message || "Falha ao conectar com a API" });
+    }
+  });
+
+  // Orders - Busca Avançada de Pedidos
+  app.get("/api/integrations/rs-logistica/orders/advanced", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      const queryParams = ["imei", "voucher_code", "voucher_status", "customer_cpf", "created_start", "created_end", "used_start", "used_end", "network", "store_type", "boost", "global_status"];
+      
+      queryParams.forEach(param => {
+        if (req.query[param]) {
+          params.append(param, req.query[param] as string);
+        }
+      });
+
+      const response = await fetch(`${RS_API_BASE_URL}/orders/advanced?${params.toString()}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("RS Logística orders/advanced error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar pedidos" });
+    }
+  });
+
+  // Logística - Relatório de Coletas
+  app.get("/api/integrations/rs-logistica/logistica/coletas", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      if (req.query.start_date) params.append("start_date", req.query.start_date as string);
+      if (req.query.end_date) params.append("end_date", req.query.end_date as string);
+
+      const response = await fetch(`${RS_API_BASE_URL}/logistica/coletas?${params.toString()}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("RS Logística logistica/coletas error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar relatório de coletas" });
+    }
+  });
+
+  // Logística - Relatório Geral
+  app.get("/api/integrations/rs-logistica/logistica/geral", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      if (req.query.start_date) params.append("start_date", req.query.start_date as string);
+      if (req.query.end_date) params.append("end_date", req.query.end_date as string);
+
+      const response = await fetch(`${RS_API_BASE_URL}/logistica/geral?${params.toString()}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("RS Logística logistica/geral error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar relatório geral" });
+    }
+  });
+
   // ============== CORREIOS LOGISTICA REVERSA ==============
   
   // Get Correios configuration status
