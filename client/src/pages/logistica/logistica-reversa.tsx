@@ -88,7 +88,7 @@ const logisticaReversaFormSchema = z.object({
   itens: z.array(itemSchema).min(1, "Adicione pelo menos um item"),
   tipoEmbalagem: z.string().optional(),
   valorDeclarado: z.string().optional(),
-  adicionalAnac: z.boolean().default(false),
+  adicionalAnac: z.boolean().default(true),
   observacao: z.string().optional(),
 });
 
@@ -113,7 +113,7 @@ const defaultFormValues: LogisticaReversaFormData = {
   itens: [{ descricao: "", quantidade: 1, valorUnitario: 0, imei: "" }],
   tipoEmbalagem: "",
   valorDeclarado: "",
-  adicionalAnac: false,
+  adicionalAnac: true,
   observacao: "",
 };
 
