@@ -1872,15 +1872,23 @@ export async function registerRoutes(
 
   // ============== LABEL PRINTING (IMPRESSÃO DE ETIQUETAS) ==============
   
+  // Zod schema for label data validation
+  const labelDataSchema = z.object({
+    imei: z.string().length(15).regex(/^\d{15}$/, "IMEI deve ter exatamente 15 dígitos numéricos"),
+    deviceDescription: z.string().min(1).max(200),
+    deviceErpCode: z.string().min(1).max(50),
+    triador: z.string().min(1).max(100),
+  });
+  
   // Generate PNG label with Code128 barcode
   app.post("/api/etiquetas/gerar-png", async (req, res) => {
     try {
-      const { imei, deviceDescription, deviceErpCode, triador } = req.body;
-      
-      if (!imei || !deviceDescription || !deviceErpCode || !triador) {
-        return res.status(400).json({ error: "Missing required fields" });
+      const validationResult = labelDataSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: "Dados inválidos", details: validationResult.error.errors });
       }
       
+      const { imei, deviceDescription, deviceErpCode, triador } = validationResult.data;
       const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
       
       // Generate Code128 barcode as PNG buffer
@@ -1914,14 +1922,15 @@ export async function registerRoutes(
     }
   });
   
-  // Generate ZPL and send to Zebra printer via web service
+  // Generate ZPL for printing (client opens print window)
   app.post("/api/etiquetas/imprimir", async (req, res) => {
     try {
-      const { imei, deviceDescription, deviceErpCode, triador, printerUrl } = req.body;
-      
-      if (!imei || !deviceDescription || !deviceErpCode || !triador) {
-        return res.status(400).json({ error: "Missing required fields" });
+      const validationResult = labelDataSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: "Dados inválidos", details: validationResult.error.errors });
       }
+      
+      const { imei, deviceDescription, deviceErpCode, triador } = validationResult.data;
       
       const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
       
@@ -1946,40 +1955,12 @@ export async function registerRoutes(
 
 ^XZ`;
       
-      // If printerUrl is provided, send to printer
-      if (printerUrl) {
-        try {
-          const printResponse = await fetch(printerUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-zpl",
-            },
-            body: zpl,
-          });
-          
-          if (!printResponse.ok) {
-            throw new Error(`Printer returned status ${printResponse.status}`);
-          }
-          
-          res.json({ 
-            success: true, 
-            message: "Label sent to printer successfully",
-            zpl 
-          });
-        } catch (printError: any) {
-          res.status(500).json({ 
-            error: `Failed to send to printer: ${printError.message}`,
-            zpl 
-          });
-        }
-      } else {
-        // Just return the ZPL for download or browser print
-        res.json({ 
-          success: true, 
-          zpl,
-          message: "ZPL generated successfully. Configure printer URL for direct printing." 
-        });
-      }
+      // Return the ZPL for client-side printing (browser print window)
+      res.json({ 
+        success: true, 
+        zpl,
+        message: "ZPL generated successfully." 
+      });
     } catch (error: any) {
       console.error("Print label error:", error);
       res.status(500).json({ error: error.message || "Failed to print label" });
@@ -1991,8 +1972,9 @@ export async function registerRoutes(
     try {
       const { imei } = req.params;
       
-      if (!imei || imei.length < 10) {
-        return res.status(400).json({ error: "Invalid IMEI" });
+      // Validate IMEI format
+      if (!imei || !/^\d{15}$/.test(imei)) {
+        return res.status(400).json({ error: "IMEI inválido. Deve ter exatamente 15 dígitos." });
       }
       
       const barcodeBuffer = await bwipjs.toBuffer({

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { 
   Printer, 
@@ -15,7 +14,6 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  Package,
   User,
   Smartphone,
   Tag,
@@ -23,6 +21,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 interface DeviceData {
   imei: string;
@@ -37,11 +36,8 @@ const TRIADORES = [
   { value: "Bryan", label: "Bryan" },
 ];
 
-
 function generateZPL(deviceData: DeviceData, triador: string): string {
   const { imei, deviceDescription, deviceErpCode } = deviceData;
-  
-  // Grading is the penultimate character, and we also want the last character
   const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
   
   const zpl = `^XA
@@ -85,7 +81,16 @@ export default function ImpressaoEtiquetasPage() {
   const [triador, setTriador] = useState("");
   const [deviceData, setDeviceData] = useState<DeviceData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [barcodeUrl, setBarcodeUrl] = useState<string | null>(null);
   const imeiInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (deviceData?.imei) {
+      setBarcodeUrl(`/api/etiquetas/barcode/${deviceData.imei}?t=${Date.now()}`);
+    } else {
+      setBarcodeUrl(null);
+    }
+  }, [deviceData?.imei]);
 
   const searchDeviceMutation = useMutation({
     mutationFn: async (searchImei: string) => {
@@ -107,7 +112,6 @@ export default function ImpressaoEtiquetasPage() {
         const deviceDescription = [modelName, storage ? `${storage}GB` : "", color].filter(Boolean).join(" ") || "Dispositivo não identificado";
         
         const erpCode = order.DeviceErpCode || order.device_erp_code || order.deviceErpCode || order.SKU || "XXXXX00";
-        // Get both grading (penultimate) and last character
         const grading = erpCode.length >= 2 ? erpCode.slice(-2) : "??";
         
         setDeviceData({
@@ -128,6 +132,115 @@ export default function ImpressaoEtiquetasPage() {
       setDeviceData(null);
       toast({
         title: "Erro na busca",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const printMutation = useMutation({
+    mutationFn: async () => {
+      if (!deviceData || !triador) throw new Error("Dados incompletos");
+      
+      const response = await apiRequest("POST", "/api/etiquetas/imprimir", {
+        imei: deviceData.imei,
+        deviceDescription: deviceData.deviceDescription,
+        deviceErpCode: deviceData.deviceErpCode,
+        triador,
+      });
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.zpl) {
+        const printWindow = window.open("", "_blank", "width=500,height=400");
+        if (printWindow) {
+          printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <title>Imprimir Etiqueta - ${deviceData?.imei}</title>
+              <style>
+                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                .label { 
+                  width: 400px; 
+                  height: 200px; 
+                  background: white; 
+                  border: 2px solid #000; 
+                  padding: 15px;
+                  margin: 20px auto;
+                  position: relative;
+                  box-sizing: border-box;
+                }
+                .grading { 
+                  position: absolute; 
+                  top: 10px; 
+                  right: 15px; 
+                  font-size: 48px; 
+                  font-weight: bold; 
+                  color: #00A137; 
+                }
+                .description { 
+                  text-align: center; 
+                  font-weight: bold; 
+                  font-size: 16px; 
+                  margin-top: 30px; 
+                }
+                .code { text-align: center; font-size: 12px; margin: 5px 0; }
+                .info { font-size: 11px; margin: 5px 0; }
+                .barcode-container { 
+                  text-align: center; 
+                  margin-top: 10px; 
+                }
+                .barcode-container img { 
+                  max-width: 280px; 
+                  height: auto; 
+                }
+                .print-btn { 
+                  display: block; 
+                  margin: 20px auto; 
+                  padding: 12px 40px; 
+                  background: #00A137; 
+                  color: white; 
+                  border: none; 
+                  border-radius: 6px; 
+                  font-size: 16px; 
+                  cursor: pointer; 
+                }
+                .print-btn:hover { background: #008f30; }
+                @media print {
+                  body { background: white; padding: 0; }
+                  .print-btn { display: none; }
+                  .label { border: none; margin: 0; }
+                }
+              </style>
+            </head>
+            <body>
+              <div class="label">
+                <div class="grading">${deviceData?.grading}</div>
+                <div class="description">${deviceData?.deviceDescription}</div>
+                <div class="code">Cód: <strong>${deviceData?.deviceErpCode}</strong></div>
+                <div class="info">IMEI: ${deviceData?.imei}</div>
+                <div class="info">Triador: ${triador}</div>
+                <div class="barcode-container">
+                  <img src="/api/etiquetas/barcode/${deviceData?.imei}" alt="Barcode" />
+                </div>
+              </div>
+              <button class="print-btn" onclick="window.print()">Imprimir Etiqueta</button>
+              <p style="text-align: center; font-size: 12px; color: #666;">
+                Ao imprimir, uma nova janela será aberta com a etiqueta pronta para impressão.
+              </p>
+            </body>
+            </html>
+          `);
+          printWindow.document.close();
+        }
+      }
+      toast({ title: "Etiqueta gerada com sucesso!" });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Erro ao gerar etiqueta",
         description: err.message,
         variant: "destructive",
       });
@@ -160,6 +273,18 @@ export default function ImpressaoEtiquetasPage() {
     toast({ title: "Arquivo ZPL gerado com sucesso!" });
   };
 
+  const handlePrint = () => {
+    if (!deviceData || !triador) {
+      toast({
+        title: "Dados incompletos",
+        description: "Selecione um triador e busque o dispositivo antes de imprimir.",
+        variant: "destructive",
+      });
+      return;
+    }
+    printMutation.mutate();
+  };
+
   const handleImeiChange = (value: string) => {
     const cleanValue = value.replace(/\D/g, "").slice(0, 15);
     setImei(cleanValue);
@@ -178,7 +303,7 @@ export default function ImpressaoEtiquetasPage() {
     <div className="flex flex-col min-h-full">
       <PageHeader 
         title="Impressão de Etiquetas" 
-        description="Gere etiquetas ZPL para triagem de dispositivos."
+        description="Gere etiquetas para triagem de dispositivos."
         breadcrumbs={[
           { label: "Logística", href: "/logistica/dashboard" },
           { label: "Impressão de Etiquetas" }
@@ -294,16 +419,34 @@ export default function ImpressaoEtiquetasPage() {
                     </div>
                   </div>
 
-                  <Button 
-                    className="w-full gap-2" 
-                    size="lg"
-                    onClick={handleDownload}
-                    disabled={!triador}
-                    data-testid="button-download-zpl"
-                  >
-                    <Download className="h-4 w-4" />
-                    Baixar Etiqueta ZPL
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button 
+                      className="flex-1 gap-2" 
+                      size="lg"
+                      onClick={handlePrint}
+                      disabled={!triador || printMutation.isPending}
+                      data-testid="button-imprimir"
+                    >
+                      {printMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Printer className="h-4 w-4" />
+                      )}
+                      Imprimir Etiqueta
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      size="lg"
+                      onClick={handleDownload}
+                      disabled={!triador}
+                      data-testid="button-download-zpl"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Ao imprimir, uma nova janela será aberta com a etiqueta pronta para impressão.
+                  </p>
                 </>
               )}
             </CardContent>
@@ -323,62 +466,51 @@ export default function ImpressaoEtiquetasPage() {
             </CardHeader>
             <CardContent>
               <div 
-                className="mx-auto border-2 border-dashed border-border rounded-lg bg-white px-6 py-3 relative"
-                style={{ width: "380px", height: "200px" }}
+                className="mx-auto border-2 border-gray-300 rounded-lg bg-white px-6 py-4 relative shadow-md"
+                style={{ width: "420px", height: "220px" }}
               >
                 {deviceData ? (
                   <div className="h-full flex flex-col">
-                    {/* Grading - Top Right */}
-                    <div className="absolute top-2 right-4">
-                      <span className="text-4xl font-bold text-[#00A137]">
+                    <div className="absolute top-3 right-4">
+                      <span className="text-5xl font-bold text-[#00A137]" style={{ fontFamily: "Arial, sans-serif" }}>
                         {deviceData.grading}
                       </span>
                     </div>
 
-                    {/* Device Description - Centered */}
-                    <div className="text-center mt-6 mb-1">
-                      <p className="font-bold text-base text-black leading-tight">
+                    <div className="text-center mt-4 mb-1">
+                      <p className="font-bold text-lg text-black leading-tight">
                         {deviceData.deviceDescription}
                       </p>
                     </div>
 
-                    {/* ERP Code - Centered */}
                     <div className="text-center mb-2">
-                      <span className="text-xs text-gray-600">Cód: </span>
-                      <span className="text-xs font-bold text-black">
+                      <span className="text-sm text-gray-600">Cód: </span>
+                      <span className="text-sm font-bold text-black">
                         {deviceData.deviceErpCode}
                       </span>
                     </div>
 
-                    {/* IMEI and Triador - Left aligned */}
-                    <div className="text-xs text-black space-y-0.5 mb-2">
+                    <div className="text-sm text-black space-y-0.5 mb-3">
                       <p><span className="text-gray-500">IMEI:</span> {deviceData.imei}</p>
                       <p><span className="text-gray-500">Triador:</span> {triador || "—"}</p>
                     </div>
 
-                    {/* Barcode - Centered at bottom */}
                     <div className="flex flex-col items-center mt-auto">
-                      <div className="flex items-end justify-center gap-px" style={{ height: "32px" }}>
-                        {deviceData.imei.split("").map((digit, i) => {
-                          const d = parseInt(digit) || 0;
-                          return (
-                            <div 
-                              key={i}
-                              className="bg-black"
-                              style={{ 
-                                width: i % 3 === 0 ? "2px" : "1px",
-                                height: `${18 + d * 1.4}px`
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
-                      <p className="text-[10px] font-mono mt-1 text-black tracking-wider">{deviceData.imei}</p>
+                      {barcodeUrl ? (
+                        <img 
+                          src={barcodeUrl} 
+                          alt={`Barcode ${deviceData.imei}`}
+                          className="h-12 max-w-[300px] object-contain"
+                          data-testid="barcode-image"
+                        />
+                      ) : (
+                        <div className="h-12 w-64 bg-gray-100 animate-pulse rounded" />
+                      )}
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <Barcode className="h-12 w-12 mb-2 opacity-30" />
+                    <Barcode className="h-16 w-16 mb-3 opacity-30" />
                     <p className="text-sm">Insira um IMEI para visualizar</p>
                   </div>
                 )}
@@ -388,7 +520,7 @@ export default function ImpressaoEtiquetasPage() {
                 <p className="text-xs text-muted-foreground">
                   <strong>Dimensões:</strong> 10 x 5 cm (Largura x Altura)<br />
                   <strong>Formato:</strong> ZPL (Zebra Programming Language)<br />
-                  <strong>Código de Barras:</strong> Code128 com IMEI
+                  <strong>Código de Barras:</strong> Code128 com IMEI (escaneável)
                 </p>
               </div>
             </CardContent>
