@@ -29,6 +29,7 @@ import {
   FileText,
   Star,
   Bot,
+  Printer,
 } from "lucide-react";
 import {
   Sidebar,
@@ -108,6 +109,7 @@ const logisticaSubItems = [
   { title: "Operadores", url: "/logistica/operadores", icon: Users },
   { title: "Solicitações", url: "/logistica/solicitacoes", icon: Package },
   { title: "Logística Reversa", url: "/logistica/reversa", icon: RotateCcw },
+  { title: "Impressão Etiquetas", url: "/logistica/impressao-etiquetas", icon: Printer },
 ];
 
 const apisSubItems = [
