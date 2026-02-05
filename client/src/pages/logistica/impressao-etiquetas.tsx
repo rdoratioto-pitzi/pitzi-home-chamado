@@ -100,14 +100,22 @@ export default function ImpressaoEtiquetasPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      if (data && data.data && data.data.length > 0) {
-        const order = data.data[0];
-        const erpCode = order.device_erp_code || order.DeviceErpCode || "XXXXX00";
+      const orders = Array.isArray(data) ? data : (data?.data || []);
+      
+      if (orders && orders.length > 0) {
+        const order = orders[0];
+        
+        const modelName = order.ModelName || order.modelName || order.model_name || "";
+        const storage = order.Storage || order.storage || "";
+        const color = order.Color || order.color || "";
+        const deviceDescription = [modelName, storage ? `${storage}GB` : "", color].filter(Boolean).join(" ") || "Dispositivo não identificado";
+        
+        const erpCode = order.DeviceErpCode || order.device_erp_code || order.deviceErpCode || order.SKU || "XXXXX00";
         const grading = erpCode.length >= 2 ? erpCode.slice(-2, -1) : "?";
         
         setDeviceData({
           imei: imei,
-          deviceDescription: order.device_description || order.DeviceDescription || "Dispositivo não identificado",
+          deviceDescription: deviceDescription.toUpperCase(),
           deviceErpCode: erpCode,
           grading: grading,
         });
