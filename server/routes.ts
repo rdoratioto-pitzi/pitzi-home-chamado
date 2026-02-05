@@ -1980,11 +1980,11 @@ export async function registerRoutes(
       const barcodeBuffer = await bwipjs.toBuffer({
         bcid: "code128",
         text: imei,
-        scale: 4,
-        height: 18,
+        scale: 6,
+        height: 25,
         includetext: true,
         textxalign: "center",
-        textsize: 12,
+        textsize: 14,
       });
       
       res.set("Content-Type", "image/png");
