@@ -190,29 +190,42 @@ export default function ImpressaoEtiquetasPage() {
             position: absolute; 
             top: 0.2cm; 
             right: 0.3cm; 
-            font-size: 28pt; 
+            font-size: 34pt; 
             font-weight: bold; 
-            color: #00A137; 
+            color: #000000; 
             line-height: 1;
           }
           .description { 
             text-align: center; 
             font-weight: bold; 
-            font-size: 12pt; 
-            margin-top: 0.8cm; 
-            margin-bottom: 0.15cm;
+            font-size: 15pt; 
+            margin-top: 0.7cm; 
+            margin-bottom: 0.1cm;
+            color: #000000;
           }
-          .code { text-align: center; font-size: 9pt; margin: 0.1cm 0; }
-          .info { font-size: 8pt; margin: 0.05cm 0; }
+          .code { text-align: center; font-size: 11pt; margin: 0.05cm 0; font-weight: bold; color: #000000; }
+          .info { font-size: 10pt; margin: 0.05cm 0; font-weight: bold; color: #000000; }
           .barcode-container { 
             text-align: center; 
-            margin-top: 0.2cm;
+            margin-top: 0.1cm;
             width: 100%;
+            height: 2.2cm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
           }
           .barcode-container img { 
-            width: 90%;
-            height: auto;
-            max-height: 1.5cm;
+            width: 100%;
+            height: 1.8cm;
+            object-fit: fill;
+          }
+          .barcode-value {
+            font-size: 10pt;
+            font-weight: bold;
+            color: #000000;
+            margin-top: -2px;
+            letter-spacing: 0;
           }
         </style>
       </head>
@@ -220,11 +233,12 @@ export default function ImpressaoEtiquetasPage() {
         <div class="label">
           <div class="grading">${deviceData.grading}</div>
           <div class="description">${deviceData.deviceDescription}</div>
-          <div class="code">Cód: <strong>${deviceData.deviceErpCode}</strong></div>
+          <div class="code">Cód: ${deviceData.deviceErpCode}</div>
           <div class="info">IMEI: ${deviceData.imei}</div>
           <div class="info">Triador: ${triador}</div>
           <div class="barcode-container">
             <img id="barcode-img" src="/api/etiquetas/barcode/${deviceData.imei}" alt="Barcode" />
+            <div class="barcode-value">${deviceData.imei}</div>
           </div>
         </div>
         <script>
@@ -463,48 +477,52 @@ export default function ImpressaoEtiquetasPage() {
             </Button>
 
             <div 
-              className="border-2 border-gray-300 rounded-lg bg-white p-6 relative"
-              style={{ minHeight: "320px" }}
+              className="border-2 border-gray-300 rounded-lg bg-white p-6 relative overflow-hidden"
+              style={{ minHeight: "350px", width: "100%" }}
               data-testid="label-preview"
             >
               <div className="absolute top-4 right-6">
                 <span 
-                  className="font-bold text-[#00A137]" 
-                  style={{ fontSize: "80px", lineHeight: 1, fontFamily: "Arial, sans-serif" }}
+                  className="font-bold text-black" 
+                  style={{ fontSize: "96px", lineHeight: 1, fontFamily: "Arial, sans-serif" }}
                 >
                   {deviceData.grading}
                 </span>
               </div>
 
-              <div className="text-center mt-8 mb-3">
-                <p className="font-bold text-2xl text-black leading-tight">
+              <div className="text-center mt-6 mb-2">
+                <p className="font-bold text-3xl text-black leading-tight">
                   {deviceData.deviceDescription}
                 </p>
               </div>
 
-              <div className="text-center mb-4">
-                <span className="text-lg text-gray-600">Cód: </span>
-                <span className="text-lg font-bold text-black">
-                  {deviceData.deviceErpCode}
+              <div className="text-center mb-2">
+                <span className="text-xl font-bold text-black">
+                  Cód: {deviceData.deviceErpCode}
                 </span>
               </div>
 
-              <div className="text-base text-black space-y-1 mb-4">
-                <p><span className="text-gray-500">IMEI:</span> {deviceData.imei}</p>
-                <p><span className="text-gray-500">Triador:</span> {triador || "—"}</p>
+              <div className="text-xl text-black font-bold space-y-1 mb-2">
+                <p>IMEI: {deviceData.imei}</p>
+                <p>Triador: {triador || "—"}</p>
               </div>
 
-              <div className="flex flex-col items-center w-full mt-4">
+              <div className="flex flex-col items-center w-full mt-2">
                 {barcodeUrl ? (
-                  <img 
-                    src={barcodeUrl} 
-                    alt={`Barcode ${deviceData.imei}`}
-                    className="w-full max-w-[600px] h-auto"
-                    style={{ minHeight: "100px" }}
-                    data-testid="barcode-image"
-                  />
+                  <>
+                    <img 
+                      src={barcodeUrl} 
+                      alt={`Barcode ${deviceData.imei}`}
+                      className="w-full h-auto"
+                      style={{ height: "120px", objectFit: "fill" }}
+                      data-testid="barcode-image"
+                    />
+                    <div className="text-xl font-bold text-black mt-1 tracking-tight">
+                      {deviceData.imei}
+                    </div>
+                  </>
                 ) : (
-                  <div className="h-24 w-full max-w-[600px] bg-gray-100 animate-pulse rounded" />
+                  <div className="h-32 w-full bg-gray-100 animate-pulse rounded" />
                 )}
               </div>
             </div>
