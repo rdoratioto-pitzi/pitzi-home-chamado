@@ -323,51 +323,59 @@ export default function ImpressaoEtiquetasPage() {
             </CardHeader>
             <CardContent>
               <div 
-                className="mx-auto border-2 border-dashed border-border rounded-lg bg-white p-4 relative flex flex-col items-center justify-between"
-                style={{ width: "380px", height: "190px" }}
+                className="mx-auto border-2 border-dashed border-border rounded-lg bg-white px-6 py-3 relative"
+                style={{ width: "380px", height: "200px" }}
               >
                 {deviceData ? (
-                  <>
+                  <div className="h-full flex flex-col">
+                    {/* Grading - Top Right */}
                     <div className="absolute top-2 right-4">
-                      <span className="text-4xl font-bold text-green-700">
+                      <span className="text-4xl font-bold text-[#00A137]">
                         {deviceData.grading}
                       </span>
                     </div>
 
-                    <div className="text-center mt-8">
-                      <p className="font-bold text-sm text-black leading-tight">
+                    {/* Device Description - Centered */}
+                    <div className="text-center mt-6 mb-1">
+                      <p className="font-bold text-base text-black leading-tight">
                         {deviceData.deviceDescription}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1 text-black">
-                      <span className="text-xs">Cód:</span>
-                      <span className="text-xs font-mono font-bold">
+                    {/* ERP Code - Centered */}
+                    <div className="text-center mb-2">
+                      <span className="text-xs text-gray-600">Cód: </span>
+                      <span className="text-xs font-bold text-black">
                         {deviceData.deviceErpCode}
                       </span>
                     </div>
 
-                    <div className="text-xs text-black space-y-0.5 w-full px-2">
-                      <p><span className="text-gray-600">IMEI:</span> {deviceData.imei}</p>
-                      <p><span className="text-gray-600">Triador:</span> {triador || "—"}</p>
+                    {/* IMEI and Triador - Left aligned */}
+                    <div className="text-xs text-black space-y-0.5 mb-2">
+                      <p><span className="text-gray-500">IMEI:</span> {deviceData.imei}</p>
+                      <p><span className="text-gray-500">Triador:</span> {triador || "—"}</p>
                     </div>
 
-                    <div className="flex flex-col items-center">
-                      <div className="flex items-end gap-px h-8">
-                        {deviceData.imei.split("").map((digit, i) => (
-                          <div 
-                            key={i}
-                            className="bg-black"
-                            style={{ 
-                              width: i % 2 === 0 ? "2px" : "1px",
-                              height: `${16 + (parseInt(digit) * 1.5)}px`
-                            }}
-                          />
-                        ))}
+                    {/* Barcode - Centered at bottom */}
+                    <div className="flex flex-col items-center mt-auto">
+                      <div className="flex items-end justify-center gap-px" style={{ height: "32px" }}>
+                        {deviceData.imei.split("").map((digit, i) => {
+                          const d = parseInt(digit) || 0;
+                          return (
+                            <div 
+                              key={i}
+                              className="bg-black"
+                              style={{ 
+                                width: i % 3 === 0 ? "2px" : "1px",
+                                height: `${18 + d * 1.4}px`
+                              }}
+                            />
+                          );
+                        })}
                       </div>
-                      <p className="text-[10px] font-mono mt-0.5 text-black">{deviceData.imei}</p>
+                      <p className="text-[10px] font-mono mt-1 text-black tracking-wider">{deviceData.imei}</p>
                     </div>
-                  </>
+                  </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                     <Barcode className="h-12 w-12 mb-2 opacity-30" />
