@@ -1981,10 +1981,8 @@ export async function registerRoutes(
         bcid: "code128",
         text: imei,
         scale: 6,
-        height: 25,
-        includetext: true,
-        textxalign: "center",
-        textsize: 14,
+        height: 30,
+        includetext: false,
       });
       
       res.set("Content-Type", "image/png");
