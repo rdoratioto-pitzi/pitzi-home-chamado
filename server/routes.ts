@@ -2137,6 +2137,9 @@ export async function registerRoutes(
         includetext: true,
         textxalign: "center",
         textsize: 10,
+        paddingwidth: 5,
+        paddingheight: 2,
+        backgroundcolor: "FFFFFF",
       });
       
       // Return barcode as base64 along with label data
@@ -2217,9 +2220,12 @@ export async function registerRoutes(
       const barcodeBuffer = await bwipjs.toBuffer({
         bcid: "code128",
         text: imei,
-        scale: 6,
-        height: 30,
+        scale: 3,
+        height: 15,
         includetext: false,
+        paddingwidth: 5,
+        paddingheight: 2,
+        backgroundcolor: "FFFFFF",
       });
       
       res.set("Content-Type", "image/png");
