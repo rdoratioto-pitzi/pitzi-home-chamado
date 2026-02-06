@@ -145,10 +145,17 @@ export default function ImpressaoEtiquetasPage() {
           grading = codigoErp.slice(-2);
         }
 
-        let triador = "—";
+        let triador = "Aguardando Triagem";
         if (triList && triList.length > 0) {
           const tri = triList[0];
-          triador = tri["Responsável pela triagem"] || tri["Responsavel pela triagem"] || "—";
+          const rawTriador = tri["Responsável pela triagem"] || tri["Responsavel pela triagem"];
+          if (rawTriador && rawTriador.trim() !== "") {
+            triador = rawTriador
+              .toLowerCase()
+              .split(" ")
+              .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ");
+          }
         }
 
         const newDeviceData: DeviceData = {
@@ -219,7 +226,7 @@ export default function ImpressaoEtiquetasPage() {
             flex: 1;
             padding: 2mm;
             font-weight: bold;
-            font-size: 14pt;
+            font-size: 24pt;
             display: flex;
             align-items: center;
             text-align: left;
@@ -509,8 +516,8 @@ export default function ImpressaoEtiquetasPage() {
               style={{ width: "100mm", height: "50mm", scale: "1.5", transformOrigin: "top center", marginBottom: "30mm" }}
               data-testid="label-preview"
             >
-              <div className="flex w-full border-b-2 border-black h-[12mm]">
-                <div className="flex-1 p-2 font-bold text-[14pt] text-black flex items-center text-left leading-tight break-words overflow-hidden">
+              <div className="flex w-full border-b-2 border-black h-[15mm]">
+                <div className="flex-1 p-2 font-bold text-[24pt] text-black flex items-center text-left leading-tight break-words overflow-hidden">
                   {deviceData.deviceDescription}
                 </div>
                 <div className="w-[20mm] bg-black text-white flex items-center justify-center text-[32pt] font-bold">
