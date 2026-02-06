@@ -259,7 +259,7 @@ export default function ImpressaoEtiquetasPage() {
       text-overflow: ellipsis;
     }
     .barcode-area { 
-      margin-top: auto;
+      margin-top: 1.5mm;
       width: 100%;
       display: flex;
       flex-direction: column;
@@ -547,7 +547,7 @@ export default function ImpressaoEtiquetasPage() {
                   <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "4mm", margin: "0.8mm 0", lineHeight: "1.15" }}>Cód: {deviceData.deviceErpCode}</div>
                   <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "4mm", margin: "0.8mm 0", lineHeight: "1.15" }}>Triador: {deviceData.triador}</div>
                   
-                  <div className="flex flex-col items-center w-full mt-auto" style={{ paddingBottom: "1mm" }}>
+                  <div className="flex flex-col items-center w-full" style={{ marginTop: "1.5mm", paddingBottom: "1mm" }}>
                     {barcodeUrl ? (
                       <>
                         <img 
