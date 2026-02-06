@@ -125,18 +125,28 @@ export default function ImpressaoEtiquetasPage() {
       if (orders && orders.length > 0) {
         const order = orders[0];
         
-        const modelName = order.ModelName || order.modelName || order.model_name || order.description || order.Description || "";
-        const storageSize = order.Storage || order.storage || order.capacity || order.Capacity || "";
-        const color = order.Color || order.color || "";
-        const deviceDescription = [modelName, storageSize ? `${storageSize}GB` : "", color].filter(Boolean).join(" ") || "Dispositivo não identificado";
+        const deviceDescription = order["Descrição do dispositivo"] || order["descricao_dispositivo"] || order.ModelName || order.modelName || order.description || order.Description || "";
         
-        const erpCode = order.DeviceErpCode || order.device_erp_code || order.deviceErpCode || order.SKU || order.sku || "XXXXX00";
-        const grading = erpCode.length >= 2 ? erpCode.slice(-2) : "??";
+        const erpCode = order.DeviceErpCode || order.device_erp_code || order.deviceErpCode || order.SKU || order.sku || "";
+        
+        const descParts = deviceDescription.split(" ");
+        let grading = "??";
+        if (erpCode && erpCode.length >= 2) {
+          grading = erpCode.slice(-2);
+        } else if (descParts.length >= 2) {
+          const sizeMatch = deviceDescription.match(/(\d+)\s*GB/i);
+          const colorPart = descParts[descParts.length - 1];
+          if (sizeMatch && colorPart) {
+            grading = sizeMatch[1].slice(-1) + colorPart.charAt(0).toUpperCase();
+          }
+        }
+        
+        const finalErpCode = erpCode || (deviceDescription ? deviceDescription.replace(/\s+/g, "").slice(0, 5).toUpperCase() + grading : "XXXXX00");
         
         const newDeviceData = {
           imei: imei,
-          deviceDescription: deviceDescription.toUpperCase(),
-          deviceErpCode: erpCode,
+          deviceDescription: deviceDescription.toUpperCase() || "DISPOSITIVO NÃO IDENTIFICADO",
+          deviceErpCode: erpCode || "—",
           grading: grading,
         };
         setDeviceData(newDeviceData);
