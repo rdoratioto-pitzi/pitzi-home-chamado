@@ -185,29 +185,13 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Data de Início</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={`w-full justify-start text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
-                            data-testid="input-project-start-date"
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? format(new Date(field.value), "dd/MM/yyyy", { locale: ptBR }) : "Selecionar data"}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value ? new Date(field.value) : undefined}
-                          onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
-                          locale={ptBR}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        data-testid="input-project-start-date"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -218,29 +202,13 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Data Fim</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={`w-full justify-start text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
-                            data-testid="input-project-end-date"
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {field.value ? format(new Date(field.value), "dd/MM/yyyy", { locale: ptBR }) : "Selecionar data"}
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value ? new Date(field.value) : undefined}
-                          onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
-                          locale={ptBR}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        data-testid="input-project-end-date"
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
