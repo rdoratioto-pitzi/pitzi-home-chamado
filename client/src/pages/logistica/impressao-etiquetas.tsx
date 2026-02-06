@@ -241,25 +241,23 @@ export default function ImpressaoEtiquetasPage() {
       font-weight: bold;
     }
     .content-area {
-      padding: 1mm 2mm 0 2mm;
+      padding: 1.5mm 2mm 0 2mm;
       flex: 1;
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      width: 100%;
     }
     .info-line { 
       text-align: left; 
       font-size: 4mm; 
-      margin: 0.8mm 0; 
+      margin: 0.5mm 0; 
       font-weight: bold; 
       color: #000;
-      line-height: 1.15;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      line-height: 1.2;
+      width: 100%;
     }
     .barcode-area { 
-      margin-top: 1.5mm;
+      margin-top: auto;
       width: 100%;
       display: flex;
       flex-direction: column;
@@ -268,7 +266,7 @@ export default function ImpressaoEtiquetasPage() {
     }
     .barcode-area img { 
       width: 85mm;
-      height: 13mm;
+      height: 12mm;
       object-fit: fill;
     }
     .barcode-number {
@@ -542,18 +540,18 @@ export default function ImpressaoEtiquetasPage() {
                   </div>
                 </div>
 
-                <div className="flex-1 flex flex-col overflow-hidden" style={{ padding: "1mm 2mm 0 2mm" }}>
-                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "4mm", margin: "0.8mm 0", lineHeight: "1.15" }}>Marca: {deviceData.marca}</div>
-                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "4mm", margin: "0.8mm 0", lineHeight: "1.15" }}>Cód: {deviceData.deviceErpCode}</div>
-                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "4mm", margin: "0.8mm 0", lineHeight: "1.15" }}>Triador: {deviceData.triador}</div>
+                <div className="flex-1 flex flex-col" style={{ padding: "1.5mm 2mm 0 2mm", width: "100%" }}>
+                  <div className="font-bold text-black text-left" style={{ fontSize: "4mm", margin: "0.5mm 0", lineHeight: "1.2", width: "100%" }}>Marca: {deviceData.marca}</div>
+                  <div className="font-bold text-black text-left" style={{ fontSize: "4mm", margin: "0.5mm 0", lineHeight: "1.2", width: "100%" }}>Cód: {deviceData.deviceErpCode}</div>
+                  <div className="font-bold text-black text-left" style={{ fontSize: "4mm", margin: "0.5mm 0", lineHeight: "1.2", width: "100%" }}>Triador: {deviceData.triador}</div>
                   
-                  <div className="flex flex-col items-center w-full" style={{ marginTop: "1.5mm", paddingBottom: "1mm" }}>
+                  <div className="flex flex-col items-center w-full mt-auto" style={{ paddingBottom: "1mm" }}>
                     {barcodeUrl ? (
                       <>
                         <img 
                           src={barcodeUrl} 
                           alt={`Barcode ${deviceData.imei}`}
-                          style={{ width: "85mm", height: "13mm", objectFit: "fill" }}
+                          style={{ width: "85mm", height: "12mm", objectFit: "fill" }}
                           data-testid="barcode-image"
                         />
                         <div className="text-black font-bold" style={{ fontSize: "4.5mm", marginTop: "0.5mm", letterSpacing: "0.3mm" }}>
