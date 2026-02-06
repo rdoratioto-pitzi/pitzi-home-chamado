@@ -190,32 +190,34 @@ export default function ImpressaoEtiquetasPage() {
         <title>Etiqueta - ${primaryImei}</title>
         <style>
           @page {
-            size: 10cm 5cm;
+            size: 100mm 50mm;
             margin: 0;
           }
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { 
             font-family: Arial, sans-serif; 
-            width: 10cm; 
-            height: 5cm; 
+            width: 100mm; 
+            height: 50mm; 
             background: white;
+            overflow: hidden;
           }
           .label { 
-            width: 10cm; 
-            height: 5cm; 
+            width: 100mm; 
+            height: 50mm; 
             background: white; 
             display: flex;
             flex-direction: column;
+            overflow: hidden;
           }
           .header-row {
             display: flex;
             width: 100%;
-            min-height: 1.2cm;
-            border-bottom: 1px solid #000;
+            height: 12mm;
+            border-bottom: 2px solid #000;
           }
           .description-box {
             flex: 1;
-            padding: 5px;
+            padding: 2mm;
             font-weight: bold;
             font-size: 14pt;
             display: flex;
@@ -223,9 +225,10 @@ export default function ImpressaoEtiquetasPage() {
             text-align: left;
             word-wrap: break-word;
             overflow: hidden;
+            line-height: 1.1;
           }
           .grading-box {
-            width: 1.8cm;
+            width: 20mm;
             background: black;
             color: white;
             display: flex;
@@ -235,30 +238,39 @@ export default function ImpressaoEtiquetasPage() {
             font-weight: bold;
           }
           .content-area {
-            padding: 0.2cm 0.3cm;
+            padding: 2mm 4mm;
             flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
           }
-          .info-large { text-align: left; font-size: 24pt; margin: 0.1cm 0; font-weight: bold; color: #000000; }
+          .info-large { 
+            text-align: left; 
+            font-size: 24pt; 
+            margin: 1mm 0; 
+            font-weight: bold; 
+            color: #000000;
+            line-height: 1;
+          }
           .barcode-container { 
             text-align: center; 
-            margin-top: 0cm;
+            margin-top: auto;
             width: 100%;
-            height: 2.5cm;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
+            padding-bottom: 2mm;
           }
           .barcode-container img { 
-            width: 100%;
-            height: 2.1cm;
+            width: 90mm;
+            height: 18mm;
             object-fit: fill;
           }
           .barcode-value {
             font-size: 24pt;
             font-weight: bold;
             color: #000000;
-            margin-top: -4px;
+            margin-top: 1mm;
             letter-spacing: 0;
           }
         </style>
@@ -281,25 +293,22 @@ export default function ImpressaoEtiquetasPage() {
         </div>
         <script>
           const img = document.getElementById('barcode-img');
-          if (img.complete) {
+          function doPrint() {
             window.print();
             setTimeout(() => window.close(), 500);
+          }
+          if (img.complete) {
+            doPrint();
           } else {
-            img.onload = function() {
-              window.print();
-              setTimeout(() => window.close(), 500);
-            };
-            img.onerror = function() {
-              window.print();
-              setTimeout(() => window.close(), 500);
-            };
+            img.onload = doPrint;
+            img.onerror = doPrint;
           }
         </script>
       </body>
       </html>
     `;
 
-    const printWindow = window.open("", "_blank", "width=400,height=250");
+    const printWindow = window.open("", "_blank", "width=800,height=400");
     if (printWindow) {
       printWindow.document.write(printContent);
       printWindow.document.close();
@@ -496,35 +505,35 @@ export default function ImpressaoEtiquetasPage() {
             </Button>
 
             <div 
-              className="border-2 border-gray-300 rounded-lg bg-white relative overflow-hidden flex flex-col"
-              style={{ minHeight: "400px", width: "100%" }}
+              className="border-2 border-gray-300 rounded-lg bg-white relative overflow-hidden flex flex-col mx-auto"
+              style={{ width: "100mm", height: "50mm", scale: "1.5", transformOrigin: "top center", marginBottom: "30mm" }}
               data-testid="label-preview"
             >
-              <div className="flex w-full border-b border-black min-h-[60px]">
-                <div className="flex-1 p-2 font-bold text-2xl text-black flex items-center text-left leading-tight break-words">
+              <div className="flex w-full border-b-2 border-black h-[12mm]">
+                <div className="flex-1 p-2 font-bold text-[14pt] text-black flex items-center text-left leading-tight break-words overflow-hidden">
                   {deviceData.deviceDescription}
                 </div>
-                <div className="w-[80px] bg-black text-white flex items-center justify-center text-5xl font-bold">
+                <div className="w-[20mm] bg-black text-white flex items-center justify-center text-[32pt] font-bold">
                   {deviceData.grading}
                 </div>
               </div>
 
-              <div className="flex-1 p-4 text-left text-black font-bold space-y-2" style={{ fontSize: "24pt" }}>
-                <p>Marca: {deviceData.marca}</p>
-                <p>Cód: {deviceData.deviceErpCode}</p>
-                <p>Triador: {deviceData.triador}</p>
+              <div className="flex-1 p-[2mm_4mm] text-left text-black font-bold flex flex-col justify-start">
+                <p style={{ fontSize: "24pt", lineHeight: "1.1", margin: "1mm 0" }}>Marca: {deviceData.marca}</p>
+                <p style={{ fontSize: "24pt", lineHeight: "1.1", margin: "1mm 0" }}>Cód: {deviceData.deviceErpCode}</p>
+                <p style={{ fontSize: "24pt", lineHeight: "1.1", margin: "1mm 0" }}>Triador: {deviceData.triador}</p>
                 
-                <div className="flex flex-col items-center w-full mt-2">
+                <div className="flex flex-col items-center w-full mt-auto pb-[2mm]">
                   {barcodeUrl ? (
                     <>
                       <img 
                         src={barcodeUrl} 
                         alt={`Barcode ${deviceData.imei}`}
-                        className="w-full h-auto"
-                        style={{ height: "140px", objectFit: "fill" }}
+                        className="w-[90mm] h-[18mm]"
+                        style={{ objectFit: "fill" }}
                         data-testid="barcode-image"
                       />
-                      <div className="text-black mt-1 tracking-tight font-bold" style={{ fontSize: "24pt" }}>
+                      <div className="text-black mt-[1mm] tracking-tight font-bold" style={{ fontSize: "24pt" }}>
                         {deviceData.imei.split("/")[0].trim()}
                       </div>
                     </>
