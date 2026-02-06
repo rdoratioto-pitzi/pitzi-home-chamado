@@ -567,6 +567,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                         <FormControl>
                           <Input
                             type="date"
+                            onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
                             {...field}
                           />
                         </FormControl>
@@ -584,6 +585,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                         <FormControl>
                           <Input
                             type="date"
+                            onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
                             {...field}
                           />
                         </FormControl>
