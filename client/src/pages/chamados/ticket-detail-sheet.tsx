@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2, Edit2, Check, X, Video } from "lucide-react";
-import type { Ticket, TicketComment, User } from "@shared/schema";
+import type { Ticket, TicketComment, User, Setting } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
@@ -207,6 +207,55 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     if (comment.trim() || commentImages.length > 0) {
       commentMutation.mutate({ content: comment, images: commentImages });
     }
+  };
+
+  const { data: categoriesSetting } = useQuery<Setting>({
+    queryKey: ["/api/settings", "ticket_categories"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/ticket_categories");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  const { data: typesSetting } = useQuery<Setting>({
+    queryKey: ["/api/settings", "ticket_types"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/ticket_types");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  const categories: { value: string; label: string }[] = categoriesSetting?.value 
+    ? JSON.parse(categoriesSetting.value) 
+    : [
+        { value: "ti", label: "TI / Infraestrutura" },
+        { value: "rh", label: "Recursos Humanos" },
+        { value: "financeiro", label: "Financeiro" },
+        { value: "operacoes", label: "Operações" },
+        { value: "comercial", label: "Comercial" },
+        { value: "outros", label: "Outros" },
+      ];
+
+  const types: { value: string; label: string }[] = typesSetting?.value 
+    ? JSON.parse(typesSetting.value) 
+    : [
+        { value: "bug", label: "Bug" },
+        { value: "melhoria", label: "Melhoria" },
+        { value: "negocio", label: "Negócio" },
+      ];
+
+  const handleCategoryChange = (category: string) => {
+    updateMutation.mutate({ category });
+  };
+
+  const handleTypeChange = (type: string) => {
+    updateMutation.mutate({ type });
+  };
+
+  const handlePriorityChange = (priority: string) => {
+    updateMutation.mutate({ priority });
   };
 
   if (!ticket) return null;
@@ -420,22 +469,76 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             </div>
           </div>
 
-          <div>
-            <h4 className="text-sm font-medium mb-2">Responsável</h4>
-            <Select 
-              value={ticket.assigneeId || "none"} 
-              onValueChange={handleAssigneeChange}
-            >
-              <SelectTrigger className="w-full" data-testid="select-change-assignee">
-                <SelectValue placeholder="Selecione um responsável" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Não atribuído</SelectItem>
-                {users.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h4 className="text-sm font-medium mb-2">Categoria</h4>
+              <Select 
+                value={ticket.category} 
+                onValueChange={handleCategoryChange}
+              >
+                <SelectTrigger className="w-full" data-testid="select-change-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium mb-2">Tipo</h4>
+              <Select 
+                value={ticket.type} 
+                onValueChange={handleTypeChange}
+              >
+                <SelectTrigger className="w-full" data-testid="select-change-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {types.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h4 className="text-sm font-medium mb-2">Prioridade</h4>
+              <Select 
+                value={ticket.priority} 
+                onValueChange={handlePriorityChange}
+              >
+                <SelectTrigger className="w-full" data-testid="select-change-priority">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Baixa</SelectItem>
+                  <SelectItem value="medium">Média</SelectItem>
+                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="critical">Crítica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium mb-2">Responsável</h4>
+              <Select 
+                value={ticket.assigneeId || "none"} 
+                onValueChange={handleAssigneeChange}
+              >
+                <SelectTrigger className="w-full" data-testid="select-change-assignee">
+                  <SelectValue placeholder="Selecione um responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Não atribuído</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div>

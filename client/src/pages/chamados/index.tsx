@@ -35,7 +35,9 @@ import {
   Trello,
   MoreHorizontal,
   Edit,
-  Trash2
+  Trash2,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -51,6 +53,12 @@ import { TicketDialog } from "./ticket-dialog";
 import { TicketDetailSheet } from "./ticket-detail-sheet";
 import { TicketKanban } from "./ticket-kanban";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const priorityColors: Record<string, string> = {
   low: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700",
@@ -228,6 +236,9 @@ const getSlaForTicket = (
   };
 };
 
+type SortField = "code" | "title" | "category" | "priority" | "status" | "createdAt";
+type SortOrder = "asc" | "desc";
+
 export default function ChamadosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -237,7 +248,8 @@ export default function ChamadosPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [slaFilter, setSlaFilter] = useState<string>("all");
-  const [dateSortAsc, setDateSortAsc] = useState(false);
+  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid">("list");
 
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
@@ -253,6 +265,15 @@ export default function ChamadosPage() {
   });
 
   const { toast } = useToast();
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortOrder("asc");
+    }
+  };
 
   const deleteTicketMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -286,9 +307,20 @@ export default function ChamadosPage() {
       return matchesSearch && matchesStatus && matchesPriority && matchesType && matchesAssignee && matchesSla;
     })
     .sort((a, b) => {
-      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return dateSortAsc ? dateA - dateB : dateB - dateA;
+      let valA: any = a[sortField as keyof Ticket];
+      let valB: any = b[sortField as keyof Ticket];
+
+      if (sortField === "createdAt") {
+        valA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        valB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      }
+
+      if (valA === null || valA === undefined) valA = "";
+      if (valB === null || valB === undefined) valB = "";
+
+      if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+      if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+      return 0;
     });
 
   const getUser = (userId: string | null) => users.find(u => u.id === userId);
@@ -589,29 +621,75 @@ export default function ChamadosPage() {
                 onTicketClick={setSelectedTicket}
               />
             ) : (
-              <Table>
+              <Table className="border-collapse">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px] text-[12px] font-bold uppercase tracking-wider">Código</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Título</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Categoria</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tipo</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Responsável</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Status</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Prioridade</TableHead>
+                    <TableHead className="w-[100px] text-[12px] font-bold uppercase tracking-wider">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        onClick={() => handleSort("code")}
+                      >
+                        Código
+                        {sortField === "code" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider min-w-[250px]">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        onClick={() => handleSort("title")}
+                      >
+                        Título
+                        {sortField === "title" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDateSortAsc(!dateSortAsc);
-                        }}
-                        data-testid="button-sort-date"
+                        onClick={() => handleSort("category")}
+                      >
+                        Categoria
+                        {sortField === "category" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tipo</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Responsável</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        onClick={() => handleSort("status")}
+                      >
+                        Status
+                        {sortField === "status" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        onClick={() => handleSort("priority")}
+                      >
+                        Prioridade
+                        {sortField === "priority" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        onClick={() => handleSort("createdAt")}
                       >
                         Abertura
-                        <ArrowUpDown className="h-3 w-3" />
+                        {sortField === "createdAt" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                       </Button>
                     </TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tempo Aberto</TableHead>
@@ -621,127 +699,138 @@ export default function ChamadosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTickets.map((ticket) => {
-                    return (
-                      <TableRow 
-                        key={ticket.id} 
-                        className="cursor-pointer hover:bg-muted/30 transition-colors"
-                        onClick={() => setSelectedTicket(ticket)}
-                        data-testid={`row-ticket-${ticket.id}`}
-                      >
-                        <TableCell>
-                          <Badge variant="outline" className="font-mono text-[11px] font-bold">
-                            {ticket.code}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-bold text-[13px] max-w-[200px] truncate">
-                          {ticket.title}
-                        </TableCell>
-                        <TableCell className="text-[13px] text-muted-foreground">{ticket.category}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={`${getTypeColor(ticket.type || "bug")} text-[10px] font-bold uppercase tracking-wider`}>
-                            {ticket.type || "Bug"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-[13px]">
-                          {ticket.assigneeId ? (
-                            <span className="font-medium">
-                              {users.find(u => u.id === ticket.assigneeId)?.name || "—"}
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">Não atribuído</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={`${statusColors[ticket.status]} text-[10px] font-bold uppercase tracking-wider`}>
-                            {statusLabels[ticket.status]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={`${priorityColors[ticket.priority]} text-[10px] font-bold uppercase tracking-wider`}>
-                            {priorityLabels[ticket.priority]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-[12px] text-muted-foreground">
-                          {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "-"}
-                        </TableCell>
-                        <TableCell>
-                          {(() => {
-                            const timeOpen = calculateTimeOpen(ticket.createdAt);
-                            return (
-                              <span className={`text-[12px] font-medium ${timeOpen.colorClass}`}>
-                                {timeOpen.text}
+                  <TooltipProvider>
+                    {filteredTickets.map((ticket) => {
+                      return (
+                        <TableRow 
+                          key={ticket.id} 
+                          className="cursor-pointer hover:bg-muted/30 transition-colors"
+                          onClick={() => setSelectedTicket(ticket)}
+                          data-testid={`row-ticket-${ticket.id}`}
+                        >
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono text-[11px] font-bold">
+                              {ticket.code}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-bold text-[13px] max-w-[300px]">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="truncate cursor-help">
+                                  {ticket.title}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-md p-3">
+                                <p className="text-sm font-medium">{ticket.title}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TableCell>
+                          <TableCell className="text-[13px] text-muted-foreground">{ticket.category}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`${getTypeColor(ticket.type || "bug")} text-[10px] font-bold uppercase tracking-wider`}>
+                              {ticket.type || "Bug"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-[13px]">
+                            {ticket.assigneeId ? (
+                              <span className="font-medium">
+                                {users.find(u => u.id === ticket.assigneeId)?.name || "—"}
                               </span>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell>
-                          {(() => {
-                            const slaInfo = getSlaForTicket(ticket, slaRules);
-                            if (slaInfo.slaHoras === null) {
-                              return <span className="text-[12px] text-muted-foreground">—</span>;
-                            }
-                            return (
-                              <span className="text-[12px] font-medium">
-                                {slaInfo.slaHoras}h
-                              </span>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell>
-                          {(() => {
-                            const slaInfo = getSlaForTicket(ticket, slaRules);
-                            if (slaInfo.status === null) {
-                              return <span className="text-[12px] text-muted-foreground">—</span>;
-                            }
-                            return slaInfo.status === "dentro_prazo" ? (
-                              <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider">
-                                Dentro do Prazo
-                              </Badge>
                             ) : (
-                              <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider">
-                                Em Atraso
-                              </Badge>
-                            );
-                          })()}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                className="h-7 w-7" 
-                                onClick={(e) => e.stopPropagation()}
-                                data-testid={`button-ticket-menu-${ticket.id}`}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedTicket(ticket);
-                              }}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                className="text-destructive"
-                                onClick={(e) => {
+                              <span className="text-muted-foreground">Não atribuído</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`${statusColors[ticket.status]} text-[10px] font-bold uppercase tracking-wider`}>
+                              {statusLabels[ticket.status]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`${priorityColors[ticket.priority]} text-[10px] font-bold uppercase tracking-wider`}>
+                              {priorityLabels[ticket.priority]}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-[12px] text-muted-foreground">
+                            {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "-"}
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const timeOpen = calculateTimeOpen(ticket.createdAt);
+                              return (
+                                <span className={`text-[12px] font-medium ${timeOpen.colorClass}`}>
+                                  {timeOpen.text}
+                                </span>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const slaInfo = getSlaForTicket(ticket, slaRules);
+                              if (slaInfo.slaHoras === null) {
+                                return <span className="text-[12px] text-muted-foreground">—</span>;
+                              }
+                              return (
+                                <span className="text-[12px] font-medium">
+                                  {slaInfo.slaHoras}h
+                                </span>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>
+                            {(() => {
+                              const slaInfo = getSlaForTicket(ticket, slaRules);
+                              if (slaInfo.status === null) {
+                                return <span className="text-[12px] text-muted-foreground">—</span>;
+                              }
+                              return slaInfo.status === "dentro_prazo" ? (
+                                <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider">
+                                  Dentro do Prazo
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider">
+                                  Em Atraso
+                                </Badge>
+                              );
+                            })()}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7" 
+                                  onClick={(e) => e.stopPropagation()}
+                                  data-testid={`button-ticket-menu-${ticket.id}`}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation();
-                                  deleteTicketMutation.mutate(ticket.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
+                                  setSelectedTicket(ticket);
+                                }}>
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  className="text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteTicketMutation.mutate(ticket.id);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TooltipProvider>
                 </TableBody>
               </Table>
             )}
