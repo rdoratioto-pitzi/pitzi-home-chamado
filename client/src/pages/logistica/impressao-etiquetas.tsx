@@ -208,40 +208,40 @@ export default function ImpressaoEtiquetasPage() {
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      padding: 0.5mm;
     }
     .header-row {
       display: flex;
       width: 100%;
-      height: 11mm;
-      min-height: 11mm;
-      max-height: 11mm;
+      height: 14mm;
+      min-height: 14mm;
+      max-height: 14mm;
       border-bottom: 0.5mm solid #000;
-      padding-top: 1mm;
     }
     .description-box {
       flex: 1;
       padding: 1mm 2mm;
       font-weight: bold;
-      font-size: 3.5mm;
+      font-size: 24pt;
       display: flex;
       align-items: center;
       text-align: left;
       overflow: hidden;
-      line-height: 1.15;
+      line-height: 1.1;
     }
     .grading-box {
-      width: 14mm;
-      min-width: 14mm;
+      width: 18mm;
+      min-width: 18mm;
       background: black;
       color: white;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 8mm;
+      font-size: 32pt;
       font-weight: bold;
     }
     .content-area {
-      padding: 1mm 2mm 0 2mm;
+      padding: 2mm 2mm 0 2mm;
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -249,11 +249,11 @@ export default function ImpressaoEtiquetasPage() {
     }
     .info-line { 
       text-align: left; 
-      font-size: 3mm; 
-      margin: 0.5mm 0; 
+      font-size: 22pt; 
+      margin: 1mm 0; 
       font-weight: bold; 
       color: #000;
-      line-height: 1.15;
+      line-height: 1.1;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -267,16 +267,16 @@ export default function ImpressaoEtiquetasPage() {
       padding-bottom: 1mm;
     }
     .barcode-area img { 
-      width: 80mm;
-      height: 12mm;
+      width: 85mm;
+      height: 14mm;
       object-fit: fill;
     }
     .barcode-number {
-      font-size: 3mm;
+      font-size: 24pt;
       font-weight: bold;
       color: #000;
-      margin-top: 0.5mm;
-      letter-spacing: 0.3mm;
+      margin-top: 1mm;
+      letter-spacing: 0.5mm;
     }
   `;
 
@@ -531,21 +531,21 @@ export default function ImpressaoEtiquetasPage() {
             >
               <div 
                 className="bg-white flex flex-col overflow-hidden border border-gray-300"
-                style={{ width: "100mm", height: "50mm" }}
+                style={{ width: "100mm", height: "50mm", padding: "0.5mm" }}
               >
-                <div className="flex" style={{ width: "100%", height: "11mm", minHeight: "11mm", maxHeight: "11mm", borderBottom: "0.5mm solid #000", paddingTop: "1mm" }}>
-                  <div className="flex-1 font-bold text-black flex items-center text-left overflow-hidden" style={{ padding: "1mm 2mm", fontSize: "3.5mm", lineHeight: "1.15" }}>
+                <div className="flex" style={{ width: "100%", height: "14mm", minHeight: "14mm", maxHeight: "14mm", borderBottom: "0.5mm solid #000" }}>
+                  <div className="flex-1 font-bold text-black flex items-center text-left overflow-hidden" style={{ padding: "1mm 2mm", fontSize: "24pt", lineHeight: "1.1" }}>
                     {deviceData.deviceDescription}
                   </div>
-                  <div className="bg-black text-white flex items-center justify-center font-bold" style={{ width: "14mm", minWidth: "14mm", fontSize: "8mm" }}>
+                  <div className="bg-black text-white flex items-center justify-center font-bold" style={{ width: "18mm", minWidth: "18mm", fontSize: "32pt" }}>
                     {deviceData.grading}
                   </div>
                 </div>
 
-                <div className="flex-1 flex flex-col overflow-hidden" style={{ padding: "1mm 2mm 0 2mm" }}>
-                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "3mm", margin: "0.5mm 0", lineHeight: "1.15" }}>Marca: {deviceData.marca}</div>
-                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "3mm", margin: "0.5mm 0", lineHeight: "1.15" }}>Cód: {deviceData.deviceErpCode}</div>
-                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "3mm", margin: "0.5mm 0", lineHeight: "1.15" }}>Triador: {deviceData.triador}</div>
+                <div className="flex-1 flex flex-col overflow-hidden" style={{ padding: "2mm 2mm 0 2mm" }}>
+                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "22pt", margin: "1mm 0", lineHeight: "1.1" }}>Marca: {deviceData.marca}</div>
+                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "22pt", margin: "1mm 0", lineHeight: "1.1" }}>Cód: {deviceData.deviceErpCode}</div>
+                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "22pt", margin: "1mm 0", lineHeight: "1.1" }}>Triador: {deviceData.triador}</div>
                   
                   <div className="flex flex-col items-center w-full mt-auto" style={{ paddingBottom: "1mm" }}>
                     {barcodeUrl ? (
@@ -553,15 +553,15 @@ export default function ImpressaoEtiquetasPage() {
                         <img 
                           src={barcodeUrl} 
                           alt={`Barcode ${deviceData.imei}`}
-                          style={{ width: "80mm", height: "12mm", objectFit: "fill" }}
+                          style={{ width: "85mm", height: "14mm", objectFit: "fill" }}
                           data-testid="barcode-image"
                         />
-                        <div className="text-black font-bold" style={{ fontSize: "3mm", marginTop: "0.5mm", letterSpacing: "0.3mm" }}>
+                        <div className="text-black font-bold" style={{ fontSize: "24pt", marginTop: "1mm", letterSpacing: "0.5mm" }}>
                           {deviceData.imei.split("/")[0].trim()}
                         </div>
                       </>
                     ) : (
-                      <div className="w-full bg-gray-100 animate-pulse rounded" style={{ height: "12mm" }} />
+                      <div className="w-full bg-gray-100 animate-pulse rounded" style={{ height: "14mm" }} />
                     )}
                   </div>
                 </div>
