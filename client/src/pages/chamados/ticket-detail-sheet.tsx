@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2, Edit2, Check, X, Video } from "lucide-react";
+import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2, Edit2, Check, X, Video, FileText, FileSpreadsheet, File, Download } from "lucide-react";
 import type { Ticket, TicketComment, User, Setting } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -378,47 +378,80 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             )}
             
             {ticket.attachments && (
-              <div className="grid grid-cols-2 gap-2 mt-2">
+              <div className="space-y-2 mt-2">
                 {(() => {
                   try {
                     const attachments = JSON.parse(ticket.attachments);
                     if (Array.isArray(attachments)) {
-                      return attachments.map((url, i) => {
+                      return attachments.map((url: string, i: number) => {
                         const isVideo = url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
-                        return (
-                          <Dialog key={i}>
-                            <DialogTrigger asChild>
-                              <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer">
-                                {isVideo ? (
-                                  <video src={url} className="max-w-full max-h-full object-contain" />
-                                ) : (
-                                  <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
-                                )}
-                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  {isVideo ? <Video className="h-6 w-6 text-white" /> : <Maximize2 className="h-6 w-6 text-white" />}
-                                </div>
-                                {isVideo && (
-                                  <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded-md">
-                                    <Video className="h-3 w-3" />
+                        const isImage = url.startsWith("data:image/") || url.endsWith(".jpg") || url.endsWith(".jpeg") || url.endsWith(".png") || url.endsWith(".gif") || url.endsWith(".webp");
+                        const isPdf = url.startsWith("data:application/pdf") || url.endsWith(".pdf");
+                        const isExcel = url.startsWith("data:application/vnd.ms-excel") || url.startsWith("data:application/vnd.openxmlformats-officedocument.spreadsheet") || url.startsWith("data:text/csv") || url.endsWith(".xlsx") || url.endsWith(".xls") || url.endsWith(".csv");
+                        
+                        if (isImage || isVideo) {
+                          return (
+                            <Dialog key={i}>
+                              <DialogTrigger asChild>
+                                <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer" style={{ maxHeight: "200px" }} data-testid={`attachment-media-${i}`}>
+                                  {isVideo ? (
+                                    <video src={url} className="max-w-full max-h-full object-contain" />
+                                  ) : (
+                                    <img src={url} alt="Anexo" className="max-w-full max-h-full object-contain" />
+                                  )}
+                                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    {isVideo ? <Video className="h-6 w-6 text-white" /> : <Maximize2 className="h-6 w-6 text-white" />}
                                   </div>
+                                  {isVideo && (
+                                    <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded-md">
+                                      <Video className="h-3 w-3" />
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                                <VisuallyHidden>
+                                  <DialogTitle>Visualização de {isVideo ? "Vídeo" : "Imagem"}</DialogTitle>
+                                </VisuallyHidden>
+                                {isVideo ? (
+                                  <video src={url} controls autoPlay className="max-w-full max-h-full" />
+                                ) : (
+                                  <img src={url} alt="Preview" className="max-w-full max-h-full object-contain" />
                                 )}
-                              </div>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
-                              <VisuallyHidden>
-                                <DialogTitle>Visualização de {isVideo ? "Vídeo" : "Imagem"}</DialogTitle>
-                              </VisuallyHidden>
-                              {isVideo ? (
-                                <video src={url} controls autoPlay className="max-w-full max-h-full" />
-                              ) : (
-                                <img 
-                                  src={url} 
-                                  alt="Preview" 
-                                  className="max-w-full max-h-full object-contain" 
-                                />
-                              )}
-                            </DialogContent>
-                          </Dialog>
+                              </DialogContent>
+                            </Dialog>
+                          );
+                        }
+
+                        const getFileName = () => {
+                          const mimeMatch = url.match(/^data:([^;]+);/);
+                          if (mimeMatch) {
+                            const extMap: Record<string, string> = { "application/pdf": "pdf", "application/vnd.ms-excel": "xls", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx", "text/csv": "csv", "application/msword": "doc", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx" };
+                            const ext = extMap[mimeMatch[1]] || mimeMatch[1].split("/")[1] || "arquivo";
+                            return `Arquivo_${i + 1}.${ext}`;
+                          }
+                          return `Arquivo_${i + 1}`;
+                        };
+
+                        const handleOpen = () => {
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = getFileName();
+                          link.target = "_blank";
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        };
+
+                        return (
+                          <div key={i} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 cursor-pointer hover-elevate" onClick={handleOpen} data-testid={`attachment-file-${i}`}>
+                            {isPdf ? <FileText className="h-6 w-6 text-red-500" /> : isExcel ? <FileSpreadsheet className="h-6 w-6 text-green-600" /> : <File className="h-6 w-6 text-muted-foreground" />}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{getFileName()}</p>
+                              <p className="text-[10px] text-muted-foreground uppercase">{isPdf ? "PDF" : isExcel ? "Planilha" : "Arquivo"}</p>
+                            </div>
+                            <Download className="h-4 w-4 text-muted-foreground" />
+                          </div>
                         );
                       });
                     }

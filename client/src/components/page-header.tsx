@@ -1,5 +1,6 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "./theme-toggle";
+import { NotificationBell } from "./notification-bell";
 import { Separator } from "@/components/ui/separator";
 import {
   Breadcrumb,
@@ -55,6 +56,7 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
         <div className="flex items-center gap-3">
           {actions}
           <div className="h-8 w-px bg-border/40 mx-1" />
+          <NotificationBell />
           <ThemeToggle />
         </div>
       </div>

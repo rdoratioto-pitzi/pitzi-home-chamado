@@ -907,3 +907,22 @@ export const aiMessages = pgTable("ai_messages", {
 export const insertAiMessageSchema = createInsertSchema(aiMessages).omit({ id: true, createdAt: true });
 export type InsertAiMessage = z.infer<typeof insertAiMessageSchema>;
 export type AiMessage = typeof aiMessages.$inferSelect;
+
+// ============== NOTIFICATIONS ==============
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  userId: varchar("user_id").notNull(),
+  fromUserId: varchar("from_user_id"),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  module: text("module").notNull(),
+  entityId: varchar("entity_id"),
+  linkUrl: text("link_url").notNull(),
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;

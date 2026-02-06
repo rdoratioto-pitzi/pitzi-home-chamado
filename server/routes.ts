@@ -424,6 +424,15 @@ export async function registerRoutes(
                 ticket.id,
                 validated.content
               ).catch(console.error);
+              storage.createNotification({
+                userId: mentionedUser.id,
+                fromUserId: commenter.id,
+                title: "Menção em chamado",
+                message: `${commenter.name} mencionou você em um comentário no chamado "${ticket.title}"`,
+                module: "chamados",
+                entityId: ticket.id,
+                linkUrl: `/chamados`,
+              }).catch(console.error);
             }
           }
         }
@@ -668,6 +677,15 @@ export async function registerRoutes(
               card.id,
               validated.content
             ).catch(console.error);
+            storage.createNotification({
+              userId: mentionedUser.id,
+              fromUserId: author.id,
+              title: "Menção em card",
+              message: `${author.name} mencionou você em um comentário no card "${card.title}"`,
+              module: "projetos",
+              entityId: card.projectId,
+              linkUrl: `/projetos`,
+            }).catch(console.error);
           }
         }
       }
@@ -1263,6 +1281,15 @@ export async function registerRoutes(
               task.id,
               validated.content
             ).catch(console.error);
+            storage.createNotification({
+              userId: mentionedUser.id,
+              fromUserId: author.id,
+              title: "Menção em tarefa",
+              message: `${author.name} mencionou você em um comentário na tarefa "${task.title}"`,
+              module: "tarefas",
+              entityId: task.id,
+              linkUrl: `/tarefas`,
+            }).catch(console.error);
           }
         }
       }
@@ -3406,6 +3433,48 @@ export async function registerRoutes(
         res.write(`data: ${JSON.stringify({ type: "error", error: error.message })}\n\n`);
         res.end();
       }
+    }
+  });
+
+  // ============== NOTIFICATIONS ==============
+  app.get("/api/notifications/:userId", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const notifs = await storage.getNotifications(userId);
+      res.json(notifs);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/notifications/:userId/unread-count", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const count = await storage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const notif = await storage.markNotificationRead(id);
+      if (!notif) return res.status(404).json({ error: "Notification not found" });
+      res.json(notif);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/notifications/:userId/read-all", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.markAllNotificationsRead(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 

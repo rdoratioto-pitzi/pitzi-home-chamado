@@ -1,0 +1,146 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Bell, Check, CheckCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
+import type { Notification } from "@shared/schema";
+
+function getCurrentUser() {
+  const stored = localStorage.getItem("currentUser");
+  if (!stored) return null;
+  try { return JSON.parse(stored); } catch { return null; }
+}
+
+function timeAgo(date: string | Date) {
+  const now = new Date();
+  const d = new Date(date);
+  const diffMs = now.getTime() - d.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "agora";
+  if (diffMin < 60) return `${diffMin}min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `${diffH}h`;
+  const diffD = Math.floor(diffH / 24);
+  return `${diffD}d`;
+}
+
+export function NotificationBell() {
+  const user = getCurrentUser();
+  const [open, setOpen] = useState(false);
+  const [, navigate] = useLocation();
+
+  const { data: notifications = [] } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications", user?.id],
+    enabled: !!user?.id,
+    refetchInterval: 30000,
+  });
+
+  const { data: unreadData } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications", user?.id, "unread-count"],
+    enabled: !!user?.id,
+    refetchInterval: 15000,
+  });
+
+  const markRead = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/notifications/${id}/read`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications", user?.id] });
+    },
+  });
+
+  const markAllRead = useMutation({
+    mutationFn: async () => {
+      await apiRequest("PATCH", `/api/notifications/${user?.id}/read-all`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications", user?.id] });
+    },
+  });
+
+  const unreadCount = unreadData?.count || 0;
+
+  const handleNotificationClick = (notif: Notification) => {
+    if (!notif.isRead) {
+      markRead.mutate(notif.id);
+    }
+    if (notif.linkUrl) {
+      navigate(notif.linkUrl);
+    }
+    setOpen(false);
+  };
+
+  if (!user) return null;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button size="icon" variant="ghost" className="relative" data-testid="button-notifications">
+          <Bell className="h-4 w-4" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="end">
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b">
+          <h4 className="text-sm font-semibold">Notificações</h4>
+          {unreadCount > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-xs h-7 px-2"
+              onClick={() => markAllRead.mutate()}
+              data-testid="button-mark-all-read"
+            >
+              <CheckCheck className="h-3 w-3 mr-1" />
+              Marcar todas como lidas
+            </Button>
+          )}
+        </div>
+        <ScrollArea className="max-h-80">
+          {notifications.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+              <Bell className="h-8 w-8 mb-2 opacity-30" />
+              <p className="text-sm">Nenhuma notificação</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {notifications.map((notif) => (
+                <button
+                  key={notif.id}
+                  onClick={() => handleNotificationClick(notif)}
+                  className={`w-full text-left px-4 py-3 hover-elevate transition-colors ${
+                    !notif.isRead ? "bg-primary/5" : ""
+                  }`}
+                  data-testid={`notification-item-${notif.id}`}
+                >
+                  <div className="flex items-start gap-2">
+                    {!notif.isRead && (
+                      <span className="mt-1.5 h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{notif.title}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-1">{timeAgo(notif.createdAt!)}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}

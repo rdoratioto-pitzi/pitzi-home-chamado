@@ -297,17 +297,6 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                 </Badge>
               )}
             </div>
-            {cardId && !readOnly && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-destructive hover:bg-destructive/10"
-                onClick={() => deleteMutation.mutate()}
-                data-testid="button-delete-card"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
           </div>
           <DialogDescription>
             {readOnly 
@@ -696,22 +685,41 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
             </ScrollArea>
 
             <DialogFooter className="p-6 border-t bg-muted/20">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => onOpenChange(false)}
-              >
-                {readOnly ? "Fechar" : "Cancelar"}
-              </Button>
-              {!readOnly && (
-                <Button 
-                  type="submit" 
-                  disabled={mutation.isPending}
-                  data-testid="button-submit-card"
-                >
-                  {mutation.isPending ? "Salvando..." : (cardId ? "Salvar Alterações" : "Criar Card")}
-                </Button>
-              )}
+              <div className="flex items-center justify-between w-full">
+                <div>
+                  {cardId && !readOnly && (
+                    <Button 
+                      type="button"
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-destructive"
+                      onClick={() => deleteMutation.mutate()}
+                      data-testid="button-delete-card"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Excluir Card
+                    </Button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => onOpenChange(false)}
+                  >
+                    {readOnly ? "Fechar" : "Cancelar"}
+                  </Button>
+                  {!readOnly && (
+                    <Button 
+                      type="submit" 
+                      disabled={mutation.isPending}
+                      data-testid="button-submit-card"
+                    >
+                      {mutation.isPending ? "Salvando..." : (cardId ? "Salvar Alterações" : "Criar Card")}
+                    </Button>
+                  )}
+                </div>
+              </div>
             </DialogFooter>
           </form>
         </Form>

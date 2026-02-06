@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, X, Loader2, Maximize2, Video, FileText } from "lucide-react";
+import { ImageIcon, X, Loader2, Maximize2, Video, FileText, Paperclip, FileSpreadsheet, File, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -23,6 +23,53 @@ interface RichTextareaProps {
   "data-testid"?: string;
 }
 
+function getFileTypeFromDataUrl(url: string): "image" | "video" | "pdf" | "excel" | "document" | "other" {
+  if (url.startsWith("data:image/")) return "image";
+  if (url.startsWith("data:video/")) return "video";
+  if (url.startsWith("data:application/pdf")) return "pdf";
+  if (url.startsWith("data:application/vnd.ms-excel") || 
+      url.startsWith("data:application/vnd.openxmlformats-officedocument.spreadsheet") ||
+      url.startsWith("data:text/csv")) return "excel";
+  if (url.startsWith("data:application/vnd.openxmlformats-officedocument.wordprocessing") ||
+      url.startsWith("data:application/msword")) return "document";
+  if (url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg")) return "video";
+  if (url.endsWith(".pdf")) return "pdf";
+  if (url.endsWith(".xlsx") || url.endsWith(".xls") || url.endsWith(".csv")) return "excel";
+  return "other";
+}
+
+function getFileNameFromDataUrl(url: string, index: number): string {
+  const mimeMatch = url.match(/^data:([^;]+);/);
+  if (mimeMatch) {
+    const mime = mimeMatch[1];
+    const extMap: Record<string, string> = {
+      "application/pdf": "pdf",
+      "application/vnd.ms-excel": "xls",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+      "text/csv": "csv",
+      "application/msword": "doc",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+      "application/vnd.ms-powerpoint": "ppt",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+      "application/zip": "zip",
+      "application/x-rar-compressed": "rar",
+      "text/plain": "txt",
+    };
+    const ext = extMap[mime] || mime.split("/")[1] || "arquivo";
+    return `Arquivo_${index + 1}.${ext}`;
+  }
+  return `Arquivo_${index + 1}`;
+}
+
+function FileIcon({ type }: { type: string }) {
+  switch (type) {
+    case "pdf": return <FileText className="h-6 w-6 text-red-500" />;
+    case "excel": return <FileSpreadsheet className="h-6 w-6 text-green-600" />;
+    case "document": return <FileText className="h-6 w-6 text-blue-500" />;
+    default: return <File className="h-6 w-6 text-muted-foreground" />;
+  }
+}
+
 export function RichTextarea({
   value,
   onChange,
@@ -39,23 +86,11 @@ export function RichTextarea({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadFile = useCallback(async (file: File): Promise<string | null> => {
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-
-    if (!isImage && !isVideo) {
-      toast({
-        title: "Formato inválido",
-        description: "Por favor, envie apenas arquivos de imagem ou vídeo.",
-        variant: "destructive",
-      });
-      return null;
-    }
-
-    const maxSize = isVideo ? 50 * 1024 * 1024 : 10 * 1024 * 1024; // 50MB for video, 10MB for image
+    const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
       toast({
         title: "Arquivo muito grande",
-        description: `O tamanho máximo é ${isVideo ? "50MB" : "10MB"}.`,
+        description: "O tamanho máximo é 50MB.",
         variant: "destructive",
       });
       return null;
@@ -109,10 +144,8 @@ export function RichTextarea({
     const files: File[] = [];
     
     for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf("image") !== -1 || items[i].type.indexOf("video") !== -1) {
-        const file = items[i].getAsFile();
-        if (file) files.push(file);
-      }
+      const file = items[i].getAsFile();
+      if (file) files.push(file);
     }
 
     if (files.length === 0) return;
@@ -146,7 +179,16 @@ export function RichTextarea({
     }
   }, [images, onImagesChange]);
 
-  const isVideoUrl = (url: string) => url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
+  const openFileInNewTab = useCallback((url: string, index: number) => {
+    const fileName = getFileNameFromDataUrl(url, index);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
 
   return (
     <div className="space-y-2">
@@ -165,14 +207,14 @@ export function RichTextarea({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,video/*"
           multiple
           className="hidden"
           onChange={handleFileSelect}
+          data-testid={dataTestId ? `${dataTestId}-file-input` : undefined}
         />
       </div>
       
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-1">
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -185,15 +227,12 @@ export function RichTextarea({
             {isUploading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-1" />
             ) : (
-              <div className="flex items-center gap-1">
-                <ImageIcon className="h-4 w-4" />
-                <Video className="h-4 w-4" />
-              </div>
+              <Paperclip className="h-4 w-4" />
             )}
-            <span className="ml-1">Adicionar Imagem/Vídeo</span>
+            <span className="ml-1">Anexar Arquivo</span>
           </Button>
           <span className="text-[10px] text-muted-foreground">
-            Suporta Colar (Ctrl+V)
+            Imagens, vídeos, PDF, Excel, etc.
           </span>
         </div>
         <span className="text-[10px] text-muted-foreground">
@@ -202,65 +241,85 @@ export function RichTextarea({
       </div>
 
       {images.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+        <div className="space-y-2 mt-2">
           {images.map((url, index) => {
-            const isVideo = isVideoUrl(url);
+            const fileType = getFileTypeFromDataUrl(url);
+            const isMedia = fileType === "image" || fileType === "video";
+            
+            if (isMedia) {
+              return (
+                <div key={index} className="relative group rounded-lg overflow-hidden border bg-muted/50 aspect-video flex items-center justify-center" style={{ maxHeight: "200px" }}>
+                  {fileType === "video" ? (
+                    <video src={url} className="max-w-full max-h-full object-contain" />
+                  ) : (
+                    <img src={url} alt={`Anexo ${index + 1}`} className="max-w-full max-h-full object-contain cursor-pointer" />
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="icon" variant="secondary" className="h-8 w-8">
+                          {fileType === "video" ? <Video className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                        <VisuallyHidden>
+                          <DialogTitle>Visualização de {fileType === "video" ? "Vídeo" : "Imagem"}</DialogTitle>
+                        </VisuallyHidden>
+                        {fileType === "video" ? (
+                          <video src={url} controls autoPlay className="max-w-full max-h-full" />
+                        ) : (
+                          <img src={url} alt="Preview" className="max-w-full max-h-full object-contain" />
+                        )}
+                      </DialogContent>
+                    </Dialog>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      className="h-8 w-8"
+                      onClick={() => removeAttachment(index)}
+                      data-testid={dataTestId ? `${dataTestId}-remove-attachment-${index}` : undefined}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {fileType === "video" && (
+                    <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded-md">
+                      <Video className="h-3 w-3" />
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            
             return (
-              <div key={index} className="relative group rounded-lg overflow-hidden border bg-muted/50 aspect-video flex items-center justify-center">
-                {isVideo ? (
-                  <video
-                    src={url}
-                    className="max-w-full max-h-full object-contain"
-                  />
-                ) : (
-                  <img
-                    src={url}
-                    alt={`Anexo ${index + 1}`}
-                    className="max-w-full max-h-full object-contain cursor-pointer"
-                  />
-                )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button size="icon" variant="secondary" className="h-8 w-8">
-                        {isVideo ? <Video className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
-                      <VisuallyHidden>
-                        <DialogTitle>Visualização de {isVideo ? "Vídeo" : "Imagem"}</DialogTitle>
-                      </VisuallyHidden>
-                      {isVideo ? (
-                        <video 
-                          src={url} 
-                          controls
-                          autoPlay
-                          className="max-w-full max-h-full" 
-                        />
-                      ) : (
-                        <img 
-                          src={url} 
-                          alt="Preview" 
-                          className="max-w-full max-h-full object-contain" 
-                        />
-                      )}
-                    </DialogContent>
-                  </Dialog>
+              <div key={index} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 group">
+                <FileIcon type={fileType} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{getFileNameFromDataUrl(url, index)}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">{fileType === "pdf" ? "PDF" : fileType === "excel" ? "Planilha" : fileType === "document" ? "Documento" : "Arquivo"}</p>
+                </div>
+                <div className="flex items-center gap-1">
                   <Button
+                    type="button"
                     size="icon"
-                    variant="destructive"
+                    variant="ghost"
                     className="h-8 w-8"
+                    onClick={() => openFileInNewTab(url, index)}
+                    data-testid={dataTestId ? `${dataTestId}-open-attachment-${index}` : undefined}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8 text-destructive"
                     onClick={() => removeAttachment(index)}
                     data-testid={dataTestId ? `${dataTestId}-remove-attachment-${index}` : undefined}
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                {isVideo && (
-                  <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded-md">
-                    <Video className="h-3 w-3" />
-                  </div>
-                )}
               </div>
             );
           })}
