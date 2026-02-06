@@ -212,10 +212,11 @@ export default function ImpressaoEtiquetasPage() {
     .header-row {
       display: flex;
       width: 100%;
-      height: 10mm;
-      min-height: 10mm;
-      max-height: 10mm;
+      height: 11mm;
+      min-height: 11mm;
+      max-height: 11mm;
       border-bottom: 0.5mm solid #000;
+      padding-top: 1mm;
     }
     .description-box {
       flex: 1;
@@ -267,7 +268,7 @@ export default function ImpressaoEtiquetasPage() {
     }
     .barcode-area img { 
       width: 80mm;
-      height: 10mm;
+      height: 12mm;
       object-fit: fill;
     }
     .barcode-number {
@@ -532,7 +533,7 @@ export default function ImpressaoEtiquetasPage() {
                 className="bg-white flex flex-col overflow-hidden border border-gray-300"
                 style={{ width: "100mm", height: "50mm" }}
               >
-                <div className="flex" style={{ width: "100%", height: "10mm", minHeight: "10mm", maxHeight: "10mm", borderBottom: "0.5mm solid #000" }}>
+                <div className="flex" style={{ width: "100%", height: "11mm", minHeight: "11mm", maxHeight: "11mm", borderBottom: "0.5mm solid #000", paddingTop: "1mm" }}>
                   <div className="flex-1 font-bold text-black flex items-center text-left overflow-hidden" style={{ padding: "1mm 2mm", fontSize: "3.5mm", lineHeight: "1.15" }}>
                     {deviceData.deviceDescription}
                   </div>
@@ -552,7 +553,7 @@ export default function ImpressaoEtiquetasPage() {
                         <img 
                           src={barcodeUrl} 
                           alt={`Barcode ${deviceData.imei}`}
-                          style={{ width: "80mm", height: "10mm", objectFit: "fill" }}
+                          style={{ width: "80mm", height: "12mm", objectFit: "fill" }}
                           data-testid="barcode-image"
                         />
                         <div className="text-black font-bold" style={{ fontSize: "3mm", marginTop: "0.5mm", letterSpacing: "0.3mm" }}>
