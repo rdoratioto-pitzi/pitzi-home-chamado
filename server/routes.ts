@@ -9,7 +9,8 @@ import {
   sendTicketCommentEmail,
   sendMeetingInviteEmail,
   sendMentionNotificationEmail,
-  sendSharedAreaInviteEmail
+  sendSharedAreaInviteEmail,
+  sendPasswordResetEmail
 } from "./email-service";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import * as correiosService from "./correios-service";
@@ -104,6 +105,55 @@ export async function registerRoutes(
         return res.status(400).json({ success: false, message: "Dados inválidos", details: error.errors });
       }
       res.status(500).json({ success: false, message: "Erro interno" });
+    }
+  });
+
+  // ============== FORGOT PASSWORD ==============
+  const forgotPasswordSchema = z.object({
+    email: z.string().email("Email inválido"),
+  });
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const validated = forgotPasswordSchema.parse(req.body);
+      console.log(`[auth] Password reset request for: ${validated.email}`);
+      const users = await storage.getUsers();
+      const user = users.find(u => u.email.toLowerCase() === validated.email.toLowerCase());
+
+      if (!user) {
+        console.log(`[auth] Password reset - user not found: ${validated.email}`);
+        return res.json({ success: true, message: "Se o email estiver cadastrado, você receberá uma nova senha temporária." });
+      }
+
+      if (user.status !== "active") {
+        console.log(`[auth] Password reset - user inactive: ${validated.email}`);
+        return res.json({ success: true, message: "Se o email estiver cadastrado, você receberá uma nova senha temporária." });
+      }
+
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+      let temporaryPassword = "";
+      for (let i = 0; i < 8; i++) {
+        temporaryPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
+      await storage.updateUser(user.id, { password: temporaryPassword });
+      console.log(`[auth] Temporary password set for: ${validated.email}`);
+
+      try {
+        await sendPasswordResetEmail(user, temporaryPassword);
+        console.log(`[auth] Password reset email sent to: ${validated.email}`);
+      } catch (emailError) {
+        console.error(`[auth] Failed to send password reset email:`, emailError);
+        return res.status(500).json({ success: false, message: "Erro ao enviar o email. Tente novamente mais tarde." });
+      }
+
+      res.json({ success: true, message: "Se o email estiver cadastrado, você receberá uma nova senha temporária." });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ success: false, message: "Email inválido" });
+      }
+      console.error("[auth] Password reset error:", error);
+      res.status(500).json({ success: false, message: "Erro interno. Tente novamente mais tarde." });
     }
   });
 
