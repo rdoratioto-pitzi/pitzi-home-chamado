@@ -14,10 +14,17 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { RenovLogo } from "@/components/renov-logo";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, Mail } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -27,11 +34,20 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Digite um email válido"),
+});
+
+type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
+
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -39,6 +55,13 @@ export default function LoginPage() {
       email: "",
       password: "",
       rememberMe: false,
+    },
+  });
+
+  const forgotForm = useForm<ForgotPasswordData>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: "",
     },
   });
 
@@ -69,6 +92,47 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const onForgotPasswordSubmit = async (data: ForgotPasswordData) => {
+    setForgotPasswordLoading(true);
+    try {
+      const response = await apiRequest("POST", "/api/auth/forgot-password", data);
+      const result = await response.json();
+
+      if (result.success) {
+        setForgotPasswordSent(true);
+      } else {
+        toast({
+          title: "Erro",
+          description: result.message || "Erro ao processar a solicitação",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: "Erro ao processar a solicitação. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  const handleOpenForgotPassword = () => {
+    const currentEmail = form.getValues("email");
+    if (currentEmail) {
+      forgotForm.setValue("email", currentEmail);
+    }
+    setForgotPasswordSent(false);
+    setForgotPasswordOpen(true);
+  };
+
+  const handleCloseForgotPassword = () => {
+    setForgotPasswordOpen(false);
+    setForgotPasswordSent(false);
+    forgotForm.reset();
   };
 
   return (
@@ -110,12 +174,13 @@ export default function LoginPage() {
               name="password"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <FormLabel className="text-sm font-medium">Senha</FormLabel>
                     <button
                       type="button"
                       className="text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
                       data-testid="button-forgot-password"
+                      onClick={handleOpenForgotPassword}
                     >
                       Esqueceu a senha?
                     </button>
@@ -199,6 +264,91 @@ export default function LoginPage() {
           </button>
         </p>
       </div>
+
+      <Dialog open={forgotPasswordOpen} onOpenChange={handleCloseForgotPassword}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Recuperar Senha</DialogTitle>
+            <DialogDescription>
+              {forgotPasswordSent
+                ? "Verifique seu email para a senha temporária."
+                : "Digite seu email cadastrado para receber uma senha temporária."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {forgotPasswordSent ? (
+            <div className="flex flex-col items-center gap-4 py-4">
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
+                <Mail className="w-8 h-8 text-primary" />
+              </div>
+              <div className="text-center space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Se o email estiver cadastrado no sistema, você receberá uma senha temporária em instantes.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Use essa senha para acessar o sistema.
+                </p>
+              </div>
+              <Button
+                className="w-full mt-2"
+                onClick={handleCloseForgotPassword}
+                data-testid="button-forgot-password-close"
+              >
+                Voltar ao Login
+              </Button>
+            </div>
+          ) : (
+            <Form {...forgotForm}>
+              <form onSubmit={forgotForm.handleSubmit(onForgotPasswordSubmit)} className="space-y-4">
+                <FormField
+                  control={forgotForm.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="seuemail@renovsmart.com.br"
+                          data-testid="input-forgot-password-email"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCloseForgotPassword}
+                    className="flex-1"
+                    data-testid="button-forgot-password-cancel"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={forgotPasswordLoading}
+                    className="flex-1"
+                    data-testid="button-forgot-password-submit"
+                  >
+                    {forgotPasswordLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      "Enviar"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
