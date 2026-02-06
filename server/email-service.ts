@@ -60,6 +60,64 @@ const getPriorityLabel = (priority: string): string => {
   return labels[priority] || priority;
 };
 
+export async function sendPasswordResetEmail(
+  user: User,
+  temporaryPassword: string
+): Promise<void> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log("SMTP not configured, skipping password reset email");
+    return;
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>${emailStyles}</head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Redefinição de Senha</h1>
+        </div>
+        <div class="content">
+          <p>Olá ${user.name},</p>
+          <p>Recebemos uma solicitação para redefinir sua senha no Renov Home.</p>
+          
+          <div class="ticket-info">
+            <h3>Sua nova senha temporária</h3>
+            <p style="font-size: 20px; font-weight: bold; letter-spacing: 2px; text-align: center; padding: 12px; background: white; border-radius: 4px; margin-top: 8px;">${temporaryPassword}</p>
+          </div>
+          
+          <p>Use esta senha para acessar o sistema. Recomendamos que você altere sua senha após o primeiro acesso.</p>
+          
+          <a href="${BASE_URL}/login" class="btn">Acessar o Sistema</a>
+          
+          <p style="margin-top: 24px; font-size: 12px; color: #999;">
+            Se você não solicitou esta redefinição, entre em contato com o administrador do sistema imediatamente.
+          </p>
+        </div>
+        <div class="footer">
+          <p>Renov Home - Sistema de Gestão Interna</p>
+          <p>Este é um email automático, não responda.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Renov Home" <${process.env.SMTP_USER}>`,
+      to: user.email,
+      subject: "Renov Home - Redefinição de Senha",
+      html,
+    });
+    console.log(`Password reset email sent to ${user.email}`);
+  } catch (error) {
+    console.error("Failed to send password reset email:", error);
+    throw error;
+  }
+}
+
 export async function sendTicketCreatedEmail(
   ticket: Ticket,
   requester: User,
