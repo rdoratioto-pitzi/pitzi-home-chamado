@@ -125,12 +125,12 @@ export default function ImpressaoEtiquetasPage() {
       if (orders && orders.length > 0) {
         const order = orders[0];
         
-        const modelName = order.ModelName || order.modelName || order.model_name || "";
-        const storage = order.Storage || order.storage || "";
+        const modelName = order.ModelName || order.modelName || order.model_name || order.description || order.Description || "";
+        const storageSize = order.Storage || order.storage || order.capacity || order.Capacity || "";
         const color = order.Color || order.color || "";
-        const deviceDescription = [modelName, storage ? `${storage}GB` : "", color].filter(Boolean).join(" ") || "Dispositivo não identificado";
+        const deviceDescription = [modelName, storageSize ? `${storageSize}GB` : "", color].filter(Boolean).join(" ") || "Dispositivo não identificado";
         
-        const erpCode = order.DeviceErpCode || order.device_erp_code || order.deviceErpCode || order.SKU || "XXXXX00";
+        const erpCode = order.DeviceErpCode || order.device_erp_code || order.deviceErpCode || order.SKU || order.sku || "XXXXX00";
         const grading = erpCode.length >= 2 ? erpCode.slice(-2) : "??";
         
         const newDeviceData = {
@@ -188,9 +188,9 @@ export default function ImpressaoEtiquetasPage() {
           }
           .grading { 
             position: absolute; 
-            top: 0.2cm; 
+            top: 2.2cm; 
             right: 0.3cm; 
-            font-size: 34pt; 
+            font-size: 32pt; 
             font-weight: bold; 
             color: #000000; 
             line-height: 1;
@@ -199,11 +199,11 @@ export default function ImpressaoEtiquetasPage() {
             text-align: center; 
             font-weight: bold; 
             font-size: 15pt; 
-            margin-top: 0.7cm; 
-            margin-bottom: 0.1cm;
+            margin-top: 0.3cm; 
+            margin-bottom: 0.2cm;
             color: #000000;
           }
-          .code { text-align: center; font-size: 11pt; margin: 0.05cm 0; font-weight: bold; color: #000000; }
+          .code { text-align: center; font-size: 11pt; margin-bottom: 0.3cm; font-weight: bold; color: #000000; }
           .info { font-size: 10pt; margin: 0.05cm 0; font-weight: bold; color: #000000; }
           .barcode-container { 
             text-align: center; 
@@ -481,28 +481,22 @@ export default function ImpressaoEtiquetasPage() {
               style={{ minHeight: "350px", width: "100%" }}
               data-testid="label-preview"
             >
-              <div className="absolute top-4 right-6">
-                <span 
-                  className="font-bold text-black" 
-                  style={{ fontSize: "96px", lineHeight: 1, fontFamily: "Arial, sans-serif" }}
-                >
-                  {deviceData.grading}
-                </span>
-              </div>
-
-              <div className="text-center mt-6 mb-2">
+              <div className="text-center mt-12 mb-4">
                 <p className="font-bold text-3xl text-black leading-tight">
                   {deviceData.deviceDescription}
                 </p>
               </div>
 
-              <div className="text-center mb-2">
-                <span className="text-xl font-bold text-black">
+              <div className="flex justify-between items-center px-4 mb-4">
+                <div className="text-xl font-bold text-black">
                   Cód: {deviceData.deviceErpCode}
-                </span>
+                </div>
+                <div className="font-bold text-black" style={{ fontSize: "72px", lineHeight: 1, fontFamily: "Arial, sans-serif" }}>
+                  {deviceData.grading}
+                </div>
               </div>
 
-              <div className="text-xl text-black font-bold space-y-1 mb-2">
+              <div className="text-xl text-black font-bold space-y-1 mb-4">
                 <p>IMEI: {deviceData.imei}</p>
                 <p>Triador: {triador || "—"}</p>
               </div>
