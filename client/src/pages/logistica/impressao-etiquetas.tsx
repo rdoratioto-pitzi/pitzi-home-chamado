@@ -273,7 +273,7 @@ export default function ImpressaoEtiquetasPage() {
       font-size: 4.5mm;
       font-weight: bold;
       color: #000;
-      margin-top: 0.5mm;
+      margin-top: 0mm;
       letter-spacing: 0.3mm;
     }
   `;
@@ -554,7 +554,7 @@ export default function ImpressaoEtiquetasPage() {
                           style={{ width: "100%", height: "auto", maxHeight: "14mm" }}
                           data-testid="barcode-image"
                         />
-                        <div className="text-black font-bold" style={{ fontSize: "4.5mm", marginTop: "0.5mm", letterSpacing: "0.3mm" }}>
+                        <div className="text-black font-bold" style={{ fontSize: "4.5mm", marginTop: "0mm", letterSpacing: "0.3mm" }}>
                           {deviceData.imei.split("/")[0].trim()}
                         </div>
                       </>
