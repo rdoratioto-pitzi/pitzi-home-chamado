@@ -65,7 +65,7 @@ interface FieldItem {
 }
 
 const defaultCategories: FieldItem[] = [
-  { value: "ti", label: "TI / Infraestrutura" },
+  { value: "tech", label: "Tech" },
   { value: "rh", label: "Recursos Humanos" },
   { value: "financeiro", label: "Financeiro" },
   { value: "operacoes", label: "Operações" },

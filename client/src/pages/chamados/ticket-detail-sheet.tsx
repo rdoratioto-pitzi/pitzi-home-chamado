@@ -230,7 +230,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   const categories: { value: string; label: string }[] = categoriesSetting?.value 
     ? JSON.parse(categoriesSetting.value) 
     : [
-        { value: "ti", label: "TI / Infraestrutura" },
+        { value: "tech", label: "Tech" },
         { value: "rh", label: "Recursos Humanos" },
         { value: "financeiro", label: "Financeiro" },
         { value: "operacoes", label: "Operações" },
