@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import type { Notification } from "@shared/schema";
 
 function getCurrentUser() {
-  const stored = localStorage.getItem("currentUser");
+  const stored = sessionStorage.getItem("user");
   if (!stored) return null;
   try { return JSON.parse(stored); } catch { return null; }
 }
