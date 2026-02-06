@@ -339,7 +339,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                 <RichTextarea
                   value={editedDescription}
                   onChange={setEditedDescription}
-                  maxLength={2000}
+                  maxLength={5000}
                   rows={6}
                 />
                 <div className="flex gap-2 justify-end">
@@ -713,7 +713,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             images={commentImages}
             onImagesChange={setCommentImages}
             rows={3}
-            maxLength={2000}
+            maxLength={5000}
             data-testid="input-comment"
           />
           <Button 

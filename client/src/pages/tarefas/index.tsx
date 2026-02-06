@@ -1129,7 +1129,7 @@ export default function TarefasPage() {
                     onImagesChange={(imgs) => setNewTask({ ...newTask, attachments: JSON.stringify(imgs) } as any)}
                     placeholder="Detalhes da tarefa..."
                     rows={4}
-                    maxLength={1000}
+                    maxLength={5000}
                     data-testid="input-task-description"
                   />
                 </div>
@@ -1457,7 +1457,7 @@ export default function TarefasPage() {
                     })}
                     placeholder="Descreva a pauta da reunião..."
                     rows={6}
-                    maxLength={1000}
+                    maxLength={5000}
                     data-testid="input-meeting-agenda"
                   />
                 </div>

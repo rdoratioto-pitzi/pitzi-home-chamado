@@ -1267,7 +1267,7 @@ export default function ReunioesPage() {
                   images={agendaImages}
                   onImagesChange={setAgendaImages}
                   placeholder="Tópicos a serem discutidos..."
-                  maxLength={2000}
+                  maxLength={5000}
                   rows={5}
                   data-testid="input-meeting-agenda"
                 />

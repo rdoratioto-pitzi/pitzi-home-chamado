@@ -471,7 +471,7 @@ export default function TaskDetailPage() {
                 onImagesChange={setEditedAttachments}
                 placeholder="Adicione uma descrição..."
                 rows={4}
-                maxLength={1000}
+                maxLength={5000}
                 data-testid="input-edit-description"
               />
             ) : (
@@ -596,12 +596,12 @@ export default function TaskDetailPage() {
                         })}
                         placeholder="Pauta da reunião..."
                         rows={10}
-                        maxLength={1000}
+                        maxLength={5000}
                         data-testid="input-meeting-agenda"
                       />
                       <div className="flex justify-end">
                         <span className="text-[10px] text-muted-foreground">
-                          {(editedMeetingData.agenda || "").length}/1000
+                          {(editedMeetingData.agenda || "").length}/5000
                         </span>
                       </div>
                     </div>
