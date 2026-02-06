@@ -594,9 +594,9 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                   <SelectValue placeholder="Selecione o impacto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Baixo</SelectItem>
-                  <SelectItem value="medium">Médio</SelectItem>
-                  <SelectItem value="high">Alto</SelectItem>
+                  {locations.map((l) => (
+                    <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

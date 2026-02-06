@@ -451,11 +451,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                         </TooltipTrigger>
                         <TooltipContent className="max-w-[280px]">
                           <p className="text-xs">
-                            <strong>Impacto</strong> mede quantas pessoas ou processos são afetados pelo problema.<br/><br/>
-                            <strong>Crítico:</strong> Toda a empresa<br/>
-                            <strong>Alto:</strong> Departamento inteiro<br/>
-                            <strong>Médio:</strong> Equipe ou grupo<br/>
-                            <strong>Baixo:</strong> Apenas você
+                            <strong>Impacto</strong> mede quantas pessoas ou processos são afetados pelo problema.
                           </p>
                         </TooltipContent>
                       </Tooltip>
@@ -467,10 +463,11 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="baixo">Baixo - Apenas eu</SelectItem>
-                        <SelectItem value="medio">Médio - Minha equipe</SelectItem>
-                        <SelectItem value="alto">Alto - Meu departamento</SelectItem>
-                        <SelectItem value="critico">Crítico - Toda a empresa</SelectItem>
+                        {locations.map((loc) => (
+                          <SelectItem key={loc.value} value={loc.value}>
+                            {loc.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
