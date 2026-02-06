@@ -221,8 +221,8 @@ export default function ImpressaoEtiquetasPage() {
             margin-bottom: 0.2cm;
             color: #000000;
           }
-          .code { text-align: center; font-size: 11pt; margin-bottom: 0.3cm; font-weight: bold; color: #000000; }
-          .info { font-size: 10pt; margin: 0.05cm 0; font-weight: bold; color: #000000; }
+          .code { text-align: left; font-size: 14pt; margin-top: 0.2cm; font-weight: bold; color: #000000; }
+          .info { text-align: left; font-size: 12.5pt; margin: 0.15cm 0; font-weight: bold; color: #000000; }
           .barcode-container { 
             text-align: center; 
             margin-top: 0.1cm;
@@ -480,22 +480,20 @@ export default function ImpressaoEtiquetasPage() {
               style={{ minHeight: "350px", width: "100%" }}
               data-testid="label-preview"
             >
-              <div className="text-center mt-12 mb-4">
+              <div className="text-center mt-6 mb-4">
                 <p className="font-bold text-3xl text-black leading-tight">
                   {deviceData.deviceDescription}
                 </p>
               </div>
 
-              <div className="flex justify-between items-center px-4 mb-4">
-                <div className="text-xl font-bold text-black">
-                  Cód: {deviceData.deviceErpCode}
-                </div>
+              <div className="flex justify-end pr-4 mb-2">
                 <div className="font-bold text-black" style={{ fontSize: "72px", lineHeight: 1, fontFamily: "Arial, sans-serif" }}>
                   {deviceData.grading}
                 </div>
               </div>
 
-              <div className="text-xl text-black font-bold space-y-1 mb-4">
+              <div className="text-left px-4 text-black font-bold space-y-3 mb-4" style={{ fontSize: "1.25em" }}>
+                <p>Cód: {deviceData.deviceErpCode}</p>
                 <p>IMEI: {deviceData.imei}</p>
                 <p>Triador: {deviceData.triador}</p>
               </div>
