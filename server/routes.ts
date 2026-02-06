@@ -1920,6 +1920,193 @@ export async function registerRoutes(
     }
   });
 
+  // ============== ADMINISTRAÇÃO LOGÍSTICA API INTEGRATION ==============
+
+  // Test connection to Administração Logística API
+  app.post("/api/integrations/adm-logistica/test-connection", async (req, res) => {
+    try {
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas?voucher_imei=000000000000000`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (response.ok) {
+        res.json({ connected: true, message: "Conexão estabelecida com sucesso" });
+      } else {
+        res.json({ connected: false, message: `Erro: ${response.status} ${response.statusText}` });
+      }
+    } catch (error: any) {
+      res.json({ connected: false, message: error.message || "Falha ao conectar com a API" });
+    }
+  });
+
+  // Adm Logística - Coletas
+  app.get("/api/integrations/adm-logistica/coletas", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      const queryParams = ["voucher_imei", "code", "awb_code", "rede", "operator", "req_start", "req_end", "col_start", "col_end", "status", "represados"];
+      queryParams.forEach(param => {
+        if (req.query[param]) params.append(param, req.query[param] as string);
+      });
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística coletas error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar coletas" });
+    }
+  });
+
+  // Adm Logística - Recebimentos
+  app.get("/api/integrations/adm-logistica/recebimentos", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      const queryParams = ["imei", "categories", "status_recebimento", "redes", "voucher_use_start", "voucher_use_end", "col_start", "col_end", "receipt_start", "receipt_end", "coleta_code", "awb_code"];
+      queryParams.forEach(param => {
+        if (req.query[param]) params.append(param, req.query[param] as string);
+      });
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/recebimentos?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística recebimentos error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar recebimentos" });
+    }
+  });
+
+  // Adm Logística - Triagem
+  app.get("/api/integrations/adm-logistica/triagem", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      const queryParams = ["imei", "categories", "status_recebimento", "redes", "responsavel_triagem", "receipt_start", "receipt_end", "col_start", "col_end", "triagem_start", "triagem_end"];
+      queryParams.forEach(param => {
+        if (req.query[param]) params.append(param, req.query[param] as string);
+      });
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/triagem?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística triagem error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar triagem" });
+    }
+  });
+
+  // Adm Logística - Bloqueados
+  app.get("/api/integrations/adm-logistica/bloqueados", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      const queryParams = ["imei", "redes", "date_start", "date_end", "status"];
+      queryParams.forEach(param => {
+        if (req.query[param]) params.append(param, req.query[param] as string);
+      });
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/bloqueados?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística bloqueados error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar bloqueados" });
+    }
+  });
+
+  // Adm Logística - Manutenção
+  app.get("/api/integrations/adm-logistica/manutencao", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      if (req.query.imei) params.append("imei", req.query.imei as string);
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/manutencao?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística manutencao error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar manutenção" });
+    }
+  });
+
+  // Adm Logística - Divergentes
+  app.get("/api/integrations/adm-logistica/divergentes", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      if (req.query.imei) params.append("imei", req.query.imei as string);
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/divergentes?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística divergentes error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar divergentes" });
+    }
+  });
+
+  // ============== RELATÓRIO PEDIDOS API INTEGRATION ==============
+
+  // Test connection to Relatório Pedidos API
+  app.post("/api/integrations/relatorio-pedidos/test-connection", async (req, res) => {
+    try {
+      const response = await fetch(`${RS_API_BASE_URL}/orders/advanced?imei=000000000000000`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      });
+      
+      if (response.ok) {
+        res.json({ connected: true, message: "Conexão estabelecida com sucesso" });
+      } else {
+        res.json({ connected: false, message: `Erro: ${response.status} ${response.statusText}` });
+      }
+    } catch (error: any) {
+      res.json({ connected: false, message: error.message || "Falha ao conectar com a API" });
+    }
+  });
+
+  // Relatório Pedidos - Consulta Avançada
+  app.get("/api/integrations/relatorio-pedidos/orders/advanced", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      const queryParams = ["imei", "voucher_code", "voucher_status", "customer_cpf", "created_start", "created_end", "used_start", "used_end", "category", "network", "seller_name", "regional", "filial", "store_type", "boost", "global_status"];
+      queryParams.forEach(param => {
+        if (req.query[param]) params.append(param, req.query[param] as string);
+      });
+      const response = await fetch(`${RS_API_BASE_URL}/orders/advanced?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Relatório Pedidos orders/advanced error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar pedidos" });
+    }
+  });
+
   // ============== LABEL PRINTING (IMPRESSÃO DE ETIQUETAS) ==============
   
   // Zod schema for label data validation

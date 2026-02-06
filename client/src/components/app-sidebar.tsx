@@ -30,6 +30,7 @@ import {
   Star,
   Bot,
   Printer,
+  Settings2,
 } from "lucide-react";
 import {
   Sidebar,
@@ -116,6 +117,8 @@ const apisSubItems = [
   { title: "Visão Geral", url: "/apis", icon: Code2 },
   { title: "Correios - Logística Reversa", url: "/apis/correios-reversa", icon: RotateCcw },
   { title: "API RS - Logística", url: "/apis/rs-logistica", icon: Truck },
+  { title: "Adm. Logística", url: "/apis/adm-logistica", icon: Settings2 },
+  { title: "Relatório Pedidos", url: "/apis/relatorio-pedidos", icon: FileText },
 ];
 
 const pricingSubItems = [

@@ -28,6 +28,8 @@ import ImpressaoEtiquetasPage from "@/pages/logistica/impressao-etiquetas";
 import ApisPage from "@/pages/apis/index";
 import CorreiosReversaPage from "@/pages/apis/correios-reversa";
 import ApiRsLogisticaPage from "@/pages/apis/api-rs-logistica";
+import ApiAdmLogisticaPage from "@/pages/apis/api-adm-logistica";
+import ApiRelatorioPedidosPage from "@/pages/apis/api-relatorio-pedidos";
 import LoginPage from "@/pages/login";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
 import PricingOverviewPage from "@/pages/pricing/index";
@@ -157,6 +159,16 @@ function Router() {
       <Route path="/apis/rs-logistica">
         <ProtectedRoute requiredPermission="apis">
           <ApiRsLogisticaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/apis/adm-logistica">
+        <ProtectedRoute requiredPermission="apis">
+          <ApiAdmLogisticaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/apis/relatorio-pedidos">
+        <ProtectedRoute requiredPermission="apis">
+          <ApiRelatorioPedidosPage />
         </ProtectedRoute>
       </Route>
       <Route path="/pricing">
