@@ -266,8 +266,8 @@ export default function ImpressaoEtiquetasPage() {
     }
     .barcode-area img { 
       width: 85mm;
-      height: 12mm;
-      object-fit: fill;
+      height: 10mm;
+      object-fit: contain;
     }
     .barcode-number {
       font-size: 4.5mm;
@@ -551,7 +551,7 @@ export default function ImpressaoEtiquetasPage() {
                         <img 
                           src={barcodeUrl} 
                           alt={`Barcode ${deviceData.imei}`}
-                          style={{ width: "85mm", height: "12mm", objectFit: "fill" }}
+                          style={{ width: "85mm", height: "10mm", objectFit: "contain" }}
                           data-testid="barcode-image"
                         />
                         <div className="text-black font-bold" style={{ fontSize: "4.5mm", marginTop: "0.5mm", letterSpacing: "0.3mm" }}>
