@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -48,8 +49,16 @@ import MacgyverIAPage from "@/pages/macgyver-ia/index";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/macgyver-ia" component={MacgyverIAPage} />
+      <Route path="/">
+        <ProtectedRoute>
+          <Home />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/macgyver-ia">
+        <ProtectedRoute>
+          <MacgyverIAPage />
+        </ProtectedRoute>
+      </Route>
       <Route path="/chamados">
         <ProtectedRoute requiredPermission="chamados">
           <ChamadosPage />
@@ -227,8 +236,15 @@ function Router() {
 }
 
 function App() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const isLoginPage = location === "/login";
+
+  useEffect(() => {
+    const user = sessionStorage.getItem("user");
+    if (!user && !isLoginPage) {
+      setLocation("/login");
+    }
+  }, [location, isLoginPage, setLocation]);
 
   const sidebarStyle = {
     "--sidebar-width": "16rem",
