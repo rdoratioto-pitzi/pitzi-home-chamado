@@ -1050,6 +1050,7 @@ export default function ReunioesPage() {
                   <label className="text-sm font-medium">Data</label>
                   <Input
                     type="date"
+                    className="date-picker-full"
                     value={newMeeting.meetingData.date}
                     onChange={(e) => setNewMeeting({ 
                       ...newMeeting, 
@@ -1144,6 +1145,7 @@ export default function ReunioesPage() {
                     <label className="text-sm font-medium">Terminar em (opcional)</label>
                     <Input
                       type="date"
+                      className="date-picker-full"
                       value={newMeeting.recurrenceEndDate}
                       onChange={(e) => setNewMeeting({ ...newMeeting, recurrenceEndDate: e.target.value })}
                       data-testid="input-recurrence-end-date"
@@ -1306,6 +1308,7 @@ export default function ReunioesPage() {
                     <div className="col-span-3">
                       <Input
                         type="date"
+                        className="date-picker-full"
                         value={action.deadline}
                         onChange={(e) => handleUpdateAction(index, "deadline", e.target.value)}
                         data-testid={`input-action-deadline-${index}`}

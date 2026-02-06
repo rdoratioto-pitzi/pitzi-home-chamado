@@ -570,7 +570,7 @@ export default function ApiRsLogisticaPage() {
                               <FormItem>
                                 <FormLabel className="text-xs">Data Criação Início</FormLabel>
                                 <FormControl>
-                                  <Input type="date" {...field} data-testid="input-created-start" />
+                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-created-start" />
                                 </FormControl>
                               </FormItem>
                             )}
@@ -582,7 +582,7 @@ export default function ApiRsLogisticaPage() {
                               <FormItem>
                                 <FormLabel className="text-xs">Data Criação Fim</FormLabel>
                                 <FormControl>
-                                  <Input type="date" {...field} data-testid="input-created-end" />
+                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-created-end" />
                                 </FormControl>
                               </FormItem>
                             )}
@@ -685,7 +685,7 @@ export default function ApiRsLogisticaPage() {
                               <FormItem>
                                 <FormLabel className="text-xs">Data Inicial</FormLabel>
                                 <FormControl>
-                                  <Input type="date" {...field} data-testid="input-coletas-start" />
+                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-coletas-start" />
                                 </FormControl>
                                 <FormDescription className="text-xs">Data inicial do romaneio (YYYY-MM-DD)</FormDescription>
                               </FormItem>
@@ -698,7 +698,7 @@ export default function ApiRsLogisticaPage() {
                               <FormItem>
                                 <FormLabel className="text-xs">Data Final</FormLabel>
                                 <FormControl>
-                                  <Input type="date" {...field} data-testid="input-coletas-end" />
+                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-coletas-end" />
                                 </FormControl>
                                 <FormDescription className="text-xs">Data final do romaneio (YYYY-MM-DD)</FormDescription>
                               </FormItem>
@@ -753,7 +753,7 @@ export default function ApiRsLogisticaPage() {
                               <FormItem>
                                 <FormLabel className="text-xs">Data Inicial</FormLabel>
                                 <FormControl>
-                                  <Input type="date" {...field} data-testid="input-geral-start" />
+                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-geral-start" />
                                 </FormControl>
                                 <FormDescription className="text-xs">Data inicial de uso (YYYY-MM-DD)</FormDescription>
                               </FormItem>
@@ -766,7 +766,7 @@ export default function ApiRsLogisticaPage() {
                               <FormItem>
                                 <FormLabel className="text-xs">Data Final</FormLabel>
                                 <FormControl>
-                                  <Input type="date" {...field} data-testid="input-geral-end" />
+                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-geral-end" />
                                 </FormControl>
                                 <FormDescription className="text-xs">Data final de uso (YYYY-MM-DD)</FormDescription>
                               </FormItem>

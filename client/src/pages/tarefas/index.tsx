@@ -1154,6 +1154,7 @@ export default function TarefasPage() {
                     <label className="text-sm font-medium">Data de Entrega</label>
                     <Input
                       type="date"
+                      className="date-picker-full"
                       value={newTask.dueDate}
                       onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                       data-testid="input-task-due-date"
@@ -1168,6 +1169,7 @@ export default function TarefasPage() {
                     <label className="text-sm font-medium">Data</label>
                     <Input
                       type="date"
+                      className="date-picker-full"
                       value={newTask.meetingData.date}
                       onChange={(e) => setNewTask({ 
                         ...newTask, 
@@ -1270,6 +1272,7 @@ export default function TarefasPage() {
                       <label className="text-sm font-medium">Repetir até (opcional)</label>
                       <Input
                         type="date"
+                        className="date-picker-full"
                         value={newTask.recurrenceEndDate}
                         onChange={(e) => setNewTask({ ...newTask, recurrenceEndDate: e.target.value })}
                         data-testid="input-recurrence-end"
@@ -1502,6 +1505,7 @@ export default function TarefasPage() {
                             </div>
                             <Input
                               type="date"
+                              className="date-picker-full"
                               value={action.deadline}
                               onChange={(e) => {
                                 const newActions = [...newTask.meetingData.actions];

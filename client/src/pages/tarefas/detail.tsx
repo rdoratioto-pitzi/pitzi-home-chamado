@@ -521,6 +521,7 @@ export default function TaskDetailPage() {
                     {isEditing ? (
                       <Input
                         type="date"
+                        className="date-picker-full"
                         value={editedMeetingData.date || ""}
                         onChange={(e) => setEditedMeetingData({ ...editedMeetingData, date: e.target.value })}
                         data-testid="input-meeting-date"
@@ -638,6 +639,7 @@ export default function TaskDetailPage() {
                           <div className="flex gap-2">
                             <Input
                               type="date"
+                              className="date-picker-full"
                               value={action.deadline}
                               onChange={(e) => {
                                 const newActions = [...(editedMeetingData.actions || [])];
