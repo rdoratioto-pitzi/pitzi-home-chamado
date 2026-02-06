@@ -186,6 +186,117 @@ export default function ImpressaoEtiquetasPage() {
     },
   });
 
+  const getLabelCSS = () => `
+    @page {
+      size: 100mm 50mm;
+      margin: 0;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: Arial, sans-serif; 
+      width: 100mm; 
+      height: 50mm; 
+      background: white;
+      overflow: hidden;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .label { 
+      width: 100mm; 
+      height: 50mm; 
+      background: white; 
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .header-row {
+      display: flex;
+      width: 100%;
+      height: 10mm;
+      min-height: 10mm;
+      max-height: 10mm;
+      border-bottom: 0.5mm solid #000;
+    }
+    .description-box {
+      flex: 1;
+      padding: 1mm 2mm;
+      font-weight: bold;
+      font-size: 3.5mm;
+      display: flex;
+      align-items: center;
+      text-align: left;
+      overflow: hidden;
+      line-height: 1.15;
+    }
+    .grading-box {
+      width: 14mm;
+      min-width: 14mm;
+      background: black;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8mm;
+      font-weight: bold;
+    }
+    .content-area {
+      padding: 1mm 2mm 0 2mm;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .info-line { 
+      text-align: left; 
+      font-size: 3mm; 
+      margin: 0.5mm 0; 
+      font-weight: bold; 
+      color: #000;
+      line-height: 1.15;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .barcode-area { 
+      margin-top: auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: 1mm;
+    }
+    .barcode-area img { 
+      width: 80mm;
+      height: 10mm;
+      object-fit: fill;
+    }
+    .barcode-number {
+      font-size: 3mm;
+      font-weight: bold;
+      color: #000;
+      margin-top: 0.5mm;
+      letter-spacing: 0.3mm;
+    }
+  `;
+
+  const getLabelHTML = (data: DeviceData, imei: string) => `
+    <div class="label">
+      <div class="header-row">
+        <div class="description-box">${data.deviceDescription}</div>
+        <div class="grading-box">${data.grading}</div>
+      </div>
+      <div class="content-area">
+        <div class="info-line">Marca: ${data.marca}</div>
+        <div class="info-line">Cód: ${data.deviceErpCode}</div>
+        <div class="info-line">Triador: ${data.triador}</div>
+        <div class="barcode-area">
+          <img id="barcode-img" src="/api/etiquetas/barcode/${imei}" alt="Barcode" />
+          <div class="barcode-number">${imei}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
   const triggerDirectPrint = useCallback(() => {
     if (!deviceData) return;
     const primaryImei = deviceData.imei.split("/")[0].trim();
@@ -195,109 +306,10 @@ export default function ImpressaoEtiquetasPage() {
       <html>
       <head>
         <title>Etiqueta - ${primaryImei}</title>
-        <style>
-          @page {
-            size: 100mm 50mm;
-            margin: 0;
-          }
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: Arial, sans-serif; 
-            width: 100mm; 
-            height: 50mm; 
-            background: white;
-            overflow: hidden;
-          }
-          .label { 
-            width: 100mm; 
-            height: 50mm; 
-            background: white; 
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-          }
-          .header-row {
-            display: flex;
-            width: 100%;
-            height: 12mm;
-            border-bottom: 2px solid #000;
-          }
-          .description-box {
-            flex: 1;
-            padding: 2mm;
-            font-weight: bold;
-            font-size: 24pt;
-            display: flex;
-            align-items: center;
-            text-align: left;
-            word-wrap: break-word;
-            overflow: hidden;
-            line-height: 1.1;
-          }
-          .grading-box {
-            width: 20mm;
-            background: black;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 32pt;
-            font-weight: bold;
-          }
-          .content-area {
-            padding: 2mm 4mm;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-          }
-          .info-large { 
-            text-align: left; 
-            font-size: 24pt; 
-            margin: 1mm 0; 
-            font-weight: bold; 
-            color: #000000;
-            line-height: 1;
-          }
-          .barcode-container { 
-            text-align: center; 
-            margin-top: auto;
-            width: 100%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding-bottom: 2mm;
-          }
-          .barcode-container img { 
-            width: 90mm;
-            height: 18mm;
-            object-fit: fill;
-          }
-          .barcode-value {
-            font-size: 24pt;
-            font-weight: bold;
-            color: #000000;
-            margin-top: 1mm;
-            letter-spacing: 0;
-          }
-        </style>
+        <style>${getLabelCSS()}</style>
       </head>
       <body>
-        <div class="label">
-          <div class="header-row">
-            <div class="description-box">${deviceData.deviceDescription}</div>
-            <div class="grading-box">${deviceData.grading}</div>
-          </div>
-          <div class="content-area">
-            <div class="info-large">Marca: ${deviceData.marca}</div>
-            <div class="info-large">Cód: ${deviceData.deviceErpCode}</div>
-            <div class="info-large">Triador: ${deviceData.triador}</div>
-            <div class="barcode-container">
-              <img id="barcode-img" src="/api/etiquetas/barcode/${primaryImei}" alt="Barcode" />
-              <div class="barcode-value">${primaryImei}</div>
-            </div>
-          </div>
-        </div>
+        ${getLabelHTML(deviceData, primaryImei)}
         <script>
           const img = document.getElementById('barcode-img');
           function doPrint() {
@@ -315,7 +327,7 @@ export default function ImpressaoEtiquetasPage() {
       </html>
     `;
 
-    const printWindow = window.open("", "_blank", "width=800,height=400");
+    const printWindow = window.open("", "_blank", "width=500,height=300");
     if (printWindow) {
       printWindow.document.write(printContent);
       printWindow.document.close();
@@ -512,41 +524,45 @@ export default function ImpressaoEtiquetasPage() {
             </Button>
 
             <div 
-              className="border-2 border-gray-300 rounded-lg bg-white relative overflow-hidden flex flex-col mx-auto"
-              style={{ width: "100mm", height: "50mm", scale: "1.5", transformOrigin: "top center", marginBottom: "30mm" }}
+              className="bg-white mx-auto"
+              style={{ width: "100mm", height: "50mm" }}
               data-testid="label-preview"
             >
-              <div className="flex w-full border-b-2 border-black h-[15mm]">
-                <div className="flex-1 p-2 font-bold text-[24pt] text-black flex items-center text-left leading-tight break-words overflow-hidden">
-                  {deviceData.deviceDescription}
+              <div 
+                className="bg-white flex flex-col overflow-hidden border border-gray-300"
+                style={{ width: "100mm", height: "50mm" }}
+              >
+                <div className="flex" style={{ width: "100%", height: "10mm", minHeight: "10mm", maxHeight: "10mm", borderBottom: "0.5mm solid #000" }}>
+                  <div className="flex-1 font-bold text-black flex items-center text-left overflow-hidden" style={{ padding: "1mm 2mm", fontSize: "3.5mm", lineHeight: "1.15" }}>
+                    {deviceData.deviceDescription}
+                  </div>
+                  <div className="bg-black text-white flex items-center justify-center font-bold" style={{ width: "14mm", minWidth: "14mm", fontSize: "8mm" }}>
+                    {deviceData.grading}
+                  </div>
                 </div>
-                <div className="w-[20mm] bg-black text-white flex items-center justify-center text-[32pt] font-bold">
-                  {deviceData.grading}
-                </div>
-              </div>
 
-              <div className="flex-1 p-[2mm_4mm] text-left text-black font-bold flex flex-col justify-start">
-                <p style={{ fontSize: "24pt", lineHeight: "1.1", margin: "1mm 0" }}>Marca: {deviceData.marca}</p>
-                <p style={{ fontSize: "24pt", lineHeight: "1.1", margin: "1mm 0" }}>Cód: {deviceData.deviceErpCode}</p>
-                <p style={{ fontSize: "24pt", lineHeight: "1.1", margin: "1mm 0" }}>Triador: {deviceData.triador}</p>
-                
-                <div className="flex flex-col items-center w-full mt-auto pb-[2mm]">
-                  {barcodeUrl ? (
-                    <>
-                      <img 
-                        src={barcodeUrl} 
-                        alt={`Barcode ${deviceData.imei}`}
-                        className="w-[90mm] h-[18mm]"
-                        style={{ objectFit: "fill" }}
-                        data-testid="barcode-image"
-                      />
-                      <div className="text-black mt-[1mm] tracking-tight font-bold" style={{ fontSize: "24pt" }}>
-                        {deviceData.imei.split("/")[0].trim()}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="h-32 w-full bg-gray-100 animate-pulse rounded" />
-                  )}
+                <div className="flex-1 flex flex-col overflow-hidden" style={{ padding: "1mm 2mm 0 2mm" }}>
+                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "3mm", margin: "0.5mm 0", lineHeight: "1.15" }}>Marca: {deviceData.marca}</div>
+                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "3mm", margin: "0.5mm 0", lineHeight: "1.15" }}>Cód: {deviceData.deviceErpCode}</div>
+                  <div className="font-bold text-black text-left overflow-hidden whitespace-nowrap" style={{ fontSize: "3mm", margin: "0.5mm 0", lineHeight: "1.15" }}>Triador: {deviceData.triador}</div>
+                  
+                  <div className="flex flex-col items-center w-full mt-auto" style={{ paddingBottom: "1mm" }}>
+                    {barcodeUrl ? (
+                      <>
+                        <img 
+                          src={barcodeUrl} 
+                          alt={`Barcode ${deviceData.imei}`}
+                          style={{ width: "80mm", height: "10mm", objectFit: "fill" }}
+                          data-testid="barcode-image"
+                        />
+                        <div className="text-black font-bold" style={{ fontSize: "3mm", marginTop: "0.5mm", letterSpacing: "0.3mm" }}>
+                          {deviceData.imei.split("/")[0].trim()}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="w-full bg-gray-100 animate-pulse rounded" style={{ height: "12mm" }} />
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
