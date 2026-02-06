@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { 
@@ -14,7 +13,6 @@ import {
   Loader2,
   CheckCircle,
   AlertCircle,
-  User,
   Smartphone,
   X
 } from "lucide-react";
@@ -27,17 +25,13 @@ interface DeviceData {
   deviceDescription: string;
   deviceErpCode: string;
   grading: string;
+  triador: string;
 }
 
-const TRIADORES = [
-  { value: "Livia", label: "Livia" },
-  { value: "Fabricio", label: "Fabricio" },
-  { value: "Bryan", label: "Bryan" },
-];
-
-function generateZPL(deviceData: DeviceData, triador: string): string {
-  const { imei, deviceDescription, deviceErpCode } = deviceData;
+function generateZPL(deviceData: DeviceData): string {
+  const { imei, deviceDescription, deviceErpCode, triador } = deviceData;
   const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
+  const barcodeImei = imei.split("/")[0].trim();
   
   const zpl = `^XA
 ^CI28
@@ -55,7 +49,7 @@ function generateZPL(deviceData: DeviceData, triador: string): string {
 
 ^FO30,250^A0N,20,20^FDTriador: ${triador}^FS
 
-^FO150,290^BY2^BCN,70,Y,N,N^FD${imei}^FS
+^FO150,290^BY2^BCN,70,Y,N,N^FD${barcodeImei}^FS
 
 ^XZ`;
   
@@ -77,7 +71,6 @@ function downloadZPL(zpl: string, imei: string) {
 export default function ImpressaoEtiquetasPage() {
   const { toast } = useToast();
   const [imei, setImei] = useState("");
-  const [triador, setTriador] = useState("");
   const [deviceData, setDeviceData] = useState<DeviceData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [barcodeUrl, setBarcodeUrl] = useState<string | null>(null);
@@ -86,7 +79,8 @@ export default function ImpressaoEtiquetasPage() {
 
   useEffect(() => {
     if (deviceData?.imei) {
-      setBarcodeUrl(`/api/etiquetas/barcode/${deviceData.imei}?t=${Date.now()}`);
+      const primaryImei = deviceData.imei.split("/")[0].trim();
+      setBarcodeUrl(`/api/etiquetas/barcode/${primaryImei}?t=${Date.now()}`);
     } else {
       setBarcodeUrl(null);
     }
@@ -113,41 +107,54 @@ export default function ImpressaoEtiquetasPage() {
 
   const searchDeviceMutation = useMutation({
     mutationFn: async (searchImei: string) => {
-      const response = await fetch(`/api/integrations/rs-logistica/orders/advanced?imei=${searchImei}`);
-      if (!response.ok) {
-        throw new Error("Falha ao buscar dados do dispositivo");
+      const [recebimentosRes, triagemRes] = await Promise.all([
+        fetch(`/api/integrations/adm-logistica/recebimentos?imei=${searchImei}`),
+        fetch(`/api/integrations/adm-logistica/triagem?imei=${searchImei}`),
+      ]);
+
+      if (!recebimentosRes.ok) {
+        throw new Error("Falha ao buscar dados de recebimentos");
       }
-      return response.json();
+
+      const recebimentosData = await recebimentosRes.json();
+      const triagemData = triagemRes.ok ? await triagemRes.json() : [];
+
+      return { recebimentos: recebimentosData, triagem: triagemData };
     },
-    onSuccess: (data) => {
-      const orders = Array.isArray(data) ? data : (data?.data || []);
-      
-      if (orders && orders.length > 0) {
-        const order = orders[0];
-        
-        const deviceDescription = order["Descrição do dispositivo"] || order["descricao_dispositivo"] || order.ModelName || order.modelName || order.description || order.Description || "";
-        
-        const erpCode = order.DeviceErpCode || order.device_erp_code || order.deviceErpCode || order.SKU || order.sku || "";
-        
-        const descParts = deviceDescription.split(" ");
-        let grading = "??";
-        if (erpCode && erpCode.length >= 2) {
-          grading = erpCode.slice(-2);
-        } else if (descParts.length >= 2) {
-          const sizeMatch = deviceDescription.match(/(\d+)\s*GB/i);
-          const colorPart = descParts[descParts.length - 1];
-          if (sizeMatch && colorPart) {
-            grading = sizeMatch[1].slice(-1) + colorPart.charAt(0).toUpperCase();
-          }
+    onSuccess: ({ recebimentos, triagem }) => {
+      const recList = Array.isArray(recebimentos) ? recebimentos : (recebimentos?.data || []);
+      const triList = Array.isArray(triagem) ? triagem : (triagem?.data || []);
+
+      if (recList && recList.length > 0) {
+        const rec = recList[0];
+
+        const modelo = rec["Modelo"] || "";
+        const codigoErp = rec["Código ERP"] || rec["Codigo ERP"] || "";
+        const imei1 = rec["IMEI"] || imei;
+        const imei2 = rec["IMEI2"] || "";
+
+        let displayImei = imei1;
+        if (imei2 && imei2.trim() !== "") {
+          displayImei = `${imei1} / ${imei2}`;
         }
-        
-        const finalErpCode = erpCode || (deviceDescription ? deviceDescription.replace(/\s+/g, "").slice(0, 5).toUpperCase() + grading : "XXXXX00");
-        
-        const newDeviceData = {
-          imei: imei,
-          deviceDescription: deviceDescription.toUpperCase() || "DISPOSITIVO NÃO IDENTIFICADO",
-          deviceErpCode: erpCode || "—",
+
+        let grading = "??";
+        if (codigoErp && codigoErp.length >= 2) {
+          grading = codigoErp.slice(-2);
+        }
+
+        let triador = "—";
+        if (triList && triList.length > 0) {
+          const tri = triList[0];
+          triador = tri["Responsável pela triagem"] || tri["Responsavel pela triagem"] || "—";
+        }
+
+        const newDeviceData: DeviceData = {
+          imei: displayImei,
+          deviceDescription: modelo.toUpperCase() || "DISPOSITIVO NÃO IDENTIFICADO",
+          deviceErpCode: codigoErp || "—",
           grading: grading,
+          triador: triador,
         };
         setDeviceData(newDeviceData);
         setError(null);
@@ -170,13 +177,14 @@ export default function ImpressaoEtiquetasPage() {
   });
 
   const triggerDirectPrint = useCallback(() => {
-    if (!deviceData || !triador) return;
+    if (!deviceData) return;
+    const primaryImei = deviceData.imei.split("/")[0].trim();
 
     const printContent = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Etiqueta - ${deviceData.imei}</title>
+        <title>Etiqueta - ${primaryImei}</title>
         <style>
           @page {
             size: 10cm 5cm;
@@ -245,10 +253,10 @@ export default function ImpressaoEtiquetasPage() {
           <div class="description">${deviceData.deviceDescription}</div>
           <div class="code">Cód: ${deviceData.deviceErpCode}</div>
           <div class="info">IMEI: ${deviceData.imei}</div>
-          <div class="info">Triador: ${triador}</div>
+          <div class="info">Triador: ${deviceData.triador}</div>
           <div class="barcode-container">
-            <img id="barcode-img" src="/api/etiquetas/barcode/${deviceData.imei}" alt="Barcode" />
-            <div class="barcode-value">${deviceData.imei}</div>
+            <img id="barcode-img" src="/api/etiquetas/barcode/${primaryImei}" alt="Barcode" />
+            <div class="barcode-value">${primaryImei}</div>
           </div>
         </div>
         <script>
@@ -276,17 +284,17 @@ export default function ImpressaoEtiquetasPage() {
       printWindow.document.write(printContent);
       printWindow.document.close();
     }
-  }, [deviceData, triador]);
+  }, [deviceData]);
 
   const printMutation = useMutation({
     mutationFn: async () => {
-      if (!deviceData || !triador) throw new Error("Dados incompletos");
+      if (!deviceData) throw new Error("Dados incompletos");
       
       const response = await apiRequest("POST", "/api/etiquetas/imprimir", {
         imei: deviceData.imei,
         deviceDescription: deviceData.deviceDescription,
         deviceErpCode: deviceData.deviceErpCode,
-        triador,
+        triador: deviceData.triador,
       });
       
       return response.json();
@@ -316,25 +324,25 @@ export default function ImpressaoEtiquetasPage() {
   };
 
   const handleDownload = () => {
-    if (!deviceData || !triador) {
+    if (!deviceData) {
       toast({
         title: "Dados incompletos",
-        description: "Selecione um triador e busque o dispositivo antes de gerar a etiqueta.",
+        description: "Busque o dispositivo antes de gerar a etiqueta.",
         variant: "destructive",
       });
       return;
     }
 
-    const zpl = generateZPL(deviceData, triador);
+    const zpl = generateZPL(deviceData);
     downloadZPL(zpl, deviceData.imei);
     toast({ title: "Arquivo ZPL gerado com sucesso!" });
   };
 
   const handlePrint = () => {
-    if (!deviceData || !triador) {
+    if (!deviceData) {
       toast({
         title: "Dados incompletos",
-        description: "Selecione um triador e busque o dispositivo antes de imprimir.",
+        description: "Busque o dispositivo antes de imprimir.",
         variant: "destructive",
       });
       return;
@@ -377,31 +385,12 @@ export default function ImpressaoEtiquetasPage() {
                 </div>
                 <div>
                   <CardTitle className="text-base">Impressão de Etiquetas</CardTitle>
-                  <CardDescription>Selecione o triador e escaneie o IMEI</CardDescription>
+                  <CardDescription>Escaneie ou digite o IMEI do dispositivo</CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="triador" className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    Triador
-                  </Label>
-                  <Select value={triador} onValueChange={setTriador}>
-                    <SelectTrigger id="triador" data-testid="select-triador">
-                      <SelectValue placeholder="Selecione o triador..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRIADORES.map((t) => (
-                        <SelectItem key={t.value} value={t.value}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="imei" className="flex items-center gap-2">
                     <Smartphone className="h-4 w-4 text-muted-foreground" />
@@ -508,7 +497,7 @@ export default function ImpressaoEtiquetasPage() {
 
               <div className="text-xl text-black font-bold space-y-1 mb-4">
                 <p>IMEI: {deviceData.imei}</p>
-                <p>Triador: {triador || "—"}</p>
+                <p>Triador: {deviceData.triador}</p>
               </div>
 
               <div className="flex flex-col items-center w-full mt-2">
@@ -536,7 +525,7 @@ export default function ImpressaoEtiquetasPage() {
                 className="flex-1 gap-2" 
                 size="lg"
                 onClick={handlePrint}
-                disabled={!triador || printMutation.isPending}
+                disabled={printMutation.isPending}
                 data-testid="button-imprimir"
               >
                 {printMutation.isPending ? (
@@ -550,7 +539,6 @@ export default function ImpressaoEtiquetasPage() {
                 variant="outline"
                 size="lg"
                 onClick={handleDownload}
-                disabled={!triador}
                 data-testid="button-download-zpl"
               >
                 <Download className="h-4 w-4" />
