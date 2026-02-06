@@ -189,7 +189,7 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
                       <Input
                         type="date"
                         data-testid="input-project-start-date"
-                        onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                        className="date-picker-full"
                         {...field}
                       />
                     </FormControl>
@@ -207,7 +207,7 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
                       <Input
                         type="date"
                         data-testid="input-project-end-date"
-                        onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                        className="date-picker-full"
                         {...field}
                       />
                     </FormControl>

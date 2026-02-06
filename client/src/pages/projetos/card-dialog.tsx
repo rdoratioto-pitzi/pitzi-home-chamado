@@ -567,7 +567,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                         <FormControl>
                           <Input
                             type="date"
-                            onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                            className="date-picker-full"
                             {...field}
                           />
                         </FormControl>
@@ -585,7 +585,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                         <FormControl>
                           <Input
                             type="date"
-                            onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                            className="date-picker-full"
                             {...field}
                           />
                         </FormControl>
