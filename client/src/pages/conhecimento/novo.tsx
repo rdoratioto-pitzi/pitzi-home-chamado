@@ -36,6 +36,8 @@ const AREAS = [
   { value: "MKT", label: "Marketing" },
   { value: "OPS", label: "Operações" },
   { value: "TI", label: "Tecnologia" },
+  { value: "DIR", label: "Diretoria" },
+  { value: "ADV", label: "Apoio a Vendas" },
 ];
 
 const TIPOS = [

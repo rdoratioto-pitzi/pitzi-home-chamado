@@ -111,15 +111,15 @@ const getTypeColor = (type: string): string => {
   return "bg-slate-500/10 text-slate-600 dark:text-slate-400";
 };
 
-import { format, addHours, isWeekend, isBefore, addDays, getHours, setHours, setMinutes, setSeconds, addBusinessDays, isAfter } from "date-fns";
-import { toZonedTime } from "date-fns-tz";
+import { format, addHours, isWeekend, isBefore, addDays, getHours, setHours, setMinutes, setSeconds, addBusinessDays, isAfter, subHours } from "date-fns";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 const TIMEZONE = "America/Sao_Paulo";
 const WORK_START_HOUR = 8;
 const WORK_HOURS_PER_DAY = 8;
 
 function calculateBusinessSLADeadline(createdAt: Date, slaHours: number): Date {
-  // Convert to SP timezone
+  // Use UTC base for calculations to avoid local JS timezone offsets
   const zonedCreated = toZonedTime(createdAt, TIMEZONE);
   let current = new Date(zonedCreated);
 
@@ -159,6 +159,15 @@ function calculateBusinessSLADeadline(createdAt: Date, slaHours: number): Date {
 
   return deadline;
 }
+
+// Helper function to format date for display in PT-BR accounting for timezone
+const formatDisplayDate = (date: Date | string | null): string => {
+  if (!date) return "-";
+  // The date from the database might be interpreted as UTC or local depending on the driver
+  // We want to force it to show the date correctly for Sao Paulo
+  const d = new Date(date);
+  return format(toZonedTime(d, TIMEZONE), "dd/MM/yyyy");
+};
 
 // Helper function to calculate time open with business hours
 const calculateTimeOpen = (createdAt: Date | string | null): { text: string; colorClass: string } => {
@@ -311,6 +320,8 @@ export default function ChamadosPage() {
       let valB: any = b[sortField as keyof Ticket];
 
       if (sortField === "createdAt") {
+        // Ensure we compare the actual time to get precise sort, 
+        // but display is handled by formatDisplayDate
         valA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         valB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       }
@@ -751,7 +762,7 @@ export default function ChamadosPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-[12px] text-muted-foreground">
-                            {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "-"}
+                            {formatDisplayDate(ticket.createdAt)}
                           </TableCell>
                           <TableCell>
                             {(() => {
