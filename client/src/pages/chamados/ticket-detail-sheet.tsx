@@ -258,6 +258,32 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     updateMutation.mutate({ priority });
   };
 
+  const { data: locationsSetting } = useQuery<Setting>({
+    queryKey: ["/api/settings", "ticket_locations"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/ticket_locations");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  const locations: { value: string; label: string }[] = locationsSetting?.value 
+    ? JSON.parse(locationsSetting.value) 
+    : [
+        { value: "sao_paulo", label: "São Paulo" },
+        { value: "curitiba", label: "Curitiba" },
+        { value: "vitoria", label: "Vitória" },
+        { value: "remoto", label: "Remoto" },
+      ];
+
+  const handleLocationChange = (location: string) => {
+    updateMutation.mutate({ location });
+  };
+
+  const handleImpactChange = (impact: string) => {
+    updateMutation.mutate({ impact });
+  };
+
   if (!ticket) return null;
 
   return (
@@ -536,6 +562,41 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                   {users.map((u) => (
                     <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <h4 className="text-sm font-medium mb-2">Local</h4>
+              <Select 
+                value={ticket.location || ""} 
+                onValueChange={handleLocationChange}
+              >
+                <SelectTrigger className="w-full" data-testid="select-change-location">
+                  <SelectValue placeholder="Selecione o local" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((l) => (
+                    <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <h4 className="text-sm font-medium mb-2">Impacto</h4>
+              <Select 
+                value={ticket.impact || ""} 
+                onValueChange={handleImpactChange}
+              >
+                <SelectTrigger className="w-full" data-testid="select-change-impact">
+                  <SelectValue placeholder="Selecione o impacto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Baixo</SelectItem>
+                  <SelectItem value="medium">Médio</SelectItem>
+                  <SelectItem value="high">Alto</SelectItem>
                 </SelectContent>
               </Select>
             </div>
