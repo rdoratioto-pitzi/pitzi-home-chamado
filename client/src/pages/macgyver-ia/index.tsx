@@ -33,7 +33,9 @@ import {
   Lightbulb,
   Code,
   BrainCircuit,
-  FileDown
+  FileDown,
+  Paperclip,
+  Image as ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -530,8 +532,16 @@ export default function MacgyverIA() {
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState("");
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+  const [attachedFiles, setAttachedFiles] = useState<Array<{
+    file: File;
+    preview: string;
+    base64: string;
+    name: string;
+    type: string;
+  }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: models = [], isLoading: modelsLoading } = useQuery<OpenRouterModel[]>({
     queryKey: ["/api/ai/models"],
@@ -562,10 +572,84 @@ export default function MacgyverIA() {
     scrollToBottom();
   }, [messages, streamingContent, scrollToBottom]);
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  const MAX_FILES = 5;
+  const SUPPORTED_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf", "text/plain", "text/csv"];
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const processFiles = useCallback(async (files: File[]) => {
+    const validFiles = files.filter(f => {
+      if (f.size > MAX_FILE_SIZE) return false;
+      if (!SUPPORTED_TYPES.some(t => f.type.startsWith(t.split("/")[0]) || f.type === t)) return false;
+      return true;
+    });
+
+    const remaining = MAX_FILES - attachedFiles.length;
+    const filesToProcess = validFiles.slice(0, remaining);
+
+    const newAttachments = await Promise.all(
+      filesToProcess.map(async (file) => {
+        const base64 = await fileToBase64(file);
+        const preview = file.type.startsWith("image/") ? base64 : "";
+        return { file, preview, base64, name: file.name, type: file.type };
+      })
+    );
+
+    setAttachedFiles(prev => [...prev, ...newAttachments]);
+  }, [attachedFiles.length]);
+
+  const handleFileSelect = useCallback((fileList: FileList) => {
+    const files = Array.from(fileList);
+    processFiles(files);
+  }, [processFiles]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageItems: DataTransferItem[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith("image/")) {
+        imageItems.push(items[i]);
+      }
+    }
+
+    if (imageItems.length > 0) {
+      e.preventDefault();
+      const files: File[] = imageItems.map(item => item.getAsFile()).filter(Boolean) as File[];
+      processFiles(files);
+    }
+  }, [processFiles]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = Array.from(e.dataTransfer.files);
+    processFiles(files);
+  }, [processFiles]);
+
+  const removeAttachment = useCallback((index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
   const handleNewConversation = () => {
     setSelectedConversationId(null);
     setInputMessage("");
     setStreamingContent("");
+    setAttachedFiles([]);
   };
 
   const handleDeleteConversation = async (id: string, e: React.MouseEvent) => {
@@ -611,25 +695,36 @@ export default function MacgyverIA() {
   };
 
   const handleSendMessageDirect = async (messageText: string) => {
-    if (!messageText.trim() || isStreaming) return;
+    if ((!messageText.trim() && attachedFiles.length === 0) || isStreaming) return;
 
-    const message = messageText.trim();
+    const message = messageText.trim() || (attachedFiles.length > 0 ? "Analise os arquivos anexados." : "");
+    const currentAttachments = attachedFiles.map(f => ({
+      type: f.type,
+      name: f.name,
+      base64: f.base64,
+    }));
+
     setInputMessage("");
+    setAttachedFiles([]);
     setIsStreaming(true);
     setStreamingContent("");
     setShowSlashMenu(false);
+
+    const displayContent = currentAttachments.length > 0
+      ? `${currentAttachments.map(a => `[Imagem anexada: ${a.name}]`).join("\n")}\n\n${message}`
+      : message;
 
     const isNewConversation = !selectedConversationId;
     const tempConversationId = selectedConversationId || "temp-" + Date.now();
 
     if (isNewConversation) {
       queryClient.setQueryData<AiMessage[]>(["/api/ai/conversations", tempConversationId, "messages"], [
-        { id: "temp-user", conversationId: tempConversationId, role: "user", content: message, createdAt: new Date(), tenantId: null }
+        { id: "temp-user", conversationId: tempConversationId, role: "user", content: displayContent, createdAt: new Date(), tenantId: null }
       ]);
     } else {
       queryClient.setQueryData<AiMessage[]>(["/api/ai/conversations", selectedConversationId, "messages"], (old = []) => [
         ...old,
-        { id: "temp-user-" + Date.now(), conversationId: selectedConversationId!, role: "user", content: message, createdAt: new Date(), tenantId: null }
+        { id: "temp-user-" + Date.now(), conversationId: selectedConversationId!, role: "user", content: displayContent, createdAt: new Date(), tenantId: null }
       ]);
     }
 
@@ -643,6 +738,7 @@ export default function MacgyverIA() {
           message,
           isNewConversation,
           model: selectedModel,
+          attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
         }),
       });
 
@@ -757,7 +853,7 @@ export default function MacgyverIA() {
   );
 
   const chatInput = (isWelcome: boolean) => (
-    <div className="relative">
+    <div className="relative" onDragOver={handleDragOver} onDrop={handleDrop}>
       {showSlashMenu && (
         <SlashCommandMenu
           commands={SLASH_COMMANDS}
@@ -766,30 +862,86 @@ export default function MacgyverIA() {
           selectedIndex={slashSelectedIndex}
         />
       )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,.pdf,.txt,.csv"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) handleFileSelect(e.target.files);
+          e.target.value = "";
+        }}
+        data-testid="input-file-upload"
+      />
       <div className="flex items-end gap-3">
         <div className={cn(
-          "flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50",
+          "flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50",
           isWelcome && "shadow-sm"
         )}>
-          <textarea
-            ref={textareaRef}
-            placeholder="Pergunte qualquer coisa ou digite / para comandos..."
-            value={inputMessage}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            disabled={isStreaming}
-            className={cn(
-              "w-full bg-transparent border-0 resize-none px-4 placeholder:text-muted-foreground focus:outline-none focus:ring-0",
-              isWelcome ? "py-4 text-base min-h-[56px] max-h-[200px]" : "py-3 text-sm min-h-[48px] max-h-[200px]"
-            )}
-            rows={1}
-            data-testid={isWelcome ? "input-chat-message" : "input-chat-message-bottom"}
-          />
+          {attachedFiles.length > 0 && (
+            <div className="flex items-center gap-2 px-3 pt-3 pb-1 flex-wrap" data-testid="attachments-preview-row">
+              {attachedFiles.map((att, idx) => (
+                <div
+                  key={idx}
+                  className="relative group flex items-center gap-2 bg-background border border-border rounded-lg p-1.5"
+                  data-testid={`attachment-preview-${idx}`}
+                >
+                  {att.type.startsWith("image/") ? (
+                    <img
+                      src={att.preview}
+                      alt={att.name}
+                      className="w-12 h-12 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  )}
+                  <span className="text-xs text-muted-foreground max-w-[80px] truncate">{att.name}</span>
+                  <button
+                    onClick={() => removeAttachment(idx)}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    data-testid={`button-remove-attachment-${idx}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-end">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 ml-1 mb-1"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isStreaming || attachedFiles.length >= MAX_FILES}
+              data-testid="button-attach-file"
+            >
+              <Paperclip className="h-4 w-4 text-muted-foreground" />
+            </Button>
+            <textarea
+              ref={textareaRef}
+              placeholder="Pergunte qualquer coisa ou digite / para comandos..."
+              value={inputMessage}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              disabled={isStreaming}
+              className={cn(
+                "w-full bg-transparent border-0 resize-none pr-4 placeholder:text-muted-foreground focus:outline-none focus:ring-0",
+                isWelcome ? "py-4 text-base min-h-[56px] max-h-[200px]" : "py-3 text-sm min-h-[48px] max-h-[200px]"
+              )}
+              rows={1}
+              data-testid={isWelcome ? "input-chat-message" : "input-chat-message-bottom"}
+            />
+          </div>
         </div>
         <Button
           size="icon"
           className="rounded-2xl shrink-0 shadow-sm"
-          disabled={!inputMessage.trim() || isStreaming}
+          disabled={(!inputMessage.trim() && attachedFiles.length === 0) || isStreaming}
           onClick={handleSendMessage}
           data-testid={isWelcome ? "button-send-message" : "button-send-message-bottom"}
         >
@@ -1003,7 +1155,22 @@ export default function MacgyverIA() {
                     {msg.role === "assistant" ? (
                       <MarkdownContent content={msg.content} />
                     ) : (
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      <div>
+                        {msg.content.includes("[Imagem anexada:") && (
+                          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                            {msg.content.match(/\[Imagem anexada: ([^\]]+)\]/g)?.map((match, i) => {
+                              const filename = match.replace("[Imagem anexada: ", "").replace("]", "");
+                              return (
+                                <span key={i} className="inline-flex items-center gap-1 text-xs bg-primary-foreground/20 px-2 py-0.5 rounded" data-testid={`attachment-marker-${i}`}>
+                                  <ImageIcon className="h-3 w-3" />
+                                  {filename}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <p className="text-sm whitespace-pre-wrap">{msg.content.replace(/\[Imagem anexada: [^\]]+\]\n*/g, "").trim()}</p>
+                      </div>
                     )}
                   </div>
                   {msg.role === "user" && (

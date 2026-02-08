@@ -3,14 +3,22 @@ import { storage } from "./storage";
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 
+type MessageContent = string | Array<{type: string; text?: string; image_url?: {url: string}}>;
+
 interface Message {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: MessageContent;
 }
 
 interface ContextOptions {
   userId?: string;
   tenantId?: string;
+}
+
+export interface Attachment {
+  type: string;
+  name: string;
+  base64: string;
 }
 
 export interface OpenRouterModel {
@@ -34,6 +42,10 @@ export interface OpenRouterModel {
 let cachedModels: OpenRouterModel[] | null = null;
 let cacheTimestamp = 0;
 const CACHE_DURATION = 30 * 60 * 1000;
+
+let cachedSystemPrompt: string | null = null;
+let systemPromptCacheTimestamp = 0;
+const SYSTEM_PROMPT_CACHE_DURATION = 5 * 60 * 1000;
 
 export async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
   const now = Date.now();
@@ -87,21 +99,30 @@ export async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
 }
 
 async function getSystemPrompt(options: ContextOptions = {}): Promise<string> {
-  const knowledgeDocs = await storage.getKnowledgeDocuments({ status: "aprovado" });
-  const metas = await storage.getMetas();
-  const tickets = await storage.getTickets();
-  const tasks = await storage.getTasks();
-  const projects = await storage.getProjects();
-  const objectives = await storage.getObjectives();
-  const pricingDevices = await storage.getPricingDevices();
-  const pricingAlerts = options.userId ? await storage.getPricingAlerts(options.userId) : [];
-  const logisticaPedidos = await storage.getLogisticaReversaPedidos();
+  const now = Date.now();
+  if (cachedSystemPrompt && (now - systemPromptCacheTimestamp) < SYSTEM_PROMPT_CACHE_DURATION) {
+    return cachedSystemPrompt;
+  }
+
+  const [knowledgeDocs, metas, tickets, tasks, projects, objectives, pricingDevices, pricingAlerts, logisticaPedidos, users, flowchartsList] = await Promise.all([
+    storage.getKnowledgeDocuments({ status: "aprovado" }),
+    storage.getMetas(),
+    storage.getTickets(),
+    storage.getTasks(),
+    storage.getProjects(),
+    storage.getObjectives(),
+    storage.getPricingDevices(),
+    options.userId ? storage.getPricingAlerts(options.userId) : Promise.resolve([]),
+    storage.getLogisticaReversaPedidos(),
+    storage.getUsers(),
+    storage.getFlowcharts(),
+  ]);
   
-  const docsContext = knowledgeDocs.slice(0, 15).map(d => `- ${d.titulo}: ${d.conteudo?.substring(0, 300)}...`).join("\n");
+  const docsContext = knowledgeDocs.slice(0, 20).map(d => `- ${d.titulo}: ${d.conteudo?.substring(0, 300)}...`).join("\n");
 
   const metasAtingidas = metas.filter(m => m.status === "concluida" || m.status === "completed").length;
   const metasPendentes = metas.filter(m => m.status === "em_andamento" || m.status === "in_progress").length;
-  const metasContext = metas.slice(0, 10).map(m => {
+  const metasContext = metas.slice(0, 15).map(m => {
     const pct = m.targetValue && Number(m.targetValue) > 0 ? Math.round((Number(m.currentValue) / Number(m.targetValue)) * 100) : 0;
     return `- ${m.title} (${m.status}): ${m.currentValue}/${m.targetValue} ${m.unit || ''} [${pct}% concluido]`;
   }).join("\n");
@@ -110,7 +131,7 @@ async function getSystemPrompt(options: ContextOptions = {}): Promise<string> {
   const ticketsAndamento = tickets.filter(t => t.status === "em_andamento" || t.status === "in_progress").length;
   const ticketsFechados = tickets.filter(t => t.status === "fechado" || t.status === "closed" || t.status === "resolved").length;
   const ticketsCriticos = tickets.filter(t => t.priority === "critica" || t.priority === "critical" || t.priority === "urgente").length;
-  const ticketsContext = tickets.slice(0, 15).map(t => {
+  const ticketsContext = tickets.slice(0, 25).map(t => {
     const assignee = t.assigneeId ? ` | Responsavel: ${t.assigneeId}` : '';
     return `- ${t.code}: ${t.title} (Status: ${t.status}, Prioridade: ${t.priority}${assignee})`;
   }).join("\n");
@@ -118,23 +139,28 @@ async function getSystemPrompt(options: ContextOptions = {}): Promise<string> {
   const tarefasPendentes = tasks.filter(t => t.status === "pendente" || t.status === "todo").length;
   const tarefasAndamento = tasks.filter(t => t.status === "em_andamento" || t.status === "in_progress").length;
   const tarefasConcluidas = tasks.filter(t => t.status === "concluida" || t.status === "done").length;
-  const tasksContext = tasks.slice(0, 15).map(t => {
+  const tasksContext = tasks.slice(0, 25).map(t => {
     const area = t.areaId ? ` | Area: ${t.areaId}` : '';
     return `- ${t.title} (Status: ${t.status}, Prioridade: ${t.priority}${area})`;
   }).join("\n");
 
-  const projectsContext = projects.slice(0, 10).map(p => {
+  const projectsContext = projects.slice(0, 15).map(p => {
     return `- ${p.name}: ${p.description || 'Sem descricao'} (Status: ${p.status})`;
   }).join("\n");
 
-  const objectivesContext = objectives.slice(0, 10).map(o => `- ${o.title} (${o.status})`).join("\n");
+  const objectivesContext = objectives.slice(0, 15).map(o => `- ${o.title} (${o.status})`).join("\n");
 
-  const pricingContext = pricingDevices.slice(0, 10).map(d => `- ${d.manufacturerName} ${d.modelName} ${d.storage}GB`).join("\n");
-  const alertsContext = pricingAlerts.slice(0, 5).map(a => `- Alerta dispositivo ${a.deviceId} (${a.alertType})`).join("\n");
-  const logisticaContext = logisticaPedidos.slice(0, 10).map(p => `- Pedido #${p.id}: ${p.status}`).join("\n");
+  const pricingContext = pricingDevices.slice(0, 15).map(d => `- ${d.manufacturerName} ${d.modelName} ${d.storage}GB`).join("\n");
+  const alertsContext = pricingAlerts.slice(0, 10).map(a => `- Alerta dispositivo ${a.deviceId} (${a.alertType})`).join("\n");
+  const logisticaContext = logisticaPedidos.slice(0, 15).map(p => `- Pedido #${p.id}: ${p.status}`).join("\n");
 
-  return `Voce e o Macgyver IA, o assistente virtual estrategico da Renov Home - uma plataforma interna de gestao empresarial da Renov.
+  const usersContext = users.slice(0, 20).map(u => `- ${u.name} (${u.email})${u.perfilAcesso ? ` | Perfil: ${u.perfilAcesso}` : ''}${u.areaNegocio ? ` | Area: ${u.areaNegocio}` : ''}`).join("\n");
+
+  const flowchartsContext = flowchartsList.slice(0, 15).map(f => `- ${f.title}${f.description ? `: ${f.description.substring(0, 100)}` : ''}`).join("\n");
+
+  const prompt = `Voce e o Macgyver IA, o assistente virtual estrategico da Renov Home - uma plataforma interna de gestao empresarial da Renov.
 Voce e um assistente avancado capaz de: analisar dados, gerar relatorios, sugerir codigo, criar prompts, identificar tendencias e fornecer insights estrategicos.
+Voce tambem pode analisar imagens enviadas pelos usuarios.
 
 CONTEXTO DA PLATAFORMA:
 A Renov Home possui os seguintes modulos:
@@ -147,8 +173,13 @@ A Renov Home possui os seguintes modulos:
 - Pricing: monitoramento de precos de smartphones/iPhones com alertas e historico
 - Base de Conhecimento: documentacao interna aprovada
 - Reunioes: gestao de reunioes com pautas e atas
+- Fluxogramas: criacao e gestao de fluxogramas de processos
 
 ESTATISTICAS CONSOLIDADAS:
+
+-- Usuarios --
+Total: ${users.length}
+${usersContext || "Nenhum usuario registrado"}
 
 -- Tickets --
 Total: ${tickets.length} | Abertos: ${ticketsAbertos} | Em Andamento: ${ticketsAndamento} | Fechados: ${ticketsFechados} | Criticos: ${ticketsCriticos}
@@ -171,6 +202,10 @@ ${objectivesContext || "Nenhum objetivo registrado"}
 Total: ${projects.length}
 ${projectsContext || "Nenhum projeto registrado"}
 
+-- Fluxogramas --
+Total: ${flowchartsList.length}
+${flowchartsContext || "Nenhum fluxograma registrado"}
+
 -- Pricing (Dispositivos Monitorados) --
 Total: ${pricingDevices.length}
 ${pricingContext || "Nenhum dispositivo monitorado"}
@@ -191,6 +226,7 @@ CAPACIDADES ESPECIAIS:
 4. RELATORIOS: Gere relatorios consolidados com dados dos modulos da plataforma
 5. SUGESTOES ESTRATEGICAS: Identifique gargalos, tendencias e oportunidades de melhoria
 6. AUTOMACAO: Sugira automacoes e workflows para otimizar processos
+7. ANALISE DE IMAGENS: Quando o usuario enviar imagens, analise e descreva o conteudo visual
 
 INSTRUCOES:
 1. Responda em portugues brasileiro de forma clara e objetiva
@@ -204,12 +240,17 @@ INSTRUCOES:
 9. Ao final de respostas analiticas, sugira proximos passos ou perguntas de aprofundamento
 10. Em analises numericas, calcule percentuais, medias e tendencias quando relevante
 11. Ao gerar relatorios, use tabelas markdown e secoes bem organizadas`;
+
+  cachedSystemPrompt = prompt;
+  systemPromptCacheTimestamp = now;
+  return prompt;
 }
 
 export async function* streamChatCompletion(
   messages: Message[],
   options: ContextOptions = {},
-  model: string = "google/gemini-2.0-flash-001"
+  model: string = "google/gemini-2.0-flash-001",
+  attachments?: Attachment[]
 ): AsyncGenerator<string> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   
@@ -218,6 +259,50 @@ export async function* streamChatCompletion(
   }
 
   const systemPrompt = await getSystemPrompt(options);
+
+  const apiMessages: Array<{role: string; content: MessageContent}> = [
+    { role: "system", content: systemPrompt },
+  ];
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const isLastUserMessage = i === messages.length - 1 && msg.role === "user";
+
+    if (isLastUserMessage && attachments && attachments.length > 0) {
+      const contentParts: Array<{type: string; text?: string; image_url?: {url: string}}> = [];
+      
+      if (typeof msg.content === "string" && msg.content.trim()) {
+        contentParts.push({ type: "text", text: msg.content });
+      }
+
+      for (const att of attachments) {
+        if (att.type.startsWith("image/")) {
+          contentParts.push({
+            type: "image_url",
+            image_url: { url: att.base64 },
+          });
+        } else {
+          try {
+            const base64Data = att.base64.includes(",") ? att.base64.split(",")[1] : att.base64;
+            const decoded = Buffer.from(base64Data, "base64").toString("utf-8");
+            contentParts.push({
+              type: "text",
+              text: `\n\n--- Conteudo do arquivo: ${att.name} ---\n${decoded}\n--- Fim do arquivo ---`,
+            });
+          } catch {
+            contentParts.push({
+              type: "text",
+              text: `\n\n[Arquivo anexado: ${att.name} (${att.type})]`,
+            });
+          }
+        }
+      }
+
+      apiMessages.push({ role: "user", content: contentParts });
+    } else {
+      apiMessages.push({ role: msg.role, content: msg.content });
+    }
+  }
 
   const response = await fetch(OPENROUTER_API_URL, {
     method: "POST",
@@ -229,10 +314,7 @@ export async function* streamChatCompletion(
     },
     body: JSON.stringify({
       model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages
-      ],
+      messages: apiMessages,
       stream: true
     })
   });
@@ -268,7 +350,6 @@ export async function* streamChatCompletion(
             yield content;
           }
         } catch {
-          // Skip invalid JSON
         }
       }
     }
@@ -309,7 +390,6 @@ export async function generateTitle(userMessage: string): Promise<string> {
       return data.choices?.[0]?.message?.content?.trim() || userMessage.slice(0, 50);
     }
   } catch {
-    // Fall back to truncating message
   }
   
   return userMessage.slice(0, 50);
