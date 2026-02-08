@@ -3573,6 +3573,32 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/flowcharts/:id/notify-collaborator", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { userId, role } = req.body;
+      if (!userId || typeof userId !== "string") return res.status(400).json({ error: "userId é obrigatório" });
+      if (!role || !["view", "edit", "comment"].includes(role)) return res.status(400).json({ error: "role deve ser view, edit ou comment" });
+      const flowchart = await storage.getFlowchart(id);
+      if (!flowchart) return res.status(404).json({ error: "Fluxograma não encontrado" });
+      const user = await storage.getUser(userId);
+      if (!user?.email) return res.status(404).json({ error: "Usuário não encontrado" });
+      const owner = flowchart.ownerId ? await storage.getUser(flowchart.ownerId) : null;
+      const roleLabel = role === "edit" ? "Editor" : role === "view" ? "Visualizador" : "Comentarista";
+      const notification = await storage.createNotification({
+        userId,
+        title: "Novo Fluxograma Compartilhado",
+        message: `Você foi adicionado como ${roleLabel} no fluxograma "${flowchart.title}"`,
+        module: "fluxogramas",
+        linkUrl: `/fluxogramas/${id}`,
+        isRead: false,
+      });
+      res.json({ success: true, notification });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ============== NOTIFICATIONS ==============
   app.get("/api/notifications/:userId", async (req, res) => {
     try {
