@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChevronLeft, ChevronRight, User as UserIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, User as UserIcon, Plus } from "lucide-react";
 import type { KanbanCard, KanbanColumn, User } from "@shared/schema";
 import {
   startOfMonth,
