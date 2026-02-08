@@ -3340,6 +3340,7 @@ export async function registerRoutes(
         message: z.string().min(1).max(10000),
         isNewConversation: z.boolean().optional(),
         tenantId: z.string().optional(),
+        model: z.string().optional(),
       });
 
       const parsed = chatSchema.safeParse(req.body);
@@ -3347,7 +3348,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid request body", details: parsed.error.errors });
       }
 
-      const { conversationId, userId, message, isNewConversation, tenantId } = parsed.data;
+      const { conversationId, userId, message, isNewConversation, tenantId, model } = parsed.data;
 
       // Create conversation if new
       let conversation;
@@ -3398,7 +3399,7 @@ export async function registerRoutes(
 
       // Stream the response with user context for personalized responses
       try {
-        for await (const chunk of streamChatCompletion(messages, { userId, tenantId })) {
+        for await (const chunk of streamChatCompletion(messages, { userId, tenantId }, model || "google/gemini-2.0-flash-001")) {
           fullResponse += chunk;
           res.write(`data: ${JSON.stringify({ type: "chunk", content: chunk })}\n\n`);
         }

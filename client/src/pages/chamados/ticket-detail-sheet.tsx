@@ -129,6 +129,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   const [commentImages, setCommentImages] = useState<string[]>([]);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
+  const [editedAttachments, setEditedAttachments] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -137,6 +138,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
       setComment("");
       setCommentImages([]);
       setEditedDescription(ticket.description);
+      setEditedAttachments(ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : []);
       setIsEditingDescription(false);
     }
   }, [ticket]);
@@ -173,10 +175,9 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
 
   const handleSaveDescription = () => {
     if (!ticket) return;
-    console.log("Saving description:", editedDescription);
     updateMutation.mutate({ 
       description: editedDescription,
-      attachments: ticket.attachments, // Preserve existing attachments unless we decide to allow editing them here
+      attachments: editedAttachments.length > 0 ? JSON.stringify(editedAttachments) : null,
       descriptionLastEditedBy: "admin", 
       descriptionLastEditedAt: new Date().toISOString() as any
     });
@@ -339,6 +340,8 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                 <RichTextarea
                   value={editedDescription}
                   onChange={setEditedDescription}
+                  images={editedAttachments}
+                  onImagesChange={setEditedAttachments}
                   maxLength={5000}
                   rows={6}
                 />
@@ -349,6 +352,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                     onClick={() => {
                       setIsEditingDescription(false);
                       setEditedDescription(ticket.description);
+                      setEditedAttachments(ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : []);
                     }}
                   >
                     <X className="h-4 w-4 mr-1" />
@@ -357,7 +361,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                   <Button 
                     size="sm" 
                     onClick={handleSaveDescription}
-                    disabled={updateMutation.isPending || editedDescription === ticket.description}
+                    disabled={updateMutation.isPending}
                   >
                     <Check className="h-4 w-4 mr-1" />
                     Salvar
@@ -377,7 +381,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
               </>
             )}
             
-            {ticket.attachments && (
+            {ticket.attachments && !isEditingDescription && (
               <div className="space-y-2 mt-2">
                 {(() => {
                   try {

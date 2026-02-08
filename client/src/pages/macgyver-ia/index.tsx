@@ -12,13 +12,37 @@ import {
   Bot, 
   User,
   Clock,
-  ArrowLeft
+  ArrowLeft,
+  ChevronDown,
+  Sparkles,
+  Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import type { AiConversation, AiMessage } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface ModelOption {
+  id: string;
+  name: string;
+  provider: string;
+  free: boolean;
+}
+
+const AVAILABLE_MODELS: ModelOption[] = [
+  { id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash", provider: "Google", free: true },
+  { id: "google/gemini-2.5-flash-preview", name: "Gemini 2.5 Flash", provider: "Google", free: true },
+  { id: "meta-llama/llama-4-maverick:free", name: "Llama 4 Maverick", provider: "Meta", free: true },
+  { id: "meta-llama/llama-4-scout:free", name: "Llama 4 Scout", provider: "Meta", free: true },
+  { id: "deepseek/deepseek-chat-v3-0324:free", name: "DeepSeek V3", provider: "DeepSeek", free: true },
+  { id: "qwen/qwen3-235b-a22b:free", name: "Qwen3 235B", provider: "Qwen", free: true },
+  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", provider: "OpenAI", free: false },
+  { id: "openai/gpt-4o", name: "GPT-4o", provider: "OpenAI", free: false },
+  { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4", provider: "Anthropic", free: false },
+  { id: "google/gemini-2.5-pro-preview", name: "Gemini 2.5 Pro", provider: "Google", free: false },
+];
 
 function formatDate(date: Date | string | null): string {
   if (!date) return "";
@@ -42,6 +66,7 @@ export default function MacgyverIA() {
   const [inputMessage, setInputMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [selectedModel, setSelectedModel] = useState<string>("google/gemini-2.0-flash-001");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -112,6 +137,7 @@ export default function MacgyverIA() {
           userId,
           message,
           isNewConversation,
+          model: selectedModel,
         }),
       });
 
@@ -237,6 +263,38 @@ export default function MacgyverIA() {
                 <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
                   Como posso te ajudar hoje?
                 </h2>
+              </div>
+
+              {/* Model Selector */}
+              <div className="w-full flex justify-center">
+                <Select value={selectedModel} onValueChange={setSelectedModel}>
+                  <SelectTrigger className="w-auto gap-2 border-border/60 bg-muted/30 rounded-full px-4" data-testid="select-model">
+                    <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Modelos Gratuitos</div>
+                    {AVAILABLE_MODELS.filter(m => m.free).map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        <span className="flex items-center gap-2">
+                          <Zap className="h-3 w-3 text-green-500 shrink-0" />
+                          <span>{model.name}</span>
+                          <span className="text-xs text-muted-foreground">({model.provider})</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">Modelos Premium</div>
+                    {AVAILABLE_MODELS.filter(m => !m.free).map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        <span className="flex items-center gap-2">
+                          <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                          <span>{model.name}</span>
+                          <span className="text-xs text-muted-foreground">({model.provider})</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Input Box - Modern Design */}
@@ -429,7 +487,37 @@ export default function MacgyverIA() {
       {/* Bottom Input - Only show when in conversation */}
       {isInConversation && (
         <div className="border-t p-4 bg-background shrink-0">
-          <div className="max-w-3xl mx-auto">
+          <div className="max-w-3xl mx-auto space-y-2">
+            <div className="flex items-center">
+              <Select value={selectedModel} onValueChange={setSelectedModel}>
+                <SelectTrigger className="w-auto gap-2 border-border/60 bg-muted/30 rounded-full px-3 h-7 text-xs" data-testid="select-model-bottom">
+                  <Sparkles className="h-3 w-3 text-primary shrink-0" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Modelos Gratuitos</div>
+                  {AVAILABLE_MODELS.filter(m => m.free).map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <span className="flex items-center gap-2">
+                        <Zap className="h-3 w-3 text-green-500 shrink-0" />
+                        <span>{model.name}</span>
+                        <span className="text-xs text-muted-foreground">({model.provider})</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">Modelos Premium</div>
+                  {AVAILABLE_MODELS.filter(m => !m.free).map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <span className="flex items-center gap-2">
+                        <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+                        <span>{model.name}</span>
+                        <span className="text-xs text-muted-foreground">({model.provider})</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-end gap-3">
               <div className="flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden focus-within:border-primary/50">
                 <textarea

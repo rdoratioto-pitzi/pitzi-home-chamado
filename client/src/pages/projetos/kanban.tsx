@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Plus, MoreHorizontal, GripVertical, Play, Square, Hash, Search, CheckCircle, Lock } from "lucide-react";
+import { Plus, MoreHorizontal, GripVertical, Play, Square, Hash, Search, CheckCircle, Lock, Pencil } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Project, KanbanColumn, KanbanCard, User } from "@shared/schema";
 import { CardDialog } from "./card-dialog";
@@ -20,6 +20,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   DndContext, 
@@ -43,7 +51,9 @@ function KanbanColumnComponent({
   onNewCard, 
   onEditCard, 
   onDeleteColumn,
-  onDragColumnStart 
+  onDragColumnStart,
+  onEditColumn,
+  onDropColumn
 }: { 
   column: KanbanColumn; 
   columnCards: KanbanCard[]; 
@@ -55,6 +65,8 @@ function KanbanColumnComponent({
   onEditCard: (card: KanbanCard) => void;
   onDeleteColumn: (id: string) => void;
   onDragColumnStart: (e: React.DragEvent, id: string) => void;
+  onEditColumn: (id: string, currentName: string) => void;
+  onDropColumn: (targetId: string) => void;
 }) {
   const { setNodeRef } = useDroppable({
     id: column.id,
@@ -64,6 +76,8 @@ function KanbanColumnComponent({
     <div 
       ref={setNodeRef}
       className="flex-shrink-0 w-80 h-full"
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={() => onDropColumn(column.id)}
     >
       <Card className="h-full flex flex-col bg-muted/30 border-none shadow-none">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 pt-3">
@@ -91,6 +105,10 @@ function KanbanColumnComponent({
                 <>
                   <DropdownMenuItem onClick={() => onNewCard(column.id)}>
                     Adicionar Card
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onEditColumn(column.id, column.name)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Renomear Coluna
                   </DropdownMenuItem>
                   <DropdownMenuItem 
                     className="text-destructive"
@@ -142,6 +160,7 @@ export default function KanbanPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
+  const [editingColumn, setEditingColumn] = useState<{ id: string; name: string } | null>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -235,6 +254,17 @@ export default function KanbanPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "columns"] });
+    },
+  });
+
+  const renameColumnMutation = useMutation({
+    mutationFn: async ({ columnId, name }: { columnId: string; name: string }) => {
+      return apiRequest("PATCH", `/api/columns/${columnId}`, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "columns"] });
+      setEditingColumn(null);
+      toast({ title: "Coluna renomeada", description: "O nome da coluna foi atualizado com sucesso." });
     },
   });
 
@@ -427,6 +457,8 @@ export default function KanbanPage() {
                   onEditCard={openEditCardDialog}
                   onDeleteColumn={(id) => deleteColumnMutation.mutate(id)}
                   onDragColumnStart={handleColumnDragStart}
+                  onEditColumn={(id, name) => setEditingColumn({ id, name })}
+                  onDropColumn={handleColumnDrop}
                 />
               ))}
             </div>
@@ -449,6 +481,35 @@ export default function KanbanPage() {
         projectId={projectId || ""}
         existingColumnsCount={columns.length}
       />
+      <Dialog open={!!editingColumn} onOpenChange={(open) => { if (!open) setEditingColumn(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Renomear Coluna</DialogTitle>
+            <DialogDescription>Altere o nome da coluna.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            if (editingColumn) {
+              renameColumnMutation.mutate({ columnId: editingColumn.id, name: editingColumn.name });
+            }
+          }} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nome da Coluna</label>
+              <Input
+                value={editingColumn?.name || ""}
+                onChange={(e) => setEditingColumn(prev => prev ? { ...prev, name: e.target.value } : null)}
+                data-testid="input-rename-column"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditingColumn(null)}>Cancelar</Button>
+              <Button type="submit" disabled={renameColumnMutation.isPending} data-testid="button-submit-rename-column">
+                {renameColumnMutation.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
