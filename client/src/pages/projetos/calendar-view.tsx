@@ -135,7 +135,7 @@ export function CalendarView({ cards, columns, users, onEditCard, onNewCard, isR
             return (
               <div
                 key={i}
-                className={`border-b border-r p-1.5 min-h-[100px] transition-colors ${
+                className={`border-b border-r p-1.5 min-h-[100px] transition-colors group ${
                   !isCurrentMonth ? "bg-muted/20" : ""
                 } ${isTodayDate ? "bg-primary/5" : ""}`}
                 data-testid={`calendar-day-${format(day, "yyyy-MM-dd")}`}
@@ -152,6 +152,17 @@ export function CalendarView({ cards, columns, users, onEditCard, onNewCard, isR
                   >
                     {format(day, "d")}
                   </span>
+                  {!isReadOnly && columns.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => onNewCard(columns[0].id)}
+                      data-testid={`calendar-add-task-${format(day, "yyyy-MM-dd")}`}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
                 <div className="space-y-0.5">
                   {visibleCards.map((card) => (

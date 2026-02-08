@@ -71,6 +71,10 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
       if (c.endDate) allDates.push(new Date(c.endDate));
     });
 
+    // Also include subtasks in the date range calculation explicitly
+    // though the above loop already covers all cards.
+
+
     if (allDates.length === 0) {
       const today = new Date();
       const start = startOfWeek(subWeeks(today, 1), { weekStartsOn: 1 });
@@ -187,7 +191,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
               return (
                 <div
                   key={card.id}
-                  className={`flex items-center gap-2 px-3 border-b hover-elevate cursor-pointer ${
+                  className={`flex items-center gap-2 px-3 border-b hover:bg-muted/50 cursor-pointer ${
                     idx % 2 === 0 ? "bg-background" : "bg-muted/10"
                   }`}
                   style={{ height: ROW_HEIGHT, paddingLeft: depth * 24 + 12 }}
@@ -230,7 +234,20 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                 </div>
               );
             })}
-            {rows.length === 0 && (
+            {!isReadOnly && columns.length > 0 && (
+              <div
+                className="flex items-center gap-2 px-3 border-b hover:bg-muted/50 cursor-pointer text-primary"
+                style={{ height: ROW_HEIGHT, paddingLeft: 12 }}
+                onClick={() => onNewCard(columns[0].id)}
+                data-testid="button-gantt-new-task"
+              >
+                <div className="w-5 flex-shrink-0 flex items-center justify-center">
+                  <Plus className="h-4 w-4" />
+                </div>
+                <span className="text-xs font-medium">Nova Tarefa</span>
+              </div>
+            )}
+            {rows.length === 0 && !(!isReadOnly && columns.length > 0) && (
               <div className="flex items-center justify-center h-32 text-sm text-muted-foreground">
                 Nenhuma tarefa com datas definidas
               </div>
@@ -283,7 +300,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                       ? "bg-muted/20"
                       : ""
                   }`}
-                  style={{ left: i * DAY_WIDTH, width: DAY_WIDTH, height: rows.length * ROW_HEIGHT }}
+                  style={{ left: i * DAY_WIDTH, width: DAY_WIDTH, height: (rows.length + (!isReadOnly ? 1 : 0)) * ROW_HEIGHT }}
                 />
               ))}
 
@@ -292,7 +309,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                   className="absolute top-0 w-0.5 bg-primary z-20"
                   style={{
                     left: differenceInDays(new Date(), timelineStart) * DAY_WIDTH + DAY_WIDTH / 2,
-                    height: rows.length * ROW_HEIGHT,
+                    height: (rows.length + (!isReadOnly ? 1 : 0)) * ROW_HEIGHT,
                   }}
                 />
               )}
@@ -313,14 +330,14 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div
-                            className={`absolute top-1.5 rounded cursor-pointer transition-all hover:brightness-110 hover:shadow-md ${
+                            className={`absolute rounded cursor-pointer transition-all hover:brightness-110 hover:shadow-md ${
                               depth === 0 ? priorityColors[card.priority] : priorityColors[card.priority] + "/70"
                             }`}
                             style={{
                               left: pos.left + 2,
                               width: pos.width,
-                              height: depth === 0 ? 24 : 20,
-                              top: depth === 0 ? 8 : 10,
+                              height: 24,
+                              top: 8,
                             }}
                             onClick={() => onEditCard(card)}
                             data-testid={`gantt-bar-${card.id}`}
