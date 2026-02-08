@@ -5,6 +5,7 @@ export interface UserPermissions {
   okrs: boolean;
   metas: boolean;
   reunioes: boolean;
+  fluxogramas: boolean;
   logistica: boolean;
   pricing: boolean;
   conhecimento: boolean;
@@ -46,6 +47,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     okrs: false,
     metas: false,
     reunioes: false,
+    fluxogramas: false,
     logistica: false,
     pricing: false,
     conhecimento: false,
@@ -63,6 +65,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       okrs: true,
       metas: true,
       reunioes: true,
+      fluxogramas: true,
       logistica: true,
       pricing: true,
       conhecimento: true,

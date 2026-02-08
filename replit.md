@@ -17,6 +17,7 @@ Key capabilities include:
 - Task management by area, supporting comments and reactions.
 - Dedicated module for meeting management including agendas and minutes.
 - Quarterly OKR tracking.
+- Visual flowchart editor (Fluxogramas) with drag-and-drop, shape library, comments, version history, and PNG export.
 - Logistics functionalities: tracking, freight simulation, and reverse logistics.
 - Real-time pricing monitoring for smartphones/iPhones via external API integration.
 - Documentation of internal APIs (BI RS, Pricing) and integrations with external services like Correios.

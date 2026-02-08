@@ -48,6 +48,7 @@ export type ModulePermissions = {
   tarefas: boolean;
   okrs: boolean;
   metas: boolean;
+  fluxogramas: boolean;
   logistica: boolean;
   pricing: boolean;
   conhecimento: boolean;
@@ -882,6 +883,54 @@ export type KnowledgeDocumentWithDetails = KnowledgeDocument & {
   aprovador?: User;
   favorito?: boolean;
 };
+
+// ============== FLUXOGRAMAS MODULE ==============
+export const flowcharts = pgTable("flowcharts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  title: text("title").notNull(),
+  description: text("description"),
+  ownerId: varchar("owner_id").notNull(),
+  nodesData: text("nodes_data"), // JSON array of React Flow nodes
+  edgesData: text("edges_data"), // JSON array of React Flow edges
+  viewport: text("viewport"), // JSON { x, y, zoom }
+  permissions: text("permissions"), // JSON: { userId: "view"|"edit"|"comment" }
+  isTemplate: boolean("is_template").default(false),
+  templateCategory: text("template_category"),
+  thumbnail: text("thumbnail"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFlowchartSchema = createInsertSchema(flowcharts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFlowchart = z.infer<typeof insertFlowchartSchema>;
+export type Flowchart = typeof flowcharts.$inferSelect;
+
+export const flowchartVersions = pgTable("flowchart_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  flowchartId: varchar("flowchart_id").notNull(),
+  versionNumber: integer("version_number").notNull().default(1),
+  createdBy: varchar("created_by").notNull(),
+  snapshotJson: text("snapshot_json").notNull(), // JSON: { nodes, edges, viewport }
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFlowchartVersionSchema = createInsertSchema(flowchartVersions).omit({ id: true, createdAt: true });
+export type InsertFlowchartVersion = z.infer<typeof insertFlowchartVersionSchema>;
+export type FlowchartVersion = typeof flowchartVersions.$inferSelect;
+
+export const flowchartComments = pgTable("flowchart_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  flowchartId: varchar("flowchart_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  nodeId: varchar("node_id"),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFlowchartCommentSchema = createInsertSchema(flowchartComments).omit({ id: true, createdAt: true });
+export type InsertFlowchartComment = z.infer<typeof insertFlowchartCommentSchema>;
+export type FlowchartComment = typeof flowchartComments.$inferSelect;
 
 // ============== AI CHAT ==============
 export const aiConversations = pgTable("ai_conversations", {

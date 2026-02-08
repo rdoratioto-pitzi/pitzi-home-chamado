@@ -3447,6 +3447,132 @@ export async function registerRoutes(
     }
   });
 
+  // ============== FLUXOGRAMAS (Flowcharts) ==============
+  app.get("/api/flowcharts", async (req, res) => {
+    try {
+      const { ownerId } = req.query;
+      const list = await storage.getFlowcharts(ownerId as string | undefined);
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/flowcharts/templates", async (req, res) => {
+    try {
+      const templates = await storage.getFlowchartTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/flowcharts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const fc = await storage.getFlowchart(id);
+      if (!fc) return res.status(404).json({ error: "Fluxograma não encontrado" });
+      res.json(fc);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/flowcharts", async (req, res) => {
+    try {
+      const data = req.body;
+      const fc = await storage.createFlowchart(data);
+      res.status(201).json(fc);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/flowcharts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const data = req.body;
+      const fc = await storage.updateFlowchart(id, data);
+      if (!fc) return res.status(404).json({ error: "Fluxograma não encontrado" });
+      res.json(fc);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/flowcharts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteFlowchart(id);
+      if (!deleted) return res.status(404).json({ error: "Fluxograma não encontrado" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Flowchart Versions
+  app.get("/api/flowcharts/:id/versions", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const versions = await storage.getFlowchartVersions(id);
+      res.json(versions);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/flowcharts/:id/versions", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const existing = await storage.getFlowchartVersions(id);
+      const nextVersion = existing.length > 0 ? Math.max(...existing.map(v => v.versionNumber)) + 1 : 1;
+      const version = await storage.createFlowchartVersion({
+        ...req.body,
+        flowchartId: id,
+        versionNumber: nextVersion,
+      });
+      res.status(201).json(version);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Flowchart Comments
+  app.get("/api/flowcharts/:id/comments", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const comments = await storage.getFlowchartComments(id);
+      res.json(comments);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/flowcharts/:id/comments", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const comment = await storage.createFlowchartComment({
+        ...req.body,
+        flowchartId: id,
+      });
+      res.status(201).json(comment);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/flowcharts/comments/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteFlowchartComment(id);
+      if (!deleted) return res.status(404).json({ error: "Comentário não encontrado" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // ============== NOTIFICATIONS ==============
   app.get("/api/notifications/:userId", async (req, res) => {
     try {

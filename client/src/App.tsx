@@ -47,6 +47,8 @@ import ConhecimentoNovoPage from "@/pages/conhecimento/novo";
 import ConhecimentoDocumentoPage from "@/pages/conhecimento/documento";
 import ConhecimentoFavoritosPage from "@/pages/conhecimento/favoritos";
 import MacgyverIAPage from "@/pages/macgyver-ia/index";
+import FluxogramasPage from "@/pages/fluxogramas/index";
+import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 
 function Router() {
   return (
@@ -87,13 +89,23 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/reunioes">
-        <ProtectedRoute requiredPermission="tarefas">
+        <ProtectedRoute requiredPermission="reunioes">
           <ReunioesPage />
         </ProtectedRoute>
       </Route>
       <Route path="/reunioes/:id">
-        <ProtectedRoute requiredPermission="tarefas">
+        <ProtectedRoute requiredPermission="reunioes">
           <MeetingDetailPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/fluxogramas">
+        <ProtectedRoute requiredPermission="fluxogramas">
+          <FluxogramasPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/fluxogramas/:id">
+        <ProtectedRoute requiredPermission="fluxogramas">
+          <FlowchartEditorPage />
         </ProtectedRoute>
       </Route>
       <Route path="/metas">

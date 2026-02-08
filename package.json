@@ -56,6 +56,7 @@
     "@uppy/core": "^5.2.0",
     "@uppy/dashboard": "^5.1.0",
     "@uppy/react": "^5.1.1",
+    "@xyflow/react": "^12.10.0",
     "bwip-js": "^4.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

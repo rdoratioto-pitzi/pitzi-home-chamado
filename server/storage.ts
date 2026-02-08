@@ -39,6 +39,9 @@ import {
   type AiConversation, type InsertAiConversation,
   type AiMessage, type InsertAiMessage,
   type Notification, type InsertNotification,
+  type Flowchart, type InsertFlowchart,
+  type FlowchartVersion, type InsertFlowchartVersion,
+  type FlowchartComment, type InsertFlowchartComment,
   users, tickets, ticketResponsaveis, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
@@ -46,6 +49,7 @@ import {
   pricingDevices, pricingPriceHistory, pricingAlerts,
   metaAreas, metas, metaCheckins,
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
+  flowcharts, flowchartVersions, flowchartComments,
   aiConversations, aiMessages, notifications
 } from "@shared/schema";
 import { db } from "./db";
@@ -285,6 +289,25 @@ export interface IStorage {
   // AI Messages
   getAiMessages(conversationId: string): Promise<AiMessage[]>;
   createAiMessage(message: InsertAiMessage): Promise<AiMessage>;
+
+  // Flowcharts
+  getFlowcharts(ownerId?: string): Promise<Flowchart[]>;
+  getFlowchart(id: string): Promise<Flowchart | undefined>;
+  createFlowchart(flowchart: InsertFlowchart): Promise<Flowchart>;
+  updateFlowchart(id: string, data: Partial<Flowchart>): Promise<Flowchart | undefined>;
+  deleteFlowchart(id: string): Promise<boolean>;
+
+  // Flowchart Templates
+  getFlowchartTemplates(): Promise<Flowchart[]>;
+
+  // Flowchart Versions
+  getFlowchartVersions(flowchartId: string): Promise<FlowchartVersion[]>;
+  createFlowchartVersion(version: InsertFlowchartVersion): Promise<FlowchartVersion>;
+
+  // Flowchart Comments
+  getFlowchartComments(flowchartId: string): Promise<FlowchartComment[]>;
+  createFlowchartComment(comment: InsertFlowchartComment): Promise<FlowchartComment>;
+  deleteFlowchartComment(id: string): Promise<boolean>;
 
   // Notifications
   getNotifications(userId: string): Promise<Notification[]>;
@@ -1126,6 +1149,68 @@ export class DatabaseStorage implements IStorage {
     const [created] = await db.insert(aiMessages).values(message).returning();
     return created;
   }
+  // Flowcharts
+  async getFlowcharts(ownerId?: string): Promise<Flowchart[]> {
+    if (ownerId) {
+      return await db.select().from(flowcharts).where(
+        and(eq(flowcharts.ownerId, ownerId), eq(flowcharts.isTemplate, false))
+      ).orderBy(sql`${flowcharts.updatedAt} DESC`);
+    }
+    return await db.select().from(flowcharts).where(eq(flowcharts.isTemplate, false)).orderBy(sql`${flowcharts.updatedAt} DESC`);
+  }
+
+  async getFlowchart(id: string): Promise<Flowchart | undefined> {
+    const [fc] = await db.select().from(flowcharts).where(eq(flowcharts.id, id));
+    return fc;
+  }
+
+  async createFlowchart(flowchart: InsertFlowchart): Promise<Flowchart> {
+    const [created] = await db.insert(flowcharts).values(flowchart).returning();
+    return created;
+  }
+
+  async updateFlowchart(id: string, data: Partial<Flowchart>): Promise<Flowchart | undefined> {
+    const [updated] = await db.update(flowcharts).set({ ...data, updatedAt: new Date() }).where(eq(flowcharts.id, id)).returning();
+    return updated;
+  }
+
+  async deleteFlowchart(id: string): Promise<boolean> {
+    await db.delete(flowchartComments).where(eq(flowchartComments.flowchartId, id));
+    await db.delete(flowchartVersions).where(eq(flowchartVersions.flowchartId, id));
+    const result = await db.delete(flowcharts).where(eq(flowcharts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Flowchart Templates
+  async getFlowchartTemplates(): Promise<Flowchart[]> {
+    return await db.select().from(flowcharts).where(eq(flowcharts.isTemplate, true));
+  }
+
+  // Flowchart Versions
+  async getFlowchartVersions(flowchartId: string): Promise<FlowchartVersion[]> {
+    return await db.select().from(flowchartVersions).where(eq(flowchartVersions.flowchartId, flowchartId)).orderBy(sql`${flowchartVersions.createdAt} DESC`);
+  }
+
+  async createFlowchartVersion(version: InsertFlowchartVersion): Promise<FlowchartVersion> {
+    const [created] = await db.insert(flowchartVersions).values(version).returning();
+    return created;
+  }
+
+  // Flowchart Comments
+  async getFlowchartComments(flowchartId: string): Promise<FlowchartComment[]> {
+    return await db.select().from(flowchartComments).where(eq(flowchartComments.flowchartId, flowchartId)).orderBy(sql`${flowchartComments.createdAt} DESC`);
+  }
+
+  async createFlowchartComment(comment: InsertFlowchartComment): Promise<FlowchartComment> {
+    const [created] = await db.insert(flowchartComments).values(comment).returning();
+    return created;
+  }
+
+  async deleteFlowchartComment(id: string): Promise<boolean> {
+    const result = await db.delete(flowchartComments).where(eq(flowchartComments.id, id)).returning();
+    return result.length > 0;
+  }
+
   // Notifications
   async getNotifications(userId: string): Promise<Notification[]> {
     return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(sql`${notifications.createdAt} DESC`).limit(50);

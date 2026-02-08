@@ -14,7 +14,8 @@ import {
   Video,
   BarChart3,
   Bot,
-  ArrowRight
+  ArrowRight,
+  Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
@@ -68,6 +69,14 @@ const modules: ModuleCard[] = [
     href: "/reunioes",
     color: "text-purple-600 dark:text-purple-400",
     bgColor: "bg-purple-100 dark:bg-purple-900/30",
+  },
+  {
+    title: "Fluxogramas",
+    description: "Crie e edite fluxogramas visuais",
+    icon: Workflow,
+    href: "/fluxogramas",
+    color: "text-teal-600 dark:text-teal-400",
+    bgColor: "bg-teal-100 dark:bg-teal-900/30",
   },
   {
     title: "Metas",

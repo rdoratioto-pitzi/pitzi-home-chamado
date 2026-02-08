@@ -31,6 +31,7 @@ import {
   Bot,
   Printer,
   Settings2,
+  Workflow,
 } from "lucide-react";
 import {
   Sidebar,
@@ -96,6 +97,12 @@ const allMenuItems = [
     url: "/reunioes",
     icon: Video,
     module: "tarefas" as keyof ModulePermissions,
+  },
+  {
+    title: "Fluxogramas",
+    url: "/fluxogramas",
+    icon: Workflow,
+    module: "fluxogramas" as keyof ModulePermissions,
   },
 ];
 
@@ -190,6 +197,7 @@ export function AppSidebar() {
           projetos: true,
           tarefas: true,
           okrs: true,
+          fluxogramas: true,
           logistica: true,
           pricing: true,
           conhecimento: true,
@@ -210,6 +218,7 @@ export function AppSidebar() {
       projetos: false,
       tarefas: false,
       okrs: false,
+      fluxogramas: false,
       logistica: false,
       pricing: false,
       conhecimento: false,
