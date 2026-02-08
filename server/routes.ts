@@ -3333,11 +3333,14 @@ export async function registerRoutes(
 
   app.post("/api/ai/spaces", async (req, res) => {
     try {
-      const schema = z.object({ userId: z.string(), name: z.string().min(1).max(50), color: z.string().optional(), tenantId: z.string().optional() });
-      const data = schema.parse(req.body);
-      const space = await storage.createAiSpace(data);
+      const { userId, name, color, tenantId } = req.body;
+      if (!userId || !name) {
+        return res.status(400).json({ error: "UserId and name are required" });
+      }
+      const space = await storage.createAiSpace({ userId, name, color, tenantId });
       res.json(space);
     } catch (error: any) {
+      console.error("Error creating space:", error);
       res.status(500).json({ error: error.message });
     }
   });

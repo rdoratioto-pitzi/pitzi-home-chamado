@@ -574,8 +574,8 @@ function RightSidebar({
   const handleCreateSpace = async () => {
     if (!newSpaceName.trim()) return;
     try {
-      await apiRequest("POST", "/api/ai/spaces", { userId, name: newSpaceName.trim() });
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
+      const res = await apiRequest("POST", "/api/ai/spaces", { userId, name: newSpaceName.trim() });
+      await queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
       setNewSpaceName("");
       setShowNewSpace(false);
     } catch (error) {
@@ -787,6 +787,20 @@ function RightSidebar({
                         </Button>
                       </div>
                       <div className="pl-4 space-y-1 border-l ml-1 mt-1">
+                        {conversations
+                          .filter(c => (spaces.find(s => s.id === space.id) as any)?.conversations?.some((sc: any) => sc.conversationId === c.id))
+                          .map(conv => (
+                            <button
+                              key={conv.id}
+                              className={cn(
+                                "w-full text-left px-2 py-1.5 rounded-md text-xs transition-colors truncate",
+                                conv.id === selectedConversationId ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                              )}
+                              onClick={() => onSelectConversation(conv.id)}
+                            >
+                              {conv.title || "Nova Conversa"}
+                            </button>
+                          ))}
                         {selectedConversationId && (
                           <Button
                             variant="ghost"
@@ -825,7 +839,7 @@ export default function MacgyverIA() {
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState("");
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
-  const [showRightSidebar, setShowRightSidebar] = useState(true);
+  const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<Array<{
     file: File;
     preview: string;
