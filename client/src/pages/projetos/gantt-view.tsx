@@ -300,7 +300,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                       ? "bg-muted/20"
                       : ""
                   }`}
-                  style={{ left: i * DAY_WIDTH, width: DAY_WIDTH, height: (rows.length + (!isReadOnly ? 1 : 0)) * ROW_HEIGHT }}
+                  style={{ left: i * DAY_WIDTH, width: DAY_WIDTH, height: (rows.length + (!isReadOnly && columns.length > 0 ? 1 : 0)) * ROW_HEIGHT }}
                 />
               ))}
 
@@ -309,7 +309,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                   className="absolute top-0 w-0.5 bg-primary z-20"
                   style={{
                     left: differenceInDays(new Date(), timelineStart) * DAY_WIDTH + DAY_WIDTH / 2,
-                    height: (rows.length + (!isReadOnly ? 1 : 0)) * ROW_HEIGHT,
+                    height: (rows.length + (!isReadOnly && columns.length > 0 ? 1 : 0)) * ROW_HEIGHT,
                   }}
                 />
               )}
@@ -338,8 +338,12 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                               width: pos.width,
                               height: 24,
                               top: 8,
+                              zIndex: depth === 0 ? 5 : 4
                             }}
-                            onClick={() => onEditCard(card)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditCard(card);
+                            }}
                             data-testid={`gantt-bar-${card.id}`}
                           >
                             <div className="flex items-center h-full px-2 gap-1 overflow-hidden">
@@ -355,7 +359,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                             )}
                           </div>
                         </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs">
+                        <TooltipContent side="top" className="max-w-xs" style={{ zIndex: 100 }}>
                           <div className="space-y-1">
                             <p className="font-semibold text-xs">{card.title}</p>
                             <p className="text-[10px] text-muted-foreground">
@@ -380,6 +384,9 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                   </div>
                 );
               })}
+              {!isReadOnly && columns.length > 0 && (
+                <div className="relative border-b" style={{ height: ROW_HEIGHT }} />
+              )}
             </div>
           </div>
         </div>
