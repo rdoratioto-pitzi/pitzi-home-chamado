@@ -118,9 +118,23 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
   const ROW_HEIGHT = 40;
   const HEADER_HEIGHT = 56;
 
+  const getEffectiveDates = (card: KanbanCard): { start: Date | null; end: Date | null } => {
+    let start = card.startDate ? startOfDay(new Date(card.startDate)) : null;
+    let end = card.endDate ? endOfDay(new Date(card.endDate)) : null;
+
+    if (!start && !end && card.parentCardId) {
+      const parent = cards.find(c => c.id === card.parentCardId);
+      if (parent) {
+        start = parent.startDate ? startOfDay(new Date(parent.startDate)) : null;
+        end = parent.endDate ? endOfDay(new Date(parent.endDate)) : null;
+      }
+    }
+
+    return { start, end };
+  };
+
   const getBarPosition = (card: KanbanCard) => {
-    const start = card.startDate ? startOfDay(new Date(card.startDate)) : null;
-    const end = card.endDate ? endOfDay(new Date(card.endDate)) : null;
+    const { start, end } = getEffectiveDates(card);
 
     if (!start && !end) return null;
 
@@ -317,6 +331,9 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
               {rows.map(({ card, depth }, idx) => {
                 const pos = getBarPosition(card);
                 const assignee = getAssignee(card.assigneeId);
+                const hasOwnDates = !!(card.startDate || card.endDate);
+                const isInherited = !hasOwnDates && !!card.parentCardId && !!pos;
+                const effectiveDates = getEffectiveDates(card);
 
                 return (
                   <div
@@ -332,7 +349,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                           <div
                             className={`absolute rounded cursor-pointer transition-all hover:brightness-110 hover:shadow-md ${
                               priorityColors[card.priority]
-                            } ${depth > 0 ? "opacity-90" : ""}`}
+                            } ${depth > 0 ? "opacity-80" : ""} ${isInherited ? "border border-dashed border-white/50 opacity-60" : ""}`}
                             style={{
                               left: pos.left + 2,
                               width: pos.width,
@@ -363,9 +380,10 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                           <div className="space-y-1">
                             <p className="font-semibold text-xs">{card.title}</p>
                             <p className="text-[10px] text-muted-foreground">
-                              {card.startDate && format(new Date(card.startDate), "dd/MM/yyyy")}
-                              {card.startDate && card.endDate && " - "}
-                              {card.endDate && format(new Date(card.endDate), "dd/MM/yyyy")}
+                              {effectiveDates.start && format(effectiveDates.start, "dd/MM/yyyy")}
+                              {effectiveDates.start && effectiveDates.end && " - "}
+                              {effectiveDates.end && format(effectiveDates.end, "dd/MM/yyyy")}
+                              {isInherited && " (herdado do pai)"}
                             </p>
                             <div className="flex items-center gap-2 text-[10px]">
                               <Badge variant="secondary" className="text-[9px] h-4">

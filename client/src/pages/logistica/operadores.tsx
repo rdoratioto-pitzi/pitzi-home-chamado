@@ -73,8 +73,8 @@ export default function OperadoresPage() {
   };
 
   const filteredOperators = operators?.filter(op => 
-    op.razaoSocial.toLowerCase().includes(search.toLowerCase()) || 
-    op.cnpj.includes(search)
+    (op.razaoSocial ?? "").toLowerCase().includes(search.toLowerCase()) || 
+    (op.cnpj ?? "").includes(search)
   );
 
   return (
@@ -175,7 +175,7 @@ export default function OperadoresPage() {
               </TableRow>
             ) : (
               filteredOperators?.map((op) => (
-                <TableRow key={op.id} className="hover-elevate" data-testid={`row-operator-${op.id}`}>
+                <TableRow key={op.id} data-testid={`row-operator-${op.id}`}>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center">

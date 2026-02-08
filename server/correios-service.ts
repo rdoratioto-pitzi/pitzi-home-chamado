@@ -309,6 +309,60 @@ async function makeSOAPRequest(soapBody: string, soapAction: string): Promise<an
   }
 }
 
+export const CORREIOS_ERROR_CODES: Record<string, string> = {
+  '0': 'Sucesso',
+  '00': 'Sucesso',
+  '-1': 'Falha no sistema. Tente novamente mais tarde.',
+  '-2': 'Erro de comunicação com o servidor dos Correios.',
+  '-3': 'Usuário ou senha inválidos.',
+  '-4': 'Código administrativo inválido ou não autorizado.',
+  '-5': 'CEP de origem ou destino inválido.',
+  '-6': 'CEP fora da área de cobertura para coleta domiciliar.',
+  '-7': 'Serviço não disponível para o CEP informado.',
+  '-8': 'Prazo de postagem expirado.',
+  '-9': 'Pedido já cancelado anteriormente.',
+  '-10': 'Número do pedido não encontrado.',
+  '-11': 'Não é possível cancelar pedido já coletado.',
+  '-12': 'Objeto já possui etiqueta vinculada.',
+  '-13': 'Limite máximo de objetos por solicitação excedido (máx. 50).',
+  '-14': 'Dados do remetente incompletos ou inválidos.',
+  '-15': 'Dados do destinatário incompletos ou inválidos.',
+  '-16': "Tipo de solicitação inválido. Use 'A' (Autorização) ou 'C' (Coleta).",
+  '-17': 'Código de serviço inválido.',
+  '-18': 'Valor declarado acima do limite permitido.',
+  '-19': 'Objeto com peso ou dimensões acima do permitido.',
+  '-20': 'Range de etiquetas esgotado.',
+  '111': 'Coleta domiciliar não disponível para esta localidade. Utilize Autorização de Postagem.',
+  '112': 'CEP não atendido pelo serviço selecionado.',
+  '113': 'Dados obrigatórios não preenchidos.',
+  '114': 'Formato de dados inválido.',
+  '999': 'Erro interno nos Correios. Tente novamente mais tarde.',
+};
+
+export const CORREIOS_STATUS_MAP: Record<string, string> = {
+  'solicitado': 'Solicitado',
+  'aguardando_postagem': 'Aguardando Postagem',
+  'aguardando_coleta': 'Aguardando Coleta',
+  'coletado': 'Coletado',
+  'objeto_postado': 'Objeto Postado',
+  'em_transito': 'Em Trânsito',
+  'em_rota_entrega': 'Em Rota de Entrega',
+  'entregue': 'Entregue ao Destinatário',
+  'devolvido': 'Devolvido ao Remetente',
+  'cancelado': 'Cancelado',
+  'expirado': 'Prazo Expirado',
+  'aguardando_objeto': 'Aguardando Objeto na Agência',
+  'nao_autorizado': 'Não Autorizado',
+};
+
+export function getCorreiosErrorMessage(code: string): string {
+  return CORREIOS_ERROR_CODES[code] || `Erro desconhecido (código: ${code})`;
+}
+
+export function getCorreiosStatusLabel(status: string): string {
+  return CORREIOS_STATUS_MAP[status] || status;
+}
+
 export interface Destinatario {
   nome: string;
   logradouro: string;
@@ -517,13 +571,20 @@ export async function solicitarPostagemReversa(params: SolicitarPostagemReversaP
     ? response.resultado_solicitacao 
     : response.resultado_solicitacao ? [response.resultado_solicitacao] : [];
 
+  const resultadosComMensagem = resultados.map((resultado: any) => ({
+    ...resultado,
+    descricao_erro: resultado.codigo_erro 
+      ? getCorreiosErrorMessage(resultado.codigo_erro)
+      : resultado.descricao_erro || ''
+  }));
+
   return {
     status_processamento: response.status_processamento || '',
     data_processamento: response.data_processamento || '',
     hora_processamento: response.hora_processamento || '',
     cod_erro: response.cod_erro || '',
     msg_erro: response.msg_erro || '',
-    resultado_solicitacao: resultados,
+    resultado_solicitacao: resultadosComMensagem,
   };
 }
 
