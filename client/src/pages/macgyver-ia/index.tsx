@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { getCurrentUser } from "@/lib/permissions";
 import { 
   MessageSquare, 
@@ -18,12 +19,28 @@ import {
   Zap,
   Search,
   X,
-  ChevronDown
+  ChevronDown,
+  Copy,
+  Check,
+  Download,
+  TicketCheck,
+  FolderKanban,
+  ListTodo,
+  Target,
+  TrendingUp,
+  FileText,
+  BarChart3,
+  Lightbulb,
+  Code,
+  BrainCircuit,
+  FileDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import type { AiConversation, AiMessage } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
 
 interface OpenRouterModel {
@@ -41,6 +58,96 @@ interface OpenRouterModel {
   };
 }
 
+interface SlashCommand {
+  command: string;
+  label: string;
+  description: string;
+  icon: typeof TicketCheck;
+  prompt: string;
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  {
+    command: "/tickets",
+    label: "Tickets",
+    description: "Resumo completo dos tickets (abertos, SLA, prioridades)",
+    icon: TicketCheck,
+    prompt: "Faca uma analise completa dos tickets do sistema. Inclua: total por status, tickets criticos/urgentes, taxa de resolucao, tempo medio de resposta estimado, e identifique gargalos ou padroes. Apresente em tabelas quando possivel."
+  },
+  {
+    command: "/projetos",
+    label: "Projetos",
+    description: "Status e progresso dos projetos",
+    icon: FolderKanban,
+    prompt: "Analise o status de todos os projetos. Inclua: projetos ativos, progresso geral, prazos proximos, e identifique riscos ou atrasos. Sugira acoes para otimizar a entrega."
+  },
+  {
+    command: "/tarefas",
+    label: "Tarefas",
+    description: "Tarefas pendentes e produtividade",
+    icon: ListTodo,
+    prompt: "Faca uma analise das tarefas do sistema. Inclua: tarefas pendentes vs concluidas, distribuicao por area, tarefas de alta prioridade, e calcule a taxa de produtividade. Sugira como priorizar o trabalho."
+  },
+  {
+    command: "/metas",
+    label: "Metas e OKRs",
+    description: "Acompanhamento de metas e objetivos",
+    icon: Target,
+    prompt: "Apresente um painel completo de metas e OKRs. Inclua: percentual de atingimento por meta, metas em risco, OKRs pendentes, e faca uma projecao de atingimento ate o fim do periodo. Use tabelas e indicadores visuais."
+  },
+  {
+    command: "/pricing",
+    label: "Pricing",
+    description: "Analise de precos e tendencias",
+    icon: TrendingUp,
+    prompt: "Analise os dados de pricing dos dispositivos monitorados. Inclua: dispositivos com alertas ativos, tendencias de preco, comparativos entre modelos, e identifique oportunidades de compra ou venda."
+  },
+  {
+    command: "/relatorio",
+    label: "Relatorio Geral",
+    description: "Relatorio consolidado de todos os modulos",
+    icon: BarChart3,
+    prompt: "Gere um relatorio executivo consolidado da plataforma Renov Home. Inclua: KPIs principais de cada modulo (tickets, projetos, tarefas, metas, OKRs, pricing, logistica), tendencias, pontos de atencao e recomendacoes estrategicas. Formate com secoes claras, tabelas e destaques."
+  },
+  {
+    command: "/codigo",
+    label: "Gerar Codigo",
+    description: "Solicite geracao de codigo ou scripts",
+    icon: Code,
+    prompt: "Estou precisando de ajuda com codigo. Me diga qual tipo de codigo voce precisa (SQL, JavaScript, Python, API call, etc.) e eu vou gerar para voce com explicacoes detalhadas."
+  },
+  {
+    command: "/prompt",
+    label: "Criar Prompt",
+    description: "Crie prompts otimizados para outras IAs",
+    icon: BrainCircuit,
+    prompt: "Me ajude a criar um prompt otimizado. Descreva o que voce precisa que uma IA faca e eu vou criar um prompt estruturado e eficiente, usando tecnicas como chain-of-thought, few-shot examples e instrucoes claras."
+  },
+];
+
+const QUICK_PROMPTS = [
+  {
+    label: "Analisar produtividade",
+    icon: BarChart3,
+    prompt: "Analise a produtividade geral da equipe com base nos dados disponiveis: tickets resolvidos, tarefas concluidas, metas atingidas. Identifique pontos fortes e areas de melhoria. Apresente em formato de dashboard textual."
+  },
+  {
+    label: "Relatorio semanal",
+    icon: FileText,
+    prompt: "Gere um relatorio semanal executivo com os principais eventos e metricas da plataforma. Inclua destaques positivos, pontos de atencao, e acoes recomendadas para a proxima semana."
+  },
+  {
+    label: "Sugerir melhorias",
+    icon: Lightbulb,
+    prompt: "Com base nos dados atuais da plataforma, identifique 5 oportunidades de melhoria nos processos internos. Para cada uma, explique o problema identificado, o impacto estimado e a acao recomendada."
+  },
+  {
+    label: "Tickets criticos",
+    icon: TicketCheck,
+    prompt: "Liste e analise todos os tickets com prioridade critica ou urgente. Para cada um, indique ha quanto tempo esta aberto, quem e o responsavel, e sugira acoes para resolucao rapida."
+  },
+];
+
 function formatDate(date: Date | string | null): string {
   if (!date) return "";
   const d = new Date(date);
@@ -50,7 +157,7 @@ function formatDate(date: Date | string | null): string {
   
   if (days === 0) return "Hoje";
   if (days === 1) return "Ontem";
-  if (days < 7) return `${days} dias atrás`;
+  if (days < 7) return `${days} dias atras`;
   return d.toLocaleDateString("pt-BR");
 }
 
@@ -95,6 +202,148 @@ function formatPrice(price: string): string {
   if (perMillion < 0.01) return `$${perMillion.toFixed(4)}/M`;
   if (perMillion < 1) return `$${perMillion.toFixed(2)}/M`;
   return `$${perMillion.toFixed(0)}/M`;
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground transition-colors hover-elevate"
+      data-testid="button-copy-code"
+    >
+      {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+      {copied ? "Copiado!" : "Copiar"}
+    </button>
+  );
+}
+
+function CodeBlock({ language, children }: { language: string; children: string }) {
+  return (
+    <div className="relative group rounded-lg overflow-hidden border border-border my-3">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/80 border-b border-border">
+        <span className="text-xs font-mono text-muted-foreground">{language || "code"}</span>
+        <CopyButton text={children} />
+      </div>
+      <SyntaxHighlighter
+        style={oneDark}
+        language={language || "text"}
+        PreTag="div"
+        customStyle={{
+          margin: 0,
+          padding: "1rem",
+          fontSize: "0.8125rem",
+          lineHeight: "1.5",
+          borderRadius: 0,
+        }}
+      >
+        {children.trim()}
+      </SyntaxHighlighter>
+    </div>
+  );
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <div className="prose prose-sm dark:prose-invert max-w-none">
+      <ReactMarkdown
+        components={{
+          code({ className, children, ...props }) {
+            const match = /language-(\w+)/.exec(className || "");
+            const codeStr = String(children).replace(/\n$/, "");
+            if (match) {
+              return <CodeBlock language={match[1]}>{codeStr}</CodeBlock>;
+            }
+            return (
+              <code
+                className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono"
+                {...props}
+              >
+                {children}
+              </code>
+            );
+          },
+          pre({ children }) {
+            return <>{children}</>;
+          },
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
+function SlashCommandMenu({
+  commands,
+  filter,
+  onSelect,
+  selectedIndex,
+}: {
+  commands: SlashCommand[];
+  filter: string;
+  onSelect: (cmd: SlashCommand) => void;
+  selectedIndex: number;
+}) {
+  const filtered = commands.filter(c =>
+    c.command.includes(filter.toLowerCase()) ||
+    c.label.toLowerCase().includes(filter.toLowerCase().replace("/", ""))
+  );
+
+  if (filtered.length === 0) return null;
+
+  return (
+    <div className="absolute bottom-full left-0 right-0 mb-2 bg-background border border-border rounded-xl shadow-lg overflow-hidden z-50" data-testid="slash-command-menu">
+      <div className="p-2 border-b border-border">
+        <span className="text-xs font-medium text-muted-foreground">Comandos Rapidos</span>
+      </div>
+      <div className="max-h-[300px] overflow-auto p-1">
+        {filtered.map((cmd, idx) => {
+          const Icon = cmd.icon;
+          return (
+            <button
+              key={cmd.command}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover-elevate",
+                idx === selectedIndex ? "bg-primary/10" : ""
+              )}
+              onClick={() => onSelect(cmd)}
+              data-testid={`slash-command-${cmd.command.slice(1)}`}
+            >
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-primary">{cmd.command}</span>
+                  <span className="font-medium text-sm">{cmd.label}</span>
+                </div>
+                <p className="text-xs text-muted-foreground truncate">{cmd.description}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function ModelPickerPopup({
@@ -235,12 +484,36 @@ function ModelPickerPopup({
         </div>
         <div className="p-3 border-t">
           <p className="text-xs text-muted-foreground text-center">
-            {models.length} modelos disponíveis via OpenRouter | Dica: digite <code className="bg-muted px-1 rounded">/model</code> no chat para abrir
+            {models.length} modelos disponiveis via OpenRouter | Dica: digite <code className="bg-muted px-1 rounded">/model</code> no chat para abrir
           </p>
         </div>
       </div>
     </div>
   );
+}
+
+function exportConversationMarkdown(messages: AiMessage[], title: string) {
+  let md = `# ${title || "Conversa Macgyver IA"}\n\n`;
+  md += `*Exportado em ${new Date().toLocaleDateString("pt-BR")} as ${new Date().toLocaleTimeString("pt-BR")}*\n\n---\n\n`;
+
+  for (const msg of messages) {
+    if (msg.role === "user") {
+      md += `## Usuario\n\n${msg.content}\n\n`;
+    } else {
+      md += `## Macgyver IA\n\n${msg.content}\n\n`;
+    }
+    md += `---\n\n`;
+  }
+
+  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `macgyver-ia-${(title || "conversa").replace(/\s+/g, "-").toLowerCase()}-${Date.now()}.md`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 export default function MacgyverIA() {
@@ -254,6 +527,9 @@ export default function MacgyverIA() {
   const [streamingContent, setStreamingContent] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>("google/gemini-2.0-flash-001");
   const [showModelPicker, setShowModelPicker] = useState(false);
+  const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [slashFilter, setSlashFilter] = useState("");
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -308,25 +584,40 @@ export default function MacgyverIA() {
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInputMessage(val);
+    
     if (val.trim() === "/model" || val.trim() === "/models") {
       setShowModelPicker(true);
       setInputMessage("");
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isStreaming) return;
-
-    const message = inputMessage.trim();
-    if (message === "/model" || message === "/models") {
-      setShowModelPicker(true);
-      setInputMessage("");
+      setShowSlashMenu(false);
       return;
     }
 
+    if (val.startsWith("/") && val.length >= 1) {
+      setShowSlashMenu(true);
+      setSlashFilter(val);
+      setSlashSelectedIndex(0);
+    } else {
+      setShowSlashMenu(false);
+    }
+  };
+
+  const handleSlashCommand = (cmd: SlashCommand) => {
+    setShowSlashMenu(false);
+    setInputMessage(cmd.prompt);
+    textareaRef.current?.focus();
+    setTimeout(() => {
+      handleSendMessageDirect(cmd.prompt);
+    }, 50);
+  };
+
+  const handleSendMessageDirect = async (messageText: string) => {
+    if (!messageText.trim() || isStreaming) return;
+
+    const message = messageText.trim();
     setInputMessage("");
     setIsStreaming(true);
     setStreamingContent("");
+    setShowSlashMenu(false);
 
     const isNewConversation = !selectedConversationId;
     const tempConversationId = selectedConversationId || "temp-" + Date.now();
@@ -406,7 +697,37 @@ export default function MacgyverIA() {
     }
   };
 
+  const handleSendMessage = async () => {
+    await handleSendMessageDirect(inputMessage);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (showSlashMenu) {
+      const filteredCmds = SLASH_COMMANDS.filter(c =>
+        c.command.includes(slashFilter.toLowerCase()) ||
+        c.label.toLowerCase().includes(slashFilter.toLowerCase().replace("/", ""))
+      );
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setSlashSelectedIndex(prev => Math.min(prev + 1, filteredCmds.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSlashSelectedIndex(prev => Math.max(prev - 1, 0));
+        return;
+      }
+      if (e.key === "Enter" && !e.shiftKey && filteredCmds.length > 0) {
+        e.preventDefault();
+        handleSlashCommand(filteredCmds[slashSelectedIndex]);
+        return;
+      }
+      if (e.key === "Escape") {
+        setShowSlashMenu(false);
+        return;
+      }
+    }
+
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -416,6 +737,8 @@ export default function MacgyverIA() {
   const displayMessages = selectedConversationId ? messages : [];
   const showWelcome = !selectedConversationId && displayMessages.length === 0 && !isStreaming;
   const isInConversation = selectedConversationId !== null;
+
+  const currentConversation = conversations.find(c => c.id === selectedConversationId);
 
   const modelButton = (
     <button
@@ -431,6 +754,53 @@ export default function MacgyverIA() {
       <span className="font-medium truncate max-w-[160px]">{selectedModelName}</span>
       <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
     </button>
+  );
+
+  const chatInput = (isWelcome: boolean) => (
+    <div className="relative">
+      {showSlashMenu && (
+        <SlashCommandMenu
+          commands={SLASH_COMMANDS}
+          filter={slashFilter}
+          onSelect={handleSlashCommand}
+          selectedIndex={slashSelectedIndex}
+        />
+      )}
+      <div className="flex items-end gap-3">
+        <div className={cn(
+          "flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50",
+          isWelcome && "shadow-sm"
+        )}>
+          <textarea
+            ref={textareaRef}
+            placeholder="Pergunte qualquer coisa ou digite / para comandos..."
+            value={inputMessage}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            disabled={isStreaming}
+            className={cn(
+              "w-full bg-transparent border-0 resize-none px-4 placeholder:text-muted-foreground focus:outline-none focus:ring-0",
+              isWelcome ? "py-4 text-base min-h-[56px] max-h-[200px]" : "py-3 text-sm min-h-[48px] max-h-[200px]"
+            )}
+            rows={1}
+            data-testid={isWelcome ? "input-chat-message" : "input-chat-message-bottom"}
+          />
+        </div>
+        <Button
+          size="icon"
+          className="rounded-2xl shrink-0 shadow-sm"
+          disabled={!inputMessage.trim() || isStreaming}
+          onClick={handleSendMessage}
+          data-testid={isWelcome ? "button-send-message" : "button-send-message-bottom"}
+        >
+          {isStreaming ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+    </div>
   );
 
   return (
@@ -449,18 +819,32 @@ export default function MacgyverIA() {
           </Button>
           <div className="flex-1 flex items-center justify-center gap-2">
             <MacGyverIcon size={24} />
-            <span className="font-semibold text-sm">Macgyver IA Renov</span>
+            <span className="font-semibold text-sm hidden sm:inline">Macgyver IA</span>
+            {modelButton}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleNewConversation}
-            className="gap-2"
-            data-testid="button-new-conversation"
-          >
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Nova</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            {displayMessages.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => exportConversationMarkdown(displayMessages, currentConversation?.title || "")}
+                title="Exportar conversa"
+                data-testid="button-export-conversation"
+              >
+                <FileDown className="h-4 w-4" />
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNewConversation}
+              className="gap-2"
+              data-testid="button-new-conversation"
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Nova</span>
+            </Button>
+          </div>
         </header>
       )}
 
@@ -477,72 +861,62 @@ export default function MacgyverIA() {
                     Macgyver IA Renov
                   </h1>
                   <p className="text-muted-foreground text-sm sm:text-base max-w-md mx-auto">
-                    MacGyver resolvia qualquer problema com clipe de papel e criatividade. 
-                    Eu faço o mesmo, mas com IA e sem gambiarras!
+                    Seu assistente estrategico com IA. Analise dados, gere relatorios, crie codigo e obtenha insights em tempo real.
                   </p>
                 </div>
               </div>
 
-              <div className="text-center">
-                <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
-                  Como posso te ajudar hoje?
-                </h2>
-              </div>
-
-              <div className="w-full flex justify-center">
-                {modelButton}
-              </div>
-
               <div className="w-full">
-                <div className="flex items-end gap-3">
-                  <div className="flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50">
-                    <textarea
-                      ref={textareaRef}
-                      placeholder="Pergunte qualquer coisa... (digite /model para trocar modelo)"
-                      value={inputMessage}
-                      onChange={handleInputChange}
-                      onKeyDown={handleKeyDown}
-                      disabled={isStreaming}
-                      className="w-full bg-transparent border-0 resize-none px-4 py-4 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-0 min-h-[56px] max-h-[200px]"
-                      rows={1}
-                      data-testid="input-chat-message"
-                    />
-                  </div>
-                  <Button
-                    size="icon"
-                    className="h-[56px] w-[56px] rounded-2xl bg-primary hover:bg-primary/90 shrink-0 shadow-sm transition-all hover:scale-105 active:scale-95"
-                    disabled={!inputMessage.trim() || isStreaming}
-                    onClick={handleSendMessage}
-                    data-testid="button-send-message"
-                  >
-                    {isStreaming ? (
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    ) : (
-                      <Send className="h-6 w-6" />
-                    )}
-                  </Button>
+                {chatInput(true)}
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <h3 className="text-sm font-semibold text-foreground">Analises Rapidas</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {QUICK_PROMPTS.map((qp) => {
+                    const Icon = qp.icon;
+                    return (
+                      <button
+                        key={qp.label}
+                        className="flex items-center gap-3 p-3 text-left rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors"
+                        onClick={() => {
+                          setInputMessage(qp.prompt);
+                          handleSendMessageDirect(qp.prompt);
+                        }}
+                        data-testid={`button-quick-prompt-${qp.label.replace(/\s+/g, '-').toLowerCase()}`}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <Icon className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="text-sm font-medium">{qp.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="flex flex-wrap justify-center gap-2">
-                {[
-                  "Tickets em aberto",
-                  "Resumo das metas",
-                  "Documentos recentes",
-                  "Criar projeto"
-                ].map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    className="px-4 py-2 text-sm font-medium bg-muted/50 dark:bg-muted/30 border border-border rounded-full hover:bg-muted transition-colors"
-                    onClick={() => {
-                      setInputMessage(suggestion);
-                      textareaRef.current?.focus();
-                    }}
-                    data-testid={`button-suggestion-${suggestion.replace(/\s+/g, '-').toLowerCase()}`}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Code className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold text-muted-foreground">Comandos /</h3>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {SLASH_COMMANDS.slice(0, 6).map((cmd) => (
+                    <button
+                      key={cmd.command}
+                      className="px-3 py-1.5 text-xs font-mono bg-muted/50 dark:bg-muted/30 border border-border rounded-full hover:bg-muted transition-colors"
+                      onClick={() => {
+                        handleSendMessageDirect(cmd.prompt);
+                      }}
+                      data-testid={`button-command-${cmd.command.slice(1)}`}
+                    >
+                      {cmd.command}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="w-full pt-4">
@@ -586,7 +960,7 @@ export default function MacgyverIA() {
                           onClick={(e) => handleDeleteConversation(conv.id, e)}
                           data-testid={`button-delete-conversation-${conv.id}`}
                         >
-                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                         </Button>
                       </div>
                     ))}
@@ -627,9 +1001,7 @@ export default function MacgyverIA() {
                     )}
                   >
                     {msg.role === "assistant" ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
+                      <MarkdownContent content={msg.content} />
                     ) : (
                       <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                     )}
@@ -648,9 +1020,7 @@ export default function MacgyverIA() {
                     <Bot className="h-5 w-5 text-primary" />
                   </div>
                   <div className="rounded-2xl px-4 py-3 max-w-[85%] bg-muted">
-                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                      <ReactMarkdown>{streamingContent}</ReactMarkdown>
-                    </div>
+                    <MarkdownContent content={streamingContent} />
                   </div>
                 </div>
               )}
@@ -670,6 +1040,25 @@ export default function MacgyverIA() {
                 </div>
               )}
 
+              {!isStreaming && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.role === "assistant" && (
+                <div className="flex flex-wrap gap-2 pl-11" data-testid="follow-up-suggestions">
+                  {[
+                    "Aprofunde essa analise",
+                    "Gere um relatorio sobre isso",
+                    "Quais os proximos passos?",
+                  ].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      className="px-3 py-1.5 text-xs font-medium bg-muted/50 dark:bg-muted/30 border border-border rounded-full hover:bg-muted transition-colors"
+                      onClick={() => handleSendMessageDirect(suggestion)}
+                      data-testid={`button-followup-${suggestion.replace(/\s+/g, '-').toLowerCase()}`}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
           </ScrollArea>
@@ -679,37 +1068,7 @@ export default function MacgyverIA() {
       {isInConversation && (
         <div className="border-t p-4 bg-background shrink-0">
           <div className="max-w-3xl mx-auto space-y-2">
-            <div className="flex items-center">
-              {modelButton}
-            </div>
-            <div className="flex items-end gap-3">
-              <div className="flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden focus-within:border-primary/50">
-                <textarea
-                  ref={textareaRef}
-                  placeholder="Pergunte qualquer coisa... (digite /model para trocar)"
-                  value={inputMessage}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyDown}
-                  disabled={isStreaming}
-                  className="w-full bg-transparent border-0 resize-none px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-0 min-h-[48px] max-h-[200px]"
-                  rows={1}
-                  data-testid="input-chat-message-bottom"
-                />
-              </div>
-              <Button
-                size="icon"
-                className="h-[48px] w-[48px] rounded-xl bg-primary hover:bg-primary/90 shrink-0 shadow-sm"
-                disabled={!inputMessage.trim() || isStreaming}
-                onClick={handleSendMessage}
-                data-testid="button-send-message-bottom"
-              >
-                {isStreaming ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
+            {chatInput(false)}
           </div>
         </div>
       )}

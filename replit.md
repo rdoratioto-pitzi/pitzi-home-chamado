@@ -83,8 +83,9 @@ Renov Home adopts a client-server architecture with a clear separation of concer
 - **date-fns-tz:** Library for timezone-aware date manipulation.
 - **OpenRouter API:** Used by the AI Chat module for LLM-powered conversations. Models are fetched dynamically from the OpenRouter API (`/api/v1/models`). Default model: `google/gemini-2.0-flash-001`.
 - **react-markdown:** Library for rendering markdown content in AI chat responses.
+- **react-syntax-highlighter:** Library for syntax highlighting in code blocks within AI chat responses.
 
-## AI Chat Module
+## AI Chat Module (Macgyver IA)
 
 The home page features a ChatGPT/Gemini-style AI assistant interface that integrates with all platform data:
 
@@ -93,8 +94,16 @@ The home page features a ChatGPT/Gemini-style AI assistant interface that integr
 - **Backend:** `/api/ai/chat` endpoint with Server-Sent Events (SSE) for streaming responses
 - **Backend:** `/api/ai/models` endpoint fetches available models from OpenRouter API (cached 30 min)
 - **Frontend:** Modern chat UI with conversation history, markdown rendering, dynamic model picker
-- **Integration:** System prompt includes context from all modules (tickets, projects, tasks, metas, OKRs, pricing, logistics, knowledge base)
+- **Integration:** System prompt includes context from all modules with aggregated statistics (ticket counts by status, resolution rates, task productivity metrics, meta completion percentages)
 - **Model Selection:** Users can choose any model from OpenRouter's catalog (600+ models). Models are categorized as free/premium with search/filter. Shortcut: type `/model` in chat input to open model picker.
+
+**Enhanced Features:**
+- **Slash Commands:** Type `/` in chat to access 8 quick commands (/tickets, /projetos, /tarefas, /metas, /pricing, /relatorio, /codigo, /prompt). Keyboard navigation with arrows and Enter.
+- **Quick Prompts:** Strategic analysis buttons on the welcome screen (Analisar produtividade, Relatorio semanal, Sugerir melhorias, Tickets criticos).
+- **Syntax Highlighting:** Code blocks in AI responses use react-syntax-highlighter with copy button.
+- **Follow-up Suggestions:** After each AI response, contextual follow-up buttons appear (Aprofunde essa analise, Gere um relatorio, Proximos passos).
+- **Export Conversations:** Download any conversation as a Markdown (.md) file via the export button in the header.
+- **Advanced System Prompt:** Includes aggregated statistics, capability instructions for code generation, report creation, prompt engineering, and strategic analysis.
 
 **Key Files:**
 - `server/openrouter.ts` - OpenRouter API integration, model fetching with caching, context building
