@@ -533,113 +533,229 @@ function exportConversationMarkdown(messages: AiMessage[], title: string) {
   URL.revokeObjectURL(url);
 }
 
-function RightSidebar({
-  isOpen,
-  onClose,
-  conversations,
-  conversationsLoading,
-  spaces,
-  userId,
-  selectedConversationId,
-  onSelectConversation,
-  onDeleteConversation,
-  onQuickPrompt,
-  onSlashCommand,
-  queryClient,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  conversations: AiConversation[];
-  conversationsLoading: boolean;
-  spaces: AiSpace[];
-  userId: string;
-  selectedConversationId: string | null;
-  onSelectConversation: (id: string) => void;
-  onDeleteConversation: (id: string, e: React.MouseEvent) => void;
-  onQuickPrompt: (prompt: string) => void;
-  onSlashCommand: (cmd: SlashCommand) => void;
-  queryClient: any;
-}) {
-  const [activeTab, setActiveTab] = useState<"historico" | "atalhos" | "comandos" | "espacos">("historico");
-  const [newSpaceName, setNewSpaceName] = useState("");
-  const [showNewSpace, setShowNewSpace] = useState(false);
-
-  const tabs = [
-    { id: "historico" as const, label: "Historico", icon: Clock },
-    { id: "atalhos" as const, label: "Atalhos", icon: Bookmark },
-    { id: "comandos" as const, label: "Comandos", icon: Command },
-    { id: "espacos" as const, label: "Espacos", icon: Hash },
-  ];
-
-  const handleCreateSpace = async () => {
-    if (!newSpaceName.trim()) return;
-    try {
-      await apiRequest("POST", "/api/ai/spaces", { userId, name: newSpaceName.trim() });
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
-      setNewSpaceName("");
-      setShowNewSpace(false);
-    } catch (error) {
-      console.error("Failed to create space:", error);
-    }
-  };
-
-  const handleDeleteSpace = async (spaceId: string) => {
-    try {
-      await apiRequest("DELETE", `/api/ai/spaces/${spaceId}`);
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
-    } catch (error) {
-      console.error("Failed to delete space:", error);
-    }
-  };
-
-  const handleAddToSpace = async (spaceId: string) => {
-    if (!selectedConversationId) return;
-    try {
-      await apiRequest("POST", `/api/ai/spaces/${spaceId}/conversations`, { conversationId: selectedConversationId });
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
-    } catch (error) {
-      console.error("Failed to add to space:", error);
-    }
-  };
-
   return (
     <div className={cn(
-      "border-l bg-background flex flex-col transition-all duration-200 shrink-0",
-      isOpen ? "w-72" : "w-0 overflow-hidden border-l-0"
+      "border-l bg-background transition-all duration-200 shrink-0 overflow-hidden flex flex-col",
+      isOpen ? "w-80" : "w-0 border-l-0"
     )}>
-      <div className="flex items-center justify-between px-3 py-3 border-b shrink-0">
-        <div className="flex items-center gap-1 overflow-x-auto">
-          {tabs.map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                className={cn(
-                  "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap",
-                  activeTab === tab.id
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                )}
-                onClick={() => setActiveTab(tab.id)}
-                data-testid={`sidebar-tab-${tab.id}`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-        <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 ml-1" data-testid="button-close-sidebar">
-          <PanelRightClose className="h-4 w-4" />
-        </Button>
-      </div>
+      <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="p-3 border-b space-y-4 shrink-0">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-base">Painel de Auxílio</h3>
+            <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-sidebar">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
 
-      <ScrollArea className="flex-1">
-        <div className="p-3 space-y-1">
-          {activeTab === "historico" && (
-            <>
-              {conversationsLoading ? (
-                <div className="flex items-center justify-center py-8">
+          <div className="grid grid-cols-1 gap-2">
+            {tabs.map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <Button
+                  key={tab.id}
+                  variant={isActive ? "default" : "outline"}
+                  className={cn(
+                    "justify-start gap-3 h-10 w-full px-3",
+                    !isActive && "text-muted-foreground hover:text-foreground"
+                  )}
+                  onClick={() => setActiveTab(tab.id)}
+                  data-testid={`sidebar-tab-${tab.id}`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 text-left font-medium">{tab.label}</span>
+                  {isActive && <ChevronDown className="h-4 w-4 opacity-50" />}
+                </Button>
+              );
+            })}
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1">
+          <div className="p-3 space-y-1">
+            <div className="mb-4 flex items-center gap-2 px-1">
+              <div className="h-1 w-1 rounded-full bg-primary" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {tabs.find(t => t.id === activeTab)?.label}
+              </h4>
+            </div>
+            {activeTab === "historico" && (
+              <>
+                {conversationsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : conversations.length === 0 ? (
+                  <div className="text-center py-8 px-4 border border-dashed rounded-lg">
+                    <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2 opacity-20" />
+                    <p className="text-xs text-muted-foreground">Nenhuma conversa iniciada</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {conversations.map(conv => {
+                      const isSelected = conv.id === selectedConversationId;
+                      return (
+                        <div key={conv.id} className="group relative">
+                          <button
+                            className={cn(
+                              "w-full text-left px-3 py-2.5 rounded-lg transition-colors flex flex-col gap-0.5",
+                              isSelected ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50 border border-transparent"
+                            )}
+                            onClick={() => onSelectConversation(conv.id)}
+                            data-testid={`conversation-item-${conv.id}`}
+                          >
+                            <span className="text-sm font-medium truncate pr-6">{conv.title || "Nova Conversa"}</span>
+                            <span className="text-[10px] text-muted-foreground">{formatDate(conv.createdAt)}</span>
+                          </button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => onDeleteConversation(conv.id, e)}
+                            data-testid={`button-delete-conversation-${conv.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+
+            {activeTab === "atalhos" && (
+              <div className="grid grid-cols-1 gap-2">
+                {QUICK_PROMPTS.map(qp => {
+                  const Icon = qp.icon;
+                  return (
+                    <button
+                      key={qp.label}
+                      className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30 text-left hover-elevate transition-all"
+                      onClick={() => onQuickPrompt(qp.prompt)}
+                      data-testid={`quick-prompt-${qp.label.toLowerCase().replace(/\s+/g, "-")}`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-background flex items-center justify-center shrink-0 border border-border">
+                        <Icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <span className="text-sm font-medium leading-tight">{qp.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeTab === "comandos" && (
+              <div className="grid grid-cols-1 gap-2">
+                {SLASH_COMMANDS.map(cmd => {
+                  const Icon = cmd.icon;
+                  return (
+                    <button
+                      key={cmd.command}
+                      className="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/30 text-left hover-elevate transition-all"
+                      onClick={() => onSlashCommand(cmd)}
+                      data-testid={`command-item-${cmd.command.slice(1)}`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-background flex items-center justify-center shrink-0 border border-border">
+                        <Icon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] text-primary font-bold">{cmd.command}</span>
+                          <span className="text-sm font-medium">{cmd.label}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground line-clamp-1">{cmd.description}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeTab === "espacos" && (
+              <div className="space-y-4">
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-2 h-9 border-dashed"
+                  onClick={() => setShowNewSpace(true)}
+                  data-testid="button-create-space"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nova Pasta de IA
+                </Button>
+
+                {showNewSpace && (
+                  <div className="p-3 border rounded-lg bg-muted/30 space-y-3">
+                    <Input
+                      placeholder="Nome da pasta..."
+                      value={newSpaceName}
+                      onChange={e => setNewSpaceName(e.target.value)}
+                      className="h-8 text-sm"
+                      autoFocus
+                    />
+                    <div className="flex gap-2">
+                      <Button size="sm" className="flex-1 h-8" onClick={handleCreateSpace}>Criar</Button>
+                      <Button size="sm" variant="ghost" className="flex-1 h-8" onClick={() => setShowNewSpace(false)}>Cancelar</Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {spaces.map(space => (
+                    <div key={space.id} className="space-y-1">
+                      <div className="flex items-center justify-between group px-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-primary/40" />
+                          <span className="text-xs font-bold text-muted-foreground uppercase">{space.name}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleDeleteSpace(space.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      <div className="pl-4 space-y-1 border-l ml-1 mt-1">
+                        {conversations
+                          .filter(c => c.spaceId === space.id)
+                          .map(conv => (
+                            <button
+                              key={conv.id}
+                              className={cn(
+                                "w-full text-left px-2 py-1.5 rounded-md text-xs transition-colors truncate",
+                                conv.id === selectedConversationId ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                              )}
+                              onClick={() => onSelectConversation(conv.id)}
+                            >
+                              {conv.title || "Nova Conversa"}
+                            </button>
+                          ))}
+
+                        {selectedConversationId && !conversations.find(c => c.id === selectedConversationId)?.spaceId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start gap-2 h-7 text-[10px] text-muted-foreground hover:text-primary"
+                            onClick={() => handleAddToSpace(space.id)}
+                          >
+                            <Plus className="h-3 w-3" />
+                            Adicionar conversa atual
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  );
+}
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 </div>
               ) : conversations.length === 0 ? (
