@@ -331,14 +331,14 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                         <TooltipTrigger asChild>
                           <div
                             className={`absolute rounded cursor-pointer transition-all hover:brightness-110 hover:shadow-md ${
-                              depth === 0 ? priorityColors[card.priority] : priorityColors[card.priority] + "/70"
-                            }`}
+                              priorityColors[card.priority]
+                            } ${depth > 0 ? "opacity-90" : ""}`}
                             style={{
                               left: pos.left + 2,
                               width: pos.width,
                               height: 24,
                               top: 8,
-                              zIndex: depth === 0 ? 5 : 4
+                              zIndex: 10
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
