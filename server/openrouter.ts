@@ -1,6 +1,7 @@
 import { storage } from "./storage";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
 
 interface Message {
   role: "system" | "user" | "assistant";
@@ -10,6 +11,79 @@ interface Message {
 interface ContextOptions {
   userId?: string;
   tenantId?: string;
+}
+
+export interface OpenRouterModel {
+  id: string;
+  name: string;
+  description?: string;
+  context_length: number;
+  pricing: {
+    prompt: string;
+    completion: string;
+  };
+  architecture?: {
+    modality?: string;
+    tokenizer?: string;
+  };
+  top_provider?: {
+    max_completion_tokens?: number;
+  };
+}
+
+let cachedModels: OpenRouterModel[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 30 * 60 * 1000;
+
+export async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
+  const now = Date.now();
+  if (cachedModels && (now - cacheTimestamp) < CACHE_DURATION) {
+    return cachedModels;
+  }
+
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY not configured");
+  }
+
+  try {
+    const response = await fetch(OPENROUTER_MODELS_URL, {
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch models: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const models: OpenRouterModel[] = (data.data || [])
+      .filter((m: any) => {
+        const modality = m.architecture?.modality || "";
+        return modality.includes("text") && modality.includes("->text");
+      })
+      .map((m: any) => ({
+        id: m.id,
+        name: m.name,
+        description: m.description,
+        context_length: m.context_length,
+        pricing: {
+          prompt: m.pricing?.prompt || "0",
+          completion: m.pricing?.completion || "0",
+        },
+        architecture: m.architecture,
+        top_provider: m.top_provider,
+      }));
+
+    cachedModels = models;
+    cacheTimestamp = now;
+    return models;
+  } catch (error) {
+    console.error("Error fetching OpenRouter models:", error);
+    if (cachedModels) return cachedModels;
+    throw error;
+  }
 }
 
 async function getSystemPrompt(options: ContextOptions = {}): Promise<string> {

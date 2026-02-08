@@ -15,7 +15,7 @@ import {
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import * as correiosService from "./correios-service";
 import bwipjs from "bwip-js";
-import { streamChatCompletion, generateTitle } from "./openrouter";
+import { streamChatCompletion, generateTitle, fetchOpenRouterModels } from "./openrouter";
 import { 
   insertUserSchema, 
   insertTicketSchema, 
@@ -3327,6 +3327,16 @@ export async function registerRoutes(
       res.json(messages);
     } catch (error: any) {
       console.error("Get AI messages error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/ai/models", async (_req, res) => {
+    try {
+      const models = await fetchOpenRouterModels();
+      res.json(models);
+    } catch (error: any) {
+      console.error("Fetch models error:", error);
       res.status(500).json({ error: error.message });
     }
   });

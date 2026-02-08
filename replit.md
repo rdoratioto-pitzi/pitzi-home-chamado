@@ -81,7 +81,7 @@ Renov Home adopts a client-server architecture with a clear separation of concer
 - **xlsx:** Library for Excel file generation and export.
 - **html2canvas:** Library for capturing screenshots of web pages (used for graphic downloads).
 - **date-fns-tz:** Library for timezone-aware date manipulation.
-- **OpenRouter API:** Used by the AI Chat module for LLM-powered conversations (model: google/gemini-2.0-flash-001).
+- **OpenRouter API:** Used by the AI Chat module for LLM-powered conversations. Models are fetched dynamically from the OpenRouter API (`/api/v1/models`). Default model: `google/gemini-2.0-flash-001`.
 - **react-markdown:** Library for rendering markdown content in AI chat responses.
 
 ## AI Chat Module
@@ -91,13 +91,15 @@ The home page features a ChatGPT/Gemini-style AI assistant interface that integr
 **Architecture:**
 - **Database:** `aiConversations` and `aiMessages` tables store chat history
 - **Backend:** `/api/ai/chat` endpoint with Server-Sent Events (SSE) for streaming responses
-- **Frontend:** Modern chat UI with sidebar for conversation history, markdown rendering for responses
+- **Backend:** `/api/ai/models` endpoint fetches available models from OpenRouter API (cached 30 min)
+- **Frontend:** Modern chat UI with conversation history, markdown rendering, dynamic model picker
 - **Integration:** System prompt includes context from all modules (tickets, projects, tasks, metas, OKRs, pricing, logistics, knowledge base)
+- **Model Selection:** Users can choose any model from OpenRouter's catalog (600+ models). Models are categorized as free/premium with search/filter. Shortcut: type `/model` in chat input to open model picker.
 
 **Key Files:**
-- `server/openrouter.ts` - OpenRouter API integration with context building
-- `server/routes.ts` - AI chat API endpoints
-- `client/src/pages/home.tsx` - Chat interface UI
+- `server/openrouter.ts` - OpenRouter API integration, model fetching with caching, context building
+- `server/routes.ts` - AI chat and models API endpoints
+- `client/src/pages/macgyver-ia/index.tsx` - Chat interface UI with ModelPickerPopup component
 - `shared/schema.ts` - AI conversation and message schemas
 
 **Security:**

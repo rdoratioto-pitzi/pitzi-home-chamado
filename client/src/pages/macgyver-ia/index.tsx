@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { getCurrentUser } from "@/lib/permissions";
 import { 
   MessageSquare, 
@@ -13,36 +14,32 @@ import {
   User,
   Clock,
   ArrowLeft,
-  ChevronDown,
   Sparkles,
-  Zap
+  Zap,
+  Search,
+  X,
+  ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import type { AiConversation, AiMessage } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-interface ModelOption {
+interface OpenRouterModel {
   id: string;
   name: string;
-  provider: string;
-  free: boolean;
+  description?: string;
+  context_length: number;
+  pricing: {
+    prompt: string;
+    completion: string;
+  };
+  architecture?: {
+    modality?: string;
+    tokenizer?: string;
+  };
 }
-
-const AVAILABLE_MODELS: ModelOption[] = [
-  { id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash", provider: "Google", free: true },
-  { id: "google/gemini-2.5-flash-preview", name: "Gemini 2.5 Flash", provider: "Google", free: true },
-  { id: "meta-llama/llama-4-maverick:free", name: "Llama 4 Maverick", provider: "Meta", free: true },
-  { id: "meta-llama/llama-4-scout:free", name: "Llama 4 Scout", provider: "Meta", free: true },
-  { id: "deepseek/deepseek-chat-v3-0324:free", name: "DeepSeek V3", provider: "DeepSeek", free: true },
-  { id: "qwen/qwen3-235b-a22b:free", name: "Qwen3 235B", provider: "Qwen", free: true },
-  { id: "openai/gpt-4o-mini", name: "GPT-4o Mini", provider: "OpenAI", free: false },
-  { id: "openai/gpt-4o", name: "GPT-4o", provider: "OpenAI", free: false },
-  { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4", provider: "Anthropic", free: false },
-  { id: "google/gemini-2.5-pro-preview", name: "Gemini 2.5 Pro", provider: "Google", free: false },
-];
 
 function formatDate(date: Date | string | null): string {
   if (!date) return "";
@@ -57,6 +54,195 @@ function formatDate(date: Date | string | null): string {
   return d.toLocaleDateString("pt-BR");
 }
 
+function isFreeModel(model: OpenRouterModel): boolean {
+  return (
+    model.id.endsWith(":free") || 
+    (parseFloat(model.pricing.prompt) === 0 && parseFloat(model.pricing.completion) === 0)
+  );
+}
+
+function getProviderName(modelId: string): string {
+  const provider = modelId.split("/")[0];
+  const names: Record<string, string> = {
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "google": "Google",
+    "meta-llama": "Meta",
+    "deepseek": "DeepSeek",
+    "qwen": "Qwen",
+    "mistralai": "Mistral",
+    "cohere": "Cohere",
+    "microsoft": "Microsoft",
+    "nvidia": "NVIDIA",
+    "x-ai": "xAI",
+    "perplexity": "Perplexity",
+    "moonshotai": "Moonshot",
+    "openrouter": "OpenRouter",
+    "stepfun": "StepFun",
+    "arcee-ai": "Arcee AI",
+    "z-ai": "Zhipu AI",
+    "minimax": "MiniMax",
+    "writer": "Writer",
+    "liquid": "LiquidAI",
+  };
+  return names[provider] || provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
+function formatPrice(price: string): string {
+  const val = parseFloat(price);
+  if (val === 0) return "Gratis";
+  const perMillion = val * 1_000_000;
+  if (perMillion < 0.01) return `$${perMillion.toFixed(4)}/M`;
+  if (perMillion < 1) return `$${perMillion.toFixed(2)}/M`;
+  return `$${perMillion.toFixed(0)}/M`;
+}
+
+function ModelPickerPopup({
+  models,
+  isLoading,
+  onSelect,
+  onClose,
+  selectedModel,
+}: {
+  models: OpenRouterModel[];
+  isLoading: boolean;
+  onSelect: (modelId: string) => void;
+  onClose: () => void;
+  selectedModel: string;
+}) {
+  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState<"all" | "free" | "premium">("all");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
+
+  const filtered = useMemo(() => {
+    let list = models;
+    if (tab === "free") list = list.filter(isFreeModel);
+    if (tab === "premium") list = list.filter(m => !isFreeModel(m));
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(m => 
+        m.name.toLowerCase().includes(q) || 
+        m.id.toLowerCase().includes(q) ||
+        getProviderName(m.id).toLowerCase().includes(q)
+      );
+    }
+    return list.slice(0, 50);
+  }, [models, search, tab]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div 
+        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="p-4 border-b space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-base">Selecionar Modelo</h3>
+            <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-model-picker">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={searchRef}
+              placeholder="Buscar modelos... (ex: claude, gpt, gemini)"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-models"
+            />
+          </div>
+          <div className="flex gap-1">
+            {(["all", "free", "premium"] as const).map(t => (
+              <Button
+                key={t}
+                variant={tab === t ? "default" : "outline"}
+                size="sm"
+                onClick={() => setTab(t)}
+                data-testid={`button-tab-${t}`}
+              >
+                {t === "all" ? "Todos" : t === "free" ? "Gratuitos" : "Premium"}
+              </Button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto p-2">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <span className="ml-2 text-sm text-muted-foreground">Carregando modelos...</span>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              Nenhum modelo encontrado
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {filtered.map(model => {
+                const free = isFreeModel(model);
+                const isSelected = model.id === selectedModel;
+                return (
+                  <button
+                    key={model.id}
+                    className={cn(
+                      "w-full text-left px-3 py-2.5 rounded-lg transition-colors flex items-start gap-3",
+                      isSelected 
+                        ? "bg-primary/10 border border-primary/30" 
+                        : "hover:bg-muted/70 border border-transparent"
+                    )}
+                    onClick={() => {
+                      onSelect(model.id);
+                      onClose();
+                    }}
+                    data-testid={`model-option-${model.id}`}
+                  >
+                    <div className="mt-0.5 shrink-0">
+                      {free ? (
+                        <Zap className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 text-amber-500" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{model.name}</span>
+                        <span className="text-xs text-muted-foreground">({getProviderName(model.id)})</span>
+                        {free && (
+                          <span className="text-[10px] font-semibold bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">
+                            FREE
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-3 flex-wrap">
+                        <span>{(model.context_length / 1000).toFixed(0)}K ctx</span>
+                        <span>In: {formatPrice(model.pricing.prompt)}</span>
+                        <span>Out: {formatPrice(model.pricing.completion)}</span>
+                      </div>
+                    </div>
+                    {isSelected && (
+                      <span className="text-xs text-primary font-medium mt-1 shrink-0">Ativo</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="p-3 border-t">
+          <p className="text-xs text-muted-foreground text-center">
+            {models.length} modelos disponíveis via OpenRouter | Dica: digite <code className="bg-muted px-1 rounded">/model</code> no chat para abrir
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MacgyverIA() {
   const queryClient = useQueryClient();
   const user = getCurrentUser();
@@ -67,8 +253,15 @@ export default function MacgyverIA() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>("google/gemini-2.0-flash-001");
+  const [showModelPicker, setShowModelPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: models = [], isLoading: modelsLoading } = useQuery<OpenRouterModel[]>({
+    queryKey: ["/api/ai/models"],
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<AiConversation[]>({
     queryKey: ["/api/ai/conversations", userId],
@@ -78,6 +271,12 @@ export default function MacgyverIA() {
     queryKey: ["/api/ai/conversations", selectedConversationId, "messages"],
     enabled: !!selectedConversationId,
   });
+
+  const selectedModelInfo = useMemo(() => {
+    return models.find(m => m.id === selectedModel);
+  }, [models, selectedModel]);
+
+  const selectedModelName = selectedModelInfo?.name || selectedModel.split("/").pop() || selectedModel;
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -106,10 +305,25 @@ export default function MacgyverIA() {
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    setInputMessage(val);
+    if (val.trim() === "/model" || val.trim() === "/models") {
+      setShowModelPicker(true);
+      setInputMessage("");
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isStreaming) return;
 
     const message = inputMessage.trim();
+    if (message === "/model" || message === "/models") {
+      setShowModelPicker(true);
+      setInputMessage("");
+      return;
+    }
+
     setInputMessage("");
     setIsStreaming(true);
     setStreamingContent("");
@@ -178,7 +392,6 @@ export default function MacgyverIA() {
                 console.error("Stream error:", data.error);
               }
             } catch {
-              // Skip invalid JSON
             }
           }
         }
@@ -204,9 +417,24 @@ export default function MacgyverIA() {
   const showWelcome = !selectedConversationId && displayMessages.length === 0 && !isStreaming;
   const isInConversation = selectedConversationId !== null;
 
+  const modelButton = (
+    <button
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/60 bg-muted/30 hover:bg-muted/60 transition-colors text-xs"
+      onClick={() => setShowModelPicker(true)}
+      data-testid="button-open-model-picker"
+    >
+      {selectedModelInfo && isFreeModel(selectedModelInfo) ? (
+        <Zap className="h-3 w-3 text-green-500 shrink-0" />
+      ) : (
+        <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+      )}
+      <span className="font-medium truncate max-w-[160px]">{selectedModelName}</span>
+      <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+    </button>
+  );
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
-      {/* Header - Only show when in conversation */}
       {isInConversation && (
         <header className="h-14 border-b flex items-center px-4 bg-background shrink-0">
           <Button
@@ -236,13 +464,10 @@ export default function MacgyverIA() {
         </header>
       )}
 
-      {/* Main Content */}
       <div className="flex-1 overflow-auto">
         {showWelcome ? (
-          /* Welcome Screen with centered input */
           <div className="min-h-full flex flex-col items-center justify-center px-4 py-8">
             <div className="w-full max-w-2xl space-y-8">
-              {/* Logo and Title */}
               <div className="flex flex-col items-center text-center space-y-4">
                 <div className="relative">
                   <MacGyverIcon size={72} />
@@ -258,54 +483,24 @@ export default function MacgyverIA() {
                 </div>
               </div>
 
-              {/* Main Question */}
               <div className="text-center">
                 <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
                   Como posso te ajudar hoje?
                 </h2>
               </div>
 
-              {/* Model Selector */}
               <div className="w-full flex justify-center">
-                <Select value={selectedModel} onValueChange={setSelectedModel}>
-                  <SelectTrigger className="w-auto gap-2 border-border/60 bg-muted/30 rounded-full px-4" data-testid="select-model">
-                    <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Modelos Gratuitos</div>
-                    {AVAILABLE_MODELS.filter(m => m.free).map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        <span className="flex items-center gap-2">
-                          <Zap className="h-3 w-3 text-green-500 shrink-0" />
-                          <span>{model.name}</span>
-                          <span className="text-xs text-muted-foreground">({model.provider})</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">Modelos Premium</div>
-                    {AVAILABLE_MODELS.filter(m => !m.free).map((model) => (
-                      <SelectItem key={model.id} value={model.id}>
-                        <span className="flex items-center gap-2">
-                          <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                          <span>{model.name}</span>
-                          <span className="text-xs text-muted-foreground">({model.provider})</span>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {modelButton}
               </div>
 
-              {/* Input Box - Modern Design */}
               <div className="w-full">
                 <div className="flex items-end gap-3">
                   <div className="flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden shadow-sm transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50">
                     <textarea
                       ref={textareaRef}
-                      placeholder="Pergunte qualquer coisa..."
+                      placeholder="Pergunte qualquer coisa... (digite /model para trocar modelo)"
                       value={inputMessage}
-                      onChange={(e) => setInputMessage(e.target.value)}
+                      onChange={handleInputChange}
                       onKeyDown={handleKeyDown}
                       disabled={isStreaming}
                       className="w-full bg-transparent border-0 resize-none px-4 py-4 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-0 min-h-[56px] max-h-[200px]"
@@ -329,7 +524,6 @@ export default function MacgyverIA() {
                 </div>
               </div>
 
-              {/* Suggestions */}
               <div className="flex flex-wrap justify-center gap-2">
                 {[
                   "Tickets em aberto",
@@ -351,12 +545,11 @@ export default function MacgyverIA() {
                 ))}
               </div>
 
-              {/* Histórico Section */}
               <div className="w-full pt-4">
                 <div className="flex items-center gap-2 mb-4">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                    Histórico
+                    Historico
                   </h3>
                 </div>
                 
@@ -368,7 +561,7 @@ export default function MacgyverIA() {
                   <div className="text-center py-8 text-muted-foreground text-sm bg-muted/30 rounded-xl border border-border/50">
                     <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p>Nenhuma conversa ainda</p>
-                    <p className="text-xs mt-1">Inicie uma conversa para ver o histórico aqui</p>
+                    <p className="text-xs mt-1">Inicie uma conversa para ver o historico aqui</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -409,7 +602,6 @@ export default function MacgyverIA() {
             </div>
           </div>
         ) : (
-          /* Conversation View */
           <ScrollArea className="h-full">
             <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
               {displayMessages.map((msg) => (
@@ -484,47 +676,19 @@ export default function MacgyverIA() {
         )}
       </div>
 
-      {/* Bottom Input - Only show when in conversation */}
       {isInConversation && (
         <div className="border-t p-4 bg-background shrink-0">
           <div className="max-w-3xl mx-auto space-y-2">
             <div className="flex items-center">
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="w-auto gap-2 border-border/60 bg-muted/30 rounded-full px-3 h-7 text-xs" data-testid="select-model-bottom">
-                  <Sparkles className="h-3 w-3 text-primary shrink-0" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Modelos Gratuitos</div>
-                  {AVAILABLE_MODELS.filter(m => m.free).map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      <span className="flex items-center gap-2">
-                        <Zap className="h-3 w-3 text-green-500 shrink-0" />
-                        <span>{model.name}</span>
-                        <span className="text-xs text-muted-foreground">({model.provider})</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">Modelos Premium</div>
-                  {AVAILABLE_MODELS.filter(m => !m.free).map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      <span className="flex items-center gap-2">
-                        <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-                        <span>{model.name}</span>
-                        <span className="text-xs text-muted-foreground">({model.provider})</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {modelButton}
             </div>
             <div className="flex items-end gap-3">
               <div className="flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl overflow-hidden focus-within:border-primary/50">
                 <textarea
                   ref={textareaRef}
-                  placeholder="Pergunte qualquer coisa..."
+                  placeholder="Pergunte qualquer coisa... (digite /model para trocar)"
                   value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
+                  onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
                   disabled={isStreaming}
                   className="w-full bg-transparent border-0 resize-none px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-0 min-h-[48px] max-h-[200px]"
@@ -548,6 +712,16 @@ export default function MacgyverIA() {
             </div>
           </div>
         </div>
+      )}
+
+      {showModelPicker && (
+        <ModelPickerPopup
+          models={models}
+          isLoading={modelsLoading}
+          onSelect={setSelectedModel}
+          onClose={() => setShowModelPicker(false)}
+          selectedModel={selectedModel}
+        />
       )}
     </div>
   );
