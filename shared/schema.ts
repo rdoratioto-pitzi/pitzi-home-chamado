@@ -977,3 +977,28 @@ export const notifications = pgTable("notifications", {
 export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true, createdAt: true });
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
+
+// ============== AI SPACES (Espaços) ==============
+export const aiSpaces = pgTable("ai_spaces", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  color: text("color").default("#00A137"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAiSpaceSchema = createInsertSchema(aiSpaces).omit({ id: true, createdAt: true });
+export type InsertAiSpace = z.infer<typeof insertAiSpaceSchema>;
+export type AiSpace = typeof aiSpaces.$inferSelect;
+
+// ============== AI SPACE CONVERSATIONS (link between spaces and conversations) ==============
+export const aiSpaceConversations = pgTable("ai_space_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  spaceId: varchar("space_id").notNull(),
+  conversationId: varchar("conversation_id").notNull(),
+});
+
+export const insertAiSpaceConversationSchema = createInsertSchema(aiSpaceConversations).omit({ id: true });
+export type InsertAiSpaceConversation = z.infer<typeof insertAiSpaceConversationSchema>;
+export type AiSpaceConversation = typeof aiSpaceConversations.$inferSelect;

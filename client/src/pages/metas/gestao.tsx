@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   Select,
   SelectContent,
@@ -796,9 +796,9 @@ export default function GestaoMetasPage() {
             </div>
             <div>
               <Label>Descrição</Label>
-              <Textarea
+              <RichTextarea
                 value={metaForm.description}
-                onChange={e => setMetaForm({ ...metaForm, description: e.target.value })}
+                onChange={(val: string) => setMetaForm({ ...metaForm, description: val })}
                 placeholder="Detalhes da meta..."
                 data-testid="input-meta-description"
               />
@@ -1000,9 +1000,9 @@ export default function GestaoMetasPage() {
               </div>
               <div>
                 <Label>Comentário</Label>
-                <Textarea
+                <RichTextarea
                   value={checkinForm.comment}
-                  onChange={e => setCheckinForm({ ...checkinForm, comment: e.target.value })}
+                  onChange={(val: string) => setCheckinForm({ ...checkinForm, comment: val })}
                   placeholder="Opcional: adicione um comentário..."
                   data-testid="input-checkin-comment"
                 />

@@ -24,7 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
@@ -341,7 +341,7 @@ export default function FluxogramasPage() {
                   <FormItem>
                     <FormLabel>Descrição (opcional)</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Descreva o objetivo deste fluxograma..." {...field} data-testid="input-flowchart-description" />
+                      <RichTextarea placeholder="Descreva o objetivo deste fluxograma..." value={field.value || ""} onChange={field.onChange} data-testid="input-flowchart-description" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

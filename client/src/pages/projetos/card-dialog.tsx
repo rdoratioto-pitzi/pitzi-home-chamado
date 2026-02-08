@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -357,19 +357,15 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                       <FormItem>
                         <FormLabel>Objetivos</FormLabel>
                         <FormControl>
-                          <Textarea
+                          <RichTextarea
                             placeholder="Descreva os objetivos deste card..."
                             className="min-h-[100px]"
                             data-testid="input-card-objectives"
                             maxLength={5000}
-                            {...field}
+                            value={field.value || ""}
+                            onChange={field.onChange}
                           />
                         </FormControl>
-                        <div className="flex justify-end">
-                          <span className="text-[10px] text-muted-foreground">
-                            {(field.value || "").length}/5000
-                          </span>
-                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -382,19 +378,15 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                       <FormItem>
                         <FormLabel>Desenvolvimento</FormLabel>
                         <FormControl>
-                          <Textarea
+                          <RichTextarea
                             placeholder="Descreva o desenvolvimento técnico..."
                             className="min-h-[100px]"
                             data-testid="input-card-development"
                             maxLength={5000}
-                            {...field}
+                            value={field.value || ""}
+                            onChange={field.onChange}
                           />
                         </FormControl>
-                        <div className="flex justify-end">
-                          <span className="text-[10px] text-muted-foreground">
-                            {(field.value || "").length}/5000
-                          </span>
-                        </div>
                         <FormMessage />
                       </FormItem>
                     )}

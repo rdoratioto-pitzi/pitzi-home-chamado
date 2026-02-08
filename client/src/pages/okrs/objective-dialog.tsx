@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   Select,
   SelectContent,
@@ -129,11 +129,12 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
                 <FormItem>
                   <FormLabel>Descrição (opcional)</FormLabel>
                   <FormControl>
-                    <Textarea
+                    <RichTextarea
                       placeholder="Descreva mais detalhes sobre o objetivo..."
                       className="min-h-[80px]"
                       data-testid="input-objective-description"
-                      {...field}
+                      value={field.value || ""}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />

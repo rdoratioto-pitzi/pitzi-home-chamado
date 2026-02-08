@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -671,9 +671,9 @@ export default function MetasVisaoGeralPage() {
 
             <div className="space-y-2">
               <Label>Descrição</Label>
-              <Textarea
+              <RichTextarea
                 value={metaForm.description}
-                onChange={e => setMetaForm(prev => ({ ...prev, description: e.target.value }))}
+                onChange={(val: string) => setMetaForm(prev => ({ ...prev, description: val }))}
                 placeholder="Descreva a meta..."
                 rows={2}
                 data-testid="input-meta-description"
@@ -848,9 +848,9 @@ export default function MetasVisaoGeralPage() {
 
                 <div className="space-y-2">
                   <Label>Comentário (opcional)</Label>
-                  <Textarea
+                  <RichTextarea
                     value={checkinForm.comment}
-                    onChange={e => setCheckinForm(prev => ({ ...prev, comment: e.target.value }))}
+                    onChange={(val: string) => setCheckinForm(prev => ({ ...prev, comment: val }))}
                     placeholder="O que mudou? Obstáculos encontrados?"
                     rows={3}
                     data-testid="input-checkin-comment"

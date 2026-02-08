@@ -36,14 +36,29 @@ import {
   FileDown,
   Paperclip,
   Image as ImageIcon,
+  PanelRightOpen,
+  PanelRightClose,
+  Hash,
+  Command,
+  Bookmark,
+  Upload,
+  MoreHorizontal,
+  Tag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
-import type { AiConversation, AiMessage } from "@shared/schema";
+import type { AiConversation, AiMessage, AiSpace } from "@shared/schema";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface OpenRouterModel {
   id: string;
@@ -476,7 +491,7 @@ function ModelPickerPopup({
                       </div>
                     </div>
                     {isSelected && (
-                      <span className="text-xs text-primary font-medium mt-1 shrink-0">Ativo</span>
+                      <Check className="h-4 w-4 text-primary mt-1 shrink-0" />
                     )}
                   </button>
                 );
@@ -486,7 +501,7 @@ function ModelPickerPopup({
         </div>
         <div className="p-3 border-t">
           <p className="text-xs text-muted-foreground text-center">
-            {models.length} modelos disponiveis via OpenRouter | Dica: digite <code className="bg-muted px-1 rounded">/model</code> no chat para abrir
+            {models.length} modelos disponiveis via OpenRouter
           </p>
         </div>
       </div>
@@ -518,6 +533,274 @@ function exportConversationMarkdown(messages: AiMessage[], title: string) {
   URL.revokeObjectURL(url);
 }
 
+function RightSidebar({
+  isOpen,
+  onClose,
+  conversations,
+  conversationsLoading,
+  spaces,
+  userId,
+  selectedConversationId,
+  onSelectConversation,
+  onDeleteConversation,
+  onQuickPrompt,
+  onSlashCommand,
+  queryClient,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  conversations: AiConversation[];
+  conversationsLoading: boolean;
+  spaces: AiSpace[];
+  userId: string;
+  selectedConversationId: string | null;
+  onSelectConversation: (id: string) => void;
+  onDeleteConversation: (id: string, e: React.MouseEvent) => void;
+  onQuickPrompt: (prompt: string) => void;
+  onSlashCommand: (cmd: SlashCommand) => void;
+  queryClient: any;
+}) {
+  const [activeTab, setActiveTab] = useState<"historico" | "atalhos" | "comandos" | "espacos">("historico");
+  const [newSpaceName, setNewSpaceName] = useState("");
+  const [showNewSpace, setShowNewSpace] = useState(false);
+
+  const tabs = [
+    { id: "historico" as const, label: "Historico", icon: Clock },
+    { id: "atalhos" as const, label: "Atalhos", icon: Bookmark },
+    { id: "comandos" as const, label: "Comandos", icon: Command },
+    { id: "espacos" as const, label: "Espacos", icon: Hash },
+  ];
+
+  const handleCreateSpace = async () => {
+    if (!newSpaceName.trim()) return;
+    try {
+      await apiRequest("POST", "/api/ai/spaces", { userId, name: newSpaceName.trim() });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
+      setNewSpaceName("");
+      setShowNewSpace(false);
+    } catch (error) {
+      console.error("Failed to create space:", error);
+    }
+  };
+
+  const handleDeleteSpace = async (spaceId: string) => {
+    try {
+      await apiRequest("DELETE", `/api/ai/spaces/${spaceId}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
+    } catch (error) {
+      console.error("Failed to delete space:", error);
+    }
+  };
+
+  const handleAddToSpace = async (spaceId: string) => {
+    if (!selectedConversationId) return;
+    try {
+      await apiRequest("POST", `/api/ai/spaces/${spaceId}/conversations`, { conversationId: selectedConversationId });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
+    } catch (error) {
+      console.error("Failed to add to space:", error);
+    }
+  };
+
+  return (
+    <div className={cn(
+      "border-l bg-background flex flex-col transition-all duration-200 shrink-0",
+      isOpen ? "w-72" : "w-0 overflow-hidden border-l-0"
+    )}>
+      <div className="flex items-center justify-between px-3 py-3 border-b shrink-0">
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {tabs.map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                className={cn(
+                  "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap",
+                  activeTab === tab.id
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+                onClick={() => setActiveTab(tab.id)}
+                data-testid={`sidebar-tab-${tab.id}`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+        <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 ml-1" data-testid="button-close-sidebar">
+          <PanelRightClose className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <ScrollArea className="flex-1">
+        <div className="p-3 space-y-1">
+          {activeTab === "historico" && (
+            <>
+              {conversationsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="text-center py-8">
+                  <MessageSquare className="h-6 w-6 mx-auto mb-2 text-muted-foreground/40" />
+                  <p className="text-xs text-muted-foreground">Nenhuma conversa</p>
+                </div>
+              ) : (
+                conversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className={cn(
+                      "group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors",
+                      selectedConversationId === conv.id
+                        ? "bg-primary/10 text-primary"
+                        : "hover:bg-muted/60 text-foreground"
+                    )}
+                    onClick={() => onSelectConversation(conv.id)}
+                    data-testid={`sidebar-conversation-${conv.id}`}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium truncate">{conv.title || "Nova conversa"}</p>
+                      <p className="text-[10px] text-muted-foreground">{formatDate(conv.updatedAt)}</p>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      {selectedConversationId === conv.id && spaces.length > 0 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`button-tag-conv-${conv.id}`}>
+                              <Tag className="h-3 w-3" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            {spaces.map(space => (
+                              <DropdownMenuItem key={space.id} onClick={() => handleAddToSpace(space.id)} data-testid={`tag-space-${space.id}`}>
+                                <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: space.color || "#00A137" }} />
+                                {space.name}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                      <button
+                        className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => onDeleteConversation(conv.id, e)}
+                        data-testid={`button-delete-sidebar-${conv.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </>
+          )}
+
+          {activeTab === "atalhos" && (
+            <div className="space-y-1">
+              {QUICK_PROMPTS.map((qp) => {
+                const Icon = qp.icon;
+                return (
+                  <button
+                    key={qp.label}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left hover:bg-muted/60 transition-colors"
+                    onClick={() => onQuickPrompt(qp.prompt)}
+                    data-testid={`sidebar-shortcut-${qp.label.replace(/\s+/g, '-').toLowerCase()}`}
+                  >
+                    <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                      <Icon className="h-3.5 w-3.5 text-primary" />
+                    </div>
+                    <span className="text-xs font-medium">{qp.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {activeTab === "comandos" && (
+            <div className="space-y-1">
+              {SLASH_COMMANDS.map((cmd) => {
+                const Icon = cmd.icon;
+                return (
+                  <button
+                    key={cmd.command}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left hover:bg-muted/60 transition-colors"
+                    onClick={() => onSlashCommand(cmd)}
+                    data-testid={`sidebar-cmd-${cmd.command.slice(1)}`}
+                  >
+                    <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center shrink-0">
+                      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-mono text-primary">{cmd.command}</span>
+                        <span className="text-xs font-medium">{cmd.label}</span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground truncate">{cmd.description}</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {activeTab === "espacos" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Seus Espacos</span>
+                <Button variant="ghost" size="icon" onClick={() => setShowNewSpace(!showNewSpace)} data-testid="button-new-space">
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {showNewSpace && (
+                <div className="flex gap-1">
+                  <Input
+                    value={newSpaceName}
+                    onChange={(e) => setNewSpaceName(e.target.value)}
+                    placeholder="Nome do espaco..."
+                    className="h-7 text-xs"
+                    onKeyDown={(e) => e.key === "Enter" && handleCreateSpace()}
+                    data-testid="input-new-space-name"
+                  />
+                  <Button size="sm" className="h-7 px-2" onClick={handleCreateSpace} data-testid="button-create-space">
+                    <Check className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+              {spaces.length === 0 && !showNewSpace ? (
+                <div className="text-center py-6">
+                  <Hash className="h-6 w-6 mx-auto mb-2 text-muted-foreground/40" />
+                  <p className="text-xs text-muted-foreground">Nenhum espaco criado</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Crie espacos para organizar suas conversas por topico</p>
+                </div>
+              ) : (
+                spaces.map((space) => (
+                  <div
+                    key={space.id}
+                    className="group flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-muted/60 transition-colors"
+                    data-testid={`space-item-${space.id}`}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: space.color || "#00A137" }} />
+                    <span className="text-xs font-medium flex-1">{space.name}</span>
+                    <button
+                      className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleDeleteSpace(space.id)}
+                      data-testid={`button-delete-space-${space.id}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+}
+
 export default function MacgyverIA() {
   const queryClient = useQueryClient();
   const user = getCurrentUser();
@@ -532,6 +815,7 @@ export default function MacgyverIA() {
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [slashFilter, setSlashFilter] = useState("");
   const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+  const [showRightSidebar, setShowRightSidebar] = useState(true);
   const [attachedFiles, setAttachedFiles] = useState<Array<{
     file: File;
     preview: string;
@@ -556,6 +840,10 @@ export default function MacgyverIA() {
   const { data: messages = [], isLoading: messagesLoading } = useQuery<AiMessage[]>({
     queryKey: ["/api/ai/conversations", selectedConversationId, "messages"],
     enabled: !!selectedConversationId,
+  });
+
+  const { data: spaces = [] } = useQuery<AiSpace[]>({
+    queryKey: ["/api/ai/spaces", userId],
   });
 
   const selectedModelInfo = useMemo(() => {
@@ -833,23 +1121,93 @@ export default function MacgyverIA() {
   const displayMessages = selectedConversationId ? messages : [];
   const showWelcome = !selectedConversationId && displayMessages.length === 0 && !isStreaming;
   const isInConversation = selectedConversationId !== null;
-
   const currentConversation = conversations.find(c => c.id === selectedConversationId);
 
-  const modelButton = (
-    <button
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/60 bg-muted/30 hover:bg-muted/60 transition-colors text-xs"
-      onClick={() => setShowModelPicker(true)}
-      data-testid="button-open-model-picker"
-    >
-      {selectedModelInfo && isFreeModel(selectedModelInfo) ? (
-        <Zap className="h-3 w-3 text-green-500 shrink-0" />
-      ) : (
-        <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-      )}
-      <span className="font-medium truncate max-w-[160px]">{selectedModelName}</span>
-      <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-    </button>
+  const modelDropdown = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 bg-background hover:bg-muted/50 transition-colors text-xs whitespace-nowrap"
+          data-testid="button-model-dropdown"
+        >
+          {selectedModelInfo && isFreeModel(selectedModelInfo) ? (
+            <Zap className="h-3 w-3 text-green-500 shrink-0" />
+          ) : (
+            <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
+          )}
+          <span className="font-medium truncate max-w-[120px]">Modelo</span>
+          <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-64 max-h-[400px] overflow-auto">
+        <div className="px-2 py-1.5 border-b">
+          <p className="text-xs font-medium text-muted-foreground">Modelo atual: {selectedModelName}</p>
+        </div>
+        {modelsLoading ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        ) : (
+          <>
+            {models.slice(0, 15).map(model => {
+              const free = isFreeModel(model);
+              const isSelected = model.id === selectedModel;
+              return (
+                <DropdownMenuItem
+                  key={model.id}
+                  onClick={() => setSelectedModel(model.id)}
+                  className={cn(isSelected && "bg-primary/10")}
+                  data-testid={`dropdown-model-${model.id}`}
+                >
+                  <div className="flex items-center gap-2 w-full">
+                    {free ? <Zap className="h-3 w-3 text-green-500 shrink-0" /> : <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />}
+                    <span className="text-xs font-medium truncate flex-1">{model.name}</span>
+                    {free && <span className="text-[9px] bg-green-500/10 text-green-600 px-1 rounded">FREE</span>}
+                    {isSelected && <Check className="h-3 w-3 text-primary shrink-0" />}
+                  </div>
+                </DropdownMenuItem>
+              );
+            })}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setShowModelPicker(true)} data-testid="button-open-model-picker">
+              <Search className="h-3 w-3 mr-2" />
+              <span className="text-xs">Ver todos os modelos...</span>
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const plusMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="icon" className="rounded-lg shrink-0" data-testid="button-plus-menu">
+          <Plus className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuItem onClick={() => fileInputRef.current?.click()} data-testid="plus-menu-upload">
+          <Upload className="h-4 w-4 mr-2" />
+          Upload de arquivos ou imagens
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {QUICK_PROMPTS.slice(0, 3).map(qp => {
+          const Icon = qp.icon;
+          return (
+            <DropdownMenuItem key={qp.label} onClick={() => handleSendMessageDirect(qp.prompt)} data-testid={`plus-menu-${qp.label.replace(/\s+/g, '-').toLowerCase()}`}>
+              <Icon className="h-4 w-4 mr-2" />
+              {qp.label}
+            </DropdownMenuItem>
+          );
+        })}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => setShowRightSidebar(true)} data-testid="plus-menu-sidebar">
+          <PanelRightOpen className="h-4 w-4 mr-2" />
+          Abrir painel lateral
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 
   const chatInput = (isWelcome: boolean) => (
@@ -874,371 +1232,308 @@ export default function MacgyverIA() {
         }}
         data-testid="input-file-upload"
       />
-      <div className="flex items-end gap-3">
-        <div className={cn(
-          "flex-1 relative bg-muted/50 dark:bg-muted/30 border border-border rounded-2xl transition-all focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50",
-          isWelcome && "shadow-sm"
-        )}>
-          {attachedFiles.length > 0 && (
-            <div className="flex items-center gap-2 px-3 pt-3 pb-1 flex-wrap" data-testid="attachments-preview-row">
-              {attachedFiles.map((att, idx) => (
-                <div
-                  key={idx}
-                  className="relative group flex items-center gap-2 bg-background border border-border rounded-lg p-1.5"
-                  data-testid={`attachment-preview-${idx}`}
+      <div className={cn(
+        "bg-muted/40 dark:bg-muted/20 border border-border rounded-2xl transition-all focus-within:border-primary/40 focus-within:shadow-sm",
+        isWelcome && "shadow-sm"
+      )}>
+        {attachedFiles.length > 0 && (
+          <div className="flex items-center gap-2 px-3 pt-3 pb-1 flex-wrap" data-testid="attachments-preview-row">
+            {attachedFiles.map((att, idx) => (
+              <div
+                key={idx}
+                className="relative group flex items-center gap-2 bg-background border border-border rounded-lg p-1.5"
+                data-testid={`attachment-preview-${idx}`}
+              >
+                {att.type.startsWith("image/") ? (
+                  <img
+                    src={att.preview}
+                    alt={att.name}
+                    className="w-10 h-10 rounded object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                )}
+                <span className="text-xs text-muted-foreground max-w-[60px] truncate">{att.name}</span>
+                <button
+                  onClick={() => removeAttachment(idx)}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  data-testid={`button-remove-attachment-${idx}`}
                 >
-                  {att.type.startsWith("image/") ? (
-                    <img
-                      src={att.preview}
-                      alt={att.name}
-                      className="w-12 h-12 rounded object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                  )}
-                  <span className="text-xs text-muted-foreground max-w-[80px] truncate">{att.name}</span>
-                  <button
-                    onClick={() => removeAttachment(idx)}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    data-testid={`button-remove-attachment-${idx}`}
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex items-end">
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex items-end px-2">
+          <textarea
+            ref={textareaRef}
+            placeholder="Pergunte qualquer coisa. Digite / para comandos..."
+            value={inputMessage}
+            onChange={handleInputChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            disabled={isStreaming}
+            className={cn(
+              "flex-1 bg-transparent border-0 resize-none placeholder:text-muted-foreground/60 focus:outline-none focus:ring-0",
+              isWelcome ? "py-4 pl-2 text-base min-h-[56px] max-h-[200px]" : "py-3 pl-2 text-sm min-h-[44px] max-h-[200px]"
+            )}
+            rows={1}
+            data-testid={isWelcome ? "input-chat-message" : "input-chat-message-bottom"}
+          />
+        </div>
+        <div className="flex items-center justify-between px-2 pb-2 gap-2">
+          <div className="flex items-center gap-1">
+            {plusMenu}
             <Button
               variant="ghost"
               size="icon"
-              className="shrink-0 ml-1 mb-1"
+              className="rounded-lg"
               onClick={() => fileInputRef.current?.click()}
               disabled={isStreaming || attachedFiles.length >= MAX_FILES}
               data-testid="button-attach-file"
             >
               <Paperclip className="h-4 w-4 text-muted-foreground" />
             </Button>
-            <textarea
-              ref={textareaRef}
-              placeholder="Pergunte qualquer coisa ou digite / para comandos..."
-              value={inputMessage}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              disabled={isStreaming}
-              className={cn(
-                "w-full bg-transparent border-0 resize-none pr-4 placeholder:text-muted-foreground focus:outline-none focus:ring-0",
-                isWelcome ? "py-4 text-base min-h-[56px] max-h-[200px]" : "py-3 text-sm min-h-[48px] max-h-[200px]"
+          </div>
+          <div className="flex items-center gap-2">
+            {modelDropdown}
+            <Button
+              size="icon"
+              className="rounded-xl shrink-0"
+              disabled={(!inputMessage.trim() && attachedFiles.length === 0) || isStreaming}
+              onClick={handleSendMessage}
+              data-testid={isWelcome ? "button-send-message" : "button-send-message-bottom"}
+            >
+              {isStreaming ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
               )}
-              rows={1}
-              data-testid={isWelcome ? "input-chat-message" : "input-chat-message-bottom"}
-            />
+            </Button>
           </div>
         </div>
-        <Button
-          size="icon"
-          className="rounded-2xl shrink-0 shadow-sm"
-          disabled={(!inputMessage.trim() && attachedFiles.length === 0) || isStreaming}
-          onClick={handleSendMessage}
-          data-testid={isWelcome ? "button-send-message" : "button-send-message-bottom"}
-        >
-          {isStreaming ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4" />
-          )}
-        </Button>
       </div>
     </div>
   );
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-background">
-      {isInConversation && (
-        <header className="h-14 border-b flex items-center px-4 bg-background shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleNewConversation}
-            className="gap-2"
-            data-testid="button-back-to-home"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Voltar</span>
-          </Button>
-          <div className="flex-1 flex items-center justify-center gap-2">
-            <MacGyverIcon size={24} />
-            <span className="font-semibold text-sm hidden sm:inline">Macgyver IA</span>
-            {modelButton}
-          </div>
-          <div className="flex items-center gap-1">
-            {displayMessages.length > 0 && (
+    <div className="flex h-screen overflow-hidden bg-background">
+      <div className="flex-1 flex flex-col min-w-0">
+        {isInConversation && (
+          <header className="h-12 border-b flex items-center px-4 bg-background shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleNewConversation}
+              className="gap-1.5"
+              data-testid="button-back-to-home"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs">Voltar</span>
+            </Button>
+            <div className="flex-1 flex items-center justify-center gap-2">
+              <MacGyverIcon size={20} />
+              <span className="font-semibold text-sm">{currentConversation?.title || "Macgyver IA"}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              {displayMessages.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => exportConversationMarkdown(displayMessages, currentConversation?.title || "")}
+                  title="Exportar conversa"
+                  data-testid="button-export-conversation"
+                >
+                  <FileDown className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => exportConversationMarkdown(displayMessages, currentConversation?.title || "")}
-                title="Exportar conversa"
-                data-testid="button-export-conversation"
+                onClick={handleNewConversation}
+                data-testid="button-new-conversation"
               >
-                <FileDown className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
               </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNewConversation}
-              className="gap-2"
-              data-testid="button-new-conversation"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Nova</span>
-            </Button>
-          </div>
-        </header>
-      )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowRightSidebar(!showRightSidebar)}
+                data-testid="button-toggle-sidebar"
+              >
+                {showRightSidebar ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+              </Button>
+            </div>
+          </header>
+        )}
 
-      <div className="flex-1 overflow-auto">
-        {showWelcome ? (
-          <div className="min-h-full flex flex-col items-center justify-center px-4 py-8">
-            <div className="w-full max-w-2xl space-y-8">
-              <div className="flex flex-col items-center text-center space-y-4">
-                <div className="relative">
-                  <MacGyverIcon size={72} />
+        <div className="flex-1 overflow-auto">
+          {showWelcome ? (
+            <div className="min-h-full flex flex-col items-center justify-center px-4 py-8">
+              <div className="w-full max-w-2xl space-y-6">
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <MacGyverIcon size={56} />
+                  <div className="space-y-1.5">
+                    <h1 className="text-2xl font-bold tracking-tight" data-testid="text-welcome-heading">
+                      Macgyver IA Renov
+                    </h1>
+                    <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                      Seu assistente estrategico com IA. Analise dados, gere relatorios e obtenha insights em tempo real.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                    Macgyver IA Renov
-                  </h1>
-                  <p className="text-muted-foreground text-sm sm:text-base max-w-md mx-auto">
-                    Seu assistente estrategico com IA. Analise dados, gere relatorios, crie codigo e obtenha insights em tempo real.
-                  </p>
-                </div>
-              </div>
 
-              <div className="w-full">
-                {chatInput(true)}
-              </div>
+                <div className="w-full">
+                  {chatInput(true)}
+                </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold text-foreground">Analises Rapidas</h3>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {QUICK_PROMPTS.map((qp) => {
-                    const Icon = qp.icon;
-                    return (
-                      <button
-                        key={qp.label}
-                        className="flex items-center gap-3 p-3 text-left rounded-xl border border-border bg-card hover:bg-muted/50 transition-colors"
-                        onClick={() => {
-                          setInputMessage(qp.prompt);
-                          handleSendMessageDirect(qp.prompt);
-                        }}
-                        data-testid={`button-quick-prompt-${qp.label.replace(/\s+/g, '-').toLowerCase()}`}
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <Icon className="h-4 w-4 text-primary" />
-                        </div>
-                        <span className="text-sm font-medium">{qp.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Code className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold text-muted-foreground">Comandos /</h3>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {SLASH_COMMANDS.slice(0, 6).map((cmd) => (
-                    <button
-                      key={cmd.command}
-                      className="px-3 py-1.5 text-xs font-mono bg-muted/50 dark:bg-muted/30 border border-border rounded-full hover:bg-muted transition-colors"
-                      onClick={() => {
-                        handleSendMessageDirect(cmd.prompt);
-                      }}
-                      data-testid={`button-command-${cmd.command.slice(1)}`}
+                {!showRightSidebar && (
+                  <div className="flex justify-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowRightSidebar(true)}
+                      className="text-xs text-muted-foreground gap-1.5"
+                      data-testid="button-show-sidebar-welcome"
                     >
-                      {cmd.command}
-                    </button>
-                  ))}
-                </div>
+                      <PanelRightOpen className="h-3.5 w-3.5" />
+                      Abrir painel lateral
+                    </Button>
+                  </div>
+                )}
               </div>
-
-              <div className="w-full pt-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                    Historico
-                  </h3>
-                </div>
-                
-                {conversationsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : conversations.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm bg-muted/30 rounded-xl border border-border/50">
-                    <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p>Nenhuma conversa ainda</p>
-                    <p className="text-xs mt-1">Inicie uma conversa para ver o historico aqui</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {conversations.slice(0, 6).map((conv) => (
-                      <div
-                        key={conv.id}
-                        className="group relative flex items-start gap-3 p-4 rounded-xl border border-border bg-card hover:bg-muted/50 cursor-pointer transition-all hover:shadow-sm"
-                        onClick={() => setSelectedConversationId(conv.id)}
-                        data-testid={`conversation-item-${conv.id}`}
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <MessageSquare className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate pr-6">{conv.title || "Nova conversa"}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{formatDate(conv.updatedAt)}</p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => handleDeleteConversation(conv.id, e)}
-                          data-testid={`button-delete-conversation-${conv.id}`}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                        </Button>
+            </div>
+          ) : (
+            <ScrollArea className="h-full">
+              <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
+                {displayMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={cn(
+                      "flex gap-3",
+                      msg.role === "user" ? "justify-end" : "justify-start"
+                    )}
+                    data-testid={`message-${msg.role}-${msg.id}`}
+                  >
+                    {msg.role === "assistant" && (
+                      <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+                        <Bot className="h-4 w-4 text-primary" />
                       </div>
+                    )}
+                    <div
+                      className={cn(
+                        "rounded-2xl px-4 py-3 max-w-[85%]",
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted/60"
+                      )}
+                    >
+                      {msg.role === "assistant" ? (
+                        <MarkdownContent content={msg.content} />
+                      ) : (
+                        <div>
+                          {msg.content.includes("[Imagem anexada:") && (
+                            <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                              {msg.content.match(/\[Imagem anexada: ([^\]]+)\]/g)?.map((match, i) => {
+                                const filename = match.replace("[Imagem anexada: ", "").replace("]", "");
+                                return (
+                                  <span key={i} className="inline-flex items-center gap-1 text-xs bg-primary-foreground/20 px-2 py-0.5 rounded" data-testid={`attachment-marker-${i}`}>
+                                    <ImageIcon className="h-3 w-3" />
+                                    {filename}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
+                          <p className="text-sm whitespace-pre-wrap">{msg.content.replace(/\[Imagem anexada: [^\]]+\]\n*/g, "").trim()}</p>
+                        </div>
+                      )}
+                    </div>
+                    {msg.role === "user" && (
+                      <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shrink-0 mt-1">
+                        <User className="h-4 w-4 text-primary-foreground" />
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {isStreaming && streamingContent && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="rounded-2xl px-4 py-3 max-w-[85%] bg-muted/60">
+                      <MarkdownContent content={streamingContent} />
+                    </div>
+                  </div>
+                )}
+
+                {isStreaming && !streamingContent && (
+                  <div className="flex gap-3 justify-start">
+                    <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 mt-1">
+                      <Bot className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="rounded-2xl px-4 py-3 bg-muted/60">
+                      <div className="flex gap-1">
+                        <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                        <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                        <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!isStreaming && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.role === "assistant" && (
+                  <div className="flex flex-wrap gap-2 pl-10" data-testid="follow-up-suggestions">
+                    {[
+                      "Aprofunde essa analise",
+                      "Gere um relatorio sobre isso",
+                      "Quais os proximos passos?",
+                    ].map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        className="px-3 py-1.5 text-xs font-medium bg-muted/40 dark:bg-muted/20 border border-border rounded-full hover:bg-muted transition-colors"
+                        onClick={() => handleSendMessageDirect(suggestion)}
+                        data-testid={`button-followup-${suggestion.replace(/\s+/g, '-').toLowerCase()}`}
+                      >
+                        {suggestion}
+                      </button>
                     ))}
                   </div>
                 )}
-                
-                {conversations.length > 6 && (
-                  <p className="text-center text-sm text-muted-foreground mt-4">
-                    +{conversations.length - 6} conversas anteriores
-                  </p>
-                )}
+
+                <div ref={messagesEndRef} />
               </div>
+            </ScrollArea>
+          )}
+        </div>
+
+        {isInConversation && (
+          <div className="border-t p-3 bg-background shrink-0">
+            <div className="max-w-3xl mx-auto">
+              {chatInput(false)}
             </div>
           </div>
-        ) : (
-          <ScrollArea className="h-full">
-            <div className="max-w-3xl mx-auto py-6 px-4 space-y-6">
-              {displayMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={cn(
-                    "flex gap-3",
-                    msg.role === "user" ? "justify-end" : "justify-start"
-                  )}
-                  data-testid={`message-${msg.role}-${msg.id}`}
-                >
-                  {msg.role === "assistant" && (
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Bot className="h-5 w-5 text-primary" />
-                    </div>
-                  )}
-                  <div
-                    className={cn(
-                      "rounded-2xl px-4 py-3 max-w-[85%]",
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    )}
-                  >
-                    {msg.role === "assistant" ? (
-                      <MarkdownContent content={msg.content} />
-                    ) : (
-                      <div>
-                        {msg.content.includes("[Imagem anexada:") && (
-                          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                            {msg.content.match(/\[Imagem anexada: ([^\]]+)\]/g)?.map((match, i) => {
-                              const filename = match.replace("[Imagem anexada: ", "").replace("]", "");
-                              return (
-                                <span key={i} className="inline-flex items-center gap-1 text-xs bg-primary-foreground/20 px-2 py-0.5 rounded" data-testid={`attachment-marker-${i}`}>
-                                  <ImageIcon className="h-3 w-3" />
-                                  {filename}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        )}
-                        <p className="text-sm whitespace-pre-wrap">{msg.content.replace(/\[Imagem anexada: [^\]]+\]\n*/g, "").trim()}</p>
-                      </div>
-                    )}
-                  </div>
-                  {msg.role === "user" && (
-                    <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-                      <User className="h-5 w-5 text-primary-foreground" />
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {isStreaming && streamingContent && (
-                <div className="flex gap-3 justify-start">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Bot className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="rounded-2xl px-4 py-3 max-w-[85%] bg-muted">
-                    <MarkdownContent content={streamingContent} />
-                  </div>
-                </div>
-              )}
-
-              {isStreaming && !streamingContent && (
-                <div className="flex gap-3 justify-start">
-                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                    <Bot className="h-5 w-5 text-primary" />
-                  </div>
-                  <div className="rounded-2xl px-4 py-3 bg-muted">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
-                      <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
-                      <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!isStreaming && displayMessages.length > 0 && displayMessages[displayMessages.length - 1]?.role === "assistant" && (
-                <div className="flex flex-wrap gap-2 pl-11" data-testid="follow-up-suggestions">
-                  {[
-                    "Aprofunde essa analise",
-                    "Gere um relatorio sobre isso",
-                    "Quais os proximos passos?",
-                  ].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      className="px-3 py-1.5 text-xs font-medium bg-muted/50 dark:bg-muted/30 border border-border rounded-full hover:bg-muted transition-colors"
-                      onClick={() => handleSendMessageDirect(suggestion)}
-                      data-testid={`button-followup-${suggestion.replace(/\s+/g, '-').toLowerCase()}`}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-          </ScrollArea>
         )}
       </div>
 
-      {isInConversation && (
-        <div className="border-t p-4 bg-background shrink-0">
-          <div className="max-w-3xl mx-auto space-y-2">
-            {chatInput(false)}
-          </div>
-        </div>
-      )}
+      <RightSidebar
+        isOpen={showRightSidebar}
+        onClose={() => setShowRightSidebar(false)}
+        conversations={conversations}
+        conversationsLoading={conversationsLoading}
+        spaces={spaces}
+        userId={userId}
+        selectedConversationId={selectedConversationId}
+        onSelectConversation={setSelectedConversationId}
+        onDeleteConversation={handleDeleteConversation}
+        onQuickPrompt={handleSendMessageDirect}
+        onSlashCommand={handleSlashCommand}
+        queryClient={queryClient}
+      />
 
       {showModelPicker && (
         <ModelPickerPopup

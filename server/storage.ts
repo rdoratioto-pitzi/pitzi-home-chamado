@@ -38,6 +38,8 @@ import {
   type KnowledgeFavorite, type InsertKnowledgeFavorite,
   type AiConversation, type InsertAiConversation,
   type AiMessage, type InsertAiMessage,
+  type AiSpace, type InsertAiSpace,
+  type AiSpaceConversation, type InsertAiSpaceConversation,
   type Notification, type InsertNotification,
   type Flowchart, type InsertFlowchart,
   type FlowchartVersion, type InsertFlowchartVersion,
@@ -50,7 +52,7 @@ import {
   metaAreas, metas, metaCheckins,
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
   flowcharts, flowchartVersions, flowchartComments,
-  aiConversations, aiMessages, notifications
+  aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql } from "drizzle-orm";
@@ -289,6 +291,15 @@ export interface IStorage {
   // AI Messages
   getAiMessages(conversationId: string): Promise<AiMessage[]>;
   createAiMessage(message: InsertAiMessage): Promise<AiMessage>;
+
+  // AI Spaces
+  getAiSpaces(userId: string): Promise<AiSpace[]>;
+  createAiSpace(space: InsertAiSpace): Promise<AiSpace>;
+  updateAiSpace(id: string, data: Partial<AiSpace>): Promise<AiSpace | undefined>;
+  deleteAiSpace(id: string): Promise<boolean>;
+  getAiSpaceConversations(spaceId: string): Promise<AiSpaceConversation[]>;
+  addConversationToSpace(data: InsertAiSpaceConversation): Promise<AiSpaceConversation>;
+  removeConversationFromSpace(spaceId: string, conversationId: string): Promise<boolean>;
 
   // Flowcharts
   getFlowcharts(ownerId?: string): Promise<Flowchart[]>;
@@ -1149,6 +1160,43 @@ export class DatabaseStorage implements IStorage {
     const [created] = await db.insert(aiMessages).values(message).returning();
     return created;
   }
+  // AI Spaces
+  async getAiSpaces(userId: string): Promise<AiSpace[]> {
+    return await db.select().from(aiSpaces).where(eq(aiSpaces.userId, userId)).orderBy(sql`${aiSpaces.createdAt} DESC`);
+  }
+
+  async createAiSpace(space: InsertAiSpace): Promise<AiSpace> {
+    const [created] = await db.insert(aiSpaces).values(space).returning();
+    return created;
+  }
+
+  async updateAiSpace(id: string, data: Partial<AiSpace>): Promise<AiSpace | undefined> {
+    const [updated] = await db.update(aiSpaces).set(data).where(eq(aiSpaces.id, id)).returning();
+    return updated;
+  }
+
+  async deleteAiSpace(id: string): Promise<boolean> {
+    await db.delete(aiSpaceConversations).where(eq(aiSpaceConversations.spaceId, id));
+    const result = await db.delete(aiSpaces).where(eq(aiSpaces.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAiSpaceConversations(spaceId: string): Promise<AiSpaceConversation[]> {
+    return await db.select().from(aiSpaceConversations).where(eq(aiSpaceConversations.spaceId, spaceId));
+  }
+
+  async addConversationToSpace(data: InsertAiSpaceConversation): Promise<AiSpaceConversation> {
+    const [created] = await db.insert(aiSpaceConversations).values(data).returning();
+    return created;
+  }
+
+  async removeConversationFromSpace(spaceId: string, conversationId: string): Promise<boolean> {
+    const result = await db.delete(aiSpaceConversations).where(
+      and(eq(aiSpaceConversations.spaceId, spaceId), eq(aiSpaceConversations.conversationId, conversationId))
+    ).returning();
+    return result.length > 0;
+  }
+
   // Flowcharts
   async getFlowcharts(ownerId?: string): Promise<Flowchart[]> {
     if (ownerId) {

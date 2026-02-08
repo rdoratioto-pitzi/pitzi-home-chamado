@@ -20,7 +20,7 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -183,12 +183,12 @@ export function KeyResultUpdateDialog({ open, onOpenChange, keyResult }: KeyResu
                   <FormItem>
                     <FormLabel>Comentário (opcional)</FormLabel>
                     <FormControl>
-                      <Textarea
+                      <RichTextarea
                         placeholder="O que mudou desde o último check-in? Obstáculos encontrados?"
-                        className="resize-none"
                         rows={3}
                         data-testid="input-update-comment"
-                        {...field}
+                        value={field.value || ""}
+                        onChange={field.onChange}
                       />
                     </FormControl>
                     <FormMessage />

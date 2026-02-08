@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -486,12 +486,10 @@ export default function DocumentoPage() {
           </DialogHeader>
           <div className="py-4">
             <Label htmlFor="motivo">Motivo da rejeição</Label>
-            <Textarea
-              id="motivo"
+            <RichTextarea
               value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
+              onChange={(val: string) => setRejectReason(val)}
               placeholder="Descreva o motivo da rejeição..."
-              className="mt-2"
               data-testid="textarea-motivo-rejeicao"
             />
           </div>

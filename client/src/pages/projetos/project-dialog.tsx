@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -224,11 +224,12 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
                 <FormItem>
                   <FormLabel>Descrição (opcional)</FormLabel>
                   <FormControl>
-                    <Textarea
+                    <RichTextarea
                       placeholder="Descreva os objetivos do projeto..."
                       className="min-h-[80px]"
                       data-testid="input-project-description"
-                      {...field}
+                      value={field.value || ""}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />

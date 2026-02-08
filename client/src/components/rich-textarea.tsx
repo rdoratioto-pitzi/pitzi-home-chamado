@@ -1,7 +1,10 @@
 import { useState, useRef, useCallback } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { ImageIcon, X, Loader2, Maximize2, Video, FileText, Paperclip, FileSpreadsheet, File, Download } from "lucide-react";
+import { 
+  ImageIcon, X, Loader2, Maximize2, Video, FileText, Paperclip, FileSpreadsheet, File, Download,
+  Bold, Italic, List, ListOrdered, CheckSquare, Link2, Code, Heading1, Heading2, Strikethrough, Quote, Minus,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -10,6 +13,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface RichTextareaProps {
   value: string;
@@ -20,6 +29,8 @@ interface RichTextareaProps {
   rows?: number;
   maxLength?: number;
   disabled?: boolean;
+  showToolbar?: boolean;
+  className?: string;
   "data-testid"?: string;
 }
 
@@ -70,6 +81,141 @@ function FileIcon({ type }: { type: string }) {
   }
 }
 
+interface ToolbarAction {
+  icon: typeof Bold;
+  label: string;
+  action: "wrap" | "prefix" | "insert";
+  wrap?: string;
+  prefix?: string;
+  insert?: string;
+  testId: string;
+}
+
+const TOOLBAR_ACTIONS: ToolbarAction[] = [
+  { icon: Heading1, label: "Titulo", action: "prefix", prefix: "# ", testId: "toolbar-h1" },
+  { icon: Heading2, label: "Subtitulo", action: "prefix", prefix: "## ", testId: "toolbar-h2" },
+  { icon: Bold, label: "Negrito", action: "wrap", wrap: "**", testId: "toolbar-bold" },
+  { icon: Italic, label: "Italico", action: "wrap", wrap: "_", testId: "toolbar-italic" },
+  { icon: Strikethrough, label: "Riscado", action: "wrap", wrap: "~~", testId: "toolbar-strike" },
+  { icon: Code, label: "Codigo", action: "wrap", wrap: "`", testId: "toolbar-code" },
+  { icon: List, label: "Lista", action: "prefix", prefix: "- ", testId: "toolbar-ul" },
+  { icon: ListOrdered, label: "Lista Numerada", action: "prefix", prefix: "1. ", testId: "toolbar-ol" },
+  { icon: CheckSquare, label: "Checklist", action: "prefix", prefix: "- [ ] ", testId: "toolbar-check" },
+  { icon: Quote, label: "Citacao", action: "prefix", prefix: "> ", testId: "toolbar-quote" },
+  { icon: Minus, label: "Separador", action: "insert", insert: "\n---\n", testId: "toolbar-hr" },
+  { icon: Link2, label: "Link", action: "insert", insert: "[texto](url)", testId: "toolbar-link" },
+];
+
+function FormattingToolbar({
+  textareaRef,
+  value,
+  onChange,
+  disabled,
+  onAttach,
+  isUploading,
+  dataTestId,
+}: {
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+  onAttach: () => void;
+  isUploading: boolean;
+  dataTestId?: string;
+}) {
+  const applyFormat = useCallback((action: ToolbarAction) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = value.substring(start, end);
+    let newValue = value;
+    let newCursorPos = end;
+
+    if (action.action === "wrap" && action.wrap) {
+      const w = action.wrap;
+      if (selected) {
+        newValue = value.substring(0, start) + w + selected + w + value.substring(end);
+        newCursorPos = end + w.length * 2;
+      } else {
+        newValue = value.substring(0, start) + w + w + value.substring(end);
+        newCursorPos = start + w.length;
+      }
+    } else if (action.action === "prefix" && action.prefix) {
+      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+      const needsNewline = lineStart > 0 && value[lineStart - 1] !== "\n" && start > 0 && value.substring(lineStart, start).trim().length > 0;
+      if (needsNewline && start === end) {
+        newValue = value.substring(0, start) + "\n" + action.prefix + value.substring(end);
+        newCursorPos = start + 1 + action.prefix.length;
+      } else {
+        newValue = value.substring(0, lineStart) + action.prefix + value.substring(lineStart);
+        newCursorPos = end + action.prefix.length;
+      }
+    } else if (action.action === "insert" && action.insert) {
+      newValue = value.substring(0, start) + action.insert + value.substring(end);
+      newCursorPos = start + action.insert.length;
+    }
+
+    onChange(newValue);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  }, [textareaRef, value, onChange]);
+
+  return (
+    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border bg-muted/30 rounded-t-md overflow-visible flex-wrap" data-testid={dataTestId ? `${dataTestId}-toolbar` : "formatting-toolbar"}>
+      {TOOLBAR_ACTIONS.map((action, idx) => {
+        const Icon = action.icon;
+        const showSep = idx === 1 || idx === 5 || idx === 8 || idx === 9;
+        return (
+          <span key={action.testId} className="contents">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="no-default-hover-elevate no-default-active-elevate [&]:h-7 [&]:w-7 text-muted-foreground"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => applyFormat(action)}
+                  disabled={disabled}
+                  data-testid={action.testId}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                {action.label}
+              </TooltipContent>
+            </Tooltip>
+            {showSep && <div className="w-px h-4 bg-border mx-0.5 shrink-0" />}
+          </span>
+        );
+      })}
+      <div className="w-px h-4 bg-border mx-0.5 shrink-0" />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="no-default-hover-elevate no-default-active-elevate [&]:h-7 [&]:w-7 text-muted-foreground"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onAttach}
+            disabled={disabled || isUploading}
+            data-testid={dataTestId ? `${dataTestId}-upload-btn` : "toolbar-attach"}
+          >
+            {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">Anexar Arquivo</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
 export function RichTextarea({
   value,
   onChange,
@@ -79,18 +225,23 @@ export function RichTextarea({
   rows = 4,
   maxLength = 5000,
   disabled = false,
+  showToolbar = true,
+  className: externalClassName,
   "data-testid": dataTestId,
 }: RichTextareaProps) {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const uploadFile = useCallback(async (file: File): Promise<string | null> => {
     const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
       toast({
         title: "Arquivo muito grande",
-        description: "O tamanho máximo é 50MB.",
+        description: "O tamanho maximo e 50MB.",
         variant: "destructive",
       });
       return null;
@@ -102,7 +253,7 @@ export function RichTextarea({
       reader.onerror = () => {
         toast({
           title: "Erro na leitura",
-          description: "Não foi possível ler o arquivo.",
+          description: "Nao foi possivel ler o arquivo.",
           variant: "destructive",
         });
         resolve(null);
@@ -164,7 +315,7 @@ export function RichTextarea({
       onImagesChange([...images, ...uploadedUrls]);
       toast({
         title: "Arquivo colado",
-        description: `${uploadedUrls.length} arquivo(s) adicionado(s) via área de transferência.`,
+        description: `${uploadedUrls.length} arquivo(s) adicionado(s) via area de transferencia.`,
       });
     }
 
@@ -190,19 +341,52 @@ export function RichTextarea({
     document.body.removeChild(link);
   }, []);
 
+  const handleBlur = useCallback((e: React.FocusEvent) => {
+    if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
+      setIsFocused(false);
+    }
+  }, []);
+
+  const toolbarVisible = showToolbar && (isFocused || value.length > 0);
+
   return (
     <div className="space-y-2">
-      <div className="relative">
+      <div 
+        ref={containerRef}
+        className={cn(
+          "relative border rounded-md transition-all",
+          toolbarVisible ? "border-primary/50 ring-1 ring-primary/20" : "border-input",
+          disabled && "opacity-60"
+        )}
+        onBlur={handleBlur}
+      >
+        {toolbarVisible && (
+          <FormattingToolbar
+            textareaRef={textareaRef}
+            value={value}
+            onChange={onChange}
+            disabled={disabled}
+            onAttach={() => fileInputRef.current?.click()}
+            isUploading={isUploading}
+            dataTestId={dataTestId}
+          />
+        )}
         <Textarea
+          ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onPaste={handlePaste}
+          onFocus={() => setIsFocused(true)}
           placeholder={placeholder}
           rows={rows}
           maxLength={maxLength}
           disabled={disabled || isUploading}
           data-testid={dataTestId}
-          className="pr-10"
+          className={cn(
+            "border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
+            toolbarVisible ? "rounded-t-none" : "",
+            externalClassName
+          )}
         />
         <input
           ref={fileInputRef}
@@ -215,27 +399,26 @@ export function RichTextarea({
       </div>
       
       <div className="flex items-center justify-between flex-wrap gap-1">
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || isUploading}
-            data-testid={dataTestId ? `${dataTestId}-upload-btn` : undefined}
-          >
-            {isUploading ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-            ) : (
-              <Paperclip className="h-4 w-4" />
-            )}
-            <span className="ml-1">Anexar Arquivo</span>
-          </Button>
-          <span className="text-[10px] text-muted-foreground">
-            Imagens, vídeos, PDF, Excel, etc.
-          </span>
-        </div>
-        <span className="text-[10px] text-muted-foreground">
+        {!toolbarVisible && (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || isUploading}
+              data-testid={dataTestId ? `${dataTestId}-upload-btn-alt` : undefined}
+            >
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Paperclip className="h-4 w-4" />
+              )}
+              <span className="ml-1">Anexar</span>
+            </Button>
+          </div>
+        )}
+        <span className={cn("text-[10px] text-muted-foreground", toolbarVisible && "ml-auto")}>
           {value.length}/{maxLength}
         </span>
       </div>
@@ -263,7 +446,7 @@ export function RichTextarea({
                       </DialogTrigger>
                       <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
                         <VisuallyHidden>
-                          <DialogTitle>Visualização de {fileType === "video" ? "Vídeo" : "Imagem"}</DialogTitle>
+                          <DialogTitle>Visualizacao de {fileType === "video" ? "Video" : "Imagem"}</DialogTitle>
                         </VisuallyHidden>
                         {fileType === "video" ? (
                           <video src={url} controls autoPlay className="max-w-full max-h-full" />

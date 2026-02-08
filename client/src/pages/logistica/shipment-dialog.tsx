@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -219,11 +219,12 @@ export function ShipmentDialog({ open, onOpenChange }: ShipmentDialogProps) {
                 <FormItem>
                   <FormLabel>Observações (opcional)</FormLabel>
                   <FormControl>
-                    <Textarea
+                    <RichTextarea
                       placeholder="Informações adicionais sobre o envio..."
                       className="min-h-[60px]"
                       data-testid="input-shipment-notes"
-                      {...field}
+                      value={field.value || ""}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />

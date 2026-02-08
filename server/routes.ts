@@ -3320,6 +3320,79 @@ export async function registerRoutes(
     }
   });
 
+  // ============== AI SPACES ==============
+  app.get("/api/ai/spaces", async (req, res) => {
+    try {
+      const userId = (req.query.userId as string) || "default-user";
+      const spaces = await storage.getAiSpaces(userId);
+      res.json(spaces);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/ai/spaces", async (req, res) => {
+    try {
+      const schema = z.object({ userId: z.string(), name: z.string().min(1).max(50), color: z.string().optional(), tenantId: z.string().optional() });
+      const data = schema.parse(req.body);
+      const space = await storage.createAiSpace(data);
+      res.json(space);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/ai/spaces/:id", async (req, res) => {
+    try {
+      const schema = z.object({ name: z.string().min(1).max(50).optional(), color: z.string().optional() });
+      const data = schema.parse(req.body);
+      const updated = await storage.updateAiSpace(req.params.id, data);
+      if (!updated) return res.status(404).json({ error: "Space not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/ai/spaces/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteAiSpace(req.params.id);
+      if (!deleted) return res.status(404).json({ error: "Space not found" });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/ai/spaces/:id/conversations", async (req, res) => {
+    try {
+      const links = await storage.getAiSpaceConversations(req.params.id);
+      res.json(links);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/ai/spaces/:id/conversations", async (req, res) => {
+    try {
+      const schema = z.object({ conversationId: z.string() });
+      const data = schema.parse(req.body);
+      const link = await storage.addConversationToSpace({ spaceId: req.params.id, conversationId: data.conversationId });
+      res.json(link);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/ai/spaces/:id/conversations/:convId", async (req, res) => {
+    try {
+      const removed = await storage.removeConversationFromSpace(req.params.id, req.params.convId);
+      res.json({ success: removed });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Get messages for a conversation
   app.get("/api/ai/conversations/:id/messages", async (req, res) => {
     try {
