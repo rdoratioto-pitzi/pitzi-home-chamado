@@ -180,6 +180,8 @@ export const kanbanCards = pgTable("kanban_cards", {
   attachments: text("attachments").array(),
   order: integer("order").notNull().default(0),
   ticketId: varchar("ticket_id"),
+  parentCardId: varchar("parent_card_id"),
+  progress: integer("progress").default(0),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

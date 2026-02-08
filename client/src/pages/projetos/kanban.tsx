@@ -6,11 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Plus, MoreHorizontal, GripVertical, Play, Square, Hash, Search, CheckCircle, Lock, Pencil } from "lucide-react";
+import { Plus, MoreHorizontal, GripVertical, Play, Square, Hash, Search, CheckCircle, Lock, Pencil, LayoutGrid, GanttChart, CalendarDays } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Project, KanbanColumn, KanbanCard, User } from "@shared/schema";
 import { CardDialog } from "./card-dialog";
 import { ColumnDialog } from "./column-dialog";
+import { GanttView } from "./gantt-view";
+import { CalendarView } from "./calendar-view";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -40,6 +42,8 @@ import {
 } from "@dnd-kit/core";
 import { DraggableCard } from "./draggable-card";
 import { useDroppable } from "@dnd-kit/core";
+
+type ViewMode = "kanban" | "gantt" | "calendar";
 
 function KanbanColumnComponent({ 
   column, 
@@ -80,7 +84,7 @@ function KanbanColumnComponent({
       onDrop={() => onDropColumn(column.id)}
     >
       <Card className="h-full flex flex-col bg-muted/30 border-none shadow-none">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 pt-3">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 pt-3 gap-1">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <div
               draggable
@@ -153,10 +157,12 @@ function KanbanColumnComponent({
 export default function KanbanPage() {
   const [, params] = useRoute("/projetos/:id");
   const projectId = params?.id;
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [isColumnDialogOpen, setIsColumnDialogOpen] = useState(false);
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
+  const [parentCardIdForNew, setParentCardIdForNew] = useState<string | undefined>();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
@@ -302,15 +308,17 @@ export default function KanbanPage() {
     setDraggedColumnId(null);
   };
 
-  const openNewCardDialog = (columnId: string) => {
+  const openNewCardDialog = (columnId: string, parentCardId?: string) => {
     setSelectedColumnId(columnId);
     setSelectedCardId(null);
+    setParentCardIdForNew(parentCardId);
     setIsCardDialogOpen(true);
   };
 
   const openEditCardDialog = (card: KanbanCard) => {
     setSelectedCardId(card.id);
     setSelectedColumnId(card.columnId);
+    setParentCardIdForNew(undefined);
     setIsCardDialogOpen(true);
   };
 
@@ -351,6 +359,12 @@ export default function KanbanPage() {
     normal: "Normal",
   };
 
+  const viewTabs = [
+    { id: "kanban" as ViewMode, label: "Kanban", icon: LayoutGrid },
+    { id: "gantt" as ViewMode, label: "Gantt", icon: GanttChart },
+    { id: "calendar" as ViewMode, label: "Calendário", icon: CalendarDays },
+  ];
+
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader 
@@ -387,7 +401,7 @@ export default function KanbanPage() {
                 Iniciar Sprint
               </Button>
             )}
-            {project?.status !== "completed" && (
+            {viewMode === "kanban" && project?.status !== "completed" && (
               <Button onClick={() => setIsColumnDialogOpen(true)} variant="outline" data-testid="button-add-column">
                 <Plus className="h-4 w-4 mr-2" />
                 Nova Coluna
@@ -398,7 +412,25 @@ export default function KanbanPage() {
       />
 
       <div className="px-6 pt-4 space-y-4">
-        <div className="flex flex-wrap items-center gap-4 bg-muted/30 p-4 rounded-lg">
+        <div className="flex flex-wrap items-center gap-4 bg-muted/30 p-3 rounded-lg">
+          <div className="flex items-center gap-1 border rounded-lg p-0.5 bg-background">
+            {viewTabs.map((tab) => (
+              <Button
+                key={tab.id}
+                variant={viewMode === tab.id ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode(tab.id)}
+                className="gap-1.5"
+                data-testid={`button-view-${tab.id}`}
+              >
+                <tab.icon className="h-3.5 w-3.5" />
+                {tab.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="h-6 w-px bg-border hidden sm:block" />
+
           <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -437,42 +469,70 @@ export default function KanbanPage() {
       </div>
 
       <main className="flex-1 p-6 overflow-hidden">
-        <DndContext 
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragEnd={handleDragEnd}
-        >
-          <ScrollArea className="w-full h-full">
-            <div className="flex gap-4 pb-4 min-h-[calc(100vh-280px)]">
-              {sortedColumns.map((column) => (
-                <KanbanColumnComponent
-                  key={column.id}
-                  column={column}
-                  columnCards={filteredCards.filter(c => c.columnId === column.id).sort((a, b) => a.order - b.order)}
-                  users={users}
-                  project={project}
-                  priorityColors={priorityColors}
-                  priorityLabels={priorityLabels}
-                  onNewCard={openNewCardDialog}
-                  onEditCard={openEditCardDialog}
-                  onDeleteColumn={(id) => deleteColumnMutation.mutate(id)}
-                  onDragColumnStart={handleColumnDragStart}
-                  onEditColumn={(id, name) => setEditingColumn({ id, name })}
-                  onDropColumn={handleColumnDrop}
-                />
-              ))}
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
-        </DndContext>
+        {viewMode === "kanban" && (
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragEnd={handleDragEnd}
+          >
+            <ScrollArea className="w-full h-full">
+              <div className="flex gap-4 pb-4 min-h-[calc(100vh-320px)]">
+                {sortedColumns.map((column) => (
+                  <KanbanColumnComponent
+                    key={column.id}
+                    column={column}
+                    columnCards={filteredCards.filter(c => c.columnId === column.id).sort((a, b) => a.order - b.order)}
+                    users={users}
+                    project={project}
+                    priorityColors={priorityColors}
+                    priorityLabels={priorityLabels}
+                    onNewCard={openNewCardDialog}
+                    onEditCard={openEditCardDialog}
+                    onDeleteColumn={(id) => deleteColumnMutation.mutate(id)}
+                    onDragColumnStart={handleColumnDragStart}
+                    onEditColumn={(id, name) => setEditingColumn({ id, name })}
+                    onDropColumn={handleColumnDrop}
+                  />
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </DndContext>
+        )}
+
+        {viewMode === "gantt" && (
+          <GanttView
+            cards={filteredCards}
+            columns={columns}
+            users={users}
+            onEditCard={openEditCardDialog}
+            onNewCard={openNewCardDialog}
+            isReadOnly={project?.status === "completed"}
+          />
+        )}
+
+        {viewMode === "calendar" && (
+          <CalendarView
+            cards={filteredCards}
+            columns={columns}
+            users={users}
+            onEditCard={openEditCardDialog}
+            onNewCard={(columnId) => openNewCardDialog(columnId)}
+            isReadOnly={project?.status === "completed"}
+          />
+        )}
       </main>
 
       <CardDialog 
         open={isCardDialogOpen} 
-        onOpenChange={setIsCardDialogOpen}
+        onOpenChange={(open) => {
+          setIsCardDialogOpen(open);
+          if (!open) setParentCardIdForNew(undefined);
+        }}
         projectId={projectId || ""}
         columnId={selectedColumnId || ""}
         cardId={selectedCardId || undefined}
+        parentCardId={parentCardIdForNew}
         readOnly={project?.status === "completed"}
       />
       <ColumnDialog 

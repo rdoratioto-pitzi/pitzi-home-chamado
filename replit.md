@@ -13,7 +13,7 @@ The platform aims to:
 
 Key capabilities include:
 - Comprehensive ticket management (internal support for IT, HR, operations).
-- Project management with Kanban boards.
+- Project management with Kanban boards, Gantt charts, and Calendar views. Subtask support with parent-child relationships.
 - Task management by area, supporting comments and reactions.
 - Dedicated module for meeting management including agendas and minutes.
 - Quarterly OKR tracking.

@@ -27,7 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Calendar as CalendarIcon, Tag, User as UserIcon, Clock, Paperclip, MessageSquare, Plus, Trash2, X, FileIcon, Image, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, Tag, User as UserIcon, Clock, Paperclip, MessageSquare, Plus, Trash2, X, FileIcon, Image, Loader2, GitBranch, ListTree } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -57,6 +57,7 @@ interface CardDialogProps {
   projectId: string;
   columnId: string;
   cardId?: string;
+  parentCardId?: string;
   readOnly?: boolean;
 }
 
@@ -67,7 +68,7 @@ interface Attachment {
   type?: string;
 }
 
-export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, readOnly = false }: CardDialogProps) {
+export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, parentCardId, readOnly = false }: CardDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState("");
@@ -136,6 +137,14 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
     enabled: !!cardId,
   });
 
+  const { data: allProjectCards = [] } = useQuery<KanbanCard[]>({
+    queryKey: ["/api/projects", projectId, "cards"],
+    enabled: !!projectId,
+  });
+
+  const subtasks = allProjectCards.filter(c => c.parentCardId === cardId);
+  const parentOptions = allProjectCards.filter(c => !c.parentCardId && c.id !== cardId);
+
   const { data: comments = [] } = useQuery<KanbanComment[]>({
     queryKey: ["/api/cards", cardId, "comments"],
     queryFn: async () => {
@@ -201,6 +210,18 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
     }
   }, [cardId, cardData, form, open]);
 
+  const [selectedParentId, setSelectedParentId] = useState<string | null>(parentCardId || null);
+
+  useEffect(() => {
+    if (cardData?.parentCardId) {
+      setSelectedParentId(cardData.parentCardId);
+    } else if (parentCardId) {
+      setSelectedParentId(parentCardId);
+    } else {
+      setSelectedParentId(null);
+    }
+  }, [cardData, parentCardId, open]);
+
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
       const payload = {
@@ -219,6 +240,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
         endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
         order: cardData?.order || 0,
         attachments: attachments.map(a => a.path),
+        parentCardId: selectedParentId || null,
       };
 
       if (cardId) {
@@ -618,6 +640,54 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, re
                       </FormItem>
                     )}
                   />
+
+                  <Separator />
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium flex items-center gap-2">
+                      <GitBranch className="h-3 w-3" /> Tarefa Pai
+                    </label>
+                    <Select
+                      value={selectedParentId || "none"}
+                      onValueChange={(val) => setSelectedParentId(val === "none" ? null : val)}
+                      disabled={readOnly}
+                    >
+                      <SelectTrigger data-testid="select-parent-card">
+                        <SelectValue placeholder="Nenhuma (tarefa principal)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma (tarefa principal)</SelectItem>
+                        {parentOptions.map(c => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.code} - {c.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {cardId && subtasks.length > 0 && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium flex items-center gap-2">
+                        <ListTree className="h-3 w-3" /> Subtarefas ({subtasks.length})
+                      </label>
+                      <div className="space-y-1">
+                        {subtasks.map(sub => (
+                          <div
+                            key={sub.id}
+                            className="flex items-center gap-2 p-2 bg-muted/30 rounded-md text-xs cursor-pointer hover-elevate"
+                            data-testid={`subtask-item-${sub.id}`}
+                          >
+                            <div className={`w-1.5 h-4 rounded-full flex-shrink-0 ${
+                              sub.priority === "muito_urgente" ? "bg-red-500" : sub.priority === "urgente" ? "bg-orange-500" : "bg-blue-500"
+                            }`} />
+                            <span className="font-mono text-muted-foreground">{sub.code}</span>
+                            <span className="flex-1 truncate">{sub.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="pt-4 space-y-3">
                     <input
