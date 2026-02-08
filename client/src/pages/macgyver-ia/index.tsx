@@ -533,6 +533,75 @@ function exportConversationMarkdown(messages: AiMessage[], title: string) {
   URL.revokeObjectURL(url);
 }
 
+function RightSidebar({
+  isOpen,
+  onClose,
+  conversations,
+  conversationsLoading,
+  spaces,
+  userId,
+  selectedConversationId,
+  onSelectConversation,
+  onDeleteConversation,
+  onQuickPrompt,
+  onSlashCommand,
+  queryClient,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  conversations: AiConversation[];
+  conversationsLoading: boolean;
+  spaces: AiSpace[];
+  userId: string;
+  selectedConversationId: string | null;
+  onSelectConversation: (id: string) => void;
+  onDeleteConversation: (id: string, e: React.MouseEvent) => void;
+  onQuickPrompt: (prompt: string) => void;
+  onSlashCommand: (cmd: SlashCommand) => void;
+  queryClient: any;
+}) {
+  const [activeTab, setActiveTab] = useState<"historico" | "atalhos" | "comandos" | "espacos">("historico");
+  const [newSpaceName, setNewSpaceName] = useState("");
+  const [showNewSpace, setShowNewSpace] = useState(false);
+
+  const tabs = [
+    { id: "historico" as const, label: "Historico", icon: Clock },
+    { id: "atalhos" as const, label: "Atalhos", icon: Bookmark },
+    { id: "comandos" as const, label: "Comandos", icon: Command },
+    { id: "espacos" as const, label: "Espacos", icon: Hash },
+  ];
+
+  const handleCreateSpace = async () => {
+    if (!newSpaceName.trim()) return;
+    try {
+      await apiRequest("POST", "/api/ai/spaces", { userId, name: newSpaceName.trim() });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
+      setNewSpaceName("");
+      setShowNewSpace(false);
+    } catch (error) {
+      console.error("Failed to create space:", error);
+    }
+  };
+
+  const handleDeleteSpace = async (spaceId: string) => {
+    try {
+      await apiRequest("DELETE", `/api/ai/spaces/${spaceId}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
+    } catch (error) {
+      console.error("Failed to delete space:", error);
+    }
+  };
+
+  const handleAddToSpace = async (spaceId: string) => {
+    if (!selectedConversationId) return;
+    try {
+      await apiRequest("POST", `/api/ai/spaces/${spaceId}/conversations`, { conversationId: selectedConversationId });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/spaces", userId] });
+    } catch (error) {
+      console.error("Failed to add to space:", error);
+    }
+  };
+
   return (
     <div className={cn(
       "border-l bg-background transition-all duration-200 shrink-0 overflow-hidden flex flex-col",
@@ -718,22 +787,7 @@ function exportConversationMarkdown(messages: AiMessage[], title: string) {
                         </Button>
                       </div>
                       <div className="pl-4 space-y-1 border-l ml-1 mt-1">
-                        {conversations
-                          .filter(c => c.spaceId === space.id)
-                          .map(conv => (
-                            <button
-                              key={conv.id}
-                              className={cn(
-                                "w-full text-left px-2 py-1.5 rounded-md text-xs transition-colors truncate",
-                                conv.id === selectedConversationId ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                              )}
-                              onClick={() => onSelectConversation(conv.id)}
-                            >
-                              {conv.title || "Nova Conversa"}
-                            </button>
-                          ))}
-
-                        {selectedConversationId && !conversations.find(c => c.id === selectedConversationId)?.spaceId && (
+                        {selectedConversationId && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -753,166 +807,6 @@ function exportConversationMarkdown(messages: AiMessage[], title: string) {
           </div>
         </ScrollArea>
       </div>
-    </div>
-  );
-}
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                </div>
-              ) : conversations.length === 0 ? (
-                <div className="text-center py-8">
-                  <MessageSquare className="h-6 w-6 mx-auto mb-2 text-muted-foreground/40" />
-                  <p className="text-xs text-muted-foreground">Nenhuma conversa</p>
-                </div>
-              ) : (
-                conversations.map((conv) => (
-                  <div
-                    key={conv.id}
-                    className={cn(
-                      "group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-colors",
-                      selectedConversationId === conv.id
-                        ? "bg-primary/10 text-primary"
-                        : "hover:bg-muted/60 text-foreground"
-                    )}
-                    onClick={() => onSelectConversation(conv.id)}
-                    data-testid={`sidebar-conversation-${conv.id}`}
-                  >
-                    <MessageSquare className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate">{conv.title || "Nova conversa"}</p>
-                      <p className="text-[10px] text-muted-foreground">{formatDate(conv.updatedAt)}</p>
-                    </div>
-                    <div className="flex items-center gap-0.5">
-                      {selectedConversationId === conv.id && spaces.length > 0 && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity" data-testid={`button-tag-conv-${conv.id}`}>
-                              <Tag className="h-3 w-3" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            {spaces.map(space => (
-                              <DropdownMenuItem key={space.id} onClick={() => handleAddToSpace(space.id)} data-testid={`tag-space-${space.id}`}>
-                                <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: space.color || "#00A137" }} />
-                                {space.name}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                      <button
-                        className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={(e) => onDeleteConversation(conv.id, e)}
-                        data-testid={`button-delete-sidebar-${conv.id}`}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </>
-          )}
-
-          {activeTab === "atalhos" && (
-            <div className="space-y-1">
-              {QUICK_PROMPTS.map((qp) => {
-                const Icon = qp.icon;
-                return (
-                  <button
-                    key={qp.label}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left hover:bg-muted/60 transition-colors"
-                    onClick={() => onQuickPrompt(qp.prompt)}
-                    data-testid={`sidebar-shortcut-${qp.label.replace(/\s+/g, '-').toLowerCase()}`}
-                  >
-                    <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                      <Icon className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                    <span className="text-xs font-medium">{qp.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {activeTab === "comandos" && (
-            <div className="space-y-1">
-              {SLASH_COMMANDS.map((cmd) => {
-                const Icon = cmd.icon;
-                return (
-                  <button
-                    key={cmd.command}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left hover:bg-muted/60 transition-colors"
-                    onClick={() => onSlashCommand(cmd)}
-                    data-testid={`sidebar-cmd-${cmd.command.slice(1)}`}
-                  >
-                    <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center shrink-0">
-                      <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-mono text-primary">{cmd.command}</span>
-                        <span className="text-xs font-medium">{cmd.label}</span>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground truncate">{cmd.description}</p>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {activeTab === "espacos" && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-muted-foreground">Seus Espacos</span>
-                <Button variant="ghost" size="icon" onClick={() => setShowNewSpace(!showNewSpace)} data-testid="button-new-space">
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              {showNewSpace && (
-                <div className="flex gap-1">
-                  <Input
-                    value={newSpaceName}
-                    onChange={(e) => setNewSpaceName(e.target.value)}
-                    placeholder="Nome do espaco..."
-                    className="h-7 text-xs"
-                    onKeyDown={(e) => e.key === "Enter" && handleCreateSpace()}
-                    data-testid="input-new-space-name"
-                  />
-                  <Button size="sm" className="h-7 px-2" onClick={handleCreateSpace} data-testid="button-create-space">
-                    <Check className="h-3 w-3" />
-                  </Button>
-                </div>
-              )}
-              {spaces.length === 0 && !showNewSpace ? (
-                <div className="text-center py-6">
-                  <Hash className="h-6 w-6 mx-auto mb-2 text-muted-foreground/40" />
-                  <p className="text-xs text-muted-foreground">Nenhum espaco criado</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">Crie espacos para organizar suas conversas por topico</p>
-                </div>
-              ) : (
-                spaces.map((space) => (
-                  <div
-                    key={space.id}
-                    className="group flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-muted/60 transition-colors"
-                    data-testid={`space-item-${space.id}`}
-                  >
-                    <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: space.color || "#00A137" }} />
-                    <span className="text-xs font-medium flex-1">{space.name}</span>
-                    <button
-                      className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => handleDeleteSpace(space.id)}
-                      data-testid={`button-delete-space-${space.id}`}
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-        </div>
-      </ScrollArea>
     </div>
   );
 }
