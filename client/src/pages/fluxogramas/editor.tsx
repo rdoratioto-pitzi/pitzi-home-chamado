@@ -14,6 +14,7 @@ import {
   ReactFlowProvider,
   Handle,
   Position,
+  NodeResizer,
   type Node,
   type Edge,
   type OnNodesChange,
@@ -141,9 +142,10 @@ const NODE_COLORS = [
 function RectangleNode({ data, selected }: { data: any; selected: boolean }) {
   return (
     <div className="group relative">
+      <NodeResizer minWidth={100} minHeight={40} isVisible={selected} />
       <div
         className={cn(
-          "px-4 py-3 rounded-md border-2 min-w-[140px] text-center shadow-sm transition-shadow",
+          "px-4 py-3 rounded-md border-2 w-full h-full min-w-[140px] text-center shadow-sm transition-shadow flex flex-col justify-center",
           selected && "ring-2 ring-primary ring-offset-2"
         )}
         style={{
@@ -166,9 +168,10 @@ function RectangleNode({ data, selected }: { data: any; selected: boolean }) {
 function EllipseNode({ data, selected }: { data: any; selected: boolean }) {
   return (
     <div className="group relative">
+      <NodeResizer minWidth={100} minHeight={40} isVisible={selected} />
       <div
         className={cn(
-          "px-6 py-3 rounded-full border-2 min-w-[140px] text-center shadow-sm",
+          "px-6 py-3 rounded-full border-2 w-full h-full min-w-[140px] text-center shadow-sm flex items-center justify-center",
           selected && "ring-2 ring-primary ring-offset-2"
         )}
         style={{
@@ -188,14 +191,15 @@ function EllipseNode({ data, selected }: { data: any; selected: boolean }) {
 function DiamondNode({ data, selected }: { data: any; selected: boolean }) {
   return (
     <div className="group relative">
+      <NodeResizer minWidth={100} minHeight={100} isVisible={selected} />
       <div
         className={cn(
-          "flex items-center justify-center",
+          "flex items-center justify-center w-full h-full",
           selected && "ring-2 ring-primary ring-offset-2 rounded-md"
         )}
       >
         <div
-          className="w-[120px] h-[120px] border-2 flex items-center justify-center shadow-sm"
+          className="w-full h-full border-2 flex items-center justify-center shadow-sm"
           style={{
             transform: "rotate(45deg)",
             backgroundColor: data.bgColor || "#fef9c3",
@@ -203,7 +207,7 @@ function DiamondNode({ data, selected }: { data: any; selected: boolean }) {
           }}
         >
           <div
-            className="text-xs font-medium text-center max-w-[80px]"
+            className="text-xs font-medium text-center max-w-[80%]"
             style={{ transform: "rotate(-45deg)", color: data.textColor || "#854d0e" }}
           >
             {data.label || "Decisão"}
@@ -218,13 +222,14 @@ function DiamondNode({ data, selected }: { data: any; selected: boolean }) {
 function TextNode({ data, selected }: { data: any; selected: boolean }) {
   return (
     <div className="group relative">
+      <NodeResizer minWidth={50} minHeight={30} isVisible={selected} />
       <div
         className={cn(
-          "px-3 py-2 min-w-[100px]",
+          "px-3 py-2 w-full h-full min-w-[100px]",
           selected && "ring-2 ring-primary ring-offset-2 rounded-md"
         )}
       >
-        <div className="text-sm" style={{ color: data.textColor || "#6b7280" }}>
+        <div className="text-sm h-full w-full" style={{ color: data.textColor || "#6b7280" }}>
           {data.label || "Texto"}
         </div>
       </div>
@@ -235,10 +240,11 @@ function TextNode({ data, selected }: { data: any; selected: boolean }) {
 
 function NoteNode({ data, selected }: { data: any; selected: boolean }) {
   return (
-    <div className="group relative">
+    <div className="group relative h-full w-full">
+      <NodeResizer minWidth={100} minHeight={60} isVisible={selected} />
       <div
         className={cn(
-          "px-4 py-3 rounded-md border min-w-[160px] shadow-sm",
+          "px-4 py-3 rounded-md border w-full h-full min-w-[160px] shadow-sm flex flex-col",
           selected && "ring-2 ring-primary ring-offset-2"
         )}
         style={{
@@ -251,7 +257,7 @@ function NoteNode({ data, selected }: { data: any; selected: boolean }) {
           <StickyNote className="h-3 w-3" />
           Nota
         </div>
-        <div className="text-xs">{data.label || "Adicione uma nota..."}</div>
+        <div className="text-xs flex-1">{data.label || "Adicione uma nota..."}</div>
       </div>
       <NodeHandles />
     </div>
@@ -260,14 +266,15 @@ function NoteNode({ data, selected }: { data: any; selected: boolean }) {
 
 function StarNode({ data, selected }: { data: any; selected: boolean }) {
   return (
-    <div className="group relative">
+    <div className="group relative h-full w-full">
+      <NodeResizer minWidth={60} minHeight={60} isVisible={selected} />
       <div
         className={cn(
-          "w-[100px] h-[100px] flex items-center justify-center",
+          "w-full h-full flex items-center justify-center",
           selected && "ring-2 ring-primary ring-offset-2 rounded-md"
         )}
       >
-        <svg viewBox="0 0 100 100" className="w-full h-full">
+        <svg viewBox="0 0 100 100" className="w-full h-full preserve-aspect-ratio">
           <polygon
             points="50,5 63,38 98,38 70,60 80,95 50,73 20,95 30,60 2,38 37,38"
             fill={data.bgColor || "#fef9c3"}
@@ -286,14 +293,15 @@ function StarNode({ data, selected }: { data: any; selected: boolean }) {
 
 function TriangleNode({ data, selected }: { data: any; selected: boolean }) {
   return (
-    <div className="group relative">
+    <div className="group relative h-full w-full">
+      <NodeResizer minWidth={60} minHeight={60} isVisible={selected} />
       <div
         className={cn(
-          "w-[120px] h-[100px] flex items-center justify-center",
+          "w-full h-full flex items-center justify-center",
           selected && "ring-2 ring-primary ring-offset-2 rounded-md"
         )}
       >
-        <svg viewBox="0 0 120 100" className="w-full h-full">
+        <svg viewBox="0 0 120 100" className="w-full h-full preserve-aspect-ratio">
           <polygon
             points="60,5 115,95 5,95"
             fill={data.bgColor || "#dbeafe"}
@@ -312,14 +320,15 @@ function TriangleNode({ data, selected }: { data: any; selected: boolean }) {
 
 function ChevronNode({ data, selected }: { data: any; selected: boolean }) {
   return (
-    <div className="group relative">
+    <div className="group relative h-full w-full">
+      <NodeResizer minWidth={80} minHeight={30} isVisible={selected} />
       <div
         className={cn(
-          "w-[160px] h-[50px] flex items-center justify-center",
+          "w-full h-full flex items-center justify-center",
           selected && "ring-2 ring-primary ring-offset-2 rounded-md"
         )}
       >
-        <svg viewBox="0 0 160 50" className="w-full h-full">
+        <svg viewBox="0 0 160 50" className="w-full h-full preserve-aspect-ratio">
           <polygon
             points="0,0 130,0 160,25 130,50 0,50 30,25"
             fill={data.bgColor || "#dcfce7"}
@@ -338,10 +347,11 @@ function ChevronNode({ data, selected }: { data: any; selected: boolean }) {
 
 function BubbleNode({ data, selected }: { data: any; selected: boolean }) {
   return (
-    <div className="group relative">
+    <div className="group relative h-full w-full">
+      <NodeResizer minWidth={100} minHeight={40} isVisible={selected} />
       <div
         className={cn(
-          "px-4 py-3 rounded-2xl border-2 min-w-[140px] text-center shadow-sm relative",
+          "px-4 py-3 rounded-2xl border-2 w-full h-full min-w-[140px] text-center shadow-sm relative flex items-center justify-center",
           selected && "ring-2 ring-primary ring-offset-2"
         )}
         style={{
@@ -366,14 +376,15 @@ function BubbleNode({ data, selected }: { data: any; selected: boolean }) {
 
 function CylinderNode({ data, selected }: { data: any; selected: boolean }) {
   return (
-    <div className="group relative">
+    <div className="group relative h-full w-full">
+      <NodeResizer minWidth={80} minHeight={60} isVisible={selected} />
       <div
         className={cn(
-          "w-[120px] h-[80px] flex items-center justify-center",
+          "w-full h-full flex items-center justify-center",
           selected && "ring-2 ring-primary ring-offset-2 rounded-md"
         )}
       >
-        <svg viewBox="0 0 120 80" className="w-full h-full">
+        <svg viewBox="0 0 120 80" className="w-full h-full preserve-aspect-ratio">
           <ellipse cx="60" cy="15" rx="55" ry="12" fill={data.bgColor || "#dbeafe"} stroke={data.borderColor || "#3b82f6"} strokeWidth="2" />
           <rect x="5" y="15" width="110" height="50" fill={data.bgColor || "#dbeafe"} stroke="none" />
           <line x1="5" y1="15" x2="5" y2="65" stroke={data.borderColor || "#3b82f6"} strokeWidth="2" />
@@ -391,14 +402,15 @@ function CylinderNode({ data, selected }: { data: any; selected: boolean }) {
 
 function ParallelogramNode({ data, selected }: { data: any; selected: boolean }) {
   return (
-    <div className="group relative">
+    <div className="group relative h-full w-full">
+      <NodeResizer minWidth={100} minHeight={40} isVisible={selected} />
       <div
         className={cn(
-          "w-[160px] h-[50px] flex items-center justify-center",
+          "w-full h-full flex items-center justify-center",
           selected && "ring-2 ring-primary ring-offset-2 rounded-md"
         )}
       >
-        <svg viewBox="0 0 160 50" className="w-full h-full">
+        <svg viewBox="0 0 160 50" className="w-full h-full preserve-aspect-ratio">
           <polygon
             points="20,0 160,0 140,50 0,50"
             fill={data.bgColor || "#ffffff"}
@@ -676,16 +688,57 @@ function FlowchartEditorInner() {
     setHasChanges(true);
   }, []);
 
-  const onConnect: OnConnect = useCallback((connection: Connection) => {
-    setEdges((eds) => addEdge({
-      ...connection,
-      type: "smoothstep",
-      animated: false,
-      markerEnd: { type: MarkerType.ArrowClosed, color: "#6b7280" },
-      style: { strokeWidth: 2, stroke: "#6b7280" },
-    }, eds));
+  const onConnect: OnConnect = useCallback(
+    (params) => {
+      const newEdge = {
+        ...params,
+        id: `edge_${Date.now()}`,
+        type: "smoothstep",
+        markerEnd: { type: MarkerType.ArrowClosed, color: "#6b7280" },
+        style: { strokeWidth: 2, stroke: "#6b7280" },
+      };
+      setEdges((eds) => addEdge(newEdge, eds));
+      setHasChanges(true);
+    },
+    [setEdges]
+  );
+
+  const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+    event.stopPropagation();
+    setSelectedEdge(edge);
+    setSelectedNode(null);
+
+    setEdges((eds) =>
+      eds.map((e) => {
+        if (e.id === edge.id) {
+          // Cycle arrow directions: A->B (End), B->A (Start), A<->B (Both), none
+          const hasStart = !!e.markerStart;
+          const hasEnd = !!e.markerEnd;
+
+          let nextState;
+          if (!hasStart && hasEnd) nextState = "B->A";
+          else if (hasStart && !hasEnd) nextState = "A<->B";
+          else if (hasStart && hasEnd) nextState = "none";
+          else nextState = "A->B";
+
+          const marker = { type: MarkerType.ArrowClosed, color: (e.style as any)?.stroke || "#6b7280" };
+
+          switch (nextState) {
+            case "B->A":
+              return { ...e, markerStart: marker, markerEnd: undefined };
+            case "A<->B":
+              return { ...e, markerStart: marker, markerEnd: marker };
+            case "none":
+              return { ...e, markerStart: undefined, markerEnd: undefined };
+            default: // A->B
+              return { ...e, markerStart: undefined, markerEnd: marker };
+          }
+        }
+        return e;
+      })
+    );
     setHasChanges(true);
-  }, []);
+  }, [setEdges]);
 
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     setSelectedNode(node);
@@ -701,30 +754,6 @@ function FlowchartEditorInner() {
     setSelectedNode(null);
     setSelectedEdge(null);
   }, []);
-
-  const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
-    setSelectedEdge(edge);
-    setSelectedNode(null);
-  }, []);
-
-  const toggleEdgeArrow = useCallback(() => {
-    if (!selectedEdge) return;
-    setEdges((eds) =>
-      eds.map((e) => {
-        if (e.id !== selectedEdge.id) return e;
-        const hasArrow = !!e.markerEnd;
-        return {
-          ...e,
-          markerEnd: hasArrow ? undefined : { type: MarkerType.ArrowClosed, color: "#6b7280" },
-        };
-      })
-    );
-    setSelectedEdge((prev) => prev ? {
-      ...prev,
-      markerEnd: prev.markerEnd ? undefined : { type: MarkerType.ArrowClosed, color: "#6b7280" },
-    } : null);
-    setHasChanges(true);
-  }, [selectedEdge]);
 
   const deleteSelectedEdge = useCallback(() => {
     if (!selectedEdge) return;
@@ -1206,25 +1235,20 @@ function FlowchartEditorInner() {
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-2 block">Seta de Direção</label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={toggleEdgeArrow}
-                  className="w-full justify-start"
-                  data-testid="button-toggle-arrow"
-                >
-                  {selectedEdge.markerEnd ? (
-                    <>
-                      <ToggleRight className="h-4 w-4 mr-2 text-primary" />
-                      Com seta (clique para remover)
-                    </>
-                  ) : (
-                    <>
-                      <ToggleLeft className="h-4 w-4 mr-2" />
-                      Sem seta (clique para adicionar)
-                    </>
-                  )}
-                </Button>
+                <div className="p-2 border rounded-md bg-muted/30 text-xs flex items-center justify-between mb-2">
+                  <span>
+                    {!selectedEdge.markerStart && selectedEdge.markerEnd ? "A → B" :
+                     selectedEdge.markerStart && !selectedEdge.markerEnd ? "B → A" :
+                     selectedEdge.markerStart && selectedEdge.markerEnd ? "A ↔ B" :
+                     "Sem Seta"}
+                  </span>
+                  <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={(e) => onEdgeClick(e as any, selectedEdge)}>
+                    Alternar
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground italic">
+                  Dica: Clique diretamente na seta no gráfico para alternar o sentido rapidamente.
+                </p>
               </div>
               <div className="text-xs text-muted-foreground">
                 <p>Tipo: <Badge variant="outline" className="text-xs">Conexão</Badge></p>
