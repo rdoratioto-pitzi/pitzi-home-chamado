@@ -1,3 +1,7 @@
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { ThemeToggle } from "./theme-toggle";
+import { NotificationBell } from "./notification-bell";
+import { UserProfileMenu } from "./app-sidebar";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -16,10 +20,13 @@ export interface PageHeaderProps {
 
 export function PageHeader({ title, description, breadcrumbs, actions }: PageHeaderProps) {
   return (
-    <div className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
-      <div className="flex items-center justify-between h-14 px-6">
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col">
+    <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
+      <div className="flex items-center justify-between h-14 px-6 gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <SidebarTrigger data-testid="button-sidebar-toggle" className="h-9 w-9 rounded-lg hover:bg-muted shrink-0" />
+          <div className="h-6 w-px bg-border/60" />
+          
+          <div className="flex flex-col min-w-0">
             {breadcrumbs && breadcrumbs.length > 0 ? (
               <Breadcrumb>
                 <BreadcrumbList className="text-[13px]">
@@ -38,20 +45,22 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
                 </BreadcrumbList>
               </Breadcrumb>
             ) : (
-              <h1 className="text-[20px] font-bold tracking-tight text-foreground leading-tight">{title}</h1>
+              <h1 className="text-[20px] font-bold tracking-tight text-foreground leading-tight truncate">{title}</h1>
             )}
             {description && !breadcrumbs && (
-              <p className="text-[12px] text-muted-foreground leading-none mt-1">{description}</p>
+              <p className="text-[12px] text-muted-foreground leading-none mt-1 truncate">{description}</p>
             )}
           </div>
         </div>
         
-        {actions && (
-          <div className="flex items-center gap-3">
-            {actions}
-          </div>
-        )}
+        <div className="flex items-center gap-3 shrink-0">
+          {actions}
+          {actions && <div className="h-8 w-px bg-border/40" />}
+          <NotificationBell />
+          <ThemeToggle />
+          <UserProfileMenu />
+        </div>
       </div>
-    </div>
+    </header>
   );
 }
