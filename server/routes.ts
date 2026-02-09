@@ -322,7 +322,7 @@ export async function registerRoutes(
           message: `O chamado "${ticket.title}" (${ticket.code}) foi criado e atribuído a você`,
           module: "chamados",
           entityId: ticket.id,
-          linkUrl: `/chamados`,
+          linkUrl: `/chamados?ticket=${ticket.id}`,
         }).catch(console.error);
       }
       
@@ -376,7 +376,7 @@ export async function registerRoutes(
             message: `O chamado "${ticket.title}" (${ticket.code || ''}) mudou para "${statusLabel}"`,
             module: "chamados",
             entityId: ticket.id,
-            linkUrl: `/chamados`,
+            linkUrl: `/chamados?ticket=${ticket.id}`,
           }).catch(console.error);
         }
       }
@@ -392,7 +392,7 @@ export async function registerRoutes(
           message: `O chamado "${ticket.title}" (${ticket.code || ''}) foi atribuído a você`,
           module: "chamados",
           entityId: ticket.id,
-          linkUrl: `/chamados`,
+          linkUrl: `/chamados?ticket=${ticket.id}`,
         }).catch(console.error);
       }
       
@@ -446,7 +446,7 @@ export async function registerRoutes(
             message: `${commenter.name} comentou no chamado "${ticket.title}"`,
             module: "chamados",
             entityId: ticket.id,
-            linkUrl: `/chamados`,
+            linkUrl: `/chamados?ticket=${ticket.id}`,
           }).catch(console.error);
         }
         if (assignee && commenter && commenter.id !== assignee.id && assignee.id !== requester?.id) {
@@ -457,7 +457,7 @@ export async function registerRoutes(
             message: `${commenter.name} comentou no chamado "${ticket.title}"`,
             module: "chamados",
             entityId: ticket.id,
-            linkUrl: `/chamados`,
+            linkUrl: `/chamados?ticket=${ticket.id}`,
           }).catch(console.error);
         }
 
@@ -487,7 +487,7 @@ export async function registerRoutes(
                 message: `${commenter.name} mencionou você em um comentário no chamado "${ticket.title}"`,
                 module: "chamados",
                 entityId: ticket.id,
-                linkUrl: `/chamados`,
+                linkUrl: `/chamados?ticket=${ticket.id}`,
               }).catch(console.error);
             }
           }
@@ -668,6 +668,33 @@ export async function registerRoutes(
     try {
       const validated = insertKanbanCardSchema.parse(req.body);
       const card = await storage.createKanbanCard(validated);
+
+      const cardCreatorId = req.body.createdBy || req.body.reporterId;
+      if (card.assigneeId && card.assigneeId !== cardCreatorId) {
+        const creator = cardCreatorId ? await storage.getUser(cardCreatorId) : null;
+        storage.createNotification({
+          userId: card.assigneeId,
+          fromUserId: cardCreatorId || undefined,
+          title: "Novo card atribuído",
+          message: `${creator?.name || 'Alguém'} atribuiu o card "${card.title}" a você`,
+          module: "projetos",
+          entityId: card.id,
+          linkUrl: `/projetos/${card.projectId}`,
+        }).catch(console.error);
+      }
+      if (card.reporterId && card.reporterId !== cardCreatorId && card.reporterId !== card.assigneeId) {
+        const creator = cardCreatorId ? await storage.getUser(cardCreatorId) : null;
+        storage.createNotification({
+          userId: card.reporterId,
+          fromUserId: cardCreatorId || undefined,
+          title: "Você foi definido como relator",
+          message: `${creator?.name || 'Alguém'} definiu você como relator do card "${card.title}"`,
+          module: "projetos",
+          entityId: card.id,
+          linkUrl: `/projetos/${card.projectId}`,
+        }).catch(console.error);
+      }
+
       res.status(201).json(card);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -679,10 +706,38 @@ export async function registerRoutes(
 
   app.patch("/api/cards/:id", async (req, res) => {
     try {
+      const oldCard = await storage.getKanbanCard(req.params.id);
       const partialSchema = insertKanbanCardSchema.partial();
       const validated = partialSchema.parse(req.body);
       const card = await storage.updateKanbanCard(req.params.id, validated);
       if (!card) return res.status(404).json({ error: "Card not found" });
+
+      const updatedBy = req.body.updatedBy || oldCard?.reporterId;
+      if (validated.assigneeId && card.assigneeId && card.assigneeId !== oldCard?.assigneeId && card.assigneeId !== updatedBy) {
+        const updater = updatedBy ? await storage.getUser(updatedBy) : null;
+        storage.createNotification({
+          userId: card.assigneeId,
+          fromUserId: updatedBy || undefined,
+          title: "Card atribuído a você",
+          message: `${updater?.name || 'Alguém'} atribuiu o card "${card.title}" a você`,
+          module: "projetos",
+          entityId: card.id,
+          linkUrl: `/projetos/${card.projectId}`,
+        }).catch(console.error);
+      }
+      if (validated.reporterId && card.reporterId && card.reporterId !== oldCard?.reporterId && card.reporterId !== updatedBy && card.reporterId !== card.assigneeId) {
+        const updater = updatedBy ? await storage.getUser(updatedBy) : null;
+        storage.createNotification({
+          userId: card.reporterId,
+          fromUserId: updatedBy || undefined,
+          title: "Você foi definido como relator",
+          message: `${updater?.name || 'Alguém'} definiu você como relator do card "${card.title}"`,
+          module: "projetos",
+          entityId: card.id,
+          linkUrl: `/projetos/${card.projectId}`,
+        }).catch(console.error);
+      }
+
       res.json(card);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -739,8 +794,8 @@ export async function registerRoutes(
               title: "Menção em card",
               message: `${author.name} mencionou você em um comentário no card "${card.title}"`,
               module: "projetos",
-              entityId: card.projectId,
-              linkUrl: `/projetos`,
+              entityId: card.id,
+              linkUrl: `/projetos/${card.projectId}`,
             }).catch(console.error);
           }
         }
@@ -1265,8 +1320,30 @@ export async function registerRoutes(
           message: `${creator?.name || 'Alguém'} atribuiu a tarefa "${task.title}" a você`,
           module: "tarefas",
           entityId: task.id,
-          linkUrl: `/tarefas`,
+          linkUrl: `/tarefas/${task.id}`,
         }).catch(console.error);
+      }
+
+      if (task.type === "meeting_note") {
+        let meetingParticipants: string[] = [];
+        try {
+          const md = typeof task.meetingData === 'string' ? JSON.parse(task.meetingData) : task.meetingData;
+          meetingParticipants = md?.participants || [];
+        } catch {}
+        const organizer = await storage.getUser(task.createdBy);
+        for (const participantId of meetingParticipants) {
+          if (participantId !== task.createdBy) {
+            storage.createNotification({
+              userId: participantId,
+              fromUserId: task.createdBy,
+              title: "Nova reunião agendada",
+              message: `${organizer?.name || 'Alguém'} convidou você para a reunião "${task.title}"`,
+              module: "reunioes",
+              entityId: task.id,
+              linkUrl: `/reunioes/${task.id}`,
+            }).catch(console.error);
+          }
+        }
       }
       
       res.status(201).json(task);
@@ -1313,7 +1390,7 @@ export async function registerRoutes(
             message: `${updater?.name || 'Alguém'} atribuiu a tarefa "${task.title}" a você`,
             module: "tarefas",
             entityId: task.id,
-            linkUrl: `/tarefas`,
+            linkUrl: `/tarefas/${task.id}`,
           }).catch(console.error);
         }
       }
@@ -1372,7 +1449,7 @@ export async function registerRoutes(
               message: `${author.name} mencionou você em um comentário na tarefa "${task.title}"`,
               module: "tarefas",
               entityId: task.id,
-              linkUrl: `/tarefas`,
+              linkUrl: `/tarefas/${task.id}`,
             }).catch(console.error);
           }
         }
