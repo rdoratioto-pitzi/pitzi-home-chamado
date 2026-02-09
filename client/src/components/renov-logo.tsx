@@ -24,11 +24,25 @@ function normalizeObjectPath(path: string): string {
 export function RenovLogo({ variant = "auto", size = "md", className = "" }: RenovLogoProps) {
   const { theme } = useTheme();
   const { data: logoUrlLight } = useQuery<Setting>({ 
-    queryKey: ["/api/settings/logo_url_light"]
+    queryKey: ["/api/settings/logo_url_light"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/logo_url_light");
+      if (!res.ok) return { value: "" };
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   const { data: logoUrlDark } = useQuery<Setting>({ 
-    queryKey: ["/api/settings/logo_url_dark"]
+    queryKey: ["/api/settings/logo_url_dark"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/logo_url_dark");
+      if (!res.ok) return { value: "" };
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   const { width, height } = sizeMap[size];

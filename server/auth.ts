@@ -68,6 +68,10 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
+  if (req.method === "GET" && /^\/api\/settings\/(logo_url_light|logo_url_dark|favicon_url)$/.test(req.path)) {
+    return next();
+  }
+
   if (!req.session?.userId) {
     return res.status(401).json({ error: "Não autenticado" });
   }
