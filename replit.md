@@ -26,7 +26,14 @@ Renov Home adopts a client-server architecture with a clear separation of concer
 
 - **Frontend:** Developed with React 18 and TypeScript, styled with Tailwind CSS, uses Wouter for routing, TanStack Query for data management, and React Hook Form with Zod for validation. Includes reusable components like `RenovLogo` and `RichTextarea`.
 - **Backend:** Built with Node.js and Express in TypeScript, using in-memory storage (MemStorage) for MVP. Exposes a RESTful API at `/api/...`.
-- **Authentication & Data Isolation:** Server-side session management with `express-session`, `requireAuth` middleware, and data isolation per module based on user roles and ownership. Admin users have elevated access.
+- **Authentication & Data Isolation:** Server-side session management with `express-session`, `requireAuth` middleware, and data isolation per module based on user roles and ownership. Admin users have elevated access. Brand settings endpoints (logo_url_light, logo_url_dark, favicon_url) are publicly accessible.
+- **Access Control by Module:**
+    - **Macgyver IA:** 100% private per user (no admin bypass).
+    - **Chamados (Tickets):** Public - all authenticated users see all tickets.
+    - **Projects & Flowcharts:** Private by default, with optional shared visibility and member management via `projectMembers` table and `permissions` JSON field.
+    - **Task Areas:** Scoped by context (`scope` field: 'tasks' vs 'meetings') to separate Tarefas and Reuniões areas.
+    - **Corporate Modules:** Visibility controlled by user `modulePermissions` JSON field.
+    - **Dashboard:** Module cards filtered based on user permissions (`modulePermissions`).
 - **Multi-tenant Architecture:** Designed with multi-tenancy in mind, incorporating a `tenantId` field in all data structures for future scalability.
 - **Module-specific Features:**
     - **Tickets:** Auto-generated codes, categorization, Kanban view, Excel export, automatic assignment, SLA management.
