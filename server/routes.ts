@@ -1403,7 +1403,6 @@ export async function registerRoutes(
               role: "member"
             });
             
-            // Send email notification
             const member = await storage.getUser(userId);
             if (member && owner) {
               sendSharedAreaInviteEmail(
@@ -1412,6 +1411,16 @@ export async function registerRoutes(
                 area.id,
                 owner.name
               ).catch(err => console.error(`[api/task-areas] Error sending email to ${member.email}:`, err));
+
+              storage.createNotification({
+                userId,
+                fromUserId: validated.ownerId,
+                title: "Nova área compartilhada",
+                message: `${owner.name} compartilhou a área "${area.name}" com você`,
+                module: "tarefas",
+                entityId: area.id,
+                linkUrl: `/tarefas?area=${area.id}`,
+              }).catch(console.error);
             }
           } catch (memberError) {
             console.error(`[api/task-areas] Error adding member ${userId} to area ${area.id}:`, memberError);
@@ -1458,7 +1467,6 @@ export async function registerRoutes(
                 role: "member"
               });
 
-              // Send email notification only to new members
               const member = await storage.getUser(userId);
               if (member && owner) {
                 sendSharedAreaInviteEmail(
@@ -1467,6 +1475,16 @@ export async function registerRoutes(
                   area.id,
                   owner.name
                 ).catch(err => console.error(`[api/task-areas] Error sending email to ${member.email}:`, err));
+
+                storage.createNotification({
+                  userId,
+                  fromUserId: area.ownerId,
+                  title: "Nova área compartilhada",
+                  message: `${owner.name} compartilhou a área "${area.name}" com você`,
+                  module: "tarefas",
+                  entityId: area.id,
+                  linkUrl: `/tarefas?area=${area.id}`,
+                }).catch(console.error);
               }
             } catch (memberError) {
               console.error(`[api/task-areas] Error adding member ${userId} to area ${area.id}:`, memberError);
@@ -1646,6 +1664,28 @@ export async function registerRoutes(
         }).catch(console.error);
       }
 
+      if (task.assigneeIds && task.type !== "meeting_note") {
+        try {
+          const ids = typeof task.assigneeIds === 'string' ? JSON.parse(task.assigneeIds) : task.assigneeIds;
+          if (Array.isArray(ids)) {
+            const creator = await storage.getUser(task.createdBy);
+            for (const assigneeId of ids) {
+              if (assigneeId !== task.createdBy && assigneeId !== task.assigneeId) {
+                storage.createNotification({
+                  userId: assigneeId,
+                  fromUserId: task.createdBy,
+                  title: "Nova tarefa atribuída",
+                  message: `${creator?.name || 'Alguém'} atribuiu a tarefa "${task.title}" a você`,
+                  module: "tarefas",
+                  entityId: task.id,
+                  linkUrl: `/tarefas/${task.id}`,
+                }).catch(console.error);
+              }
+            }
+          }
+        } catch {}
+      }
+
       if (task.type === "meeting_note") {
         let meetingParticipants: string[] = [];
         try {
@@ -1712,7 +1752,7 @@ export async function registerRoutes(
       if (!task) return res.status(404).json({ error: "Task not found" });
       if (validated.assigneeId && task && task.assigneeId) {
         const updatedBy = req.body.updatedBy || task.createdBy;
-        if (task.assigneeId !== updatedBy) {
+        if (task.assigneeId !== updatedBy && task.assigneeId !== existingTask.assigneeId) {
           const updater = await storage.getUser(updatedBy);
           storage.createNotification({
             userId: task.assigneeId,
@@ -1725,6 +1765,37 @@ export async function registerRoutes(
           }).catch(console.error);
         }
       }
+
+      if (validated.assigneeIds) {
+        try {
+          const newIds = typeof validated.assigneeIds === 'string' ? JSON.parse(validated.assigneeIds) : validated.assigneeIds;
+          let oldIds: string[] = [];
+          try {
+            oldIds = existingTask.assigneeIds
+              ? (typeof existingTask.assigneeIds === 'string' ? JSON.parse(existingTask.assigneeIds) : existingTask.assigneeIds)
+              : [];
+          } catch {}
+          if (Array.isArray(newIds)) {
+            const oldSet = new Set(oldIds);
+            const updatedBy = req.body.updatedBy || task!.createdBy;
+            const updater = await storage.getUser(updatedBy);
+            for (const assigneeId of newIds) {
+              if (!oldSet.has(assigneeId) && assigneeId !== updatedBy && assigneeId !== task!.assigneeId) {
+                storage.createNotification({
+                  userId: assigneeId,
+                  fromUserId: updatedBy,
+                  title: "Tarefa atribuída a você",
+                  message: `${updater?.name || 'Alguém'} atribuiu a tarefa "${task!.title}" a você`,
+                  module: "tarefas",
+                  entityId: task!.id,
+                  linkUrl: `/tarefas/${task!.id}`,
+                }).catch(console.error);
+              }
+            }
+          }
+        } catch {}
+      }
+
       res.json(task);
     } catch (error) {
       if (error instanceof z.ZodError) {

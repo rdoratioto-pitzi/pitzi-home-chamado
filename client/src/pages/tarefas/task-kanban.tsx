@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,29 @@ const typeConfig: Record<string, { label: string; icon: React.ElementType }> = {
 export function TaskKanban({ tasks, areas }: TaskKanbanProps) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const resizingCol = useRef<string | null>(null);
+
+  const getColumnWidth = (colId: string) => columnWidths[colId] || 288;
+
+  const handleColumnResizeStart = useCallback((e: React.MouseEvent, colId: string) => {
+    e.preventDefault();
+    resizingCol.current = colId;
+    const startX = e.clientX;
+    const startWidth = columnWidths[colId] || 288;
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!resizingCol.current) return;
+      const newWidth = Math.max(220, Math.min(600, startWidth + (ev.clientX - startX)));
+      setColumnWidths(prev => ({ ...prev, [colId]: newWidth }));
+    };
+    const onMouseUp = () => {
+      resizingCol.current = null;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [columnWidths]);
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -66,26 +90,29 @@ export function TaskKanban({ tasks, areas }: TaskKanbanProps) {
   const getArea = (areaId: string) => areas.find((a) => a.id === areaId);
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-4">
+    <div className="flex gap-0 overflow-x-auto pb-4 select-none">
       {columns.map((column) => {
         const columnTasks = tasks.filter((t) => t.status === column.id);
+        const width = getColumnWidth(column.id);
         return (
           <div
             key={column.id}
-            className="flex-shrink-0 w-72"
+            className="flex-shrink-0 relative"
+            style={{ width }}
             onDragOver={handleDragOver}
             onDrop={(e) => handleDrop(e, column.id)}
             data-testid={`kanban-column-${column.id}`}
           >
-            <div className="flex items-center gap-2 mb-3">
-              <div className={`h-3 w-3 rounded-full ${column.color}`} />
-              <h3 className="font-semibold">{column.title}</h3>
-              <Badge variant="secondary" className="ml-auto">
-                {columnTasks.length}
-              </Badge>
-            </div>
+            <div className="pr-3 pl-1">
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`h-3 w-3 rounded-full ${column.color}`} />
+                <h3 className="font-semibold">{column.title}</h3>
+                <Badge variant="secondary" className="ml-auto">
+                  {columnTasks.length}
+                </Badge>
+              </div>
 
-            <div className="space-y-3 min-h-[200px] bg-muted/30 rounded-lg p-2">
+              <div className="space-y-3 min-h-[200px] bg-muted/30 rounded-lg p-2">
               {columnTasks.map((task) => {
                 const taskArea = getArea(task.areaId);
                 const taskType = typeConfig[task.type as keyof typeof typeConfig];
@@ -145,6 +172,12 @@ export function TaskKanban({ tasks, areas }: TaskKanbanProps) {
                 );
               })}
             </div>
+            </div>
+            <div
+              className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
+              onMouseDown={(e) => handleColumnResizeStart(e, column.id)}
+              data-testid={`kanban-resize-${column.id}`}
+            />
           </div>
         );
       })}

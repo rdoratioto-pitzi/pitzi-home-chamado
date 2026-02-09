@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/permissions";
@@ -91,6 +91,28 @@ export default function TarefasPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list" | "kanban">("list");
+  const [sidebarWidth, setSidebarWidth] = useState(256);
+  const sidebarResizing = useRef(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  const handleSidebarMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    sidebarResizing.current = true;
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!sidebarResizing.current) return;
+      const newWidth = Math.max(180, Math.min(480, startWidth + (ev.clientX - startX)));
+      setSidebarWidth(newWidth);
+    };
+    const onMouseUp = () => {
+      sidebarResizing.current = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }, [sidebarWidth]);
 
   const currentUser = getCurrentUser();
   const currentUserId = currentUser?.id || "";
@@ -490,7 +512,11 @@ export default function TarefasPage() {
     <div className="flex h-full">
       {/* Áreas Sidebar (Left) */}
       {isAreasSidebarOpen && (
-        <div className="w-64 border-r border-border bg-muted/30 flex flex-col animate-in slide-in-from-left duration-200">
+        <div
+          ref={sidebarRef}
+          className="border-r border-border bg-muted/30 flex flex-col animate-in slide-in-from-left duration-200 relative select-none"
+          style={{ width: sidebarWidth, minWidth: 180, maxWidth: 480 }}
+        >
           <div className="p-4 border-b border-border flex items-center justify-between">
             <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
               Áreas
@@ -593,6 +619,11 @@ export default function TarefasPage() {
               )}
             </div>
           </div>
+          <div
+            className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
+            onMouseDown={handleSidebarMouseDown}
+            data-testid="sidebar-resize-handle"
+          />
         </div>
       )}
 
