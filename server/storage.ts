@@ -659,8 +659,7 @@ export class DatabaseStorage implements IStorage {
     const memberAreaIds = new Set(memberRecords.map(m => m.areaId));
     return allAreas.filter(area => 
       area.ownerId === userId || 
-      memberAreaIds.has(area.id) || 
-      area.visibility === "shared"
+      memberAreaIds.has(area.id)
     );
   }
   async createTaskArea(insertArea: InsertTaskArea): Promise<TaskArea> {
