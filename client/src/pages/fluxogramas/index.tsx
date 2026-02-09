@@ -40,7 +40,11 @@ import {
   Workflow,
   Clock,
   User as UserIcon,
+  Lock,
+  Globe,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import type { Flowchart } from "@shared/schema";
 
 function getCurrentUser() {
@@ -54,6 +58,7 @@ function getCurrentUser() {
 const createFlowchartSchema = z.object({
   title: z.string().min(1, "Título é obrigatório"),
   description: z.string().optional(),
+  visibility: z.enum(["private", "shared"]).default("private"),
 });
 
 type CreateFormData = z.infer<typeof createFlowchartSchema>;
@@ -75,7 +80,9 @@ export default function FluxogramasPage() {
   const createMutation = useMutation({
     mutationFn: async (data: CreateFormData) => {
       const res = await apiRequest("POST", "/api/flowcharts", {
-        ...data,
+        title: data.title,
+        description: data.description,
+        visibility: data.visibility,
         ownerId: currentUser?.id,
         tenantId: currentUser?.tenantId,
       });
@@ -143,7 +150,7 @@ export default function FluxogramasPage() {
 
   const form = useForm<CreateFormData>({
     resolver: zodResolver(createFlowchartSchema),
-    defaultValues: { title: "", description: "" },
+    defaultValues: { title: "", description: "", visibility: "private" },
   });
 
   const filteredFlowcharts = (flowcharts || []).filter((fc) =>
@@ -344,6 +351,38 @@ export default function FluxogramasPage() {
                       <RichTextarea placeholder="Descreva o objetivo deste fluxograma..." value={field.value || ""} onChange={field.onChange} data-testid="input-flowchart-description" />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="visibility"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Visibilidade</FormLabel>
+                      <div className="flex items-center gap-2">
+                        {field.value === "private" ? (
+                          <Lock className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Globe className="h-4 w-4 text-primary" />
+                        )}
+                        <Label htmlFor="fc-visibility-toggle" className="text-sm text-muted-foreground">
+                          {field.value === "private" ? "Privado" : "Compartilhado"}
+                        </Label>
+                        <Switch
+                          id="fc-visibility-toggle"
+                          data-testid="switch-flowchart-visibility"
+                          checked={field.value === "shared"}
+                          onCheckedChange={(checked) => field.onChange(checked ? "shared" : "private")}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {field.value === "private"
+                        ? "Apenas você pode ver este fluxograma."
+                        : "Outros usuários com permissão podem ver este fluxograma."}
+                    </p>
                   </FormItem>
                 )}
               />

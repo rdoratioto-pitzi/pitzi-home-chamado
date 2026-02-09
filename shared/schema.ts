@@ -129,6 +129,7 @@ export const projects = pgTable("projects", {
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").notNull().default("active"),
+  visibility: text("visibility").notNull().default("private"),
   ownerId: varchar("owner_id").notNull(),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
@@ -146,6 +147,20 @@ export const insertProjectSchema = baseInsertProjectSchema.extend({
 });
 export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
+
+// ============== PROJECT MEMBERS ==============
+export const projectMembers = pgTable("project_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  projectId: varchar("project_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  role: text("role").notNull().default("viewer"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProjectMemberSchema = createInsertSchema(projectMembers).omit({ id: true, createdAt: true });
+export type InsertProjectMember = z.infer<typeof insertProjectMemberSchema>;
+export type ProjectMember = typeof projectMembers.$inferSelect;
 
 // ============== KANBAN COLUMNS ==============
 export const kanbanColumns = pgTable("kanban_columns", {
@@ -353,6 +368,7 @@ export const taskAreas = pgTable("task_areas", {
   description: text("description"),
   ownerId: varchar("owner_id").notNull(),
   visibility: text("visibility").notNull().default("private"),
+  scope: text("scope").notNull().default("tasks"),
   color: text("color").default("#00A137"),
   icon: text("icon").default("folder"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -891,6 +907,7 @@ export const flowcharts = pgTable("flowcharts", {
   title: text("title").notNull(),
   description: text("description"),
   ownerId: varchar("owner_id").notNull(),
+  visibility: text("visibility").notNull().default("private"),
   nodesData: text("nodes_data"), // JSON array of React Flow nodes
   edgesData: text("edges_data"), // JSON array of React Flow edges
   viewport: text("viewport"), // JSON { x, y, zoom }

@@ -70,15 +70,14 @@ export async function registerRoutes(
   }
 
   async function getUserAccessibleProjectIds(userId: string): Promise<string[]> {
-    const projects = await storage.getProjects();
+    const allProjects = await storage.getProjects();
+    const userMemberships = await storage.getProjectMembersByUser(userId);
+    const memberProjectIds = new Set(userMemberships.map(m => m.projectId));
     const accessibleIds: string[] = [];
-    for (const project of projects) {
+    for (const project of allProjects) {
       if (project.ownerId === userId) {
         accessibleIds.push(project.id);
-        continue;
-      }
-      const cards = await storage.getKanbanCards(project.id);
-      if (cards.some(c => c.assigneeId === userId || c.reporterId === userId)) {
+      } else if (project.visibility === "shared" && memberProjectIds.has(project.id)) {
         accessibleIds.push(project.id);
       }
     }
@@ -87,11 +86,13 @@ export async function registerRoutes(
 
   function hasFlowchartAccess(flowchart: any, userId: string): boolean {
     if (flowchart.ownerId === userId) return true;
-    if (flowchart.permissions) {
-      try {
-        const perms = typeof flowchart.permissions === 'string' ? JSON.parse(flowchart.permissions) : flowchart.permissions;
-        if (perms && typeof perms === 'object' && userId in perms) return true;
-      } catch {}
+    if (flowchart.visibility === "shared") {
+      if (flowchart.permissions) {
+        try {
+          const perms = typeof flowchart.permissions === 'string' ? JSON.parse(flowchart.permissions) : flowchart.permissions;
+          if (perms && typeof perms === 'object' && userId in perms) return true;
+        } catch {}
+      }
     }
     return false;
   }
@@ -391,20 +392,13 @@ export async function registerRoutes(
 
   // ============== TICKETS ==============
   app.get("/api/tickets", async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
     const tickets = await storage.getTickets();
-    if (isAdmin) return res.json(tickets);
-    const filtered = tickets.filter(t => t.requesterId === userId || t.assigneeId === userId);
-    res.json(filtered);
+    res.json(tickets);
   });
 
   app.get("/api/tickets/:id", async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
     const ticket = await storage.getTicket(req.params.id);
     if (!ticket) return res.status(404).json({ error: "Ticket not found" });
-    if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
-      return res.status(403).json({ error: "Access denied" });
-    }
     res.json(ticket);
   });
 
@@ -707,8 +701,20 @@ export async function registerRoutes(
 
   app.post("/api/projects", async (req, res) => {
     try {
-      const validated = insertProjectSchema.parse(req.body);
+      const { memberIds, ...projectData } = req.body;
+      const validated = insertProjectSchema.parse(projectData);
       const project = await storage.createProject(validated);
+      
+      if (memberIds && Array.isArray(memberIds) && memberIds.length > 0 && validated.visibility === "shared") {
+        for (const uid of memberIds) {
+          try {
+            await storage.addProjectMember({ projectId: project.id, userId: uid, role: "member" });
+          } catch (e) {
+            console.error(`Error adding member ${uid} to project ${project.id}:`, e);
+          }
+        }
+      }
+      
       res.status(201).json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -726,10 +732,29 @@ export async function registerRoutes(
       if (!isAdmin && existing.ownerId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
+      const { memberIds, ...projectData } = req.body;
       const partialSchema = insertProjectSchema.partial();
-      const validated = partialSchema.parse(req.body);
+      const validated = partialSchema.parse(projectData);
       const project = await storage.updateProject(req.params.id, validated);
       if (!project) return res.status(404).json({ error: "Project not found" });
+      
+      if (memberIds && Array.isArray(memberIds) && (validated.visibility === "shared" || existing.visibility === "shared")) {
+        const currentMembers = await storage.getProjectMembers(req.params.id);
+        const currentMemberIds = new Set(currentMembers.map(m => m.userId));
+        const newMemberIds = new Set(memberIds as string[]);
+        
+        for (const uid of memberIds) {
+          if (!currentMemberIds.has(uid)) {
+            await storage.addProjectMember({ projectId: req.params.id, userId: uid, role: "member" });
+          }
+        }
+        for (const member of currentMembers) {
+          if (!newMemberIds.has(member.userId)) {
+            await storage.removeProjectMember(member.id);
+          }
+        }
+      }
+      
       res.json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -748,6 +773,28 @@ export async function registerRoutes(
     }
     const deleted = await storage.deleteProject(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Project not found" });
+    res.status(204).send();
+  });
+
+  // Project Members
+  app.get("/api/projects/:id/members", async (req, res) => {
+    const members = await storage.getProjectMembers(req.params.id);
+    res.json(members);
+  });
+
+  app.post("/api/projects/:id/members", async (req, res) => {
+    try {
+      const { userId: uid, role } = req.body;
+      const member = await storage.addProjectMember({ projectId: req.params.id, userId: uid, role: role || "member" });
+      res.status(201).json(member);
+    } catch (error) {
+      res.status(400).json({ error: "Failed to add member" });
+    }
+  });
+
+  app.delete("/api/projects/:id/members/:memberId", async (req, res) => {
+    const deleted = await storage.removeProjectMember(req.params.memberId);
+    if (!deleted) return res.status(404).json({ error: "Member not found" });
     res.status(204).send();
   });
 
@@ -1288,8 +1335,10 @@ export async function registerRoutes(
   // ============== TASK AREAS ==============
   app.get("/api/task-areas", async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
+    const scope = (req.query.scope as string) || undefined;
     const areas = await storage.getTaskAreas(isAdmin ? "__all__" : userId);
-    res.json(areas);
+    const filtered = scope ? areas.filter(a => a.scope === scope) : areas;
+    res.json(filtered);
   });
 
   app.get("/api/task-areas/:id", async (req, res) => {
@@ -3824,8 +3873,8 @@ export async function registerRoutes(
   // Get all conversations for a user
   app.get("/api/ai/conversations/:userId", async (req, res) => {
     try {
-      const { userId: sessionUserId, isAdmin } = getSessionUser(req);
-      if (!isAdmin && sessionUserId !== req.params.userId) {
+      const { userId: sessionUserId } = getSessionUser(req);
+      if (sessionUserId !== req.params.userId) {
         return res.status(403).json({ error: "Access denied" });
       }
       const conversations = await storage.getAiConversations(req.params.userId);
@@ -3879,10 +3928,8 @@ export async function registerRoutes(
   // ============== AI SPACES ==============
   app.get("/api/ai/spaces", async (req, res) => {
     try {
-      const { userId, isAdmin } = getSessionUser(req);
-      const queryUserId = req.query.userId as string | undefined;
-      const targetUserId = isAdmin && queryUserId ? queryUserId : userId;
-      const spaces = await storage.getAiSpaces(targetUserId);
+      const { userId } = getSessionUser(req);
+      const spaces = await storage.getAiSpaces(userId);
       res.json(spaces);
     } catch (error: any) {
       res.status(500).json({ error: error.message });

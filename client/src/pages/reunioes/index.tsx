@@ -68,6 +68,7 @@ export default function ReunioesPage() {
     color: "#00A137",
     ownerId: "admin",
     memberIds: [] as string[],
+    scope: "meetings" as string,
   });
   const [memberSearchInput, setMemberSearchInput] = useState("");
 
@@ -102,7 +103,12 @@ export default function ReunioesPage() {
   const [externalParticipantInput, setExternalParticipantInput] = useState("");
 
   const { data: areas = [], isLoading: areasLoading } = useQuery<TaskArea[]>({
-    queryKey: ["/api/task-areas"],
+    queryKey: ["/api/task-areas", "meetings"],
+    queryFn: async () => {
+      const res = await fetch("/api/task-areas?scope=meetings");
+      if (!res.ok) throw new Error("Failed to fetch areas");
+      return res.json();
+    },
   });
 
   const { data: users = [] } = useQuery<UserType[]>({
@@ -140,9 +146,9 @@ export default function ReunioesPage() {
       return apiRequest("POST", "/api/task-areas", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-areas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "meetings"] });
       setShowAreaDialog(false);
-      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin", memberIds: [] });
+      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin", memberIds: [], scope: "meetings" });
       setMemberSearchInput("");
       toast({ title: "Área criada com sucesso!" });
     },
@@ -157,7 +163,7 @@ export default function ReunioesPage() {
       return apiRequest("PUT", `/api/task-areas/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-areas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "meetings"] });
       setShowAreaDialog(false);
       setEditingArea(null);
       toast({ title: "Área atualizada com sucesso!" });
@@ -169,7 +175,7 @@ export default function ReunioesPage() {
       return apiRequest("DELETE", `/api/task-areas/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-areas"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "meetings"] });
       if (selectedAreaId) setSelectedAreaId(null);
       toast({ title: "Área excluída com sucesso!" });
     },

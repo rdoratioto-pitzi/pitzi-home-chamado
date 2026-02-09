@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
+import { getCurrentUser, getUserPermissions, type UserPermissions } from "@/lib/permissions";
+import { useMemo } from "react";
 
 interface ModuleCard {
   title: string;
@@ -27,6 +29,7 @@ interface ModuleCard {
   href: string;
   color: string;
   bgColor: string;
+  permissionKey?: keyof UserPermissions;
 }
 
 const modules: ModuleCard[] = [
@@ -45,6 +48,7 @@ const modules: ModuleCard[] = [
     href: "/chamados",
     color: "text-orange-600 dark:text-orange-400",
     bgColor: "bg-orange-100 dark:bg-orange-900/30",
+    permissionKey: "chamados",
   },
   {
     title: "Projetos",
@@ -53,6 +57,7 @@ const modules: ModuleCard[] = [
     href: "/projetos",
     color: "text-blue-600 dark:text-blue-400",
     bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    permissionKey: "projetos",
   },
   {
     title: "Tarefas",
@@ -61,6 +66,7 @@ const modules: ModuleCard[] = [
     href: "/tarefas",
     color: "text-green-600 dark:text-green-400",
     bgColor: "bg-green-100 dark:bg-green-900/30",
+    permissionKey: "tarefas",
   },
   {
     title: "Reuniões",
@@ -69,6 +75,7 @@ const modules: ModuleCard[] = [
     href: "/reunioes",
     color: "text-purple-600 dark:text-purple-400",
     bgColor: "bg-purple-100 dark:bg-purple-900/30",
+    permissionKey: "reunioes",
   },
   {
     title: "Fluxogramas",
@@ -77,6 +84,7 @@ const modules: ModuleCard[] = [
     href: "/fluxogramas",
     color: "text-teal-600 dark:text-teal-400",
     bgColor: "bg-teal-100 dark:bg-teal-900/30",
+    permissionKey: "fluxogramas",
   },
   {
     title: "Metas",
@@ -85,6 +93,7 @@ const modules: ModuleCard[] = [
     href: "/metas",
     color: "text-cyan-600 dark:text-cyan-400",
     bgColor: "bg-cyan-100 dark:bg-cyan-900/30",
+    permissionKey: "metas",
   },
   {
     title: "OKRs",
@@ -93,6 +102,7 @@ const modules: ModuleCard[] = [
     href: "/okrs",
     color: "text-red-600 dark:text-red-400",
     bgColor: "bg-red-100 dark:bg-red-900/30",
+    permissionKey: "okrs",
   },
   {
     title: "Logística",
@@ -101,6 +111,7 @@ const modules: ModuleCard[] = [
     href: "/logistica/dashboard",
     color: "text-amber-600 dark:text-amber-400",
     bgColor: "bg-amber-100 dark:bg-amber-900/30",
+    permissionKey: "logistica",
   },
   {
     title: "Pricing",
@@ -109,6 +120,7 @@ const modules: ModuleCard[] = [
     href: "/pricing/dashboard",
     color: "text-emerald-600 dark:text-emerald-400",
     bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
+    permissionKey: "pricing",
   },
   {
     title: "Base de Conhecimento",
@@ -117,10 +129,21 @@ const modules: ModuleCard[] = [
     href: "/conhecimento",
     color: "text-indigo-600 dark:text-indigo-400",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
+    permissionKey: "conhecimento",
   },
 ];
 
 export default function Home() {
+  const currentUser = getCurrentUser();
+  const permissions = getUserPermissions(currentUser);
+
+  const visibleModules = useMemo(() => {
+    return modules.filter((mod) => {
+      if (!mod.permissionKey) return true;
+      return permissions[mod.permissionKey];
+    });
+  }, [permissions]);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
@@ -145,7 +168,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {modules.map((module) => (
+          {visibleModules.map((module) => (
             <Link key={module.href} href={module.href}>
               <Card 
                 className={cn(

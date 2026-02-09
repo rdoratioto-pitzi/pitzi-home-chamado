@@ -41,10 +41,11 @@ import {
   type AiSpace, type InsertAiSpace,
   type AiSpaceConversation, type InsertAiSpaceConversation,
   type Notification, type InsertNotification,
+  type ProjectMember, type InsertProjectMember,
   type Flowchart, type InsertFlowchart,
   type FlowchartVersion, type InsertFlowchartVersion,
   type FlowchartComment, type InsertFlowchartComment,
-  users, tickets, ticketResponsaveis, ticketComments, projects, kanbanColumns, kanbanCards, kanbanComments,
+  users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
   collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules,
@@ -91,6 +92,12 @@ export interface IStorage {
   createProject(project: InsertProject): Promise<Project>;
   updateProject(id: string, data: Partial<Project>): Promise<Project | undefined>;
   deleteProject(id: string): Promise<boolean>;
+
+  // Project Members
+  getProjectMembers(projectId: string): Promise<ProjectMember[]>;
+  addProjectMember(member: InsertProjectMember): Promise<ProjectMember>;
+  removeProjectMember(id: string): Promise<boolean>;
+  getProjectMembersByUser(userId: string): Promise<ProjectMember[]>;
 
   // Kanban Columns
   getKanbanColumns(projectId: string): Promise<KanbanColumn[]>;
@@ -470,8 +477,25 @@ export class DatabaseStorage implements IStorage {
     return project;
   }
   async deleteProject(id: string): Promise<boolean> {
+    await db.delete(projectMembers).where(eq(projectMembers.projectId, id));
     const result = await db.delete(projects).where(eq(projects.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Project Members
+  async getProjectMembers(projectId: string): Promise<ProjectMember[]> {
+    return await db.select().from(projectMembers).where(eq(projectMembers.projectId, projectId));
+  }
+  async addProjectMember(member: InsertProjectMember): Promise<ProjectMember> {
+    const [m] = await db.insert(projectMembers).values(member).returning();
+    return m;
+  }
+  async removeProjectMember(id: string): Promise<boolean> {
+    const result = await db.delete(projectMembers).where(eq(projectMembers.id, id)).returning();
+    return result.length > 0;
+  }
+  async getProjectMembersByUser(userId: string): Promise<ProjectMember[]> {
+    return await db.select().from(projectMembers).where(eq(projectMembers.userId, userId));
   }
 
   // Kanban Columns
