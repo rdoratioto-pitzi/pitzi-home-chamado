@@ -341,6 +341,63 @@ export function RichTextarea({
     document.body.removeChild(link);
   }, []);
 
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== "Enter" || e.shiftKey) return;
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const cursorPos = textarea.selectionStart;
+    const lineStart = value.lastIndexOf("\n", cursorPos - 1) + 1;
+    const currentLine = value.substring(lineStart, cursorPos);
+
+    const numberedMatch = currentLine.match(/^(\d+)\.\s/);
+    const unorderedMatch = currentLine.match(/^-\s(?!\[[ x]\]\s)/);
+    const checklistMatch = currentLine.match(/^-\s\[[ x]\]\s/);
+    const blockquoteMatch = currentLine.match(/^>\s/);
+
+    let prefix = "";
+    let isEmptyItem = false;
+
+    if (numberedMatch) {
+      const num = parseInt(numberedMatch[0], 10);
+      prefix = `${num + 1}. `;
+      isEmptyItem = currentLine.trim() === `${num}.`;
+    } else if (checklistMatch) {
+      prefix = "- [ ] ";
+      isEmptyItem = currentLine.trim() === "- [ ]" || currentLine.trim() === "- [x]";
+    } else if (unorderedMatch) {
+      prefix = "- ";
+      isEmptyItem = currentLine.trim() === "-";
+    } else if (blockquoteMatch) {
+      prefix = "> ";
+      isEmptyItem = currentLine.trim() === ">";
+    }
+
+    if (!prefix) return;
+
+    e.preventDefault();
+
+    if (isEmptyItem) {
+      const newValue = value.substring(0, lineStart) + "\n" + value.substring(cursorPos);
+      onChange(newValue);
+      const newPos = lineStart + 1;
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(newPos, newPos);
+      }, 0);
+    } else {
+      const insert = "\n" + prefix;
+      const newValue = value.substring(0, cursorPos) + insert + value.substring(cursorPos);
+      onChange(newValue);
+      const newPos = cursorPos + insert.length;
+      setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(newPos, newPos);
+      }, 0);
+    }
+  }, [value, onChange, textareaRef]);
+
   const handleBlur = useCallback((e: React.FocusEvent) => {
     if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
       setIsFocused(false);
@@ -375,6 +432,7 @@ export function RichTextarea({
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onFocus={() => setIsFocused(true)}
           placeholder={placeholder}
