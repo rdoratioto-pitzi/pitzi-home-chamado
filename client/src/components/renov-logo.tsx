@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { type Setting } from "@shared/schema";
+import { useTheme } from "@/hooks/use-theme";
 
 interface RenovLogoProps {
-  variant?: "light" | "dark" | "white";
+  variant?: "light" | "dark" | "white" | "auto";
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }
@@ -20,7 +21,8 @@ function normalizeObjectPath(path: string): string {
   return `/objects/${path.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
 }
 
-export function RenovLogo({ variant = "light", size = "md", className = "" }: RenovLogoProps) {
+export function RenovLogo({ variant = "auto", size = "md", className = "" }: RenovLogoProps) {
+  const { theme } = useTheme();
   const { data: logoUrlLight } = useQuery<Setting>({ 
     queryKey: ["/api/settings/logo_url_light"]
   });
@@ -31,7 +33,8 @@ export function RenovLogo({ variant = "light", size = "md", className = "" }: Re
 
   const { width, height } = sizeMap[size];
 
-  const logoUrlSetting = variant === "dark" || variant === "white" ? logoUrlDark : logoUrlLight;
+  const resolvedVariant = variant === "auto" ? theme : variant;
+  const logoUrlSetting = resolvedVariant === "dark" || resolvedVariant === "white" ? logoUrlDark : logoUrlLight;
 
   if (logoUrlSetting?.value) {
     const src = normalizeObjectPath(logoUrlSetting.value);
@@ -50,7 +53,7 @@ export function RenovLogo({ variant = "light", size = "md", className = "" }: Re
     );
   }
 
-  const textColor = variant === "dark" || variant === "white" ? "#FFFFFF" : "#000000";
+  const textColor = resolvedVariant === "dark" || resolvedVariant === "white" ? "#FFFFFF" : "#000000";
   
   return (
     <svg 
@@ -77,13 +80,13 @@ export function RenovLogo({ variant = "light", size = "md", className = "" }: Re
           cy="17"
           r="10"
           fill="none"
-          stroke={variant === "white" ? "#FFFFFF" : "#00A137"}
+          stroke={resolvedVariant === "white" ? "#FFFFFF" : "#00A137"}
           strokeWidth="4"
         />
         <path
           d="M12 7 L12 2 L17 7"
           fill="none"
-          stroke={variant === "white" ? "#FFFFFF" : "#00A137"}
+          stroke={resolvedVariant === "white" ? "#FFFFFF" : "#00A137"}
           strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
