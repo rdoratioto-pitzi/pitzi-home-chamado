@@ -1,8 +1,6 @@
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
-import { NotificationBell } from "@/components/notification-bell";
+import { PageHeader } from "@/components/page-header";
 import { 
   Ticket, 
   FolderKanban, 
@@ -146,19 +144,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
-        <div className="flex items-center justify-between h-16 px-6">
-          <div className="flex items-center gap-4">
-            <SidebarTrigger data-testid="button-sidebar-toggle-home" className="h-9 w-9 rounded-lg hover:bg-muted" />
-            <div className="h-6 w-px bg-border/60 mx-1" />
-            <h1 className="text-[20px] font-bold tracking-tight text-foreground leading-tight">Início</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <NotificationBell />
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Início" />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold tracking-tight">Bem-vindo ao Renov Home</h1>
