@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar, UserProfileMenu } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
 import { ProtectedRoute } from "@/components/protected-route";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
@@ -312,6 +313,7 @@ function App() {
                     <SidebarTrigger data-testid="button-sidebar-toggle" />
                   </div>
                   <div className="flex items-center gap-3">
+                    <NotificationBell />
                     <ThemeToggle />
                     <UserProfileMenu />
                   </div>
