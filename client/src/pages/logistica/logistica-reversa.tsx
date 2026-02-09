@@ -195,6 +195,36 @@ export default function LogisticaReversaPage() {
       return;
     }
 
+    if (cepCoberturaStatus && !cepCoberturaStatus.coberto) {
+      toast({
+        title: "CEP sem cobertura",
+        description: "O CEP do remetente não possui cobertura dos Correios para logística reversa. Verifique o CEP informado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!cepCoberturaStatus) {
+      const cepLimpo = data.remetente.cep.replace(/\D/g, "");
+      if (cepLimpo.length === 8) {
+        try {
+          const coberturaResponse = await fetch(`/api/cep/${cepLimpo}/cobertura`);
+          const coberturaData = await coberturaResponse.json();
+          setCepCoberturaStatus(coberturaData);
+          if (!coberturaData.coberto) {
+            toast({
+              title: "CEP sem cobertura",
+              description: coberturaData.erro || "O CEP do remetente não possui cobertura dos Correios para logística reversa.",
+              variant: "destructive",
+            });
+            return;
+          }
+        } catch (e) {
+          // Continue if coverage check fails
+        }
+      }
+    }
+
     try {
       await solicitarMutation.mutateAsync({ 
         ...data, 
@@ -246,9 +276,15 @@ export default function LogisticaReversaPage() {
     }
   };
 
+  const [cepCoberturaStatus, setCepCoberturaStatus] = useState<{ coberto: boolean; mensagem?: string; erro?: string; cidade?: string; uf?: string } | null>(null);
+  const [verificandoCep, setVerificandoCep] = useState(false);
+
   const consultarCep = async (cep: string) => {
     const cepLimpo = cep.replace(/\D/g, "");
     if (cepLimpo.length !== 8) return;
+    
+    setVerificandoCep(true);
+    setCepCoberturaStatus(null);
     
     try {
       const response = await fetch(`/api/cep/${cepLimpo}`);
@@ -264,10 +300,25 @@ export default function LogisticaReversaPage() {
           uf: data.uf || currentValues.uf,
           ddd: data.ddd || currentValues.ddd,
         });
-        toast({ title: "CEP encontrado" });
+      }
+
+      const coberturaResponse = await fetch(`/api/cep/${cepLimpo}/cobertura`);
+      const coberturaData = await coberturaResponse.json();
+      setCepCoberturaStatus(coberturaData);
+      
+      if (coberturaData.coberto) {
+        toast({ title: "CEP validado", description: coberturaData.mensagem });
+      } else {
+        toast({ 
+          title: "CEP sem cobertura", 
+          description: coberturaData.erro || "CEP fora da área de cobertura dos Correios para logística reversa.",
+          variant: "destructive" 
+        });
       }
     } catch (e) {
       toast({ title: "Erro ao consultar CEP", variant: "destructive" });
+    } finally {
+      setVerificandoCep(false);
     }
   };
 
@@ -636,11 +687,17 @@ export default function LogisticaReversaPage() {
                                     size="icon"
                                     className="absolute right-0 top-0"
                                     onClick={() => consultarCep(field.value)}
+                                    disabled={verificandoCep}
                                   >
-                                    <Search className="h-4 w-4" />
+                                    {verificandoCep ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                                   </Button>
                                 </div>
                               </FormControl>
+                              {cepCoberturaStatus && (
+                                <p className={`text-xs mt-1 ${cepCoberturaStatus.coberto ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} data-testid="text-cep-cobertura">
+                                  {cepCoberturaStatus.coberto ? `Cobertura confirmada - ${cepCoberturaStatus.cidade}/${cepCoberturaStatus.uf}` : (cepCoberturaStatus.erro || 'CEP sem cobertura')}
+                                </p>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )}
@@ -947,9 +1004,22 @@ export default function LogisticaReversaPage() {
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  <SelectItem value="1">Caixa/Pacote (tipo 1)</SelectItem>
-                                  <SelectItem value="2">Rolo/Prisma (tipo 2)</SelectItem>
-                                  <SelectItem value="3">Envelope (tipo 3)</SelectItem>
+                                  <SelectItem value="116600403">116600403 - Caixa de Encomenda "B" (16x11x6 cm)</SelectItem>
+                                  <SelectItem value="116600055">116600055 - Caixa Encomenda 01 (18x13,5x9 cm)</SelectItem>
+                                  <SelectItem value="116600063">116600063 - Caixa Encomenda 02 (27x18x9 cm)</SelectItem>
+                                  <SelectItem value="116600071">116600071 - Caixa Encomenda 03 (27x22,5x13,5 cm)</SelectItem>
+                                  <SelectItem value="116600080">116600080 - Caixa Encomenda 04 (36x27x18 cm)</SelectItem>
+                                  <SelectItem value="116600160">116600160 - Caixa Encomenda 05 (54x36x27 cm)</SelectItem>
+                                  <SelectItem value="116600179">116600179 - Caixa Encomenda 06 (36x27x27 cm)</SelectItem>
+                                  <SelectItem value="116600187">116600187 - Caixa Encomenda 07 (36x28x4 cm)</SelectItem>
+                                  <SelectItem value="765000660">765000660 - Envelope Bolha Grande (20x28 cm)</SelectItem>
+                                  <SelectItem value="765000652">765000652 - Envelope Bolha Médio (21x18 cm)</SelectItem>
+                                  <SelectItem value="765000644">765000644 - Envelope SEDEX Plástico Grande (40x28 cm)</SelectItem>
+                                  <SelectItem value="765000636">765000636 - Envelope SEDEX Plástico Médio (35,3x25 cm)</SelectItem>
+                                  <SelectItem value="116601558">116601558 - Caixa Encomenda P (CxLxA) - (24x16x8 cm)</SelectItem>
+                                  <SelectItem value="116601566">116601566 - Caixa Encomenda M (CxLxA) - (30x22x13 cm)</SelectItem>
+                                  <SelectItem value="116601540">116601540 - Caixa Encomenda G (CxLxA) - (36x28x28 cm)</SelectItem>
+                                  <SelectItem value="76500071">76500071 - Caixa Encomenda 03 (27x22,5x13,5)</SelectItem>
                                 </SelectContent>
                               </Select>
                               <FormMessage />

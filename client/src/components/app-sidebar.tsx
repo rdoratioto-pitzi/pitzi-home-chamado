@@ -32,6 +32,7 @@ import {
   Printer,
   Settings2,
   Workflow,
+  ClipboardList,
 } from "lucide-react";
 import {
   Sidebar,
@@ -117,6 +118,7 @@ const logisticaSubItems = [
   { title: "Operadores", url: "/logistica/operadores", icon: Users },
   { title: "Solicitações", url: "/logistica/solicitacoes", icon: Package },
   { title: "Logística Reversa", url: "/logistica/reversa", icon: RotateCcw },
+  { title: "Romaneios", url: "/logistica/romaneios", icon: ClipboardList },
   { title: "Impressão Etiquetas", url: "/logistica/impressao-etiquetas", icon: Printer },
 ];
 

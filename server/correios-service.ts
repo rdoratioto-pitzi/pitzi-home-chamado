@@ -411,8 +411,37 @@ export interface ObjetoColeta {
   num?: string;
 }
 
+export interface ProdutoEmbalagem {
+  codigo: string;
+  tipo: string;
+  qtd: number;
+}
+
+const EMBALAGEM_TIPO_MAP: Record<string, string> = {
+  '116600403': '0',
+  '116600055': '0',
+  '116600063': '0',
+  '116600071': '2',
+  '116600080': '0',
+  '116600160': '2',
+  '116600179': '0',
+  '116600187': '0',
+  '765000660': '0',
+  '765000652': '2',
+  '765000644': '2',
+  '765000636': '2',
+  '116601558': '0',
+  '116601566': '0',
+  '116601540': '0',
+  '76500071': '2',
+};
+
+export function getEmbalagemTipo(codigo: string): string {
+  return EMBALAGEM_TIPO_MAP[codigo] || '0';
+}
+
 export interface ColetaSolicitada {
-  tipo: 'A' | 'C' | 'CA'; // A=Autorização, C=Coleta, CA=Coleta com fallback
+  tipo: 'A' | 'C' | 'CA';
   numero?: string;
   id_cliente?: string;
   ag?: string;
@@ -425,12 +454,14 @@ export interface ColetaSolicitada {
   documento?: string[];
   remetente: Remetente;
   obj_col?: ObjetoColeta[];
+  produto?: ProdutoEmbalagem;
 }
 
 export interface SolicitarPostagemReversaParams {
   codigo_servico: string;
   destinatario: Destinatario;
   coletas_solicitadas: ColetaSolicitada[];
+  produto?: ProdutoEmbalagem;
 }
 
 export interface SolicitarPostagemReversaResponse {
@@ -545,6 +576,13 @@ export async function solicitarPostagemReversa(params: SolicitarPostagemReversaP
         ${params.destinatario.identificacao ? `<identificacao>${params.destinatario.identificacao}</identificacao>` : ''}
         <ciencia_conteudo_proibido>${params.destinatario.ciencia_conteudo_proibido}</ciencia_conteudo_proibido>
       </destinatario>
+      ${params.produto ? `
+      <produto>
+        <codigo>${params.produto.codigo}</codigo>
+        <tipo>${params.produto.tipo}</tipo>
+        <qtd>${params.produto.qtd}</qtd>
+      </produto>
+      ` : ''}
       ${coletasXML}
     </ser:solicitarPostagemReversa>
   `;

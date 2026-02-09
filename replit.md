@@ -65,7 +65,9 @@ Renov Home adopts a client-server architecture with a clear separation of concer
     - **Tasks:** Kanban view with drag-and-drop, flexible sorting (priority, date, manual), support for private and shared areas.
     - **Meetings:** Standalone module, supports shared areas, recurring meetings (daily/weekly), multi-participant selection (internal/external), email invitations with ICS attachments, formatted agendas.
     - **Pricing:** Dashboard with KPIs and charts, detailed product analysis and comparison, historical price graphing, deflation indicators, customizable price alerts, comprehensive product details.
-    - **Logistics:** Freight simulation comparing multiple operators, reverse logistics request forms (individual and bulk via import), tracking and order management, label printing for device triage (ZPL format for Zebra printers).
+    - **Logistics:** Freight simulation comparing multiple operators, reverse logistics request forms (individual and bulk via import), tracking and order management, label printing for device triage (ZPL format for Zebra printers), Romaneios (coletas search with filters from Dashboard Renov API).
+    - **Correios Embalagens:** Packaging types match official Correios documentation (Anexo 5.2) with 16 options including codes and descriptions.
+    - **CEP Coverage Validation:** Pre-submission CEP validation via ViaCEP + Correios service check to prevent requests to unsupported areas.
 - **Email Notifications:** Implemented for key events in Ticket management (creation, assignment, status change, comments), utilizing professional HTML templates with Renov's branding.
 - **User Management:** Granular permissions per module (Tickets, Projects, Tasks, OKRs, Logistics, Pricing, Integrations, Configurations), user invitation system with welcome emails.
 - **Configuration Management:** Dynamic field configuration (categories, types, locations), automatic assignment rules for tickets.

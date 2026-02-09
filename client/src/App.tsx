@@ -25,6 +25,7 @@ import SolicitacoesPage from "@/pages/logistica/solicitacoes";
 import LogisticaReversaPage from "@/pages/logistica/logistica-reversa";
 import SimularFretePage from "@/pages/logistica/simular-frete";
 import ImpressaoEtiquetasPage from "@/pages/logistica/impressao-etiquetas";
+import RomaneiosPage from "@/pages/logistica/romaneios";
 import ApisPage from "@/pages/apis/index";
 import CorreiosReversaPage from "@/pages/apis/correios-reversa";
 import ApiRsLogisticaPage from "@/pages/apis/api-rs-logistica";
@@ -156,6 +157,11 @@ function Router() {
       <Route path="/logistica/impressao-etiquetas">
         <ProtectedRoute requiredPermission="logistica">
           <ImpressaoEtiquetasPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/romaneios">
+        <ProtectedRoute requiredPermission="logistica">
+          <RomaneiosPage />
         </ProtectedRoute>
       </Route>
       <Route path="/apis">
