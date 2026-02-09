@@ -390,6 +390,37 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/users/:id/reset-password", async (req, res) => {
+    try {
+      const { isAdmin } = getSessionUser(req);
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const user = await storage.getUser(req.params.id);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+      let temporaryPassword = "";
+      for (let i = 0; i < 8; i++) {
+        temporaryPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
+      await storage.updateUser(user.id, { password: temporaryPassword });
+
+      try {
+        await sendPasswordResetEmail(user, temporaryPassword);
+      } catch (emailError) {
+        console.error(`[users] Failed to send password reset email:`, emailError);
+      }
+
+      res.json({ success: true, temporaryPassword });
+    } catch (error) {
+      console.error("[users] Password reset error:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // ============== TICKETS ==============
   app.get("/api/tickets", async (req, res) => {
     const tickets = await storage.getTickets();

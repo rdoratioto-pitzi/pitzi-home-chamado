@@ -343,6 +343,25 @@ export function UsersSettings() {
     },
   });
 
+  const resetPasswordMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("POST", `/api/users/${id}/reset-password`, {});
+    },
+    onSuccess: (data: any) => {
+      toast({ 
+        title: "Senha resetada", 
+        description: `Uma nova senha temporária foi enviada para o e-mail do usuário: ${data.temporaryPassword}` 
+      });
+    },
+    onError: () => {
+      toast({ 
+        title: "Erro", 
+        description: "Não foi possível resetar a senha do usuário.", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   const onSubmit = (data: FormData) => {
     mutation.mutate(data);
   };
@@ -468,6 +487,17 @@ export function UsersSettings() {
                             data-testid={`menu-toggle-${user.id}`}
                           >
                             {user.status === "active" ? "Desativar" : "Ativar"}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              if (confirm(`Deseja realmente resetar a senha de ${user.name}? Uma nova senha temporária será enviada por e-mail.`)) {
+                                resetPasswordMutation.mutate(user.id);
+                              }
+                            }}
+                            className="text-destructive focus:text-destructive"
+                            data-testid={`menu-reset-password-${user.id}`}
+                          >
+                            Resetar Senha
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
