@@ -305,7 +305,14 @@ export default function TarefasPage() {
 
   const priorityOrder = { high: 0, medium: 1, low: 2 };
 
-  // Filter out meetings - they are now in a separate module
+  // Filter for open tasks (todo + doing) for counters
+  const openTasksOnly = useMemo(() => {
+    return tasks.filter(task => 
+      task.type !== "meeting_note" && 
+      (task.status === "todo" || task.status === "doing")
+    );
+  }, [tasks]);
+
   const tasksOnly = useMemo(() => {
     return tasks.filter(task => task.type !== "meeting_note");
   }, [tasks]);
@@ -522,7 +529,7 @@ export default function TarefasPage() {
               <Folder className="h-4 w-4" />
               <span>Todas as Tarefas</span>
               <Badge variant="secondary" className="ml-auto text-xs">
-                {tasksOnly.length}
+                {openTasksOnly.length}
               </Badge>
             </button>
 
@@ -531,7 +538,7 @@ export default function TarefasPage() {
                 <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
               ) : (
                 areas.map((area) => {
-                  const areaTaskCount = tasksOnly.filter(t => t.areaId === area.id).length;
+                  const areaTaskCount = openTasksOnly.filter(t => t.areaId === area.id).length;
                   return (
                     <div 
                       key={area.id}
