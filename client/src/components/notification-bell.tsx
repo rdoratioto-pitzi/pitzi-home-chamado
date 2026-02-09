@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Check, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, Volume2, VolumeX, BellRing } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -8,9 +8,20 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import type { Notification } from "@shared/schema";
+import {
+  useNotificationPreferences,
+  playNotificationSound,
+  requestPushPermission,
+  sendBrowserNotification,
+} from "@/hooks/use-notification-preferences";
 
 function getCurrentUser() {
   const stored = sessionStorage.getItem("user");
@@ -31,21 +42,38 @@ function timeAgo(date: string | Date) {
   return `${diffD}d`;
 }
 
+function getModuleIcon(module: string) {
+  switch (module) {
+    case "tickets": return "🎫";
+    case "projects": return "📋";
+    case "tasks": return "✅";
+    case "okrs": return "🎯";
+    case "logistics": return "📦";
+    case "flowcharts": return "📊";
+    case "meetings": return "📅";
+    default: return "🔔";
+  }
+}
+
 export function NotificationBell() {
   const user = getCurrentUser();
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
+  const { prefs, setPrefs } = useNotificationPreferences();
+  const prevUnreadRef = useRef<number>(0);
+  const initialLoadRef = useRef(true);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const { data: notifications = [] } = useQuery<Notification[]>({
     queryKey: ["/api/notifications", user?.id],
     enabled: !!user?.id,
-    refetchInterval: 30000,
+    refetchInterval: 8000,
   });
 
   const { data: unreadData } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications", user?.id, "unread-count"],
     enabled: !!user?.id,
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
   const markRead = useMutation({
@@ -68,6 +96,57 @@ export function NotificationBell() {
 
   const unreadCount = unreadData?.count || 0;
 
+  useEffect(() => {
+    if (initialLoadRef.current) {
+      prevUnreadRef.current = unreadCount;
+      initialLoadRef.current = false;
+      return;
+    }
+
+    if (unreadCount > prevUnreadRef.current) {
+      setIsAnimating(true);
+      setTimeout(() => setIsAnimating(false), 1000);
+
+      if (prefs.soundEnabled) {
+        playNotificationSound(prefs.soundVolume);
+      }
+
+      if (prefs.pushEnabled) {
+        const latestUnread = notifications.find((n) => !n.isRead);
+        if (latestUnread) {
+          sendBrowserNotification(
+            latestUnread.title,
+            latestUnread.message,
+            latestUnread.linkUrl
+          );
+        }
+      }
+    }
+
+    prevUnreadRef.current = unreadCount;
+  }, [unreadCount, notifications, prefs.soundEnabled, prefs.pushEnabled, prefs.soundVolume]);
+
+  useEffect(() => {
+    if (prefs.pushEnabled) {
+      requestPushPermission();
+    }
+  }, [prefs.pushEnabled]);
+
+  const toggleSound = useCallback(() => {
+    setPrefs({ soundEnabled: !prefs.soundEnabled });
+  }, [prefs.soundEnabled, setPrefs]);
+
+  const togglePush = useCallback(async () => {
+    if (!prefs.pushEnabled) {
+      const granted = await requestPushPermission();
+      if (granted) {
+        setPrefs({ pushEnabled: true });
+      }
+    } else {
+      setPrefs({ pushEnabled: false });
+    }
+  }, [prefs.pushEnabled, setPrefs]);
+
   const handleNotificationClick = (notif: Notification) => {
     if (!notif.isRead) {
       markRead.mutate(notif.id);
@@ -83,10 +162,15 @@ export function NotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button size="icon" variant="ghost" className="relative" data-testid="button-notifications">
+        <Button
+          size="icon"
+          variant="ghost"
+          className={`relative ${isAnimating ? "animate-bell-ring" : ""}`}
+          data-testid="button-notifications"
+        >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground" data-testid="badge-unread-count">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -94,19 +178,53 @@ export function NotificationBell() {
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-b">
-          <h4 className="text-sm font-semibold">Notificações</h4>
-          {unreadCount > 0 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-xs h-7 px-2"
-              onClick={() => markAllRead.mutate()}
-              data-testid="button-mark-all-read"
-            >
-              <CheckCheck className="h-3 w-3 mr-1" />
-              Marcar todas como lidas
-            </Button>
-          )}
+          <h4 className="text-sm font-semibold" data-testid="text-notifications-title">Notificações</h4>
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={`h-7 w-7 ${prefs.soundEnabled ? "text-primary" : "text-muted-foreground"}`}
+                  onClick={toggleSound}
+                  data-testid="button-toggle-sound"
+                >
+                  {prefs.soundEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{prefs.soundEnabled ? "Som ativado" : "Som desativado"}</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={`h-7 w-7 ${prefs.pushEnabled ? "text-primary" : "text-muted-foreground"}`}
+                  onClick={togglePush}
+                  data-testid="button-toggle-push"
+                >
+                  <BellRing className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{prefs.pushEnabled ? "Push ativado" : "Push desativado"}</p>
+              </TooltipContent>
+            </Tooltip>
+            {unreadCount > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-xs h-7 px-2 ml-1"
+                onClick={() => markAllRead.mutate()}
+                data-testid="button-mark-all-read"
+              >
+                <CheckCheck className="h-3 w-3 mr-1" />
+                Ler todas
+              </Button>
+            )}
+          </div>
         </div>
         <ScrollArea className="max-h-80">
           {notifications.length === 0 ? (
@@ -132,7 +250,12 @@ export function NotificationBell() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{notif.title}</p>
                       <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
-                      <p className="text-[10px] text-muted-foreground/60 mt-1">{timeAgo(notif.createdAt!)}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-muted-foreground/60">{timeAgo(notif.createdAt!)}</span>
+                        {notif.module && (
+                          <span className="text-[10px] text-muted-foreground/40 capitalize">{notif.module}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </button>
