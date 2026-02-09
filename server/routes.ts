@@ -351,7 +351,7 @@ export async function registerRoutes(
               <p>Você foi cadastrado na plataforma interna de gestão da Renov.</p>
               <p>Abaixo estão suas informações de acesso:</p>
               <div style="background-color: #f9f9f9; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                <p style="margin: 0;"><strong>Link:</strong> <a href="https://home.renovsmart.com.br" style="color: #00A137;">home.renovsmart.com.br</a></p>
+                <p style="margin: 0;"><strong>Link:</strong> <a href="https://home.renovsmart.com.br/" style="color: #00A137;">home.renovsmart.com.br</a></p>
                 <p style="margin: 5px 0 0 0;"><strong>E-mail:</strong> ${user.email}</p>
                 <p style="margin: 5px 0 0 0;"><strong>Senha inicial:</strong> ${validated.password}</p>
               </div>
