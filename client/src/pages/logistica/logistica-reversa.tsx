@@ -290,89 +290,70 @@ export default function LogisticaReversaPage() {
     setBuscandoColeta(true);
     setColetaPreenchida(false);
     try {
-      const response = await fetch(`/api/integrations/adm-logistica/coletas?code=${encodeURIComponent(cod)}`);
+      const response = await fetch(`/api/integrations/adm-logistica/coleta-detalhes?code=${encodeURIComponent(cod)}`);
       if (!response.ok) throw new Error("Erro ao buscar coleta");
       const data = await response.json();
-      const items = Array.isArray(data) ? data : (data?.data || data?.results || data?.coletas || []);
-      
-      if (items.length === 0) {
+
+      if (!data.coleta) {
         toast({ title: "Coleta não encontrada", description: `Nenhum resultado para o código "${cod}".`, variant: "destructive" });
         return;
       }
 
-      const coleta = items[0];
+      const { coleta, dispositivos: devicesFromApi, totalDispositivos, dispositivosUnicos } = data;
 
       const remetenteUpdate: Record<string, string> = {};
-      if (coleta.store_name || coleta.filial || coleta.rede) {
-        remetenteUpdate.nome = coleta.store_name || coleta.filial || coleta.rede || "";
+      if (coleta.filial) {
+        remetenteUpdate.nome = coleta.filial;
       }
-      if (coleta.address || coleta.logradouro) remetenteUpdate.logradouro = coleta.address || coleta.logradouro || "";
-      if (coleta.number || coleta.numero) remetenteUpdate.numero = String(coleta.number || coleta.numero || "");
-      if (coleta.complement || coleta.complemento) remetenteUpdate.complemento = coleta.complement || coleta.complemento || "";
-      if (coleta.neighborhood || coleta.bairro) remetenteUpdate.bairro = coleta.neighborhood || coleta.bairro || "";
-      if (coleta.city || coleta.cidade) remetenteUpdate.cidade = coleta.city || coleta.cidade || "";
-      if (coleta.state || coleta.uf) remetenteUpdate.uf = coleta.state || coleta.uf || "";
-      if (coleta.zip_code || coleta.cep) remetenteUpdate.cep = String(coleta.zip_code || coleta.cep || "").replace(/\D/g, "");
-      if (coleta.ddd) remetenteUpdate.ddd = coleta.ddd || "";
-      if (coleta.phone || coleta.telefone) remetenteUpdate.telefone = coleta.phone || coleta.telefone || "";
-      if (coleta.email) remetenteUpdate.email = coleta.email || "";
 
       const currentRemetente = form.getValues("remetente");
       form.setValue("remetente", { ...currentRemetente, ...remetenteUpdate });
 
-      const dispositivos: Array<{ descricao: string; quantidade: number; valorUnitario: number; imei: string }> = [];
+      const formDevices = (devicesFromApi || []).map((d: any) => ({
+        descricao: d.descricao || "Dispositivo",
+        quantidade: 1,
+        valorUnitario: d.valor || 0,
+        imei: d.imei || "",
+      }));
 
-      if (coleta.vouchers && Array.isArray(coleta.vouchers)) {
-        coleta.vouchers.forEach((v: any) => {
-          dispositivos.push({
-            descricao: v.device_description || v.descricao || v.product_name || v.modelo || "Dispositivo",
-            quantidade: 1,
-            valorUnitario: parseFloat(v.value || v.valor || v.price || "0") || 0,
-            imei: v.imei || v.device_imei || "",
-          });
-        });
-      } else if (coleta.devices && Array.isArray(coleta.devices)) {
-        coleta.devices.forEach((d: any) => {
-          dispositivos.push({
-            descricao: d.description || d.descricao || d.device_description || d.model || "Dispositivo",
-            quantidade: 1,
-            valorUnitario: parseFloat(d.value || d.valor || d.price || "0") || 0,
-            imei: d.imei || d.device_imei || "",
-          });
-        });
-      } else if (coleta.items && Array.isArray(coleta.items)) {
-        coleta.items.forEach((it: any) => {
-          dispositivos.push({
-            descricao: it.description || it.descricao || it.device_description || "Dispositivo",
-            quantidade: parseInt(it.quantity || it.quantidade || "1") || 1,
-            valorUnitario: parseFloat(it.value || it.valor || it.price || "0") || 0,
-            imei: it.imei || it.device_imei || "",
-          });
-        });
-      }
-
-      if (dispositivos.length > 0) {
-        replace(dispositivos);
+      if (formDevices.length > 0) {
+        replace(formDevices);
 
         const observacaoAtual = form.getValues("observacao") || "";
-        const listaItens = dispositivos
-          .map((item) => `${item.descricao}${item.imei ? ` (IMEI: ${item.imei})` : ""}`)
-          .join("\n");
+        const resumo = [
+          `Coleta: ${coleta.codigo}`,
+          `Filial: ${coleta.filial}`,
+          `Operador: ${coleta.operador}`,
+          `Status: ${coleta.status}`,
+          coleta.dataSolicitacao ? `Data Solicitação: ${coleta.dataSolicitacao}` : "",
+          coleta.dataColeta ? `Data Coleta: ${coleta.dataColeta}` : "",
+          `Total dispositivos: ${totalDispositivos} (${dispositivosUnicos} únicos)`,
+          "",
+          "Dispositivos:",
+          ...formDevices.map((item: any) => `- ${item.descricao}${item.imei ? ` (IMEI: ${item.imei})` : ""} - R$ ${item.valorUnitario.toFixed(2)}`),
+        ].filter(Boolean).join("\n");
+
         const novaObservacao = observacaoAtual 
-          ? `${observacaoAtual}\n\nItens da Coleta ${cod}:\n${listaItens}`
-          : `Itens da Coleta ${cod}:\n${listaItens}`;
+          ? `${observacaoAtual}\n\n${resumo}`
+          : resumo;
         form.setValue("observacao", novaObservacao);
+      } else {
+        const observacaoAtual = form.getValues("observacao") || "";
+        const resumo = [
+          `Coleta: ${coleta.codigo}`,
+          `Filial: ${coleta.filial}`,
+          `Operador: ${coleta.operador}`,
+          `Status: ${coleta.status}`,
+          `Nº de pedidos: ${coleta.numPedidos}`,
+        ].filter(Boolean).join("\n");
+        form.setValue("observacao", observacaoAtual ? `${observacaoAtual}\n\n${resumo}` : resumo);
       }
 
       setColetaPreenchida(true);
       toast({
         title: "Coleta encontrada",
-        description: `Dados da coleta "${cod}" preenchidos automaticamente.${dispositivos.length > 0 ? ` ${dispositivos.length} dispositivo(s) adicionado(s) e itens finalizados.` : ""}`,
+        description: `Dados da coleta "${cod}" preenchidos. ${formDevices.length} dispositivo(s) adicionado(s).`,
       });
-
-      if (remetenteUpdate.cep && remetenteUpdate.cep.length === 8) {
-        consultarCep(remetenteUpdate.cep);
-      }
     } catch (error: any) {
       toast({ title: "Erro ao buscar coleta", description: error.message || "Falha na consulta.", variant: "destructive" });
     } finally {

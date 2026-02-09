@@ -2054,6 +2054,77 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/integrations/adm-logistica/coleta-detalhes", async (req, res) => {
+    try {
+      const code = req.query.code as string;
+      if (!code) {
+        return res.status(400).json({ error: "Código da coleta é obrigatório" });
+      }
+
+      const [coletaResponse, ordersResponse] = await Promise.all([
+        fetch(`${RS_API_BASE_URL}/adm_logistica/coletas?code=${encodeURIComponent(code)}`, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        }),
+        fetch(`${RS_API_BASE_URL}/orders/advanced?coleta_code=${encodeURIComponent(code)}`, {
+          method: "GET",
+          headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        }),
+      ]);
+
+      if (!coletaResponse.ok) throw new Error(`Coletas API error: ${coletaResponse.status}`);
+
+      const coletaData = await coletaResponse.json();
+      const coletaItems = Array.isArray(coletaData) ? coletaData : [];
+
+      let orders: any[] = [];
+      if (ordersResponse.ok) {
+        const ordersData = await ordersResponse.json();
+        orders = Array.isArray(ordersData) ? ordersData : [];
+      }
+
+      if (coletaItems.length === 0) {
+        return res.json({ coleta: null, dispositivos: [] });
+      }
+
+      const coleta = coletaItems[0];
+
+      const dispositivos = orders.map((order: any) => ({
+        descricao: order["Descrição do dispositivo"] || order["Categoria"] || "Dispositivo",
+        imei: order["IMEI / Serial"] || order["IMEI"] || "",
+        valor: parseFloat(order["Valor do dispositivo"] || "0") || 0,
+        filial: order["Filial"] || "",
+        rede: order["Rede"] || "",
+        uf: order["UF"] || "",
+        categoria: order["Categoria"] || "",
+      }));
+
+      const uniqueDevices = dispositivos.filter((d: any, i: number, arr: any[]) => {
+        if (!d.imei) return true;
+        return arr.findIndex((x: any) => x.imei === d.imei) === i;
+      });
+
+      res.json({
+        coleta: {
+          codigo: coleta["Código"] || coleta["Codigo"] || code,
+          filial: coleta["Filial / Centro de distribuição"] || coleta["Filial / Centro de distribuicao"] || "",
+          operador: coleta["Operador logístico"] || coleta["Operador logistico"] || "",
+          dataSolicitacao: coleta["Data de solicitação"] || coleta["Data de solicitacao"] || "",
+          dataColeta: coleta["Data de coleta"] || "",
+          status: coleta["Status"] || "",
+          codigoAwb: coleta["Código AWB"] || coleta["Codigo AWB"] || "",
+          numPedidos: coleta["Nº de pedidos"] || coleta["N de pedidos"] || 0,
+        },
+        dispositivos: uniqueDevices,
+        totalDispositivos: orders.length,
+        dispositivosUnicos: uniqueDevices.length,
+      });
+    } catch (error: any) {
+      console.error("Coleta detalhes error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar detalhes da coleta" });
+    }
+  });
+
   // Adm Logística - Recebimentos
   app.get("/api/integrations/adm-logistica/recebimentos", async (req, res) => {
     try {
