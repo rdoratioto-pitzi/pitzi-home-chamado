@@ -275,9 +275,6 @@ export function AppSidebar() {
       
       <SidebarContent className="px-3 py-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-[12px] font-bold text-muted-foreground/70 uppercase tracking-widest px-3 mb-3">
-            Módulos Principais
-          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
               {menuItems.map((item) => {
