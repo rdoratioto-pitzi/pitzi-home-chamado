@@ -312,6 +312,18 @@ export async function registerRoutes(
       if (assignee && assignee.id !== ticket.requesterId) {
         sendTicketAssignedEmail(ticket, assignee).catch(console.error);
       }
+
+      if (ticket.assigneeId && ticket.assigneeId !== ticket.requesterId) {
+        storage.createNotification({
+          userId: ticket.assigneeId,
+          fromUserId: ticket.requesterId,
+          title: "Novo chamado atribuído",
+          message: `O chamado "${ticket.title}" (${ticket.code}) foi criado e atribuído a você`,
+          module: "chamados",
+          entityId: ticket.id,
+          linkUrl: `/chamados`,
+        }).catch(console.error);
+      }
       
       res.status(201).json(ticket);
     } catch (error) {
@@ -354,6 +366,18 @@ export async function registerRoutes(
         if (requester) {
           sendTicketStatusChangedEmail(ticket, oldTicket.status, req.body.status, requester, assignee || null).catch(console.error);
         }
+        const statusLabels: Record<string, string> = { open: "Aberto", in_progress: "Em andamento", resolved: "Resolvido", closed: "Fechado", pending: "Pendente" };
+        const statusLabel = statusLabels[req.body.status] || req.body.status;
+        if (ticket.requesterId) {
+          storage.createNotification({
+            userId: ticket.requesterId,
+            title: "Status do chamado alterado",
+            message: `O chamado "${ticket.title}" (${ticket.code || ''}) mudou para "${statusLabel}"`,
+            module: "chamados",
+            entityId: ticket.id,
+            linkUrl: `/chamados`,
+          }).catch(console.error);
+        }
       }
       
       if (req.body.assigneeId && req.body.assigneeId !== oldTicket.assigneeId) {
@@ -361,6 +385,14 @@ export async function registerRoutes(
         if (assignee) {
           sendTicketAssignedEmail(ticket, assignee).catch(console.error);
         }
+        storage.createNotification({
+          userId: req.body.assigneeId,
+          title: "Chamado atribuído a você",
+          message: `O chamado "${ticket.title}" (${ticket.code || ''}) foi atribuído a você`,
+          module: "chamados",
+          entityId: ticket.id,
+          linkUrl: `/chamados`,
+        }).catch(console.error);
       }
       
       res.json(ticket);
@@ -403,6 +435,29 @@ export async function registerRoutes(
         
         if (commenter && requester) {
           sendTicketCommentEmail(ticket, comment, commenter, requester, assignee || null).catch(console.error);
+        }
+
+        if (requester && commenter && commenter.id !== requester.id) {
+          storage.createNotification({
+            userId: requester.id,
+            fromUserId: commenter.id,
+            title: "Novo comentário no chamado",
+            message: `${commenter.name} comentou no chamado "${ticket.title}"`,
+            module: "chamados",
+            entityId: ticket.id,
+            linkUrl: `/chamados`,
+          }).catch(console.error);
+        }
+        if (assignee && commenter && commenter.id !== assignee.id && assignee.id !== requester?.id) {
+          storage.createNotification({
+            userId: assignee.id,
+            fromUserId: commenter.id,
+            title: "Novo comentário no chamado",
+            message: `${commenter.name} comentou no chamado "${ticket.title}"`,
+            module: "chamados",
+            entityId: ticket.id,
+            linkUrl: `/chamados`,
+          }).catch(console.error);
         }
 
         // Process @mentions and send notifications
@@ -1199,6 +1254,19 @@ export async function registerRoutes(
           }
         }
       }
+
+      if (task.assigneeId && task.assigneeId !== task.createdBy) {
+        const creator = await storage.getUser(task.createdBy);
+        storage.createNotification({
+          userId: task.assigneeId,
+          fromUserId: task.createdBy,
+          title: "Nova tarefa atribuída",
+          message: `${creator?.name || 'Alguém'} atribuiu a tarefa "${task.title}" a você`,
+          module: "tarefas",
+          entityId: task.id,
+          linkUrl: `/tarefas`,
+        }).catch(console.error);
+      }
       
       res.status(201).json(task);
     } catch (error) {
@@ -1233,6 +1301,21 @@ export async function registerRoutes(
       const validated = partialSchema.parse(req.body);
       const task = await storage.updateTask(req.params.id, validated);
       if (!task) return res.status(404).json({ error: "Task not found" });
+      if (validated.assigneeId && task && task.assigneeId) {
+        const updatedBy = req.body.updatedBy || task.createdBy;
+        if (task.assigneeId !== updatedBy) {
+          const updater = await storage.getUser(updatedBy);
+          storage.createNotification({
+            userId: task.assigneeId,
+            fromUserId: updatedBy,
+            title: "Tarefa atribuída a você",
+            message: `${updater?.name || 'Alguém'} atribuiu a tarefa "${task.title}" a você`,
+            module: "tarefas",
+            entityId: task.id,
+            linkUrl: `/tarefas`,
+          }).catch(console.error);
+        }
+      }
       res.json(task);
     } catch (error) {
       if (error instanceof z.ZodError) {
