@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, MoreHorizontal, Eye, EyeOff } from "lucide-react";
+import { Plus, MoreHorizontal, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -125,9 +125,72 @@ export function UsersSettings() {
     return () => window.removeEventListener("storage", checkAdminStatus);
   }, []);
 
+  const [sortConfig, setSortConfig] = useState<{ key: keyof User; direction: "asc" | "desc" }>({
+    key: "status",
+    direction: "asc",
+  });
+
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
+
+  const sortedUsers = [...users].sort((a, b) => {
+    // Primary sort by sortConfig.key
+    if (sortConfig.key === "status") {
+      // Custom order for status: active first, then inactive
+      const statusOrder = { active: 0, inactive: 1 };
+      const aVal = statusOrder[a.status as keyof typeof statusOrder] ?? 2;
+      const bVal = statusOrder[b.status as keyof typeof statusOrder] ?? 2;
+      
+      if (aVal !== bVal) {
+        return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
+      }
+      
+      // Secondary sort by name when status is the same (only if not already sorting by name)
+      return a.name.localeCompare(b.name, "pt-BR");
+    }
+
+    const aVal = a[sortConfig.key];
+    const bVal = b[sortConfig.key];
+
+    if (aVal === bVal) {
+      // Secondary sort by name
+      if (sortConfig.key !== "name") {
+        return a.name.localeCompare(b.name, "pt-BR");
+      }
+      return 0;
+    }
+
+    if (aVal === null || aVal === undefined) return 1;
+    if (bVal === null || bVal === undefined) return -1;
+
+    let comparison = 0;
+    if (typeof aVal === "string" && typeof bVal === "string") {
+      comparison = aVal.localeCompare(bVal, "pt-BR");
+    } else if (aVal < bVal) {
+      comparison = -1;
+    } else if (aVal > bVal) {
+      comparison = 1;
+    }
+
+    return sortConfig.direction === "asc" ? comparison : -comparison;
+  });
+
+  const handleSort = (key: keyof User) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: keyof User }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />;
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp className="ml-2 h-4 w-4" />
+    ) : (
+      <ArrowDown className="ml-2 h-4 w-4" />
+    );
+  };
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -329,15 +392,31 @@ export function UsersSettings() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Usuário</TableHead>
-                <TableHead>Módulos</TableHead>
-                <TableHead>Método de Login</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort("name")}>
+                  <div className="flex items-center">
+                    Usuário <SortIcon column="name" />
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort("isAdmin")}>
+                  <div className="flex items-center">
+                    Acesso <SortIcon column="isAdmin" />
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort("authMethod")}>
+                  <div className="flex items-center">
+                    Método de Login <SortIcon column="authMethod" />
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort("status")}>
+                  <div className="flex items-center">
+                    Status <SortIcon column="status" />
+                  </div>
+                </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {sortedUsers.map((user) => (
                 <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
                   <TableCell>
                     <div className="flex items-center gap-3">
