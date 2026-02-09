@@ -51,6 +51,7 @@ import {
   insertKnowledgeFavoriteSchema,
   insertAiConversationSchema,
   insertAiMessageSchema,
+  insertNotificationSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -3901,6 +3902,19 @@ export async function registerRoutes(
   });
 
   // ============== NOTIFICATIONS ==============
+  app.post("/api/notifications", async (req, res) => {
+    try {
+      const validated = insertNotificationSchema.parse(req.body);
+      const notification = await storage.createNotification(validated);
+      res.status(201).json(notification);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/notifications/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
