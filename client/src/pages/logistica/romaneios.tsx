@@ -24,7 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Loader2, FileSpreadsheet, Download, ClipboardList } from "lucide-react";
 
 const coletasFilterSchema = z.object({
@@ -371,52 +370,50 @@ export default function RomaneiosPage() {
               </Badge>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {results.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground" data-testid="text-no-results">
+              <div className="text-center py-12 text-muted-foreground px-6" data-testid="text-no-results">
                 <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="text-lg font-medium">Nenhuma coleta encontrada</p>
                 <p className="text-sm">Tente ajustar os filtros da busca.</p>
               </div>
             ) : (
-              <ScrollArea className="w-full">
-                <div className="min-w-[800px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
+              <div className="overflow-x-auto" data-testid="table-scroll-container">
+                <Table className="min-w-[1200px]">
+                  <TableHeader>
+                    <TableRow>
+                      {displayColumns.map((col) => (
+                        <TableHead key={col} className="text-xs font-bold whitespace-nowrap px-4">
+                          {col.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {results.map((item, idx) => (
+                      <TableRow key={idx} data-testid={`row-coleta-${idx}`}>
                         {displayColumns.map((col) => (
-                          <TableHead key={col} className="text-xs font-bold whitespace-nowrap">
-                            {col.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())}
-                          </TableHead>
+                          <TableCell key={col} className="text-sm whitespace-nowrap px-4">
+                            {col.toLowerCase().includes("status") ? (
+                              <Badge variant="outline" className={getStatusBadgeClass(String(item[col] || ""))}>
+                                {String(item[col] || "-")}
+                              </Badge>
+                            ) : col.toLowerCase().includes("date") || col.toLowerCase().includes("data") ? (
+                              <span className="font-mono text-xs">
+                                {item[col] ? new Date(item[col]).toLocaleDateString("pt-BR") : "-"}
+                              </span>
+                            ) : typeof item[col] === "boolean" ? (
+                              item[col] ? "Sim" : "Não"
+                            ) : (
+                              String(item[col] ?? "-")
+                            )}
+                          </TableCell>
                         ))}
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {results.map((item, idx) => (
-                        <TableRow key={idx} data-testid={`row-coleta-${idx}`}>
-                          {displayColumns.map((col) => (
-                            <TableCell key={col} className="text-sm whitespace-nowrap">
-                              {col.toLowerCase().includes("status") ? (
-                                <Badge variant="outline" className={getStatusBadgeClass(String(item[col] || ""))}>
-                                  {String(item[col] || "-")}
-                                </Badge>
-                              ) : col.toLowerCase().includes("date") || col.toLowerCase().includes("data") ? (
-                                <span className="font-mono text-xs">
-                                  {item[col] ? new Date(item[col]).toLocaleDateString("pt-BR") : "-"}
-                                </span>
-                              ) : typeof item[col] === "boolean" ? (
-                                item[col] ? "Sim" : "Não"
-                              ) : (
-                                String(item[col] ?? "-")
-                              )}
-                            </TableCell>
-                          ))}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </ScrollArea>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </CardContent>
         </Card>

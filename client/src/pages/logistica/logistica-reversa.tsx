@@ -35,7 +35,8 @@ import {
   Timer,
   Ban,
   Download,
-  Upload
+  Upload,
+  FileSpreadsheet
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -161,7 +162,7 @@ export default function LogisticaReversaPage() {
     defaultValues: defaultFormValues,
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "itens",
   });
@@ -279,6 +280,106 @@ export default function LogisticaReversaPage() {
   const [cepCoberturaStatus, setCepCoberturaStatus] = useState<{ coberto: boolean; mensagem?: string; erro?: string; cidade?: string; uf?: string } | null>(null);
   const [verificandoCep, setVerificandoCep] = useState(false);
 
+  const [codigoColeta, setCodigoColeta] = useState("");
+  const [buscandoColeta, setBuscandoColeta] = useState(false);
+  const [coletaPreenchida, setColetaPreenchida] = useState(false);
+
+  const handleBuscarColeta = async (codigo: string) => {
+    const cod = codigo.trim();
+    if (!cod) return;
+    setBuscandoColeta(true);
+    setColetaPreenchida(false);
+    try {
+      const response = await fetch(`/api/integrations/adm-logistica/coletas?code=${encodeURIComponent(cod)}`);
+      if (!response.ok) throw new Error("Erro ao buscar coleta");
+      const data = await response.json();
+      const items = Array.isArray(data) ? data : (data?.data || data?.results || data?.coletas || []);
+      
+      if (items.length === 0) {
+        toast({ title: "Coleta não encontrada", description: `Nenhum resultado para o código "${cod}".`, variant: "destructive" });
+        return;
+      }
+
+      const coleta = items[0];
+
+      const remetenteUpdate: Record<string, string> = {};
+      if (coleta.store_name || coleta.filial || coleta.rede) {
+        remetenteUpdate.nome = coleta.store_name || coleta.filial || coleta.rede || "";
+      }
+      if (coleta.address || coleta.logradouro) remetenteUpdate.logradouro = coleta.address || coleta.logradouro || "";
+      if (coleta.number || coleta.numero) remetenteUpdate.numero = String(coleta.number || coleta.numero || "");
+      if (coleta.complement || coleta.complemento) remetenteUpdate.complemento = coleta.complement || coleta.complemento || "";
+      if (coleta.neighborhood || coleta.bairro) remetenteUpdate.bairro = coleta.neighborhood || coleta.bairro || "";
+      if (coleta.city || coleta.cidade) remetenteUpdate.cidade = coleta.city || coleta.cidade || "";
+      if (coleta.state || coleta.uf) remetenteUpdate.uf = coleta.state || coleta.uf || "";
+      if (coleta.zip_code || coleta.cep) remetenteUpdate.cep = String(coleta.zip_code || coleta.cep || "").replace(/\D/g, "");
+      if (coleta.ddd) remetenteUpdate.ddd = coleta.ddd || "";
+      if (coleta.phone || coleta.telefone) remetenteUpdate.telefone = coleta.phone || coleta.telefone || "";
+      if (coleta.email) remetenteUpdate.email = coleta.email || "";
+
+      const currentRemetente = form.getValues("remetente");
+      form.setValue("remetente", { ...currentRemetente, ...remetenteUpdate });
+
+      const dispositivos: Array<{ descricao: string; quantidade: number; valorUnitario: number; imei: string }> = [];
+
+      if (coleta.vouchers && Array.isArray(coleta.vouchers)) {
+        coleta.vouchers.forEach((v: any) => {
+          dispositivos.push({
+            descricao: v.device_description || v.descricao || v.product_name || v.modelo || "Dispositivo",
+            quantidade: 1,
+            valorUnitario: parseFloat(v.value || v.valor || v.price || "0") || 0,
+            imei: v.imei || v.device_imei || "",
+          });
+        });
+      } else if (coleta.devices && Array.isArray(coleta.devices)) {
+        coleta.devices.forEach((d: any) => {
+          dispositivos.push({
+            descricao: d.description || d.descricao || d.device_description || d.model || "Dispositivo",
+            quantidade: 1,
+            valorUnitario: parseFloat(d.value || d.valor || d.price || "0") || 0,
+            imei: d.imei || d.device_imei || "",
+          });
+        });
+      } else if (coleta.items && Array.isArray(coleta.items)) {
+        coleta.items.forEach((it: any) => {
+          dispositivos.push({
+            descricao: it.description || it.descricao || it.device_description || "Dispositivo",
+            quantidade: parseInt(it.quantity || it.quantidade || "1") || 1,
+            valorUnitario: parseFloat(it.value || it.valor || it.price || "0") || 0,
+            imei: it.imei || it.device_imei || "",
+          });
+        });
+      }
+
+      if (dispositivos.length > 0) {
+        replace(dispositivos);
+
+        const observacaoAtual = form.getValues("observacao") || "";
+        const listaItens = dispositivos
+          .map((item) => `${item.descricao}${item.imei ? ` (IMEI: ${item.imei})` : ""}`)
+          .join("\n");
+        const novaObservacao = observacaoAtual 
+          ? `${observacaoAtual}\n\nItens da Coleta ${cod}:\n${listaItens}`
+          : `Itens da Coleta ${cod}:\n${listaItens}`;
+        form.setValue("observacao", novaObservacao);
+      }
+
+      setColetaPreenchida(true);
+      toast({
+        title: "Coleta encontrada",
+        description: `Dados da coleta "${cod}" preenchidos automaticamente.${dispositivos.length > 0 ? ` ${dispositivos.length} dispositivo(s) adicionado(s) e itens finalizados.` : ""}`,
+      });
+
+      if (remetenteUpdate.cep && remetenteUpdate.cep.length === 8) {
+        consultarCep(remetenteUpdate.cep);
+      }
+    } catch (error: any) {
+      toast({ title: "Erro ao buscar coleta", description: error.message || "Falha na consulta.", variant: "destructive" });
+    } finally {
+      setBuscandoColeta(false);
+    }
+  };
+
   const consultarCep = async (cep: string) => {
     const cepLimpo = cep.replace(/\D/g, "");
     if (cepLimpo.length !== 8) return;
@@ -372,11 +473,12 @@ export default function LogisticaReversaPage() {
     }
   };
 
-  const handleDownloadTemplate = () => {
-    const header = "nome,email,cep,logradouro,numero,complemento,bairro,cidade,uf,ddd,telefone,descricao_item,quantidade,valor_unitario,imei";
-    const example = "João Silva,joao@email.com,01001000,Praça da Sé,100,,Sé,São Paulo,SP,11,999999999,Samsung Galaxy A03,1,500.00,350916874861670";
-    const csvContent = header + "\n" + example;
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const templateHeader = ["nome", "email", "cep", "logradouro", "numero", "complemento", "bairro", "cidade", "uf", "ddd", "telefone", "descricao_item", "quantidade", "valor_unitario", "imei"];
+  const templateExample = ["João Silva", "joao@email.com", "01001000", "Praça da Sé", "100", "", "Sé", "São Paulo", "SP", "11", "999999999", "Samsung Galaxy A03", "1", "500.00", "350916874861670"];
+
+  const handleDownloadTemplateCSV = () => {
+    const csvContent = templateHeader.join(",") + "\n" + templateExample.join(",");
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -385,9 +487,52 @@ export default function LogisticaReversaPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleBulkFileChange = (file: File | null) => {
+  const handleDownloadTemplateExcel = async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const wsData = [templateHeader, templateExample];
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+      const colWidths = templateHeader.map((h, i) => ({
+        wch: Math.max(h.length, (templateExample[i] || "").length) + 2,
+      }));
+      ws["!cols"] = colWidths;
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Template");
+      XLSX.writeFile(wb, "template_coleta_massa.xlsx");
+    } catch {
+      toast({ title: "Erro ao gerar Excel", description: "Tente o formato CSV.", variant: "destructive" });
+    }
+  };
+
+  const handleBulkFileChange = async (file: File | null) => {
     if (!file) return;
     setBulkFile(file);
+
+    if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      try {
+        const XLSX = await import("xlsx");
+        const arrayBuffer = await file.arrayBuffer();
+        const wb = XLSX.read(arrayBuffer, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(ws, { defval: "" });
+        if (jsonData.length === 0) {
+          toast({ title: "Arquivo vazio ou sem dados", variant: "destructive" });
+          return;
+        }
+        const rows = jsonData.map((row) => {
+          const cleanRow: Record<string, string> = {};
+          Object.entries(row).forEach(([key, val]) => {
+            cleanRow[key.trim()] = String(val ?? "").trim();
+          });
+          return cleanRow;
+        });
+        setBulkData(rows);
+      } catch {
+        toast({ title: "Erro ao ler arquivo Excel", variant: "destructive" });
+      }
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
@@ -585,6 +730,41 @@ export default function LogisticaReversaPage() {
               <CardContent>
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(handleSolicitar)} className="space-y-6">
+                    <div className="border rounded-lg p-4 space-y-3 bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Search className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        <h3 className="font-medium text-blue-800 dark:text-blue-200">Importar dados de Coleta</h3>
+                      </div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mb-2">
+                        Informe o código da coleta para preencher automaticamente os dados do remetente e dispositivos.
+                      </p>
+                      <div className="flex gap-2 max-w-md">
+                        <Input
+                          placeholder="Código da coleta (ex: 0F49C891)"
+                          value={codigoColeta}
+                          onChange={(e) => { setCodigoColeta(e.target.value); setColetaPreenchida(false); }}
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleBuscarColeta(codigoColeta); } }}
+                          data-testid="input-codigo-coleta"
+                        />
+                        <Button
+                          type="button"
+                          variant="default"
+                          onClick={() => handleBuscarColeta(codigoColeta)}
+                          disabled={buscandoColeta || !codigoColeta.trim()}
+                          data-testid="button-buscar-coleta"
+                        >
+                          {buscandoColeta ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+                          Buscar
+                        </Button>
+                      </div>
+                      {coletaPreenchida && (
+                        <p className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1" data-testid="text-coleta-preenchida">
+                          <CheckCircle className="h-3 w-3" />
+                          Dados importados com sucesso. Verifique os campos preenchidos abaixo.
+                        </p>
+                      )}
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
@@ -1119,14 +1299,22 @@ export default function LogisticaReversaPage() {
                   <Truck className="h-5 w-5" />
                   Coleta em Massa
                 </CardTitle>
-                <CardDescription>Importe um arquivo CSV para criar múltiplas solicitações de coleta de uma vez.</CardDescription>
+                <CardDescription>Importe um arquivo CSV ou Excel para criar múltiplas solicitações de coleta de uma vez.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="flex gap-4">
-                  <Button variant="outline" onClick={handleDownloadTemplate} data-testid="button-download-template">
-                    <Download className="h-4 w-4 mr-2" />
-                    Baixar Template CSV
-                  </Button>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Baixar Template de Importação</p>
+                  <p className="text-xs text-muted-foreground mb-2">Escolha o formato do template para preencher com os dados da coleta em massa.</p>
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={handleDownloadTemplateCSV} data-testid="button-download-template-csv">
+                      <Download className="h-4 w-4 mr-2" />
+                      Template CSV
+                    </Button>
+                    <Button variant="outline" onClick={handleDownloadTemplateExcel} data-testid="button-download-template-excel">
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Template Excel
+                    </Button>
+                  </div>
                 </div>
 
                 <div
@@ -1136,21 +1324,21 @@ export default function LogisticaReversaPage() {
                     e.preventDefault();
                     e.stopPropagation();
                     const file = e.dataTransfer.files?.[0];
-                    if (file && file.name.endsWith(".csv")) {
+                    if (file && (file.name.endsWith(".csv") || file.name.endsWith(".xlsx") || file.name.endsWith(".xls"))) {
                       handleBulkFileChange(file);
                     } else {
-                      toast({ title: "Formato inválido", description: "Por favor, envie um arquivo CSV.", variant: "destructive" });
+                      toast({ title: "Formato inválido", description: "Por favor, envie um arquivo CSV ou Excel (.xlsx).", variant: "destructive" });
                     }
                   }}
                   data-testid="dropzone-bulk"
                 >
                   <Upload className="h-12 w-12 mx-auto text-muted-foreground opacity-30 mb-4" />
-                  <p className="text-muted-foreground mb-2">Arraste e solte seu arquivo CSV aqui</p>
+                  <p className="text-muted-foreground mb-2">Arraste e solte seu arquivo CSV ou Excel aqui</p>
                   <p className="text-xs text-muted-foreground mb-4">ou</p>
                   <label>
                     <input
                       type="file"
-                      accept=".csv"
+                      accept=".csv,.xlsx,.xls"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0] || null;
