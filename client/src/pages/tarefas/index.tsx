@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { getCurrentUser } from "@/lib/permissions";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -91,12 +92,15 @@ export default function TarefasPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list" | "kanban">("list");
 
+  const currentUser = getCurrentUser();
+  const currentUserId = currentUser?.id || "";
+
   const [newArea, setNewArea] = useState({
     name: "",
     description: "",
     visibility: "private" as "private" | "shared",
     color: "#00A137",
-    ownerId: "admin",
+    ownerId: currentUserId,
     memberIds: [] as string[],
     scope: "tasks" as string,
   });
@@ -172,7 +176,7 @@ export default function TarefasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "tasks"] });
       setShowAreaDialog(false);
-      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin", memberIds: [], scope: "tasks" });
+      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "tasks" });
       setMemberSearchInput("");
       toast({ title: "Área criada com sucesso!" });
     },
@@ -245,7 +249,7 @@ export default function TarefasPage() {
         status: "todo",
         priority: "medium",
         areaId: "",
-        createdBy: "admin",
+        createdBy: currentUserId,
         assigneeId: "",
         assigneeIds: [],
         dueDate: "",
@@ -385,6 +389,7 @@ export default function TarefasPage() {
             color: area.color || "#00A137",
             ownerId: area.ownerId,
             memberIds: members.map((m: any) => m.userId),
+            scope: "tasks",
           });
         }
       } catch (error) {
@@ -396,11 +401,12 @@ export default function TarefasPage() {
           color: area.color || "#00A137",
           ownerId: area.ownerId,
           memberIds: [],
+          scope: "tasks",
         });
       }
     } else {
       setEditingArea(null);
-      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin", memberIds: [] });
+      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "tasks" });
     }
     setMemberSearchInput("");
     setShowAreaDialog(true);
@@ -422,7 +428,7 @@ export default function TarefasPage() {
       status: "todo",
       priority: "medium",
       areaId: selectedAreaId || (areas[0]?.id || ""),
-      createdBy: "admin",
+      createdBy: currentUserId,
       assigneeId: "",
       assigneeIds: [],
       dueDate: "",

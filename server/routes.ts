@@ -1336,28 +1336,27 @@ export async function registerRoutes(
   app.get("/api/task-areas", async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
     const scope = (req.query.scope as string) || undefined;
-    const areas = await storage.getTaskAreas(isAdmin ? "__all__" : userId);
+    const areas = await storage.getTaskAreas(userId);
     const filtered = scope ? areas.filter(a => a.scope === scope) : areas;
     res.json(filtered);
   });
 
   app.get("/api/task-areas/:id", async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
+    const { userId } = getSessionUser(req);
     const area = await storage.getTaskArea(req.params.id);
     if (!area) return res.status(404).json({ error: "Area not found" });
-    if (!isAdmin) {
-      const accessibleIds = await getUserAccessibleAreaIds(userId);
-      if (!accessibleIds.includes(area.id)) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+    const accessibleIds = await getUserAccessibleAreaIds(userId);
+    if (!accessibleIds.includes(area.id)) {
+      return res.status(403).json({ error: "Access denied" });
     }
     res.json(area);
   });
 
   app.post("/api/task-areas", async (req, res) => {
     try {
+      const { userId } = getSessionUser(req);
       const { memberIds, ...areaData } = req.body;
-      const validated = insertTaskAreaSchema.parse(areaData);
+      const validated = insertTaskAreaSchema.parse({ ...areaData, ownerId: userId });
       const area = await storage.createTaskArea(validated);
       
       // Process shared area members and send invites

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { getCurrentUser } from "@/lib/permissions";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -61,12 +62,15 @@ export default function ReunioesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
+  const currentUser = getCurrentUser();
+  const currentUserId = currentUser?.id || "";
+
   const [newArea, setNewArea] = useState({
     name: "",
     description: "",
     visibility: "private" as "private" | "shared",
     color: "#00A137",
-    ownerId: "admin",
+    ownerId: currentUserId,
     memberIds: [] as string[],
     scope: "meetings" as string,
   });
@@ -79,7 +83,7 @@ export default function ReunioesPage() {
     status: "todo",
     priority: "medium",
     areaId: "",
-    createdBy: "admin",
+    createdBy: currentUserId,
     assigneeId: "",
     assigneeIds: [] as string[],
     dueDate: "",
@@ -148,7 +152,7 @@ export default function ReunioesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "meetings"] });
       setShowAreaDialog(false);
-      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin", memberIds: [], scope: "meetings" });
+      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "meetings" });
       setMemberSearchInput("");
       toast({ title: "Área criada com sucesso!" });
     },
@@ -296,7 +300,7 @@ export default function ReunioesPage() {
       status: "todo",
       priority: "medium",
       areaId: "",
-      createdBy: "admin",
+      createdBy: currentUserId,
       assigneeId: "",
       assigneeIds: [],
       dueDate: "",
@@ -333,6 +337,7 @@ export default function ReunioesPage() {
             color: area.color || "#00A137",
             ownerId: area.ownerId,
             memberIds: members.map((m: any) => m.userId),
+            scope: "meetings",
           });
         }
       } catch (error) {
@@ -344,11 +349,12 @@ export default function ReunioesPage() {
           color: area.color || "#00A137",
           ownerId: area.ownerId,
           memberIds: [],
+          scope: "meetings",
         });
       }
     } else {
       setEditingArea(null);
-      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: "admin", memberIds: [] });
+      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "meetings" });
     }
     setMemberSearchInput("");
     setShowAreaDialog(true);

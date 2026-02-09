@@ -655,13 +655,12 @@ export class DatabaseStorage implements IStorage {
   }
   async getTaskAreas(userId: string): Promise<TaskArea[]> {
     const allAreas = await db.select().from(taskAreas);
-    if (userId === "__all__") {
-      return allAreas;
-    }
     const memberRecords = await db.select().from(taskAreaMembers).where(eq(taskAreaMembers.userId, userId));
     const memberAreaIds = new Set(memberRecords.map(m => m.areaId));
     return allAreas.filter(area => 
-      area.ownerId === userId || memberAreaIds.has(area.id)
+      area.ownerId === userId || 
+      memberAreaIds.has(area.id) || 
+      area.visibility === "shared"
     );
   }
   async createTaskArea(insertArea: InsertTaskArea): Promise<TaskArea> {
