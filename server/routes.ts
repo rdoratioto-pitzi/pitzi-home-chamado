@@ -1555,9 +1555,32 @@ export async function registerRoutes(
       type: req.query.type as string | undefined,
     };
     const tasks = await storage.getTasks(filters);
+    
+    // Admin vê tudo
     if (isAdmin) return res.json(tasks);
+    
+    // Filtragem para usuários comuns:
+    // 1. Tarefas criadas pelo usuário
+    // 2. Tarefas atribuídas ao usuário (assigneeId ou na lista de assigneeIds)
+    // 3. Tarefas em áreas que o usuário tem acesso
     const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
-    const filtered = tasks.filter(t => !t.areaId || accessibleAreaIds.includes(t.areaId));
+    const filtered = tasks.filter(t => {
+      const isCreator = t.createdBy === userId;
+      const isAssignee = t.assigneeId === userId;
+      
+      let isMultiAssignee = false;
+      if (t.assigneeIds) {
+        try {
+          const ids = typeof t.assigneeIds === 'string' ? JSON.parse(t.assigneeIds) : t.assigneeIds;
+          if (Array.isArray(ids)) isMultiAssignee = ids.includes(userId);
+        } catch (e) {}
+      }
+
+      const hasAreaAccess = t.areaId ? accessibleAreaIds.includes(t.areaId) : false;
+
+      return isCreator || isAssignee || isMultiAssignee || hasAreaAccess;
+    });
+    
     res.json(filtered);
   });
 
