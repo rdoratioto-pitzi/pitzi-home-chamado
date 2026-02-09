@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -264,6 +264,19 @@ export default function ChamadosPage() {
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
     queryKey: ["/api/tickets"],
   });
+
+  useEffect(() => {
+    if (tickets.length === 0 || isLoading) return;
+    const params = new URLSearchParams(window.location.search);
+    const ticketId = params.get("ticket");
+    if (ticketId && !selectedTicket) {
+      const ticket = tickets.find((t) => t.id === ticketId);
+      if (ticket) {
+        setSelectedTicket(ticket);
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
+  }, [tickets, isLoading]);
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],

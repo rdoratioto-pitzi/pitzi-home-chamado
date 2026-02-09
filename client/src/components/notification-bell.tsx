@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, CheckCheck, Volume2, VolumeX, BellRing } from "lucide-react";
+import { Bell, CheckCheck, Volume2, VolumeX, BellRing, Ticket, FolderKanban, CheckSquare, Target, Package, GitBranch, Calendar, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -42,16 +42,18 @@ function timeAgo(date: string | Date) {
   return `${diffD}d`;
 }
 
-function getModuleIcon(module: string) {
+function ModuleIcon({ module }: { module: string }) {
+  const className = "h-3.5 w-3.5 text-muted-foreground";
   switch (module) {
-    case "tickets": return "🎫";
-    case "projects": return "📋";
-    case "tasks": return "✅";
-    case "okrs": return "🎯";
-    case "logistics": return "📦";
-    case "flowcharts": return "📊";
-    case "meetings": return "📅";
-    default: return "🔔";
+    case "chamados": return <Ticket className={className} />;
+    case "projetos": return <FolderKanban className={className} />;
+    case "tarefas": return <CheckSquare className={className} />;
+    case "metas": return <Target className={className} />;
+    case "logistica": return <Package className={className} />;
+    case "fluxogramas": return <GitBranch className={className} />;
+    case "reunioes": return <Calendar className={className} />;
+    case "comentarios": return <MessageSquare className={className} />;
+    default: return <Bell className={className} />;
   }
 }
 
@@ -152,7 +154,13 @@ export function NotificationBell() {
       markRead.mutate(notif.id);
     }
     if (notif.linkUrl) {
-      navigate(notif.linkUrl);
+      const [path, query] = notif.linkUrl.split("?");
+      const currentPath = window.location.pathname;
+      if (currentPath === path && query) {
+        window.location.href = notif.linkUrl;
+      } else {
+        navigate(notif.linkUrl);
+      }
     }
     setOpen(false);
   };
@@ -253,7 +261,10 @@ export function NotificationBell() {
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] text-muted-foreground/60">{timeAgo(notif.createdAt!)}</span>
                         {notif.module && (
-                          <span className="text-[10px] text-muted-foreground/40 capitalize">{notif.module}</span>
+                          <span className="flex items-center gap-1 text-[10px] text-muted-foreground/40 capitalize">
+                            <ModuleIcon module={notif.module} />
+                            {notif.module}
+                          </span>
                         )}
                       </div>
                     </div>
