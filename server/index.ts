@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase } from "./seed";
+import { setupSession, requireAuth } from "./auth";
 
 const app = express();
 const httpServer = createServer(app);
@@ -23,6 +24,9 @@ app.use(
 );
 
 app.use(express.urlencoded({ limit: "50mb", extended: false }));
+
+setupSession(app);
+app.use(requireAuth);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

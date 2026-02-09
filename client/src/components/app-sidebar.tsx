@@ -243,7 +243,10 @@ export function AppSidebar() {
   const hasApisAccess = permissions.apis === true;
   const hasConfiguracoesAccess = permissions.configuracoes === true;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch {}
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("modulePermissions");
     localStorage.removeItem("user");

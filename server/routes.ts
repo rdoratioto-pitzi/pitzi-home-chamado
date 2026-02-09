@@ -60,6 +60,42 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   
+  function getSessionUser(req: any) {
+    return { userId: req.session.userId!, isAdmin: req.session.isAdmin === true };
+  }
+
+  async function getUserAccessibleAreaIds(userId: string): Promise<string[]> {
+    const areas = await storage.getTaskAreas(userId);
+    return areas.map(a => a.id);
+  }
+
+  async function getUserAccessibleProjectIds(userId: string): Promise<string[]> {
+    const projects = await storage.getProjects();
+    const accessibleIds: string[] = [];
+    for (const project of projects) {
+      if (project.ownerId === userId) {
+        accessibleIds.push(project.id);
+        continue;
+      }
+      const cards = await storage.getKanbanCards(project.id);
+      if (cards.some(c => c.assigneeId === userId || c.reporterId === userId)) {
+        accessibleIds.push(project.id);
+      }
+    }
+    return accessibleIds;
+  }
+
+  function hasFlowchartAccess(flowchart: any, userId: string): boolean {
+    if (flowchart.ownerId === userId) return true;
+    if (flowchart.permissions) {
+      try {
+        const perms = typeof flowchart.permissions === 'string' ? JSON.parse(flowchart.permissions) : flowchart.permissions;
+        if (perms && typeof perms === 'object' && userId in perms) return true;
+      } catch {}
+    }
+    return false;
+  }
+
   // ============== AUTH ==============
   const loginSchema = z.object({
     email: z.string().email("Email inválido"),
@@ -90,6 +126,10 @@ export async function registerRoutes(
       }
       
       console.log(`[auth] Login successful for: ${user.email}, isAdmin: ${user.isAdmin}`);
+      
+      req.session.userId = user.id;
+      req.session.isAdmin = user.isAdmin === true;
+
       res.json({ 
         success: true, 
         user: {
@@ -107,6 +147,38 @@ export async function registerRoutes(
       }
       res.status(500).json({ success: false, message: "Erro interno" });
     }
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ authenticated: false });
+    }
+    const user = await storage.getUser(req.session.userId);
+    if (!user || user.status !== "active") {
+      req.session.destroy(() => {});
+      return res.status(401).json({ authenticated: false });
+    }
+    res.json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        modulePermissions: user.modulePermissions,
+        isAdmin: user.isAdmin === true,
+        status: user.status,
+      },
+    });
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Erro ao fazer logout" });
+      }
+      res.clearCookie("renov.sid");
+      res.json({ success: true });
+    });
   });
 
   // ============== FORGOT PASSWORD ==============
@@ -161,6 +233,7 @@ export async function registerRoutes(
   // ============== DASHBOARD STATS ==============
   app.get("/api/dashboard/stats", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
       const [tickets, projects, tasks, objectives, shipments, metas, pricingAlerts, knowledgeDocs] = await Promise.all([
         storage.getTickets(),
         storage.getProjects(),
@@ -172,13 +245,51 @@ export async function registerRoutes(
         storage.getKnowledgeDocuments({ status: "aprovado" }),
       ]);
 
-      const openTickets = tickets.filter(t => t.status !== "closed").length;
-      const activeProjects = projects.length;
-      const pendingTasks = tasks.filter(t => t.type !== "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
-      const scheduledMeetings = tasks.filter(t => t.type === "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
-      const activeObjectives = objectives.length;
+      if (isAdmin) {
+        const openTickets = tickets.filter(t => t.status !== "closed").length;
+        const activeProjects = projects.length;
+        const pendingTasks = tasks.filter(t => t.type !== "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
+        const scheduledMeetings = tasks.filter(t => t.type === "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
+        const activeObjectives = objectives.length;
+        const inTransitShipments = shipments.filter(s => s.status === "in_transit").length;
+        const activeMetas = metas.filter(m => m.status !== "completed").length;
+        const activeAlerts = pricingAlerts.filter(a => a.isActive).length;
+        const approvedDocs = knowledgeDocs.length;
+
+        return res.json({
+          tickets: openTickets,
+          projects: activeProjects,
+          tasks: pendingTasks,
+          meetings: scheduledMeetings,
+          objectives: activeObjectives,
+          logistica: inTransitShipments,
+          metas: activeMetas,
+          pricing: activeAlerts,
+          conhecimento: approvedDocs,
+        });
+      }
+
+      const userTickets = tickets.filter(t => t.requesterId === userId || t.assigneeId === userId);
+      const openTickets = userTickets.filter(t => t.status !== "closed").length;
+
+      const accessibleProjectIds = await getUserAccessibleProjectIds(userId);
+      const activeProjects = accessibleProjectIds.length;
+
+      const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
+      const userTasks = tasks.filter(t => !t.areaId || accessibleAreaIds.includes(t.areaId));
+      const pendingTasks = userTasks.filter(t => t.type !== "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
+      const scheduledMeetings = userTasks.filter(t => t.type === "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
+
+      const keyResults = await storage.getKeyResults();
+      const userObjectives = objectives.filter(obj => {
+        if (obj.ownerId === userId) return true;
+        return keyResults.some(kr => kr.objectiveId === obj.id && kr.responsibleId === userId);
+      });
+      const activeObjectives = userObjectives.length;
+
       const inTransitShipments = shipments.filter(s => s.status === "in_transit").length;
-      const activeMetas = metas.filter(m => m.status !== "completed").length;
+      const userMetas = metas.filter(m => m.responsibleId === userId);
+      const activeMetas = userMetas.filter(m => m.status !== "completed").length;
       const activeAlerts = pricingAlerts.filter(a => a.isActive).length;
       const approvedDocs = knowledgeDocs.length;
 
@@ -280,13 +391,20 @@ export async function registerRoutes(
 
   // ============== TICKETS ==============
   app.get("/api/tickets", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
     const tickets = await storage.getTickets();
-    res.json(tickets);
+    if (isAdmin) return res.json(tickets);
+    const filtered = tickets.filter(t => t.requesterId === userId || t.assigneeId === userId);
+    res.json(filtered);
   });
 
   app.get("/api/tickets/:id", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
     const ticket = await storage.getTicket(req.params.id);
     if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+    if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     res.json(ticket);
   });
 
@@ -337,8 +455,12 @@ export async function registerRoutes(
 
   app.patch("/api/tickets/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
       const oldTicket = await storage.getTicket(req.params.id);
       if (!oldTicket) return res.status(404).json({ error: "Ticket not found" });
+      if (!isAdmin && oldTicket.requesterId !== userId && oldTicket.assigneeId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       
       // Auto-fill timestamp fields based on status changes
       const updateData: any = { ...req.body };
@@ -404,6 +526,12 @@ export async function registerRoutes(
   });
 
   app.delete("/api/tickets/:id", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
+    const ticket = await storage.getTicket(req.params.id);
+    if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+    if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const deleted = await storage.deleteTicket(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Ticket not found" });
     res.status(204).send();
@@ -556,13 +684,24 @@ export async function registerRoutes(
 
   // ============== PROJECTS ==============
   app.get("/api/projects", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
     const projects = await storage.getProjects();
-    res.json(projects);
+    if (isAdmin) return res.json(projects);
+    const accessibleIds = await getUserAccessibleProjectIds(userId);
+    const filtered = projects.filter(p => accessibleIds.includes(p.id));
+    res.json(filtered);
   });
 
   app.get("/api/projects/:id", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
     const project = await storage.getProject(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
+    if (!isAdmin) {
+      const accessibleIds = await getUserAccessibleProjectIds(userId);
+      if (!accessibleIds.includes(project.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     res.json(project);
   });
 
@@ -581,6 +720,12 @@ export async function registerRoutes(
 
   app.patch("/api/projects/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const existing = await storage.getProject(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Project not found" });
+      if (!isAdmin && existing.ownerId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const partialSchema = insertProjectSchema.partial();
       const validated = partialSchema.parse(req.body);
       const project = await storage.updateProject(req.params.id, validated);
@@ -595,6 +740,12 @@ export async function registerRoutes(
   });
 
   app.delete("/api/projects/:id", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
+    const project = await storage.getProject(req.params.id);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+    if (!isAdmin && project.ownerId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const deleted = await storage.deleteProject(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Project not found" });
     res.status(204).send();
@@ -602,12 +753,26 @@ export async function registerRoutes(
 
   // Project Columns
   app.get("/api/projects/:id/columns", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
+    if (!isAdmin) {
+      const accessibleIds = await getUserAccessibleProjectIds(userId);
+      if (!accessibleIds.includes(req.params.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     const columns = await storage.getKanbanColumns(req.params.id);
     res.json(columns);
   });
 
   // Project Cards
   app.get("/api/projects/:id/cards", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
+    if (!isAdmin) {
+      const accessibleIds = await getUserAccessibleProjectIds(userId);
+      if (!accessibleIds.includes(req.params.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     const cards = await storage.getKanbanCards(req.params.id);
     res.json(cards);
   });
@@ -813,8 +978,15 @@ export async function registerRoutes(
   // ============== OKRs ==============
   app.get("/api/objectives", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
       const objectives = await storage.getObjectives();
-      res.json(objectives);
+      if (isAdmin) return res.json(objectives);
+      const keyResults = await storage.getKeyResults();
+      const filtered = objectives.filter(obj => {
+        if (obj.ownerId === userId) return true;
+        return keyResults.some(kr => kr.objectiveId === obj.id && kr.responsibleId === userId);
+      });
+      res.json(filtered);
     } catch (error) {
       console.error("Error fetching objectives:", error);
       res.status(500).json({ error: "Failed to fetch objectives" });
@@ -823,8 +995,14 @@ export async function registerRoutes(
 
   app.get("/api/objectives/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
       const objective = await storage.getObjective(req.params.id);
       if (!objective) return res.status(404).json({ error: "Objective not found" });
+      if (!isAdmin && objective.ownerId !== userId) {
+        const keyResults = await storage.getKeyResults();
+        const hasAccess = keyResults.some(kr => kr.objectiveId === objective.id && kr.responsibleId === userId);
+        if (!hasAccess) return res.status(403).json({ error: "Access denied" });
+      }
       res.json(objective);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch objective" });
@@ -846,6 +1024,12 @@ export async function registerRoutes(
 
   app.patch("/api/objectives/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const existing = await storage.getObjective(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Objective not found" });
+      if (!isAdmin && existing.ownerId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const partialSchema = insertObjectiveSchema.partial();
       const validated = partialSchema.parse(req.body);
       const objective = await storage.updateObjective(req.params.id, validated);
@@ -860,6 +1044,12 @@ export async function registerRoutes(
   });
 
   app.delete("/api/objectives/:id", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
+    const objective = await storage.getObjective(req.params.id);
+    if (!objective) return res.status(404).json({ error: "Objective not found" });
+    if (!isAdmin && objective.ownerId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const deleted = await storage.deleteObjective(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Objective not found" });
     res.status(204).send();
@@ -1097,14 +1287,21 @@ export async function registerRoutes(
 
   // ============== TASK AREAS ==============
   app.get("/api/task-areas", async (req, res) => {
-    const userId = req.query.userId as string || "admin";
-    const areas = await storage.getTaskAreas(userId);
+    const { userId, isAdmin } = getSessionUser(req);
+    const areas = await storage.getTaskAreas(isAdmin ? "__all__" : userId);
     res.json(areas);
   });
 
   app.get("/api/task-areas/:id", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
     const area = await storage.getTaskArea(req.params.id);
     if (!area) return res.status(404).json({ error: "Area not found" });
+    if (!isAdmin) {
+      const accessibleIds = await getUserAccessibleAreaIds(userId);
+      if (!accessibleIds.includes(area.id)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     res.json(area);
   });
 
@@ -1154,6 +1351,12 @@ export async function registerRoutes(
 
   app.put("/api/task-areas/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const existing = await storage.getTaskArea(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Area not found" });
+      if (!isAdmin && existing.ownerId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const { memberIds, ...areaData } = req.body;
       const partialSchema = insertTaskAreaSchema.partial();
       const validated = partialSchema.parse(areaData);
@@ -1210,6 +1413,12 @@ export async function registerRoutes(
   });
 
   app.delete("/api/task-areas/:id", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
+    const area = await storage.getTaskArea(req.params.id);
+    if (!area) return res.status(404).json({ error: "Area not found" });
+    if (!isAdmin && area.ownerId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const deleted = await storage.deleteTaskArea(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Area not found" });
     res.status(204).send();
@@ -1258,6 +1467,7 @@ export async function registerRoutes(
 
   // ============== TASKS ==============
   app.get("/api/tasks", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
     const filters = {
       areaId: req.query.area_id as string | undefined,
       status: req.query.status as string | undefined,
@@ -1266,12 +1476,22 @@ export async function registerRoutes(
       type: req.query.type as string | undefined,
     };
     const tasks = await storage.getTasks(filters);
-    res.json(tasks);
+    if (isAdmin) return res.json(tasks);
+    const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
+    const filtered = tasks.filter(t => !t.areaId || accessibleAreaIds.includes(t.areaId));
+    res.json(filtered);
   });
 
   app.get("/api/tasks/:id", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
     const task = await storage.getTask(req.params.id);
     if (!task) return res.status(404).json({ error: "Task not found" });
+    if (!isAdmin && task.areaId) {
+      const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
+      if (!accessibleAreaIds.includes(task.areaId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     res.json(task);
   });
 
@@ -1375,6 +1595,15 @@ export async function registerRoutes(
 
   app.put("/api/tasks/:id", async (req, res) => {
     try {
+      const { userId: sessionUserId, isAdmin } = getSessionUser(req);
+      const existingTask = await storage.getTask(req.params.id);
+      if (!existingTask) return res.status(404).json({ error: "Task not found" });
+      if (!isAdmin && existingTask.areaId) {
+        const accessibleAreaIds = await getUserAccessibleAreaIds(sessionUserId);
+        if (!accessibleAreaIds.includes(existingTask.areaId)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
       const partialSchema = insertTaskSchema.partial();
       const validated = partialSchema.parse(req.body);
       const task = await storage.updateTask(req.params.id, validated);
@@ -1404,6 +1633,15 @@ export async function registerRoutes(
   });
 
   app.delete("/api/tasks/:id", async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
+    const task = await storage.getTask(req.params.id);
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (!isAdmin && task.areaId) {
+      const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
+      if (!accessibleAreaIds.includes(task.areaId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     const deleted = await storage.deleteTask(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Task not found" });
     res.status(204).send();
@@ -3059,12 +3297,15 @@ export async function registerRoutes(
   // Metas
   app.get("/api/metas", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
       const filters: any = {};
       if (req.query.month) filters.month = req.query.month as string;
       if (req.query.areaId) filters.areaId = req.query.areaId as string;
       if (req.query.responsibleId) filters.responsibleId = req.query.responsibleId as string;
       const metas = await storage.getMetas(filters);
-      res.json(metas);
+      if (isAdmin) return res.json(metas);
+      const filtered = metas.filter(m => m.responsibleId === userId);
+      res.json(filtered);
     } catch (error: any) {
       console.error("Get metas error:", error);
       res.status(500).json({ error: error.message });
@@ -3073,9 +3314,13 @@ export async function registerRoutes(
 
   app.get("/api/metas/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
       const meta = await storage.getMeta(req.params.id);
       if (!meta) {
         return res.status(404).json({ error: "Meta not found" });
+      }
+      if (!isAdmin && meta.responsibleId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
       }
       res.json(meta);
     } catch (error: any) {
@@ -3097,6 +3342,12 @@ export async function registerRoutes(
 
   app.patch("/api/metas/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const existing = await storage.getMeta(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Meta not found" });
+      if (!isAdmin && existing.responsibleId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const updated = await storage.updateMeta(req.params.id, req.body);
       if (!updated) {
         return res.status(404).json({ error: "Meta not found" });
@@ -3110,6 +3361,12 @@ export async function registerRoutes(
 
   app.delete("/api/metas/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const existing = await storage.getMeta(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Meta not found" });
+      if (!isAdmin && existing.responsibleId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const success = await storage.deleteMeta(req.params.id);
       if (!success) {
         return res.status(404).json({ error: "Meta not found" });
@@ -3567,6 +3824,10 @@ export async function registerRoutes(
   // Get all conversations for a user
   app.get("/api/ai/conversations/:userId", async (req, res) => {
     try {
+      const { userId: sessionUserId, isAdmin } = getSessionUser(req);
+      if (!isAdmin && sessionUserId !== req.params.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const conversations = await storage.getAiConversations(req.params.userId);
       res.json(conversations);
     } catch (error: any) {
@@ -3618,8 +3879,10 @@ export async function registerRoutes(
   // ============== AI SPACES ==============
   app.get("/api/ai/spaces", async (req, res) => {
     try {
-      const userId = (req.query.userId as string) || "default-user";
-      const spaces = await storage.getAiSpaces(userId);
+      const { userId, isAdmin } = getSessionUser(req);
+      const queryUserId = req.query.userId as string | undefined;
+      const targetUserId = isAdmin && queryUserId ? queryUserId : userId;
+      const spaces = await storage.getAiSpaces(targetUserId);
       res.json(spaces);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -3829,9 +4092,11 @@ export async function registerRoutes(
   // ============== FLUXOGRAMAS (Flowcharts) ==============
   app.get("/api/flowcharts", async (req, res) => {
     try {
-      const { ownerId } = req.query;
-      const list = await storage.getFlowcharts(ownerId as string | undefined);
-      res.json(list);
+      const { userId, isAdmin } = getSessionUser(req);
+      const list = await storage.getFlowcharts(undefined);
+      if (isAdmin) return res.json(list);
+      const filtered = list.filter(fc => hasFlowchartAccess(fc, userId));
+      res.json(filtered);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -3848,9 +4113,13 @@ export async function registerRoutes(
 
   app.get("/api/flowcharts/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
       const { id } = req.params;
       const fc = await storage.getFlowchart(id);
       if (!fc) return res.status(404).json({ error: "Fluxograma não encontrado" });
+      if (!isAdmin && !hasFlowchartAccess(fc, userId)) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       res.json(fc);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -3869,7 +4138,13 @@ export async function registerRoutes(
 
   app.patch("/api/flowcharts/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
       const { id } = req.params;
+      const existing = await storage.getFlowchart(id);
+      if (!existing) return res.status(404).json({ error: "Fluxograma não encontrado" });
+      if (!isAdmin && existing.ownerId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const data = req.body;
       const fc = await storage.updateFlowchart(id, data);
       if (!fc) return res.status(404).json({ error: "Fluxograma não encontrado" });
@@ -3881,7 +4156,13 @@ export async function registerRoutes(
 
   app.delete("/api/flowcharts/:id", async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
       const { id } = req.params;
+      const existing = await storage.getFlowchart(id);
+      if (!existing) return res.status(404).json({ error: "Fluxograma não encontrado" });
+      if (!isAdmin && existing.ownerId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const deleted = await storage.deleteFlowchart(id);
       if (!deleted) return res.status(404).json({ error: "Fluxograma não encontrado" });
       res.json({ success: true });
@@ -3994,7 +4275,11 @@ export async function registerRoutes(
 
   app.get("/api/notifications/:userId", async (req, res) => {
     try {
+      const { userId: sessionUserId, isAdmin } = getSessionUser(req);
       const { userId } = req.params;
+      if (!isAdmin && sessionUserId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const notifs = await storage.getNotifications(userId);
       res.json(notifs);
     } catch (error: any) {
@@ -4004,7 +4289,11 @@ export async function registerRoutes(
 
   app.get("/api/notifications/:userId/unread-count", async (req, res) => {
     try {
+      const { userId: sessionUserId, isAdmin } = getSessionUser(req);
       const { userId } = req.params;
+      if (!isAdmin && sessionUserId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       const count = await storage.getUnreadNotificationCount(userId);
       res.json({ count });
     } catch (error: any) {
@@ -4025,7 +4314,11 @@ export async function registerRoutes(
 
   app.patch("/api/notifications/:userId/read-all", async (req, res) => {
     try {
+      const { userId: sessionUserId, isAdmin } = getSessionUser(req);
       const { userId } = req.params;
+      if (!isAdmin && sessionUserId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
       await storage.markAllNotificationsRead(userId);
       res.json({ success: true });
     } catch (error: any) {
