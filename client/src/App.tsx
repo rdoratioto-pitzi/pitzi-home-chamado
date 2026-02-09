@@ -5,8 +5,9 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/hooks/use-theme";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar, UserProfileMenu } from "@/components/app-sidebar";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { ProtectedRoute } from "@/components/protected-route";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
@@ -303,11 +304,22 @@ function App() {
       <ThemeProvider>
         <TooltipProvider>
           <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-            <div className="flex h-screen w-full">
+            <div className="flex h-screen w-full overflow-hidden bg-background">
               <AppSidebar />
-              <main className="flex-1 overflow-auto">
-                <Router />
-              </main>
+              <div className="flex flex-col flex-1 overflow-hidden">
+                <header className="h-14 border-b flex items-center justify-between px-4 bg-card shrink-0">
+                  <div className="flex items-center gap-2">
+                    <SidebarTrigger data-testid="button-sidebar-toggle" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <ThemeToggle />
+                    <UserProfileMenu />
+                  </div>
+                </header>
+                <main className="flex-1 overflow-auto relative">
+                  <Router />
+                </main>
+              </div>
             </div>
           </SidebarProvider>
           <Toaster />
