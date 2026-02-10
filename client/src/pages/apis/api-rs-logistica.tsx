@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,32 +15,25 @@ import {
   Package, 
   Truck, 
   Search, 
-  Clock,
   Loader2,
   XCircle,
   CheckCircle,
-  Send,
   RefreshCw,
-  AlertCircle,
   Info,
-  Link as LinkIcon,
   Key,
   FileText,
-  BarChart3,
-  Calendar,
   ExternalLink,
   Copy,
   Play,
-  Settings2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 const API_BASE_URL = "https://dash.renovsmart.com.br/api";
-const POSTMAN_DOC_URL = "https://documenter.getpostman.com/view/49982216/2sBXc7Mk6f";
+const POSTMAN_DOC_URL = "https://documenter.getpostman.com/view/49982216/2sBXcAJNtU";
 
 interface ConnectionStatus {
   connected: boolean;
@@ -48,29 +41,17 @@ interface ConnectionStatus {
   timestamp?: string;
 }
 
-const buscaPedidosSchema = z.object({
+const meusDispositivosSchema = z.object({
   imei: z.string().optional(),
+  filiais: z.string().optional(),
   voucher_code: z.string().optional(),
-  voucher_status: z.string().optional(),
-  customer_cpf: z.string().optional(),
-  created_start: z.string().optional(),
-  created_end: z.string().optional(),
-  used_start: z.string().optional(),
-  used_end: z.string().optional(),
-  network: z.string().optional(),
-  store_type: z.string().optional(),
-  boost: z.string().optional(),
-  global_status: z.string().optional(),
+  status: z.string().optional(),
 });
 
-const relatorioColetasSchema = z.object({
-  start_date: z.string().optional(),
-  end_date: z.string().optional(),
-});
-
-const relatorioGeralSchema = z.object({
-  start_date: z.string().optional(),
-  end_date: z.string().optional(),
+const meusFechamentosSchema = z.object({
+  code: z.string().optional(),
+  rede: z.string().optional(),
+  status: z.string().optional(),
 });
 
 export default function ApiRsLogisticaPage() {
@@ -81,37 +62,22 @@ export default function ApiRsLogisticaPage() {
   const [apiResponse, setApiResponse] = useState<any>(null);
   const [activeEndpoint, setActiveEndpoint] = useState<string | null>(null);
 
-  const buscaPedidosForm = useForm({
-    resolver: zodResolver(buscaPedidosSchema),
+  const meusDispositivosForm = useForm({
+    resolver: zodResolver(meusDispositivosSchema),
     defaultValues: {
       imei: "",
+      filiais: "",
       voucher_code: "",
-      voucher_status: "",
-      customer_cpf: "",
-      created_start: "",
-      created_end: "",
-      used_start: "",
-      used_end: "",
-      network: "",
-      store_type: "",
-      boost: "",
-      global_status: "",
+      status: "",
     },
   });
 
-  const relatorioColetasForm = useForm({
-    resolver: zodResolver(relatorioColetasSchema),
+  const meusFechamentosForm = useForm({
+    resolver: zodResolver(meusFechamentosSchema),
     defaultValues: {
-      start_date: "",
-      end_date: "",
-    },
-  });
-
-  const relatorioGeralForm = useForm({
-    resolver: zodResolver(relatorioGeralSchema),
-    defaultValues: {
-      start_date: "",
-      end_date: "",
+      code: "",
+      rede: "",
+      status: "",
     },
   });
 
@@ -150,14 +116,13 @@ export default function ApiRsLogisticaPage() {
     }
   };
 
-  const buscaPedidosMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof buscaPedidosSchema>) => {
+  const meusDispositivosMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof meusDispositivosSchema>) => {
       const params = new URLSearchParams();
       Object.entries(data).forEach(([key, value]) => {
         if (value) params.append(key, value);
       });
-      
-      const response = await fetch(`/api/integrations/rs-logistica/orders/advanced?${params.toString()}`);
+      const response = await fetch(`/api/integrations/rs-logistica/meus-dispositivos?${params.toString()}`);
       if (!response.ok) throw new Error("Falha na requisição");
       return response.json();
     },
@@ -166,57 +131,26 @@ export default function ApiRsLogisticaPage() {
       toast({ title: "Consulta realizada com sucesso!" });
     },
     onError: (error: any) => {
-      toast({
-        title: "Erro na consulta",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Erro na consulta", description: error.message, variant: "destructive" });
     },
   });
 
-  const relatorioColetasMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof relatorioColetasSchema>) => {
+  const meusFechamentosMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof meusFechamentosSchema>) => {
       const params = new URLSearchParams();
-      if (data.start_date) params.append("start_date", data.start_date);
-      if (data.end_date) params.append("end_date", data.end_date);
-      
-      const response = await fetch(`/api/integrations/rs-logistica/logistica/coletas?${params.toString()}`);
+      Object.entries(data).forEach(([key, value]) => {
+        if (value) params.append(key, value);
+      });
+      const response = await fetch(`/api/integrations/rs-logistica/meus-fechamentos?${params.toString()}`);
       if (!response.ok) throw new Error("Falha na requisição");
       return response.json();
     },
     onSuccess: (data) => {
       setApiResponse(data);
-      toast({ title: "Relatório gerado com sucesso!" });
+      toast({ title: "Consulta realizada com sucesso!" });
     },
     onError: (error: any) => {
-      toast({
-        title: "Erro ao gerar relatório",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const relatorioGeralMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof relatorioGeralSchema>) => {
-      const params = new URLSearchParams();
-      if (data.start_date) params.append("start_date", data.start_date);
-      if (data.end_date) params.append("end_date", data.end_date);
-      
-      const response = await fetch(`/api/integrations/rs-logistica/logistica/geral?${params.toString()}`);
-      if (!response.ok) throw new Error("Falha na requisição");
-      return response.json();
-    },
-    onSuccess: (data) => {
-      setApiResponse(data);
-      toast({ title: "Relatório gerado com sucesso!" });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Erro ao gerar relatório",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Erro na consulta", description: error.message, variant: "destructive" });
     },
   });
 
@@ -227,36 +161,32 @@ export default function ApiRsLogisticaPage() {
 
   const endpoints = [
     {
-      id: "busca-pedidos",
-      name: "Busca Avançada de Pedidos",
+      id: "meus-dispositivos",
+      name: "Meus Dispositivos",
       method: "GET",
-      path: "/api/orders/advanced",
-      description: "Retorna uma lista de pedidos com base em múltiplos filtros opcionais. Retorna no máximo 1000 registros.",
-      category: "Orders",
+      path: "/api/logistica/meus_dispositivos",
+      description: "Retorna dados de dispositivos com filtros por IMEI, filial, código voucher e status logístico.",
+      category: "Dispositivos",
+      tab: "meus-dispositivos",
     },
     {
-      id: "relatorio-coletas",
-      name: "Relatório de Coletas",
+      id: "meus-fechamentos",
+      name: "Meus Fechamentos",
       method: "GET",
-      path: "/api/logistica/coletas",
-      description: "Retorna dados de coletas logísticas, incluindo status, dias, IMEIs e Vouchers agrupados por romaneio.",
-      category: "Logística",
-    },
-    {
-      id: "relatorio-geral",
-      name: "Relatório Geral Logística",
-      method: "GET",
-      path: "/api/logistica/geral",
-      description: "Retorna visão geral de logística.",
-      category: "Logística",
+      path: "/api/logistica/meus-fechamentos",
+      description: "Retorna dados de fechamentos com filtros por código, rede e status.",
+      category: "Fechamentos",
+      tab: "meus-fechamentos",
     },
   ];
+
+  const tabTriggerClass = "bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none h-12 px-1 text-[13px] font-bold gap-2";
 
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader 
         title="API RS - Logística" 
-        description="Integração com a API do Dashboard Renov para Orders e Logística."
+        description="Coleção de endpoints para serviços de logística Renov"
         breadcrumbs={[
           { label: "Integrações", href: "/apis" },
           { label: "API RS - Logística" }
@@ -270,8 +200,8 @@ export default function ApiRsLogisticaPage() {
               <Truck className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Renov API - Dashboard RS</h2>
-              <p className="text-sm text-muted-foreground">Documentação oficial das APIs de Orders e Logística</p>
+              <h2 className="text-lg font-bold">Renov API - Logística</h2>
+              <p className="text-sm text-muted-foreground">Coleção de endpoints para serviços de logística Renov</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -317,7 +247,7 @@ export default function ApiRsLogisticaPage() {
               {connectionStatus.connected ? "Conectado" : "Desconectado"}
             </AlertTitle>
             <AlertDescription className={`text-xs ${connectionStatus.connected ? "text-green-600/80" : "text-red-600/80"}`}>
-              {connectionStatus.message} • Último teste: {connectionStatus.timestamp}
+              {connectionStatus.message} {connectionStatus.timestamp && `• Último teste: ${connectionStatus.timestamp}`}
             </AlertDescription>
           </Alert>
         )}
@@ -326,29 +256,17 @@ export default function ApiRsLogisticaPage() {
           <Card className="shadow-sm border-border/60">
             <CardHeader className="border-b border-border/50 pb-0 px-6">
               <TabsList className="bg-transparent h-12 p-0 gap-8">
-                <TabsTrigger 
-                  value="visao-geral" 
-                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none h-12 px-1 text-[13px] font-bold gap-2"
-                  data-testid="tab-visao-geral"
-                >
+                <TabsTrigger value="visao-geral" className={tabTriggerClass} data-testid="tab-visao-geral">
                   <Info className="h-4 w-4" />
                   Visão Geral
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="orders" 
-                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none h-12 px-1 text-[13px] font-bold gap-2"
-                  data-testid="tab-orders"
-                >
+                <TabsTrigger value="meus-dispositivos" className={tabTriggerClass} data-testid="tab-meus-dispositivos">
                   <Package className="h-4 w-4" />
-                  Orders
+                  Meus Dispositivos
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="logistica" 
-                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none h-12 px-1 text-[13px] font-bold gap-2"
-                  data-testid="tab-logistica"
-                >
-                  <Truck className="h-4 w-4" />
-                  Logística
+                <TabsTrigger value="meus-fechamentos" className={tabTriggerClass} data-testid="tab-meus-fechamentos">
+                  <FileText className="h-4 w-4" />
+                  Meus Fechamentos
                 </TabsTrigger>
               </TabsList>
             </CardHeader>
@@ -365,9 +283,8 @@ export default function ApiRsLogisticaPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        Esta integração permite consultar dados de pedidos e logística do Dashboard Renov. 
-                        A API disponibiliza endpoints para busca avançada de pedidos, relatórios de coletas 
-                        e visão geral logística.
+                        Esta integração permite consultar dados de logística do Dashboard Renov. 
+                        A API disponibiliza endpoints para consulta de dispositivos e fechamentos.
                       </p>
                       
                       <Separator />
@@ -473,11 +390,7 @@ export default function ApiRsLogisticaPage() {
                               size="sm"
                               className="gap-1 text-xs"
                               onClick={() => {
-                                if (endpoint.category === "Orders") {
-                                  setActiveTab("orders");
-                                } else {
-                                  setActiveTab("logistica");
-                                }
+                                setActiveTab(endpoint.tab);
                                 setActiveEndpoint(endpoint.id);
                               }}
                               data-testid={`button-test-${endpoint.id}`}
@@ -493,7 +406,7 @@ export default function ApiRsLogisticaPage() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="orders" className="m-0 space-y-6">
+              <TabsContent value="meus-dispositivos" className="m-0 space-y-6">
                 <Card className="border-2 border-border/60">
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
@@ -502,123 +415,63 @@ export default function ApiRsLogisticaPage() {
                           GET
                         </Badge>
                         <div>
-                          <CardTitle className="text-base">Busca Avançada de Pedidos</CardTitle>
-                          <code className="text-xs text-muted-foreground">/api/orders/advanced</code>
+                          <CardTitle className="text-base">Meus Dispositivos</CardTitle>
+                          <code className="text-xs text-muted-foreground">/api/logistica/meus_dispositivos</code>
                         </div>
                       </div>
                     </div>
                     <CardDescription className="mt-2">
-                      Retorna uma lista de pedidos com base em múltiplos filtros opcionais. Retorna no máximo 1000 registros.
+                      Retorna dados de dispositivos com filtros por IMEI, filial, código voucher e status logístico.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <Form {...buscaPedidosForm}>
-                      <form onSubmit={buscaPedidosForm.handleSubmit((data) => buscaPedidosMutation.mutate(data))} className="space-y-4">
+                    <Form {...meusDispositivosForm}>
+                      <form onSubmit={meusDispositivosForm.handleSubmit((data) => meusDispositivosMutation.mutate(data))} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <FormField
-                            control={buscaPedidosForm.control}
+                            control={meusDispositivosForm.control}
                             name="imei"
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-xs">IMEI</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="Filtrar por IMEI exato" {...field} data-testid="input-imei" />
+                                  <Input placeholder="Filtrar pelo IMEI" {...field} data-testid="input-rs-meus-dispositivos-imei" />
                                 </FormControl>
                               </FormItem>
                             )}
                           />
                           <FormField
-                            control={buscaPedidosForm.control}
+                            control={meusDispositivosForm.control}
+                            name="filiais"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Filial</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="ID ou nome da filial" {...field} data-testid="input-rs-meus-dispositivos-filiais" />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={meusDispositivosForm.control}
                             name="voucher_code"
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-xs">Código Voucher</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="Código do voucher" {...field} data-testid="input-voucher-code" />
+                                  <Input placeholder="Código do voucher" {...field} data-testid="input-rs-meus-dispositivos-voucher_code" />
                                 </FormControl>
                               </FormItem>
                             )}
                           />
                           <FormField
-                            control={buscaPedidosForm.control}
-                            name="voucher_status"
+                            control={meusDispositivosForm.control}
+                            name="status"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs">Status Voucher</FormLabel>
+                                <FormLabel className="text-xs">Status</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="UTILIZADO, DISPONÍVEL, EXPIRADO, NÃO GERADO" {...field} data-testid="input-voucher-status" />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={buscaPedidosForm.control}
-                            name="customer_cpf"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">CPF Cliente</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="CPF do cliente" {...field} data-testid="input-cpf" />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={buscaPedidosForm.control}
-                            name="created_start"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Data Criação Início</FormLabel>
-                                <FormControl>
-                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-created-start" />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={buscaPedidosForm.control}
-                            name="created_end"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Data Criação Fim</FormLabel>
-                                <FormControl>
-                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-created-end" />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={buscaPedidosForm.control}
-                            name="network"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Rede</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Ex: TIM, CASAS BAHIA" {...field} data-testid="input-network" />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={buscaPedidosForm.control}
-                            name="store_type"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Tipo Loja</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Loja Própria ou Dealer" {...field} data-testid="input-store-type" />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={buscaPedidosForm.control}
-                            name="global_status"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Status Global</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="Ex: Completed" {...field} data-testid="input-global-status" />
+                                  <Input placeholder="Ex: Confirmado" {...field} data-testid="input-rs-meus-dispositivos-status" />
                                 </FormControl>
                               </FormItem>
                             )}
@@ -628,21 +481,21 @@ export default function ApiRsLogisticaPage() {
                           <Button 
                             type="submit" 
                             className="gap-2"
-                            disabled={buscaPedidosMutation.isPending}
-                            data-testid="button-buscar-pedidos"
+                            disabled={meusDispositivosMutation.isPending}
+                            data-testid="button-buscar-meus-dispositivos"
                           >
-                            {buscaPedidosMutation.isPending ? (
+                            {meusDispositivosMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <Search className="h-4 w-4" />
                             )}
-                            Buscar Pedidos
+                            Buscar Dispositivos
                           </Button>
                         </div>
                       </form>
                     </Form>
 
-                    {apiResponse && activeTab === "orders" && (
+                    {apiResponse && activeTab === "meus-dispositivos" && (
                       <div className="space-y-2">
                         <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Resposta da API</Label>
                         <ScrollArea className="h-64 w-full rounded-md border bg-muted/20 p-4">
@@ -656,7 +509,7 @@ export default function ApiRsLogisticaPage() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="logistica" className="m-0 space-y-6">
+              <TabsContent value="meus-fechamentos" className="m-0 space-y-6">
                 <Card className="border-2 border-border/60">
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
@@ -665,42 +518,52 @@ export default function ApiRsLogisticaPage() {
                           GET
                         </Badge>
                         <div>
-                          <CardTitle className="text-base">Relatório de Coletas</CardTitle>
-                          <code className="text-xs text-muted-foreground">/api/logistica/coletas</code>
+                          <CardTitle className="text-base">Meus Fechamentos</CardTitle>
+                          <code className="text-xs text-muted-foreground">/api/logistica/meus-fechamentos</code>
                         </div>
                       </div>
                     </div>
                     <CardDescription className="mt-2">
-                      Retorna dados de coletas logísticas, incluindo status, dias, IMEIs e Vouchers agrupados por romaneio.
+                      Retorna dados de fechamentos com filtros por código, rede e status.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Form {...relatorioColetasForm}>
-                      <form onSubmit={relatorioColetasForm.handleSubmit((data) => relatorioColetasMutation.mutate(data))} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <CardContent className="space-y-6">
+                    <Form {...meusFechamentosForm}>
+                      <form onSubmit={meusFechamentosForm.handleSubmit((data) => meusFechamentosMutation.mutate(data))} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <FormField
-                            control={relatorioColetasForm.control}
-                            name="start_date"
+                            control={meusFechamentosForm.control}
+                            name="code"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs">Data Inicial</FormLabel>
+                                <FormLabel className="text-xs">Código</FormLabel>
                                 <FormControl>
-                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-coletas-start" />
+                                  <Input placeholder="Código exato do fechamento" {...field} data-testid="input-rs-meus-fechamentos-code" />
                                 </FormControl>
-                                <FormDescription className="text-xs">Data inicial do romaneio (YYYY-MM-DD)</FormDescription>
                               </FormItem>
                             )}
                           />
                           <FormField
-                            control={relatorioColetasForm.control}
-                            name="end_date"
+                            control={meusFechamentosForm.control}
+                            name="rede"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs">Data Final</FormLabel>
+                                <FormLabel className="text-xs">Rede</FormLabel>
                                 <FormControl>
-                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-coletas-end" />
+                                  <Input placeholder="Nome da rede" {...field} data-testid="input-rs-meus-fechamentos-rede" />
                                 </FormControl>
-                                <FormDescription className="text-xs">Data final do romaneio (YYYY-MM-DD)</FormDescription>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={meusFechamentosForm.control}
+                            name="status"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">Status</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="Ex: ScheduledPayment" {...field} data-testid="input-rs-meus-fechamentos-status" />
+                                </FormControl>
                               </FormItem>
                             )}
                           />
@@ -709,104 +572,32 @@ export default function ApiRsLogisticaPage() {
                           <Button 
                             type="submit" 
                             className="gap-2"
-                            disabled={relatorioColetasMutation.isPending}
-                            data-testid="button-relatorio-coletas"
+                            disabled={meusFechamentosMutation.isPending}
+                            data-testid="button-buscar-meus-fechamentos"
                           >
-                            {relatorioColetasMutation.isPending ? (
+                            {meusFechamentosMutation.isPending ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <BarChart3 className="h-4 w-4" />
+                              <Search className="h-4 w-4" />
                             )}
-                            Gerar Relatório
+                            Buscar Fechamentos
                           </Button>
                         </div>
                       </form>
                     </Form>
-                  </CardContent>
-                </Card>
 
-                <Card className="border-2 border-border/60">
-                  <CardHeader className="pb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Badge variant="secondary" className="font-bold text-xs h-6 px-2 bg-green-500/10 text-green-700 border-green-500/30">
-                          GET
-                        </Badge>
-                        <div>
-                          <CardTitle className="text-base">Relatório Geral Logística</CardTitle>
-                          <code className="text-xs text-muted-foreground">/api/logistica/geral</code>
-                        </div>
+                    {apiResponse && activeTab === "meus-fechamentos" && (
+                      <div className="space-y-2">
+                        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Resposta da API</Label>
+                        <ScrollArea className="h-64 w-full rounded-md border bg-muted/20 p-4">
+                          <pre className="text-xs font-mono whitespace-pre-wrap">
+                            {JSON.stringify(apiResponse, null, 2)}
+                          </pre>
+                        </ScrollArea>
                       </div>
-                    </div>
-                    <CardDescription className="mt-2">
-                      Retorna visão geral de logística.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Form {...relatorioGeralForm}>
-                      <form onSubmit={relatorioGeralForm.handleSubmit((data) => relatorioGeralMutation.mutate(data))} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField
-                            control={relatorioGeralForm.control}
-                            name="start_date"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Data Inicial</FormLabel>
-                                <FormControl>
-                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-geral-start" />
-                                </FormControl>
-                                <FormDescription className="text-xs">Data inicial de uso (YYYY-MM-DD)</FormDescription>
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={relatorioGeralForm.control}
-                            name="end_date"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs">Data Final</FormLabel>
-                                <FormControl>
-                                  <Input type="date" className="date-picker-full" {...field} data-testid="input-geral-end" />
-                                </FormControl>
-                                <FormDescription className="text-xs">Data final de uso (YYYY-MM-DD)</FormDescription>
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <div className="flex justify-end">
-                          <Button 
-                            type="submit" 
-                            className="gap-2"
-                            disabled={relatorioGeralMutation.isPending}
-                            data-testid="button-relatorio-geral"
-                          >
-                            {relatorioGeralMutation.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <BarChart3 className="h-4 w-4" />
-                            )}
-                            Gerar Relatório
-                          </Button>
-                        </div>
-                      </form>
-                    </Form>
+                    )}
                   </CardContent>
                 </Card>
-
-                {apiResponse && activeTab === "logistica" && (
-                  <Card className="border-2 border-border/60">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="text-base">Resposta da API</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ScrollArea className="h-64 w-full rounded-md border bg-muted/20 p-4">
-                        <pre className="text-xs font-mono whitespace-pre-wrap">
-                          {JSON.stringify(apiResponse, null, 2)}
-                        </pre>
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-                )}
               </TabsContent>
             </CardContent>
           </Card>

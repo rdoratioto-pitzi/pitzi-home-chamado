@@ -31,7 +31,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
 const API_BASE_URL = "https://dash.renovsmart.com.br/api";
-const POSTMAN_DOC_URL = "https://documenter.getpostman.com/view/49982216/2sBXc8oiGF";
+const POSTMAN_DOC_URL = "https://documenter.getpostman.com/view/49982216/2sBXcAJNtW";
 
 interface ConnectionStatus {
   connected: boolean;

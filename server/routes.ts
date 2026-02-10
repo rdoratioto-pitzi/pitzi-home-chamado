@@ -2478,7 +2478,7 @@ export async function registerRoutes(
   // Test connection to RS Logística API
   app.post("/api/integrations/rs-logistica/test-connection", async (req, res) => {
     try {
-      const response = await fetch(`${RS_API_BASE_URL}/logistica/geral?start_date=2024-01-01&end_date=2024-01-01`, {
+      const response = await fetch(`${RS_API_BASE_URL}/logistica/meus_dispositivos?imei=000000000000000`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${RS_API_TOKEN}`,
@@ -2496,11 +2496,11 @@ export async function registerRoutes(
     }
   });
 
-  // Orders - Busca Avançada de Pedidos
-  app.get("/api/integrations/rs-logistica/orders/advanced", async (req, res) => {
+  // Meus Dispositivos
+  app.get("/api/integrations/rs-logistica/meus-dispositivos", async (req, res) => {
     try {
       const params = new URLSearchParams();
-      const queryParams = ["imei", "voucher_code", "voucher_status", "customer_cpf", "created_start", "created_end", "used_start", "used_end", "network", "store_type", "boost", "global_status"];
+      const queryParams = ["imei", "filiais", "voucher_code", "status"];
       
       queryParams.forEach(param => {
         if (req.query[param]) {
@@ -2508,7 +2508,7 @@ export async function registerRoutes(
         }
       });
 
-      const response = await fetch(`${RS_API_BASE_URL}/orders/advanced?${params.toString()}`, {
+      const response = await fetch(`${RS_API_BASE_URL}/logistica/meus_dispositivos?${params.toString()}`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${RS_API_TOKEN}`,
@@ -2523,19 +2523,24 @@ export async function registerRoutes(
       const data = await response.json();
       res.json(data);
     } catch (error: any) {
-      console.error("RS Logística orders/advanced error:", error);
-      res.status(500).json({ error: error.message || "Falha ao buscar pedidos" });
+      console.error("RS Logística meus_dispositivos error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar dispositivos" });
     }
   });
 
-  // Logística - Relatório de Coletas
-  app.get("/api/integrations/rs-logistica/logistica/coletas", async (req, res) => {
+  // Meus Fechamentos
+  app.get("/api/integrations/rs-logistica/meus-fechamentos", async (req, res) => {
     try {
       const params = new URLSearchParams();
-      if (req.query.start_date) params.append("start_date", req.query.start_date as string);
-      if (req.query.end_date) params.append("end_date", req.query.end_date as string);
+      const queryParams = ["code", "rede", "status"];
+      
+      queryParams.forEach(param => {
+        if (req.query[param]) {
+          params.append(param, req.query[param] as string);
+        }
+      });
 
-      const response = await fetch(`${RS_API_BASE_URL}/logistica/coletas?${params.toString()}`, {
+      const response = await fetch(`${RS_API_BASE_URL}/logistica/meus-fechamentos?${params.toString()}`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${RS_API_TOKEN}`,
@@ -2550,35 +2555,8 @@ export async function registerRoutes(
       const data = await response.json();
       res.json(data);
     } catch (error: any) {
-      console.error("RS Logística logistica/coletas error:", error);
-      res.status(500).json({ error: error.message || "Falha ao buscar relatório de coletas" });
-    }
-  });
-
-  // Logística - Relatório Geral
-  app.get("/api/integrations/rs-logistica/logistica/geral", async (req, res) => {
-    try {
-      const params = new URLSearchParams();
-      if (req.query.start_date) params.append("start_date", req.query.start_date as string);
-      if (req.query.end_date) params.append("end_date", req.query.end_date as string);
-
-      const response = await fetch(`${RS_API_BASE_URL}/logistica/geral?${params.toString()}`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${RS_API_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      res.json(data);
-    } catch (error: any) {
-      console.error("RS Logística logistica/geral error:", error);
-      res.status(500).json({ error: error.message || "Falha ao buscar relatório geral" });
+      console.error("RS Logística meus-fechamentos error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar fechamentos" });
     }
   });
 
