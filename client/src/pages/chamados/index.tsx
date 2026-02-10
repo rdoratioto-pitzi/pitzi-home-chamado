@@ -20,15 +20,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { 
-  Plus, 
-  Search, 
-  Filter, 
-  Clock, 
-  AlertCircle, 
-  CheckCircle2, 
-  ArrowUpDown, 
-  LayoutGrid, 
+import {
+  Plus,
+  Search,
+  Filter,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  ArrowUpDown,
+  LayoutGrid,
   List,
   Download,
   Ban,
@@ -127,12 +127,12 @@ function calculateBusinessSLADeadline(createdAt: Date, slaHours: number): Date {
   if (getHours(current) < WORK_START_HOUR) {
     current = setHours(setMinutes(setSeconds(current, 0), 0), WORK_START_HOUR);
   }
-  
+
   // If created after 16:00 (WORK_START_HOUR + WORK_HOURS_PER_DAY), move to next business day at 08:00
   if (getHours(current) >= WORK_START_HOUR + WORK_HOURS_PER_DAY) {
     current = addBusinessDays(setHours(setMinutes(setSeconds(current, 0), 0), WORK_START_HOUR), 1);
   }
-  
+
   // Ensure we are not on a weekend
   if (isWeekend(current)) {
     current = addBusinessDays(current, 1);
@@ -148,7 +148,7 @@ function calculateBusinessSLADeadline(createdAt: Date, slaHours: number): Date {
   // Calculate hours remaining in the current business day
   const currentHour = getHours(deadline);
   const hoursLeftInDay = (WORK_START_HOUR + WORK_HOURS_PER_DAY) - currentHour;
-  
+
   if (remainingHours <= hoursLeftInDay) {
     deadline = addHours(deadline, remainingHours);
   } else {
@@ -172,16 +172,16 @@ const formatDisplayDate = (date: Date | string | null): string => {
 // Helper function to calculate time open with business hours
 const calculateTimeOpen = (createdAt: Date | string | null): { text: string; colorClass: string } => {
   if (!createdAt) return { text: "-", colorClass: "text-muted-foreground" };
-  
+
   const created = new Date(createdAt);
   const now = new Date();
-  
+
   const diffMs = now.getTime() - created.getTime();
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffHours / 24);
   const remainingHours = diffHours % 24;
   const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  
+
   let text: string;
   if (diffDays > 0) {
     text = `${diffDays}d ${remainingHours}h`;
@@ -190,7 +190,7 @@ const calculateTimeOpen = (createdAt: Date | string | null): { text: string; col
   } else {
     text = `${diffMinutes}m`;
   }
-  
+
   let colorClass: string;
   if (diffHours < 24) {
     colorClass = "text-green-600 dark:text-green-400";
@@ -199,13 +199,13 @@ const calculateTimeOpen = (createdAt: Date | string | null): { text: string; col
   } else {
     colorClass = "text-red-600 dark:text-red-400";
   }
-  
+
   return { text, colorClass };
 };
 
 // Helper function to get SLA for a ticket
 const getSlaForTicket = (
-  ticket: Ticket, 
+  ticket: Ticket,
   slaRules: SlaRule[]
 ): { slaHoras: number | null; status: "dentro_prazo" | "em_atraso" | null } => {
   const tipo = ticket.type?.toLowerCase();
@@ -223,13 +223,13 @@ const getSlaForTicket = (
 
   const slaHoras = parseFloat(rule.slaHoras.toString());
   const createdAt = ticket.dataAbertura ? new Date(ticket.dataAbertura) : ticket.createdAt ? new Date(ticket.createdAt) : null;
-  
+
   if (!createdAt) {
     return { slaHoras, status: null };
   }
 
   const deadline = calculateBusinessSLADeadline(createdAt, slaHoras);
-  
+
   if (ticket.status === "closed" || ticket.status === "resolved") {
     if (ticket.dataResolucao) {
       const resolutionDate = new Date(ticket.dataResolucao);
@@ -319,13 +319,13 @@ export default function ChamadosPage() {
       const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
       const matchesType = typeFilter === "all" || ticket.type === typeFilter;
       const matchesAssignee = assigneeFilter === "all" || ticket.assigneeId === assigneeFilter;
-      
+
       let matchesSla = true;
       if (slaFilter === "dentro_prazo" || slaFilter === "em_atraso") {
         const sla = getSlaForTicket(ticket, slaRules);
         matchesSla = sla.status === slaFilter;
       }
-      
+
       return matchesSearch && matchesStatus && matchesPriority && matchesType && matchesAssignee && matchesSla;
     })
     .sort((a, b) => {
@@ -360,6 +360,7 @@ export default function ChamadosPage() {
       return sla.status === "dentro_prazo";
     }).length,
     emAtraso: tickets.filter(t => {
+      if (t.status !== "open" && t.status !== "in_progress") return false;
       const sla = getSlaForTicket(t, slaRules);
       return sla.status === "em_atraso";
     }).length,
@@ -410,8 +411,8 @@ export default function ChamadosPage() {
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader 
-        title="Gestão de Chamados" 
+      <PageHeader
+        title="Gestão de Chamados"
         breadcrumbs={[{ label: "Chamados" }]}
         actions={
           <Button onClick={() => setIsDialogOpen(true)} data-testid="button-new-ticket">
@@ -423,7 +424,7 @@ export default function ChamadosPage() {
 
       <main className="flex-1 p-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-7">
-          <Card 
+          <Card
             className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "all" && slaFilter === "all" ? "ring-2 ring-primary" : ""}`}
             onClick={() => handleKpiClick("status", "all")}
           >
@@ -436,7 +437,7 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">registrados</p>
             </CardContent>
           </Card>
-          <Card 
+          <Card
             className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "open" ? "ring-2 ring-primary" : ""}`}
             onClick={() => handleKpiClick("status", "open")}
           >
@@ -449,7 +450,7 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">aguardando</p>
             </CardContent>
           </Card>
-          <Card 
+          <Card
             className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "in_progress" ? "ring-2 ring-primary" : ""}`}
             onClick={() => handleKpiClick("status", "in_progress")}
           >
@@ -462,7 +463,7 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">resolvendo</p>
             </CardContent>
           </Card>
-          <Card 
+          <Card
             className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "blocked" ? "ring-2 ring-primary" : ""}`}
             onClick={() => handleKpiClick("status", "blocked")}
           >
@@ -475,7 +476,7 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">impedidos</p>
             </CardContent>
           </Card>
-          <Card 
+          <Card
             className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "resolved" ? "ring-2 ring-primary" : ""}`}
             onClick={() => handleKpiClick("status", "resolved")}
           >
@@ -488,7 +489,7 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">concluídos</p>
             </CardContent>
           </Card>
-          <Card 
+          <Card
             className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${slaFilter === "dentro_prazo" ? "ring-2 ring-primary" : ""}`}
             onClick={() => handleKpiClick("sla", "dentro_prazo")}
           >
@@ -503,7 +504,7 @@ export default function ChamadosPage() {
               <p className="text-[10px] text-muted-foreground mt-1">SLA OK</p>
             </CardContent>
           </Card>
-          <Card 
+          <Card
             className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${slaFilter === "em_atraso" ? "ring-2 ring-primary" : ""}`}
             onClick={() => handleKpiClick("sla", "em_atraso")}
           >
@@ -525,9 +526,9 @@ export default function ChamadosPage() {
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
               <CardTitle className="text-[18px] font-bold tracking-tight">Chamados</CardTitle>
               <div className="flex flex-wrap items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="h-9 px-3 text-[12px] font-bold"
                   onClick={exportToExcel}
                   data-testid="button-export-excel"
@@ -633,14 +634,14 @@ export default function ChamadosPage() {
                 <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-medium">Nenhum chamado encontrado</h3>
                 <p className="text-muted-foreground mt-1">
-                  {tickets.length === 0 
+                  {tickets.length === 0
                     ? "Crie seu primeiro chamado clicando no botão acima"
                     : "Tente ajustar os filtros de busca"}
                 </p>
               </div>
             ) : viewMode === "kanban" ? (
-              <TicketKanban 
-                tickets={filteredTickets} 
+              <TicketKanban
+                tickets={filteredTickets}
                 users={users}
                 onTicketClick={setSelectedTicket}
               />
@@ -726,8 +727,8 @@ export default function ChamadosPage() {
                   <TooltipProvider>
                     {filteredTickets.map((ticket) => {
                       return (
-                        <TableRow 
-                          key={ticket.id} 
+                        <TableRow
+                          key={ticket.id}
                           className="cursor-pointer hover:bg-muted/30 transition-colors"
                           onClick={() => setSelectedTicket(ticket)}
                           data-testid={`row-ticket-${ticket.id}`}
@@ -820,10 +821,10 @@ export default function ChamadosPage() {
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button 
-                                  size="icon" 
-                                  variant="ghost" 
-                                  className="h-7 w-7" 
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7"
                                   onClick={(e) => e.stopPropagation()}
                                   data-testid={`button-ticket-menu-${ticket.id}`}
                                 >
@@ -838,7 +839,7 @@ export default function ChamadosPage() {
                                   <Edit className="h-4 w-4 mr-2" />
                                   Editar
                                 </DropdownMenuItem>
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   className="text-destructive"
                                   onClick={(e) => {
                                     e.stopPropagation();
