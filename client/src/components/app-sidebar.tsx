@@ -1,10 +1,10 @@
 import { Link, useLocation } from "wouter";
 import { useState, useMemo, useEffect } from "react";
-import { 
-  Ticket, 
-  FolderKanban, 
-  Target, 
-  Truck, 
+import {
+  Ticket,
+  FolderKanban,
+  Target,
+  Truck,
   Settings,
   ChevronDown,
   ChevronRight,
@@ -33,6 +33,7 @@ import {
   Settings2,
   Workflow,
   ClipboardList,
+  Sparkles,
 } from "lucide-react";
 import {
   Sidebar,
@@ -162,10 +163,10 @@ export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { theme } = useTheme();
   const { toast } = useToast();
-  
+
   // State to force re-render when user data changes
   const [currentUser, setCurrentUser] = useState(getCurrentUser());
-  
+
   useEffect(() => {
     const handleStorageChange = () => {
       setCurrentUser(getCurrentUser());
@@ -184,13 +185,13 @@ export function AppSidebar() {
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
   const [conhecimentoOpen, setConhecimentoOpen] = useState(location.startsWith("/conhecimento"));
-  
+
   const isMetasActive = location.startsWith("/metas");
   const isLogisticaActive = location.startsWith("/logistica");
   const isApisActive = location.startsWith("/apis");
   const isPricingActive = location.startsWith("/pricing");
   const isConhecimentoActive = location.startsWith("/conhecimento");
-  
+
   const permissions = useMemo(() => {
     try {
       if (currentUser?.isAdmin === true || currentUser?.isAdmin === "true") {
@@ -208,8 +209,8 @@ export function AppSidebar() {
         };
       }
       if (currentUser?.modulePermissions) {
-        return typeof currentUser.modulePermissions === "string" 
-          ? JSON.parse(currentUser.modulePermissions) 
+        return typeof currentUser.modulePermissions === "string"
+          ? JSON.parse(currentUser.modulePermissions)
           : currentUser.modulePermissions;
       }
     } catch (e) {
@@ -228,14 +229,14 @@ export function AppSidebar() {
       configuracoes: false,
     };
   }, [currentUser]);
-  
+
   const menuItems = useMemo(() => {
     return allMenuItems.filter(item => {
       if (item.module === null) return true;
       return permissions[item.module] === true;
     });
   }, [permissions]);
-  
+
   const hasMetasAccess = permissions.okrs === true;
   const hasLogisticaAccess = permissions.logistica === true;
   const hasPricingAccess = permissions.pricing === true;
@@ -246,7 +247,7 @@ export function AppSidebar() {
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch {}
+    } catch { }
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("modulePermissions");
     localStorage.removeItem("user");
@@ -257,8 +258,8 @@ export function AppSidebar() {
     });
     setLocation("/login");
   };
-  
-  const userInitials = currentUser?.name 
+
+  const userInitials = currentUser?.name
     ? currentUser.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     : "US";
 
@@ -266,20 +267,20 @@ export function AppSidebar() {
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="h-16 flex items-center justify-center border-b border-sidebar-border">
         <Link href="/" data-testid="link-home" className="flex items-center justify-center w-full px-6">
-          <RenovLogo 
-            variant={theme === "dark" ? "dark" : "light"} 
-            className="h-8 w-auto mx-auto" 
+          <RenovLogo
+            variant={theme === "dark" ? "dark" : "light"}
+            className="h-8 w-auto mx-auto"
           />
         </Link>
       </SidebarHeader>
-      
+
       <SidebarContent className="px-3 py-4">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1.5">
               {menuItems.map((item) => {
                 const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url + "/"));
-                
+
                 const handleClick = () => {
                   if (item.url === "/" && location === "/") {
                     window.location.reload();
@@ -288,7 +289,7 @@ export function AppSidebar() {
 
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
+                    <SidebarMenuButton
                       asChild
                       isActive={isActive}
                       className={`h-11 px-3 transition-all duration-200 rounded-lg ${isActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
@@ -306,7 +307,7 @@ export function AppSidebar() {
                 <Collapsible open={metasOpen} onOpenChange={setMetasOpen}>
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton 
+                      <SidebarMenuButton
                         className={`h-11 px-3 transition-all duration-200 rounded-lg ${isMetasActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                         isActive={isMetasActive}
                         data-testid="link-metas"
@@ -342,7 +343,7 @@ export function AppSidebar() {
               )}
 
               <SidebarMenuItem>
-                <SidebarMenuButton 
+                <SidebarMenuButton
                   asChild
                   isActive={location === "/okrs"}
                   className={`h-11 px-3 transition-all duration-200 rounded-lg ${location === "/okrs" ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
@@ -353,12 +354,12 @@ export function AppSidebar() {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
-              
+
               {hasLogisticaAccess && (
                 <Collapsible open={logisticaOpen} onOpenChange={setLogisticaOpen}>
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton 
+                      <SidebarMenuButton
                         className={`h-11 px-3 transition-all duration-200 rounded-lg ${isLogisticaActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                         isActive={isLogisticaActive}
                         data-testid="link-logistica"
@@ -397,7 +398,7 @@ export function AppSidebar() {
                 <Collapsible open={pricingOpen} onOpenChange={setPricingOpen}>
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton 
+                      <SidebarMenuButton
                         className={`h-11 px-3 transition-all duration-200 rounded-lg ${isPricingActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                         isActive={isPricingActive}
                         data-testid="link-pricing"
@@ -436,7 +437,7 @@ export function AppSidebar() {
                 <Collapsible open={conhecimentoOpen} onOpenChange={setConhecimentoOpen}>
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton 
+                      <SidebarMenuButton
                         className={`h-11 px-3 transition-all duration-200 rounded-lg ${isConhecimentoActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                         isActive={isConhecimentoActive}
                         data-testid="link-conhecimento"
@@ -475,7 +476,7 @@ export function AppSidebar() {
                 <Collapsible open={apisOpen} onOpenChange={setApisOpen}>
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
-                      <SidebarMenuButton 
+                      <SidebarMenuButton
                         className={`h-11 px-3 transition-all duration-200 rounded-lg ${isApisActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                         isActive={isApisActive}
                         data-testid="link-integracoes"
@@ -510,9 +511,22 @@ export function AppSidebar() {
                 </Collapsible>
               )}
 
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location === "/updates"}
+                  className={`h-11 px-3 transition-all duration-200 rounded-lg ${location === "/updates" ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                >
+                  <Link href="/updates" data-testid="link-updates">
+                    <Sparkles className={`h-[20px] w-[20px] ${location === "/updates" ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-[14px]">Novidades</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
               {hasConfiguracoesAccess && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton 
+                  <SidebarMenuButton
                     asChild
                     isActive={location === "/configuracoes" || location.startsWith("/configuracoes/")}
                     className={`h-11 px-3 transition-all duration-200 rounded-lg ${location.startsWith("/configuracoes") ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
@@ -536,7 +550,7 @@ export function UserProfileMenu() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState(getCurrentUser());
-  
+
   useEffect(() => {
     const handleStorageChange = () => {
       setCurrentUser(getCurrentUser());
@@ -552,7 +566,7 @@ export function UserProfileMenu() {
   const handleLogout = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch {}
+    } catch { }
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("modulePermissions");
     localStorage.removeItem("user");
@@ -564,14 +578,14 @@ export function UserProfileMenu() {
     setLocation("/login");
   };
 
-  const userInitials = currentUser?.name 
+  const userInitials = currentUser?.name
     ? currentUser.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     : "US";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button 
+        <button
           className="flex items-center gap-2.5 p-1.5 rounded-lg hover:bg-muted transition-colors max-w-[200px]"
           data-testid="button-user-menu"
         >
@@ -594,7 +608,7 @@ export function UserProfileMenu() {
             <span>Meu Perfil</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={handleLogout}
           className="text-destructive focus:text-destructive flex items-center gap-2 cursor-pointer"
           data-testid="menu-item-logout"

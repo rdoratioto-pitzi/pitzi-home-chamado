@@ -54,6 +54,7 @@ export type ModulePermissions = {
   conhecimento: boolean;
   apis: boolean;
   configuracoes: boolean;
+  updates: boolean;
 };
 
 // ============== TICKETS (Chamados) ==============
@@ -1019,3 +1020,23 @@ export const aiSpaceConversations = pgTable("ai_space_conversations", {
 export const insertAiSpaceConversationSchema = createInsertSchema(aiSpaceConversations).omit({ id: true });
 export type InsertAiSpaceConversation = z.infer<typeof insertAiSpaceConversationSchema>;
 export type AiSpaceConversation = typeof aiSpaceConversations.$inferSelect;
+
+// ============== UPDATES / NEWS ==============
+export const updates = pgTable("updates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  version: text("version").notNull(), // e.g., "v2.1.0"
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  category: text("category").notNull().default("feature"), // feature, bugfix, improvement, announcement
+  source: text("source"), // e.g., "Sistema", "Integração", "Manutenção"
+  isPublished: boolean("is_published").notNull().default(false),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
+  createdBy: varchar("created_by"),
+});
+
+export const insertUpdateSchema = createInsertSchema(updates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUpdate = z.infer<typeof insertUpdateSchema>;
+export type Update = typeof updates.$inferSelect;

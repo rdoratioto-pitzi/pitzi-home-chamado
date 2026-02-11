@@ -32,6 +32,10 @@ const PUBLIC_ROUTES = [
   "/api/auth/me",
 ];
 
+import createMemoryStore from "memorystore";
+
+const MemoryStore = createMemoryStore(session);
+
 export function setupSession(app: Express) {
   const sessionSecret = process.env.SESSION_SECRET || "renov-home-session-secret-dev-fallback";
   const isProduction = process.env.NODE_ENV === "production";
@@ -46,6 +50,9 @@ export function setupSession(app: Express) {
       resave: false,
       saveUninitialized: false,
       name: "renov.sid",
+      store: new MemoryStore({
+        checkPeriod: 86400000 // prune expired entries every 24h
+      }),
       cookie: {
         httpOnly: true,
         secure: isProduction,
