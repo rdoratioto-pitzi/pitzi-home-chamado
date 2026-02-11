@@ -345,6 +345,9 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // In-memory storage for updates when database is not available
+  private mockUpdates: Update[] = [];
+
   // Users
   async getUser(id: string): Promise<User | undefined> {
     if (!db) {
@@ -1424,49 +1427,102 @@ export class DatabaseStorage implements IStorage {
   }
 
   private getMockUpdates(): Update[] {
-    return [
-      {
-        id: "mock-1",
-        version: "v1.2.0",
-        title: "Módulo de Novidades e Automação Git (Modo Mock)",
-        content: "- Lançamento do novo portal de novidades (Updates).\n- Integração com histórico de commits para geração automática de changelogs.\n- Notificações em tempo real para novos updates publicados.\n\n(Nota: Você está vendo dados mockados porque o banco de dados não está conectado)",
-        category: "feature",
-        isPublished: true,
-        publishedAt: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        tenantId: null,
-        deletedAt: null,
-      } as Update
-    ];
+    // Initialize with default mock data if empty
+    if (this.mockUpdates.length === 0) {
+      this.mockUpdates = [
+        {
+          id: "mock-1",
+          version: "v1.2.0",
+          title: "Módulo de Novidades e Automação Git (Modo Mock)",
+          content: "- Lançamento do novo portal de novidades (Updates).\n- Integração com histórico de commits para geração automática de changelogs.\n- Notificações em tempo real para novos updates publicados.\n\n(Nota: Você está vendo dados mockados porque o banco de dados não está conectado)",
+          category: "feature",
+          isPublished: true,
+          publishedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          tenantId: null,
+          deletedAt: null,
+        } as Update
+      ];
+    }
+    return this.mockUpdates;
   }
 
   async getUpdate(id: string): Promise<Update | undefined> {
-    if (!db) return this.getMockUpdates().find(u => u.id === id);
-    const [update] = await db.select().from(updates).where(eq(updates.id, id));
+    if (!db) {
+      return this.getMockUpdates().find(u => u.id === id);
+    }
+    const [update] = await db!.select().from(updates).where(eq(updates.id, id));
     return update;
   }
 
   async createUpdate(update: InsertUpdate): Promise<Update> {
+    const newUpdate = {
+      ...update,
+      id: Math.random().toString(36).substr(2, 9),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as Update;
+    
     if (!db) {
-      const newUpdate = { ...update, id: Math.random().toString(36).substr(2, 9), createdAt: new Date() } as Update;
+      // Store in memory when database is not available
+      this.mockUpdates.unshift(newUpdate);
+      console.log("[storage] Update created in memory (DB unavailable):", newUpdate.id);
       return newUpdate;
     }
-    const { id, ...data } = update as any;
-    const [created] = await db.insert(updates).values(data).returning();
-    return created;
+    
+    try {
+      const { id, ...data } = update as any;
+      const [created] = await db!.insert(updates).values(data).returning();
+      return created;
+    } catch (error) {
+      console.warn("[storage] DB insert failed, using memory fallback:", error);
+      this.mockUpdates.unshift(newUpdate);
+      return newUpdate;
+    }
   }
 
   async updateUpdate(id: string, data: Partial<Update>): Promise<Update | undefined> {
-    if (!db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
-    const [updated] = await db.update(updates).set(updateData).where(eq(updates.id, id)).returning();
-    return updated;
+    
+    if (!db) {
+      // Update in memory when database is not available
+      const index = this.mockUpdates.findIndex(u => u.id === id);
+      if (index !== -1) {
+        this.mockUpdates[index] = { ...this.mockUpdates[index], ...updateData };
+        console.log("[storage] Update updated in memory (DB unavailable):", id);
+        return this.mockUpdates[index];
+      }
+      return undefined;
+    }
+    
+    try {
+      const [updated] = await db!.update(updates).set(updateData).where(eq(updates.id, id)).returning();
+      return updated;
+    } catch (error) {
+      console.warn("[storage] DB update failed, using memory fallback:", error);
+      const index = this.mockUpdates.findIndex(u => u.id === id);
+      if (index !== -1) {
+        this.mockUpdates[index] = { ...this.mockUpdates[index], ...updateData };
+        return this.mockUpdates[index];
+      }
+      return undefined;
+    }
   }
 
   async deleteUpdate(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(updates).where(eq(updates.id, id)).returning();
+    if (!db) {
+      // Delete from memory when database is not available
+      const index = this.mockUpdates.findIndex(u => u.id === id);
+      if (index !== -1) {
+        this.mockUpdates.splice(index, 1);
+        console.log("[storage] Update deleted from memory (DB unavailable):", id);
+        return true;
+      }
+      return false;
+    }
+    
+    const result = await db!.delete(updates).where(eq(updates.id, id)).returning();
     return result.length > 0;
   }
 

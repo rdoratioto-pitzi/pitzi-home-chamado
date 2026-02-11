@@ -4604,5 +4604,26 @@ export async function registerRoutes(
     }
   });
 
+  // Sync updates from Git commits (Admin only)
+  app.post("/api/updates/sync-git", async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Apenas administradores podem sincronizar commits" });
+      }
+
+      // Import parseCommits dynamically
+      const { parseCommits } = await import("../scripts/parse-commits");
+      
+      // Execute sync
+      await parseCommits();
+      
+      res.json({ success: true, message: "Commits sincronizados com sucesso" });
+    } catch (error: any) {
+      console.error("Sync git commits error:", error);
+      res.status(500).json({ error: error.message || "Erro ao sincronizar commits" });
+    }
+  });
+
   return httpServer;
 }

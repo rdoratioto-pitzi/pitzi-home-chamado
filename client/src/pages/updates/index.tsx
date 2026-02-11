@@ -3,7 +3,8 @@ import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Sparkles, CheckCircle2, AlertCircle, Info, Calendar, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Sparkles, CheckCircle2, AlertCircle, Info, Calendar, Plus, Pencil, Trash2, Loader2, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -67,39 +68,110 @@ export default function UpdatesPage() {
     const [editingUpdate, setEditingUpdate] = useState<Update | null>(null);
 
     const { data: updates, isLoading } = useQuery<Update[]>({
-        queryKey: ["/api/updates"],
+        queryKey: ["/api/updates", isAdmin],
+        queryFn: async () => {
+            const url = isAdmin ? "/api/updates?includeUnpublished=true" : "/api/updates";
+            const res = await apiRequest("GET", url);
+            if (!res.ok) throw new Error("Erro ao carregar novidades");
+            return res.json();
+        },
     });
+
+    // Detect if running in mock mode (database not connected)
+    const isMockMode = updates?.some(u => u.id.startsWith("mock-")) || false;
 
     const createMutation = useMutation({
         mutationFn: async (data: any) => {
-            return apiRequest("POST", "/api/updates", data);
+            const res = await apiRequest("POST", "/api/updates", data);
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ error: "Erro ao criar novidade" }));
+                throw new Error(error.error || "Erro ao criar novidade");
+            }
+            return res.json();
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/updates"] });
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["/api/updates"], refetchType: 'all' });
+            await queryClient.refetchQueries({ queryKey: ["/api/updates"] });
             setOpen(false);
-            toast({ title: "Sucesso", description: "Novidade criada." });
+            toast({ title: "Sucesso", description: "Novidade criada com sucesso!" });
+        },
+        onError: (error: any) => {
+            toast({ 
+                title: "Erro", 
+                description: error.message || "Não foi possível criar a novidade. Verifique sua conexão.",
+                variant: "destructive"
+            });
         }
     });
 
     const updateMutation = useMutation({
         mutationFn: async ({ id, data }: { id: string, data: any }) => {
-            return apiRequest("PATCH", `/api/updates/${id}`, data);
+            const res = await apiRequest("PATCH", `/api/updates/${id}`, data);
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ error: "Erro ao atualizar novidade" }));
+                throw new Error(error.error || "Erro ao atualizar novidade");
+            }
+            return res.json();
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/updates"] });
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["/api/updates"], refetchType: 'all' });
+            await queryClient.refetchQueries({ queryKey: ["/api/updates"] });
             setOpen(false);
             setEditingUpdate(null);
-            toast({ title: "Sucesso", description: "Novidade atualizada." });
+            toast({ title: "Sucesso", description: "Novidade atualizada com sucesso!" });
+        },
+        onError: (error: any) => {
+            toast({ 
+                title: "Erro", 
+                description: error.message || "Não foi possível atualizar a novidade.",
+                variant: "destructive"
+            });
         }
     });
 
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            return apiRequest("DELETE", `/api/updates/${id}`);
+            const res = await apiRequest("DELETE", `/api/updates/${id}`);
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ error: "Erro ao remover novidade" }));
+                throw new Error(error.error || "Erro ao remover novidade");
+            }
+            return res.json();
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["/api/updates"] });
-            toast({ title: "Sucesso", description: "Novidade removida." });
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["/api/updates"], refetchType: 'all' });
+            await queryClient.refetchQueries({ queryKey: ["/api/updates"] });
+            toast({ title: "Sucesso", description: "Novidade removida com sucesso!" });
+        },
+        onError: (error: any) => {
+            toast({ 
+                title: "Erro", 
+                description: error.message || "Não foi possível remover a novidade.",
+                variant: "destructive"
+            });
+        }
+    });
+
+    const syncGitMutation = useMutation({
+        mutationFn: async () => {
+            const res = await apiRequest("POST", "/api/updates/sync-git");
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({ error: "Erro ao sincronizar commits" }));
+                throw new Error(error.error || "Erro ao sincronizar commits");
+            }
+            return res.json();
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["/api/updates"], refetchType: 'all' });
+            await queryClient.refetchQueries({ queryKey: ["/api/updates"] });
+            toast({ title: "Sucesso", description: "Commits sincronizados com sucesso!" });
+        },
+        onError: (error: any) => {
+            toast({ 
+                title: "Erro", 
+                description: error.message || "Não foi possível sincronizar os commits.",
+                variant: "destructive"
+            });
         }
     });
 
@@ -112,6 +184,7 @@ export default function UpdatesPage() {
             content: formData.get("content") as string,
             category: formData.get("category") as string,
             isPublished: formData.get("isPublished") === "on",
+            source: "Manual",
         };
 
         if (editingUpdate) {
@@ -127,13 +200,27 @@ export default function UpdatesPage() {
                 title="Novidades do Sistema"
                 breadcrumbs={[{ label: "Novidades" }]}
                 actions={isAdmin && (
-                    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingUpdate(null); }}>
-                        <DialogTrigger asChild>
-                            <Button className="bg-primary hover:bg-primary/90 text-white gap-2 shadow-sm">
-                                <Plus className="h-4 w-4" />
-                                Novo Update
-                            </Button>
-                        </DialogTrigger>
+                    <div className="flex gap-2">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => syncGitMutation.mutate()}
+                            disabled={syncGitMutation.isPending}
+                            className="gap-2"
+                        >
+                            {syncGitMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <RefreshCw className="h-4 w-4" />
+                            )}
+                            Sincronizar Git
+                        </Button>
+                        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingUpdate(null); }}>
+                            <DialogTrigger asChild>
+                                <Button className="bg-primary hover:bg-primary/90 text-white gap-2 shadow-sm">
+                                    <Plus className="h-4 w-4" />
+                                    Novo Update
+                                </Button>
+                            </DialogTrigger>
                         <DialogContent className="sm:max-w-[500px]">
                             <DialogHeader>
                                 <DialogTitle>{editingUpdate ? "Editar Novidade" : "Criar Nova Novidade"}</DialogTitle>
@@ -180,17 +267,28 @@ export default function UpdatesPage() {
                             </form>
                         </DialogContent>
                     </Dialog>
+                    </div>
                 )}
             />
 
             <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
+                {isMockMode && isAdmin && (
+                    <Alert className="mb-6 border-amber-500/50 bg-amber-50/50 dark:bg-amber-900/10">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800 dark:text-amber-200">
+                            <strong>Modo de Demonstração:</strong> O banco de dados não está conectado. 
+                            As alterações são salvas apenas na memória temporária e serão perdidas ao recarregar a página.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 {isLoading ? (
                     <div className="flex items-center justify-center p-20">
                         <Loader2 className="h-8 w-8 animate-spin text-primary/40" />
                     </div>
                 ) : (
-                    <div className="relative pl-8 sm:pl-32 py-4">
-                        <div className="absolute left-[11px] sm:left-[31px] top-0 bottom-0 w-0.5 bg-border/60"></div>
+                    <div className="relative pl-8 sm:pl-48 py-4">
+                        <div className="absolute left-[11px] sm:left-[47px] top-0 bottom-0 w-0.5 bg-border/60"></div>
 
                         <div className="space-y-12">
                             <AnimatePresence mode="popLayout">
@@ -209,15 +307,15 @@ export default function UpdatesPage() {
                                             transition={{ delay: index * 0.05 }}
                                             className="relative group"
                                         >
-                                            <div className="absolute -left-[30px] sm:-left-[105px] mt-1.5 flex items-center justify-center">
-                                                <div className={`h-6 w-6 rounded-full bg-white dark:bg-slate-900 border-2 flex items-center justify-center z-10 shadow-sm ${update.isPublished ? 'border-primary' : 'border-muted-foreground/30'}`}>
-                                                    <div className={`h-2 w-2 rounded-full ${update.isPublished ? 'bg-primary animate-pulse' : 'bg-muted-foreground/30'}`}></div>
+                                            <div className="absolute -left-[30px] sm:-left-[110px] mt-1 flex items-center justify-center">
+                                                <div className="h-6 w-6 rounded-full bg-white dark:bg-slate-900 border-2 border-primary flex items-center justify-center z-10 shadow-sm">
+                                                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse"></div>
                                                 </div>
                                             </div>
 
-                                            <div className="hidden sm:block absolute -left-32 top-1.5 text-right w-24">
-                                                <p className="text-sm font-bold text-foreground">{update.version}</p>
-                                                <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
+                                            <div className="hidden sm:block absolute -left-[220px] top-0 text-right w-24">
+                                                <p className="text-sm font-bold text-foreground leading-tight">{update.version}</p>
+                                                <p className="text-[11px] text-muted-foreground uppercase tracking-wider mt-1">
                                                     {format(date, "dd MMM yyyy", { locale: ptBR })}
                                                 </p>
                                             </div>
