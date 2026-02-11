@@ -323,8 +323,13 @@ export default function ChamadosPage() {
 
       let matchesSla = true;
       if (slaFilter === "dentro_prazo" || slaFilter === "em_atraso") {
-        const sla = getSlaForTicket(ticket, slaRules);
-        matchesSla = sla.status === slaFilter;
+        // Só filtra SLA para chamados abertos ou em andamento
+        if (ticket.status !== "open" && ticket.status !== "in_progress") {
+          matchesSla = false;
+        } else {
+          const sla = getSlaForTicket(ticket, slaRules);
+          matchesSla = sla.status === slaFilter;
+        }
       }
 
       return matchesSearch && matchesStatus && matchesPriority && matchesType && matchesAssignee && matchesSla;
