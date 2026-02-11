@@ -4537,6 +4537,12 @@ export async function registerRoutes(
   app.post("/api/updates", async (req, res) => {
     try {
       const data = insertUpdateSchema.parse(req.body);
+      
+      // Se está publicando, define a data de publicação
+      if (data.isPublished && !data.publishedAt) {
+        (data as any).publishedAt = new Date();
+      }
+      
       const update = await storage.createUpdate(data);
       res.status(201).json(update);
     } catch (error: any) {

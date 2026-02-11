@@ -1457,8 +1457,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUpdate(update: InsertUpdate): Promise<Update> {
+    // Se está publicando e não tem data definida, define agora
+    const dataToInsert: any = { ...update };
+    if (dataToInsert.isPublished && !dataToInsert.publishedAt) {
+      dataToInsert.publishedAt = new Date();
+    }
+    
     const newUpdate = {
-      ...update,
+      ...dataToInsert,
       id: Math.random().toString(36).substr(2, 9),
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -1472,7 +1478,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     try {
-      const { id, ...data } = update as any;
+      const { id, ...data } = dataToInsert;
       const [created] = await db!.insert(updates).values(data).returning();
       return created;
     } catch (error) {
@@ -1483,7 +1489,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUpdate(id: string, data: Partial<Update>): Promise<Update | undefined> {
-    const updateData = { ...data, updatedAt: new Date() };
+    const updateData: any = { ...data, updatedAt: new Date() };
+    
+    // Se está publicando agora e não tem data, define a data
+    if (data.isPublished && !data.publishedAt) {
+      updateData.publishedAt = new Date();
+    }
     
     if (!db) {
       // Update in memory when database is not available

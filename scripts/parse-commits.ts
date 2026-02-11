@@ -185,7 +185,7 @@ async function parseCommits() {
                 content: content,
                 category: category,
                 source: "Git",
-                isPublished: false,
+                isPublished: true, // Sincronizados do Git são publicados automaticamente
             });
 
             console.log(`✅ Novidade criada: [${category}] ${title}`);

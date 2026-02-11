@@ -1037,6 +1037,6 @@ export const updates = pgTable("updates", {
   createdBy: varchar("created_by"),
 });
 
-export const insertUpdateSchema = createInsertSchema(updates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertUpdateSchema = createInsertSchema(updates).omit({ id: true, createdAt: true, updatedAt: true, publishedAt: true });
 export type InsertUpdate = z.infer<typeof insertUpdateSchema>;
 export type Update = typeof updates.$inferSelect;
