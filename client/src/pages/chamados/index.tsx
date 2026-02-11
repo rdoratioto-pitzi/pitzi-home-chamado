@@ -435,9 +435,11 @@ export default function ChamadosPage() {
     if (type === "status") {
       setStatusFilter(value);
       setSlaFilter("all");
+      setPeriodFilter("month"); // Resetar período ao clicar em status
     } else {
       setStatusFilter("all");
       setSlaFilter(value);
+      setPeriodFilter("month"); // Resetar período ao clicar em SLA
     }
   };
 
@@ -610,7 +612,7 @@ export default function ChamadosPage() {
                 <AlertCircle className="h-3.5 w-3.5 text-red-600" />
               </div>
             </CardHeader>
-            <CardContent>
+             <CardContent>
               <div className="text-4xl font-bold tracking-tight text-red-700 font-mono mb-1" data-testid="text-sla-overdue-tickets">
                 {stats.emAtraso}
               </div>
@@ -620,6 +622,13 @@ export default function ChamadosPage() {
               </div>
             </CardContent>
           </Card>
+          
+          {/* Label de período ativo */}
+          <div className="mt-2 text-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              Período: {periodFilter === "month" ? "Mês Vigente" : periodFilter === "year" ? "Este Ano" : "Total Histórico"}
+            </span>
+          </div>
         </div>
 
         <Card className="shadow-sm border-border/60">

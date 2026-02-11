@@ -89,6 +89,8 @@ const defaultLocations: FieldItem[] = [
   { value: "Outros", label: "Outros" },
 ];
 
+import { getCurrentUser } from "@/lib/permissions";
+
 export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -98,6 +100,8 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
+
+  const currentUser = getCurrentUser();
 
   const { data: categoriesSetting } = useQuery<Setting>({
     queryKey: ["/api/settings", "ticket_categories"],
@@ -156,21 +160,21 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
   const descriptionValue = form.watch("description") || "";
   const titleValue = form.watch("title") || "";
 
-  const mutation = useMutation({
-    mutationFn: async (data: FormData) => {
-      const payload: Record<string, unknown> = {
-        ...data,
-        attachments: attachments.length > 0 ? JSON.stringify(attachments) : null,
-        requesterId: "admin",
-        status: "open",
-        code: "",
-      };
-      if (!data.assigneeId || data.assigneeId === "auto") {
-        delete payload.assigneeId;
-      }
-      const res = await apiRequest("POST", "/api/tickets", payload);
-      return res.json();
-    },
+   const mutation = useMutation({
+     mutationFn: async (data: FormData) => {
+       const payload: Record<string, unknown> = {
+         ...data,
+         attachments: attachments.length > 0 ? JSON.stringify(attachments) : null,
+         requesterId: currentUser?.id || "admin",
+         status: "open",
+         code: "",
+       };
+       if (!data.assigneeId || data.assigneeId === "auto") {
+         delete payload.assigneeId;
+       }
+       const res = await apiRequest("POST", "/api/tickets", payload);
+       return res.json();
+     },
     onSuccess: (ticket: Ticket) => {
       queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
       setCreatedTicket(ticket);
