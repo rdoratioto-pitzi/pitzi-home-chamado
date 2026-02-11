@@ -195,17 +195,22 @@ export default function UpdatesPage() {
         const isNew = !editingUpdate;
         const shouldPublish = formData.get("isPublished") === "on";
         
-        const data = {
+        // Dados para criar/editar - NÃO enviar publishedAt, o backend gerencia isso
+        const data: any = {
             title: formData.get("title") as string,
             version: formData.get("version") as string,
             content: formData.get("content") as string,
             category: formData.get("category") as string,
-            // Novos updates sempre publicados automaticamente
-            isPublished: isNew ? true : shouldPublish,
             source: "Manual",
-            // Se está publicando agora, define a data
-            publishedAt: isNew || (!editingUpdate?.isPublished && shouldPublish) ? new Date() : editingUpdate?.publishedAt,
         };
+        
+        if (isNew) {
+            // Novos updates: sempre publicados automaticamente
+            data.isPublished = true;
+        } else {
+            // Edição: respeitar o toggle
+            data.isPublished = shouldPublish;
+        }
 
         if (editingUpdate) {
             updateMutation.mutate({ id: editingUpdate.id, data });
