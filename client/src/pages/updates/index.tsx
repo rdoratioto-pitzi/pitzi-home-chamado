@@ -67,6 +67,23 @@ export default function UpdatesPage() {
     const [open, setOpen] = useState(false);
     const [editingUpdate, setEditingUpdate] = useState<Update | null>(null);
 
+    // Check database health
+    const { data: dbHealth } = useQuery<{ connected: boolean }>({
+        queryKey: ["/api/health/db"],
+        queryFn: async () => {
+            try {
+                const res = await apiRequest("GET", "/api/health/db");
+                if (!res.ok) return { connected: false };
+                return res.json();
+            } catch {
+                return { connected: false };
+            }
+        },
+        refetchInterval: 30000, // Check every 30 seconds
+    });
+
+    const isMockMode = !dbHealth?.connected;
+
     const { data: updates, isLoading } = useQuery<Update[]>({
         queryKey: ["/api/updates", isAdmin],
         queryFn: async () => {
@@ -76,9 +93,6 @@ export default function UpdatesPage() {
             return res.json();
         },
     });
-
-    // Detect if running in mock mode (database not connected)
-    const isMockMode = updates?.some(u => u.id.startsWith("mock-")) || false;
 
     const createMutation = useMutation({
         mutationFn: async (data: any) => {
@@ -178,13 +192,19 @@ export default function UpdatesPage() {
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget);
+        const isNew = !editingUpdate;
+        const shouldPublish = formData.get("isPublished") === "on";
+        
         const data = {
             title: formData.get("title") as string,
             version: formData.get("version") as string,
             content: formData.get("content") as string,
             category: formData.get("category") as string,
-            isPublished: formData.get("isPublished") === "on",
+            // Novos updates sempre publicados automaticamente
+            isPublished: isNew ? true : shouldPublish,
             source: "Manual",
+            // Se está publicando agora, define a data
+            publishedAt: isNew || (!editingUpdate?.isPublished && shouldPublish) ? new Date() : editingUpdate?.publishedAt,
         };
 
         if (editingUpdate) {
@@ -254,10 +274,16 @@ export default function UpdatesPage() {
                                     <Label htmlFor="content">Conteúdo</Label>
                                     <Textarea id="content" name="content" defaultValue={editingUpdate?.content} placeholder="Descreva as mudanças..." className="min-h-[150px]" required />
                                 </div>
-                                <div className="flex items-center space-x-2 pt-2">
-                                    <Switch id="isPublished" name="isPublished" defaultChecked={editingUpdate?.isPublished} />
-                                    <Label htmlFor="isPublished">Publicar imediatamente (notifica todos os usuários)</Label>
-                                </div>
+                                {editingUpdate && (
+                                    <div className="flex items-center space-x-2 pt-2">
+                                        <Switch id="isPublished" name="isPublished" defaultChecked={editingUpdate?.isPublished} />
+                                        <Label htmlFor="isPublished">
+                                            {editingUpdate?.isPublished 
+                                                ? "Publicado (visível para todos os usuários)" 
+                                                : "Publicar agora (tornar visível para todos os usuários)"}
+                                        </Label>
+                                    </div>
+                                )}
                                 <DialogFooter className="pt-4">
                                     <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
                                         {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -273,11 +299,11 @@ export default function UpdatesPage() {
 
             <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
                 {isMockMode && isAdmin && (
-                    <Alert className="mb-6 border-amber-500/50 bg-amber-50/50 dark:bg-amber-900/10">
-                        <AlertCircle className="h-4 w-4 text-amber-600" />
-                        <AlertDescription className="text-amber-800 dark:text-amber-200">
-                            <strong>Modo de Demonstração:</strong> O banco de dados não está conectado. 
-                            As alterações são salvas apenas na memória temporária e serão perdidas ao recarregar a página.
+                    <Alert className="mb-6 border-red-500/50 bg-red-50/50 dark:bg-red-900/10">
+                        <AlertCircle className="h-4 w-4 text-red-600" />
+                        <AlertDescription className="text-red-800 dark:text-red-200">
+                            <strong>⚠️ Atenção:</strong> O banco de dados não está conectado em produção. 
+                            Entre em contato com o administrador do sistema. As alterações não serão persistidas.
                         </AlertDescription>
                     </Alert>
                 )}

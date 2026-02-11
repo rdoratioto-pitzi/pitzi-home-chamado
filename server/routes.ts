@@ -55,6 +55,7 @@ import {
   insertUpdateSchema,
 } from "@shared/schema";
 import { z } from "zod";
+import { sql } from "drizzle-orm";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -4622,6 +4623,38 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Sync git commits error:", error);
       res.status(500).json({ error: error.message || "Erro ao sincronizar commits" });
+    }
+  });
+
+  // Health check endpoint for database
+  app.get("/api/health/db", async (req, res) => {
+    try {
+      // Try to execute a simple query
+      const { db } = await import("./db");
+      if (!db) {
+        return res.status(503).json({ 
+          status: "error", 
+          message: "Database not connected",
+          connected: false 
+        });
+      }
+      
+      // Try a simple query to verify connection
+      await db.execute(sql`SELECT 1`);
+      
+      res.json({ 
+        status: "ok", 
+        message: "Database connected",
+        connected: true 
+      });
+    } catch (error: any) {
+      console.error("Database health check failed:", error);
+      res.status(503).json({ 
+        status: "error", 
+        message: "Database connection failed",
+        connected: false,
+        error: error.message 
+      });
     }
   });
 
