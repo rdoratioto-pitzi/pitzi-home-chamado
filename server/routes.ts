@@ -4537,12 +4537,6 @@ export async function registerRoutes(
   app.post("/api/updates", async (req, res) => {
     try {
       const data = insertUpdateSchema.parse(req.body);
-      
-      // Se está publicando, define a data de publicação
-      if (data.isPublished && !data.publishedAt) {
-        (data as any).publishedAt = new Date();
-      }
-      
       const update = await storage.createUpdate(data);
       res.status(201).json(update);
     } catch (error: any) {
@@ -4635,18 +4629,37 @@ export async function registerRoutes(
   // Health check endpoint for database
   app.get("/api/health/db", async (req, res) => {
     try {
-      // Try to execute a simple query
-      const { db } = await import("./db");
-      if (!db) {
+      // Check if db module is available
+      const dbModule = await import("./db");
+      const pool = dbModule.pool;
+      
+      if (!pool) {
         return res.status(503).json({ 
           status: "error", 
-          message: "Database not connected",
+          message: "Database pool not initialized - DATABASE_URL may not be set",
           connected: false 
         });
       }
       
-      // Try a simple query to verify connection
-      await db.execute(sql`SELECT 1`);
+      // Try a simple query to verify connection is working
+      try {
+        const result = await pool.query('SELECT 1 as connected');
+        if (result && result.rows && result.rows[0]) {
+          return res.json({ 
+            status: "ok", 
+            message: "Database connected and responding",
+            connected: true 
+          });
+        }
+      } catch (queryError: any) {
+        console.error("Database query failed:", queryError);
+        return res.status(503).json({ 
+          status: "error", 
+          message: "Database query failed",
+          connected: false,
+          error: queryError.message || "Query execution error"
+        });
+      }
       
       res.json({ 
         status: "ok", 
@@ -4657,7 +4670,7 @@ export async function registerRoutes(
       console.error("Database health check failed:", error);
       res.status(503).json({ 
         status: "error", 
-        message: "Database connection failed",
+        message: "Database health check error",
         connected: false,
         error: error.message 
       });
