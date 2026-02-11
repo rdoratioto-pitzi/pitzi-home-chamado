@@ -222,8 +222,8 @@ export default function UpdatesPage() {
     return (
         <div className="flex flex-col min-h-full bg-slate-50/50 dark:bg-transparent">
             <PageHeader
-                title="Novidades do Sistema"
-                breadcrumbs={[{ label: "Novidades" }]}
+                title="Updates do Sistema"
+                breadcrumbs={[{ label: "Updates" }]}
                 actions={isAdmin && (
                     <div className="flex gap-2">
                         <Button 
@@ -304,11 +304,12 @@ export default function UpdatesPage() {
 
             <main className="flex-1 p-6 max-w-5xl mx-auto w-full">
                 {isMockMode && isAdmin && (
-                    <Alert className="mb-6 border-red-500/50 bg-red-50/50 dark:bg-red-900/10">
-                        <AlertCircle className="h-4 w-4 text-red-600" />
-                        <AlertDescription className="text-red-800 dark:text-red-200">
-                            <strong>⚠️ Atenção:</strong> O banco de dados não está conectado em produção. 
-                            Entre em contato com o administrador do sistema. As alterações não serão persistidas.
+                    <Alert className="mb-6 border-amber-500/50 bg-amber-50/50 dark:bg-amber-900/10">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <AlertDescription className="text-amber-800 dark:text-amber-200">
+                            <strong>⚠️ Modo de Demonstração:</strong> O banco de dados não está conectado. 
+                            As alterações são salvas apenas na memória temporária e serão perdidas ao recarregar a página.
+                            {process.env.NODE_ENV === 'development' && " Verifique se a variável DATABASE_URL está configurada corretamente."}
                         </AlertDescription>
                     </Alert>
                 )}

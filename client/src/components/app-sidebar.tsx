@@ -519,7 +519,7 @@ export function AppSidebar() {
                 >
                   <Link href="/updates" data-testid="link-updates">
                     <Sparkles className={`h-[20px] w-[20px] ${location === "/updates" ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-[14px]">Novidades</span>
+                    <span className="text-[14px]">Updates</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
