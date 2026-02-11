@@ -2,10 +2,10 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import nodemailer from "nodemailer";
 import { storage } from "./storage";
-import { 
-  sendTicketCreatedEmail, 
-  sendTicketAssignedEmail, 
-  sendTicketStatusChangedEmail, 
+import {
+  sendTicketCreatedEmail,
+  sendTicketAssignedEmail,
+  sendTicketStatusChangedEmail,
   sendTicketCommentEmail,
   sendMeetingInviteEmail,
   sendMentionNotificationEmail,
@@ -16,9 +16,9 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import * as correiosService from "./correios-service";
 import bwipjs from "bwip-js";
 import { streamChatCompletion, generateTitle, fetchOpenRouterModels } from "./openrouter";
-import { 
-  insertUserSchema, 
-  insertTicketSchema, 
+import {
+  insertUserSchema,
+  insertTicketSchema,
   insertTicketResponsavelSchema,
   insertTicketCommentSchema,
   insertProjectSchema,
@@ -52,6 +52,7 @@ import {
   insertAiConversationSchema,
   insertAiMessageSchema,
   insertNotificationSchema,
+  insertUpdateSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -59,7 +60,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  
+
   function getSessionUser(req: any) {
     return { userId: req.session.userId!, isAdmin: req.session.isAdmin === true };
   }
@@ -91,7 +92,7 @@ export async function registerRoutes(
         try {
           const perms = typeof flowchart.permissions === 'string' ? JSON.parse(flowchart.permissions) : flowchart.permissions;
           if (perms && typeof perms === 'object' && userId in perms) return true;
-        } catch {}
+        } catch { }
       }
     }
     return false;
@@ -105,34 +106,48 @@ export async function registerRoutes(
 
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const validated = loginSchema.parse(req.body);
-      console.log(`[auth] Login attempt for: ${validated.email}`);
+      const loginBodySchema = z.object({
+        email: z.string().email("Email inválido"),
+        password: z.string().min(1, "Senha é obrigatória"),
+        rememberMe: z.boolean().optional().default(false),
+      });
+
+      const validated = loginBodySchema.parse(req.body);
+      console.log(`[auth] Login attempt for: ${validated.email}, rememberMe: ${validated.rememberMe}`);
       const users = await storage.getUsers();
       const user = users.find(u => u.email.toLowerCase() === validated.email.toLowerCase());
-      
+
       if (!user) {
         console.log(`[auth] User not found: ${validated.email}`);
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
-      
-      console.log(`[auth] User found: ${user.email}, status: ${user.status}, isAdmin: ${user.isAdmin}, password in DB: "${user.password}"`);
+
+      console.log(`[auth] User found: ${user.email}, status: ${user.status}, isAdmin: ${user.isAdmin}`);
       if (user.password !== validated.password) {
-        console.log(`[auth] Password mismatch for: ${user.email}. Expected: "${user.password}", Got: "${validated.password}"`);
+        console.log(`[auth] Password mismatch for: ${user.email}`);
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
-      
+
       if (user.status !== "active") {
         console.log(`[auth] User inactive: ${user.email}`);
         return res.status(401).json({ success: false, message: "Sua conta está inativa. Entre em contato com o administrador." });
       }
-      
+
       console.log(`[auth] Login successful for: ${user.email}, isAdmin: ${user.isAdmin}`);
-      
+
       req.session.userId = user.id;
       req.session.isAdmin = user.isAdmin === true;
 
-      res.json({ 
-        success: true, 
+      if (validated.rememberMe) {
+        // Set session to 30 days if rememberMe is checked
+        req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
+      } else {
+        // Default session (e.g., 24 hours or browser close depending on store config)
+        req.session.cookie.maxAge = 24 * 60 * 60 * 1000;
+      }
+
+      res.json({
+        success: true,
         user: {
           id: user.id,
           name: user.name,
@@ -146,6 +161,7 @@ export async function registerRoutes(
       if (error instanceof z.ZodError) {
         return res.status(400).json({ success: false, message: "Dados inválidos", details: error.errors });
       }
+      console.error("[auth] Login error:", error);
       res.status(500).json({ success: false, message: "Erro interno" });
     }
   });
@@ -156,7 +172,7 @@ export async function registerRoutes(
     }
     const user = await storage.getUser(req.session.userId);
     if (!user || user.status !== "active") {
-      req.session.destroy(() => {});
+      req.session.destroy(() => { });
       return res.status(401).json({ authenticated: false });
     }
     res.json({
@@ -435,24 +451,29 @@ export async function registerRoutes(
 
   app.post("/api/tickets", async (req, res) => {
     try {
-      const validated = insertTicketSchema.parse(req.body);
-      
+      const data = { ...req.body };
+      // Preencher solicitante automaticamente se não enviado
+      if (!data.requesterId && req.user) {
+        data.requesterId = req.user.id;
+      }
+      const validated = insertTicketSchema.parse(data);
+
       if (!validated.assigneeId && validated.category && validated.type) {
         const autoAssignee = await storage.findResponsavelForTicket(validated.category, validated.type);
         if (autoAssignee) {
           validated.assigneeId = autoAssignee;
         }
       }
-      
+
       const ticket = await storage.createTicket(validated);
-      
+
       const requester = await storage.getUser(ticket.requesterId);
       const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
-      
+
       if (requester) {
         sendTicketCreatedEmail(ticket, requester, assignee || null).catch(console.error);
       }
-      
+
       if (assignee && assignee.id !== ticket.requesterId) {
         sendTicketAssignedEmail(ticket, assignee).catch(console.error);
       }
@@ -468,7 +489,7 @@ export async function registerRoutes(
           linkUrl: `/chamados?ticket=${ticket.id}`,
         }).catch(console.error);
       }
-      
+
       res.status(201).json(ticket);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -486,7 +507,7 @@ export async function registerRoutes(
       if (!isAdmin && oldTicket.requesterId !== userId && oldTicket.assigneeId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      
+
       // Auto-fill timestamp fields based on status changes
       const updateData: any = { ...req.body };
       if (req.body.status && req.body.status !== oldTicket.status) {
@@ -504,10 +525,10 @@ export async function registerRoutes(
       }
 
       console.log("Updating ticket with data:", JSON.stringify(updateData, null, 2));
-      
+
       const ticket = await storage.updateTicket(req.params.id, updateData);
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
-      
+
       if (req.body.status && req.body.status !== oldTicket.status) {
         const requester = await storage.getUser(ticket.requesterId);
         const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
@@ -527,7 +548,7 @@ export async function registerRoutes(
           }).catch(console.error);
         }
       }
-      
+
       if (req.body.assigneeId && req.body.assigneeId !== oldTicket.assigneeId) {
         const assignee = await storage.getUser(req.body.assigneeId);
         if (assignee) {
@@ -542,7 +563,7 @@ export async function registerRoutes(
           linkUrl: `/chamados?ticket=${ticket.id}`,
         }).catch(console.error);
       }
-      
+
       res.json(ticket);
     } catch (error) {
       console.error("Error updating ticket:", error);
@@ -575,18 +596,18 @@ export async function registerRoutes(
         ticketId: req.params.id,
       });
       const comment = await storage.createTicketComment(validated);
-      
+
       const ticket = await storage.getTicket(req.params.id);
       if (ticket) {
         // Set first response timestamp if assignee comments and it's not set yet
         if (ticket.assigneeId && comment.userId === ticket.assigneeId && !ticket.dataPrimeiraResposta) {
           await storage.updateTicket(ticket.id, { dataPrimeiraResposta: new Date() });
         }
-        
+
         const commenter = await storage.getUser(comment.userId);
         const requester = await storage.getUser(ticket.requesterId);
         const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
-        
+
         if (commenter && requester) {
           sendTicketCommentEmail(ticket, comment, commenter, requester, assignee || null).catch(console.error);
         }
@@ -618,13 +639,13 @@ export async function registerRoutes(
         const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
         if (mentionMatches) {
           const users = await storage.getUsers();
-          
+
           for (const mention of mentionMatches) {
             const mentionedName = mention.slice(1).trim();
-            const mentionedUser = users.find(u => 
+            const mentionedUser = users.find(u =>
               u.name.toLowerCase() === mentionedName.toLowerCase() && u.status === "active"
             );
-            
+
             if (mentionedUser && commenter) {
               sendMentionNotificationEmail(
                 mentionedUser,
@@ -646,7 +667,7 @@ export async function registerRoutes(
           }
         }
       }
-      
+
       res.status(201).json(comment);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -735,7 +756,7 @@ export async function registerRoutes(
       const { memberIds, ...projectData } = req.body;
       const validated = insertProjectSchema.parse(projectData);
       const project = await storage.createProject(validated);
-      
+
       if (memberIds && Array.isArray(memberIds) && memberIds.length > 0 && validated.visibility === "shared") {
         for (const uid of memberIds) {
           try {
@@ -745,7 +766,7 @@ export async function registerRoutes(
           }
         }
       }
-      
+
       res.status(201).json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -768,12 +789,12 @@ export async function registerRoutes(
       const validated = partialSchema.parse(projectData);
       const project = await storage.updateProject(req.params.id, validated);
       if (!project) return res.status(404).json({ error: "Project not found" });
-      
+
       if (memberIds && Array.isArray(memberIds) && (validated.visibility === "shared" || existing.visibility === "shared")) {
         const currentMembers = await storage.getProjectMembers(req.params.id);
         const currentMemberIds = new Set(currentMembers.map(m => m.userId));
         const newMemberIds = new Set(memberIds as string[]);
-        
+
         for (const uid of memberIds) {
           if (!currentMemberIds.has(uid)) {
             await storage.addProjectMember({ projectId: req.params.id, userId: uid, role: "member" });
@@ -785,7 +806,7 @@ export async function registerRoutes(
           }
         }
       }
-      
+
       res.json(project);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1183,12 +1204,12 @@ export async function registerRoutes(
   app.get("/api/key-results/:id/updates", async (req, res) => {
     const updates = await storage.getKeyResultUpdates(req.params.id);
     const users = await storage.getUsers();
-    
+
     const updatesWithUser = updates.map(update => ({
       ...update,
       user: users.find(u => u.id === update.userId)
     }));
-    
+
     res.json(updatesWithUser);
   });
 
@@ -1207,7 +1228,7 @@ export async function registerRoutes(
       const startVal = parseFloat(kr.startValue || "0");
       const targetVal = parseFloat(kr.targetValue || "100");
       const newVal = parseFloat(validated.newValue || "0");
-      
+
       let progressPercentage: number;
       if (kr.measurementType === "decreasing") {
         // For decreasing: progress = (start - current) / (start - target) * 100
@@ -1219,7 +1240,7 @@ export async function registerRoutes(
         // For percentage, absolute, monetary, temporal
         progressPercentage = targetVal !== startVal ? ((newVal - startVal) / (targetVal - startVal)) * 100 : 0;
       }
-      
+
       // Clamp between 0 and 100
       progressPercentage = Math.max(0, Math.min(100, progressPercentage));
 
@@ -1389,11 +1410,11 @@ export async function registerRoutes(
       const { memberIds, ...areaData } = req.body;
       const validated = insertTaskAreaSchema.parse({ ...areaData, ownerId: userId });
       const area = await storage.createTaskArea(validated);
-      
+
       // Process shared area members and send invites
       if (memberIds && Array.isArray(memberIds) && memberIds.length > 0 && validated.visibility === "shared") {
         const owner = await storage.getUser(validated.ownerId);
-        
+
         for (const userId of memberIds) {
           try {
             // Create area member
@@ -1402,7 +1423,7 @@ export async function registerRoutes(
               userId,
               role: "member"
             });
-            
+
             const member = await storage.getUser(userId);
             if (member && owner) {
               sendSharedAreaInviteEmail(
@@ -1427,7 +1448,7 @@ export async function registerRoutes(
           }
         }
       }
-      
+
       res.status(201).json(area);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1573,10 +1594,10 @@ export async function registerRoutes(
       type: req.query.type as string | undefined,
     };
     const tasks = await storage.getTasks(filters);
-    
+
     // Admin vê tudo
     if (isAdmin) return res.json(tasks);
-    
+
     // Filtragem para usuários comuns:
     // 1. Tarefas criadas pelo usuário
     // 2. Tarefas atribuídas ao usuário (assigneeId ou na lista de assigneeIds)
@@ -1585,20 +1606,20 @@ export async function registerRoutes(
     const filtered = tasks.filter(t => {
       const isCreator = t.createdBy === userId;
       const isAssignee = t.assigneeId === userId;
-      
+
       let isMultiAssignee = false;
       if (t.assigneeIds) {
         try {
           const ids = typeof t.assigneeIds === 'string' ? JSON.parse(t.assigneeIds) : t.assigneeIds;
           if (Array.isArray(ids)) isMultiAssignee = ids.includes(userId);
-        } catch (e) {}
+        } catch (e) { }
       }
 
       const hasAreaAccess = t.areaId ? accessibleAreaIds.includes(t.areaId) : false;
 
       return isCreator || isAssignee || isMultiAssignee || hasAreaAccess;
     });
-    
+
     res.json(filtered);
   });
 
@@ -1619,7 +1640,7 @@ export async function registerRoutes(
     try {
       const validated = insertTaskSchema.parse(req.body);
       const task = await storage.createTask(validated);
-      
+
       if (task.type === "meeting_note") {
         let meetingData: {
           date?: string;
@@ -1627,7 +1648,7 @@ export async function registerRoutes(
           participants?: string[];
           externalParticipants?: string[];
         } | null = null;
-        
+
         try {
           meetingData = typeof task.meetingData === 'string'
             ? JSON.parse(task.meetingData)
@@ -1635,7 +1656,7 @@ export async function registerRoutes(
         } catch {
           meetingData = null;
         }
-        
+
         if (meetingData?.date && meetingData?.time) {
           const organizer = await storage.getUser(task.createdBy);
           if (organizer) {
@@ -1645,7 +1666,7 @@ export async function registerRoutes(
             );
             const validParticipants = participants.filter((p): p is NonNullable<typeof p> => p !== undefined);
             const externalEmails = meetingData.externalParticipants || [];
-            
+
             sendMeetingInviteEmail(task, organizer, validParticipants, externalEmails).catch(console.error);
           }
         }
@@ -1683,7 +1704,7 @@ export async function registerRoutes(
               }
             }
           }
-        } catch {}
+        } catch { }
       }
 
       if (task.type === "meeting_note") {
@@ -1691,7 +1712,7 @@ export async function registerRoutes(
         try {
           const md = typeof task.meetingData === 'string' ? JSON.parse(task.meetingData) : task.meetingData;
           meetingParticipants = md?.participants || [];
-        } catch {}
+        } catch { }
         const organizer = await storage.getUser(task.createdBy);
         for (const participantId of meetingParticipants) {
           if (participantId !== task.createdBy) {
@@ -1707,7 +1728,7 @@ export async function registerRoutes(
           }
         }
       }
-      
+
       res.status(201).json(task);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1723,11 +1744,11 @@ export async function registerRoutes(
       if (!Array.isArray(updates)) {
         return res.status(400).json({ error: "Updates must be an array" });
       }
-      
+
       await Promise.all(
         updates.map(update => storage.updateTask(update.id, { order: update.order }))
       );
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error reordering tasks:", error);
@@ -1774,7 +1795,7 @@ export async function registerRoutes(
             oldIds = existingTask.assigneeIds
               ? (typeof existingTask.assigneeIds === 'string' ? JSON.parse(existingTask.assigneeIds) : existingTask.assigneeIds)
               : [];
-          } catch {}
+          } catch { }
           if (Array.isArray(newIds)) {
             const oldSet = new Set(oldIds);
             const updatedBy = req.body.updatedBy || task!.createdBy;
@@ -1793,7 +1814,7 @@ export async function registerRoutes(
               }
             }
           }
-        } catch {}
+        } catch { }
       }
 
       res.json(task);
@@ -1831,20 +1852,20 @@ export async function registerRoutes(
       const data = { ...req.body, taskId: req.params.id };
       const validated = insertTaskCommentSchema.parse(data);
       const comment = await storage.createTaskComment(validated);
-      
+
       // Process @mentions and send notifications
       const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
       if (mentionMatches) {
         const task = await storage.getTask(req.params.id);
         const users = await storage.getUsers();
         const author = await storage.getUser(validated.authorId);
-        
+
         for (const mention of mentionMatches) {
           const mentionedName = mention.slice(1).trim();
-          const mentionedUser = users.find(u => 
+          const mentionedUser = users.find(u =>
             u.name.toLowerCase() === mentionedName.toLowerCase()
           );
-          
+
           if (mentionedUser && task && author) {
             sendMentionNotificationEmail(
               mentionedUser,
@@ -1865,7 +1886,7 @@ export async function registerRoutes(
           }
         }
       }
-      
+
       res.status(201).json(comment);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -2088,18 +2109,18 @@ export async function registerRoutes(
   app.post("/api/logistica-reversa/solicitar", async (req, res) => {
     try {
       const { tipo: tipoInput, codigoServico: servicoInput, remetente, destinatario, observacao, tipoEmbalagem } = req.body;
-      
+
       // Define valores padrão
       const tipo = tipoInput || 'A'; // A = Autorização de Postagem (padrão)
       const codigoServico = servicoInput || '03247'; // SEDEX Reversa (padrão)
-      
+
       // Chama a API real dos Correios
       console.log('=== Solicitando Logística Reversa nos Correios ===');
       console.log('Tipo:', tipo);
       console.log('Serviço:', codigoServico);
       console.log('Remetente:', remetente?.nome);
       console.log('Destinatário:', destinatario?.nome);
-      
+
       const correiosParams: correiosService.SolicitarPostagemReversaParams = {
         codigo_servico: codigoServico,
         destinatario: {
@@ -2147,56 +2168,56 @@ export async function registerRoutes(
           }],
         }],
       };
-      
+
       let numeroPedido: string;
       let numeroEtiqueta: string;
       let prazo: string;
       let correiosResponse: correiosService.SolicitarPostagemReversaResponse | null = null;
-      
+
       try {
         correiosResponse = await correiosService.solicitarPostagemReversa(correiosParams);
         console.log('=== Resposta dos Correios ===');
         console.log('Status:', correiosResponse.status_processamento);
         console.log('Erro:', correiosResponse.cod_erro, correiosResponse.msg_erro);
         console.log('Resultados:', JSON.stringify(correiosResponse.resultado_solicitacao, null, 2));
-        
+
         // Verifica se houve erro geral (00 e 0 são sucesso)
         const codErroGeral = correiosResponse.cod_erro?.trim();
         if (codErroGeral && codErroGeral !== '0' && codErroGeral !== '00' && codErroGeral !== '') {
           throw new Error(`Correios: ${correiosResponse.msg_erro || correiosResponse.cod_erro}`);
         }
-        
+
         const resultado = correiosResponse.resultado_solicitacao[0];
         if (!resultado) {
           throw new Error('Correios: Nenhum resultado retornado');
         }
-        
+
         // Verifica erro no resultado individual (0 e 00 são sucesso)
         const codErroItem = resultado.codigo_erro?.toString().trim();
         if (codErroItem && codErroItem !== '0' && codErroItem !== '00' && codErroItem !== '') {
           throw new Error(`Correios: ${resultado.descricao_erro || resultado.codigo_erro}`);
         }
-        
+
         // Usa os valores reais retornados pelos Correios
         numeroPedido = resultado.numero_coleta || `LR${Date.now()}`;
         numeroEtiqueta = resultado.numero_etiqueta || '';
         prazo = resultado.prazo || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
-        
+
         console.log('Número do Pedido:', numeroPedido);
         console.log('Número da Etiqueta:', numeroEtiqueta);
         console.log('Prazo:', prazo);
-        
+
       } catch (correiosError: any) {
         console.error('=== Erro na API dos Correios ===');
         console.error(correiosError.message);
-        
+
         // Retorna o erro para o usuário em vez de criar pedido falso
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: correiosError.message || 'Erro ao comunicar com os Correios',
           details: 'Verifique as credenciais e tente novamente'
         });
       }
-      
+
       const pedidoData = {
         numeroPedido,
         numeroEtiqueta,
@@ -2221,7 +2242,7 @@ export async function registerRoutes(
       };
 
       const pedido = await storage.createLogisticaReversaPedido(pedidoData);
-      
+
       // Create initial event with Correios response info
       await storage.createLogisticaReversaEvento({
         pedidoId: pedido.id,
@@ -2229,8 +2250,8 @@ export async function registerRoutes(
         descricao: `Pedido de logística reversa criado nos Correios. Etiqueta: ${numeroEtiqueta}`,
       });
 
-      res.status(201).json({ 
-        pedido, 
+      res.status(201).json({
+        pedido,
         success: true,
         correiosResponse: correiosResponse ? {
           status: correiosResponse.status_processamento,
@@ -2266,13 +2287,13 @@ export async function registerRoutes(
     try {
       const pedido = await storage.updateLogisticaReversaPedido(req.params.id, { status: "cancelado" });
       if (!pedido) return res.status(404).json({ error: "Pedido not found" });
-      
+
       await storage.createLogisticaReversaEvento({
         pedidoId: pedido.id,
         status: "cancelado",
         descricao: "Pedido cancelado pelo usuário",
       });
-      
+
       res.json({ pedido, success: true });
     } catch (error) {
       res.status(400).json({ error: "Failed to cancel pedido" });
@@ -2339,15 +2360,15 @@ export async function registerRoutes(
   app.post("/api/slas", async (req, res) => {
     try {
       const validated = insertSlaRuleSchema.parse(req.body);
-      
+
       const existing = await storage.getSlaRuleByTipoAndPrioridade(validated.tipo, validated.prioridade);
       if (existing) {
-        return res.status(409).json({ 
+        return res.status(409).json({
           error: "conflict",
           message: `Já existe uma regra de SLA para ${validated.tipo} com prioridade ${validated.prioridade}`
         });
       }
-      
+
       const rule = await storage.createSlaRule(validated);
       res.status(201).json(rule);
     } catch (error) {
@@ -2362,17 +2383,17 @@ export async function registerRoutes(
     try {
       const partialSchema = insertSlaRuleSchema.partial();
       const validated = partialSchema.parse(req.body);
-      
+
       if (validated.tipo && validated.prioridade) {
         const existing = await storage.getSlaRuleByTipoAndPrioridade(validated.tipo, validated.prioridade);
         if (existing && existing.id !== req.params.id) {
-          return res.status(409).json({ 
+          return res.status(409).json({
             error: "conflict",
             message: `Já existe uma regra de SLA para ${validated.tipo} com prioridade ${validated.prioridade}`
           });
         }
       }
-      
+
       const rule = await storage.updateSlaRule(req.params.id, validated);
       if (!rule) return res.status(404).json({ error: "SLA rule not found" });
       res.json(rule);
@@ -2396,11 +2417,11 @@ export async function registerRoutes(
       const cep = req.params.cep.replace(/\D/g, "");
       const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
       const data = await response.json();
-      
+
       if (data.erro) {
         return res.status(404).json({ error: "CEP not found" });
       }
-      
+
       res.json({
         cep: data.cep,
         logradouro: data.logradouro,
@@ -2424,7 +2445,7 @@ export async function registerRoutes(
 
       const viacepResponse = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
       const viacepData = await viacepResponse.json();
-      
+
       if (viacepData.erro) {
         return res.json({ coberto: false, erro: "CEP não encontrado. Verifique o número informado." });
       }
@@ -2433,23 +2454,23 @@ export async function registerRoutes(
 
       try {
         const correiosCalcUrl = `http://ws.correios.com.br/calculador/CalcPrecoPrazo.aspx?nCdEmpresa=&sDsSenha=&nCdServico=04510&sCepOrigem=${cep}&sCepDestino=${cepDestino}&nVlPeso=1&nCdFormato=1&nVlComprimento=20&nVlAltura=10&nVlLargura=15&nVlDiametro=0&sCdMaoPropria=N&nVlValorDeclarado=0&sCdAvisoRecebimento=N&StrRetorno=xml`;
-        
+
         const correiosResponse = await fetch(correiosCalcUrl, {
           signal: AbortSignal.timeout(8000),
         });
-        
+
         if (correiosResponse.ok) {
           const xmlText = await correiosResponse.text();
-          
+
           const hasError = xmlText.includes('<Erro>') && !xmlText.includes('<Erro>0</Erro>') && !xmlText.includes('<Erro></Erro>');
           const errorMatch = xmlText.match(/<MsgErro>(.*?)<\/MsgErro>/);
-          const cepNotCovered = errorMatch?.[1]?.toLowerCase().includes('não atend') || 
-                                errorMatch?.[1]?.toLowerCase().includes('localidade') ||
-                                xmlText.includes('CEP de origem') && xmlText.includes('inválido');
-          
+          const cepNotCovered = errorMatch?.[1]?.toLowerCase().includes('não atend') ||
+            errorMatch?.[1]?.toLowerCase().includes('localidade') ||
+            xmlText.includes('CEP de origem') && xmlText.includes('inválido');
+
           if (hasError && cepNotCovered) {
-            return res.json({ 
-              coberto: false, 
+            return res.json({
+              coberto: false,
               erro: `CEP ${cep} não possui cobertura dos Correios para serviços de entrega/coleta. ${errorMatch?.[1] || ''}`.trim(),
             });
           }
@@ -2458,8 +2479,8 @@ export async function registerRoutes(
         console.log("CEP coverage calc check unavailable, falling back to ViaCEP validation");
       }
 
-      res.json({ 
-        coberto: true, 
+      res.json({
+        coberto: true,
         cidade: viacepData.localidade,
         uf: viacepData.uf,
         mensagem: `CEP ${cep} está na área de cobertura dos Correios.`
@@ -2471,7 +2492,7 @@ export async function registerRoutes(
   });
 
   // ============== RS LOGISTICA API INTEGRATION ==============
-  
+
   const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
   const RS_API_TOKEN = "Renov123";
 
@@ -2485,7 +2506,7 @@ export async function registerRoutes(
           "Content-Type": "application/json",
         },
       });
-      
+
       if (response.ok) {
         res.json({ connected: true, message: "Conexão estabelecida com sucesso" });
       } else {
@@ -2501,7 +2522,7 @@ export async function registerRoutes(
     try {
       const params = new URLSearchParams();
       const queryParams = ["imei", "voucher_code", "voucher_status", "customer_cpf", "created_start", "created_end", "used_start", "used_end", "network", "store_type", "boost", "global_status"];
-      
+
       queryParams.forEach(param => {
         if (req.query[param]) {
           params.append(param, req.query[param] as string);
@@ -2594,7 +2615,7 @@ export async function registerRoutes(
           "Content-Type": "application/json",
         },
       });
-      
+
       if (response.ok) {
         res.json({ connected: true, message: "Conexão estabelecida com sucesso" });
       } else {
@@ -2808,7 +2829,7 @@ export async function registerRoutes(
           "Content-Type": "application/json",
         },
       });
-      
+
       if (response.ok) {
         res.json({ connected: true, message: "Conexão estabelecida com sucesso" });
       } else {
@@ -2841,7 +2862,7 @@ export async function registerRoutes(
   });
 
   // ============== LABEL PRINTING (IMPRESSÃO DE ETIQUETAS) ==============
-  
+
   // Zod schema for label data validation
   const labelDataSchema = z.object({
     imei: z.string().length(15).regex(/^\d{15}$/, "IMEI deve ter exatamente 15 dígitos numéricos"),
@@ -2849,7 +2870,7 @@ export async function registerRoutes(
     deviceErpCode: z.string().min(1).max(50),
     triador: z.string().min(1).max(100),
   });
-  
+
   // Generate PNG label with Code128 barcode
   app.post("/api/etiquetas/gerar-png", async (req, res) => {
     try {
@@ -2857,10 +2878,10 @@ export async function registerRoutes(
       if (!validationResult.success) {
         return res.status(400).json({ error: "Dados inválidos", details: validationResult.error.errors });
       }
-      
+
       const { imei, deviceDescription, deviceErpCode, triador } = validationResult.data;
       const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
-      
+
       // Generate Code128 barcode as PNG buffer
       const barcodeBuffer = await bwipjs.toBuffer({
         bcid: "code128",
@@ -2874,10 +2895,10 @@ export async function registerRoutes(
         paddingheight: 2,
         backgroundcolor: "FFFFFF",
       });
-      
+
       // Return barcode as base64 along with label data
       const barcodeBase64 = barcodeBuffer.toString("base64");
-      
+
       res.json({
         success: true,
         label: {
@@ -2894,7 +2915,7 @@ export async function registerRoutes(
       res.status(500).json({ error: error.message || "Failed to generate label" });
     }
   });
-  
+
   // Generate ZPL for printing (client opens print window)
   app.post("/api/etiquetas/imprimir", async (req, res) => {
     try {
@@ -2902,11 +2923,11 @@ export async function registerRoutes(
       if (!validationResult.success) {
         return res.status(400).json({ error: "Dados inválidos", details: validationResult.error.errors });
       }
-      
+
       const { imei, deviceDescription, deviceErpCode, triador } = validationResult.data;
-      
+
       const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
-      
+
       // Generate ZPL code for Zebra printer
       const zpl = `^XA
 ^CI28
@@ -2927,29 +2948,29 @@ export async function registerRoutes(
 ^FO150,290^BY2^BCN,70,Y,N,N^FD${imei}^FS
 
 ^XZ`;
-      
+
       // Return the ZPL for client-side printing (browser print window)
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         zpl,
-        message: "ZPL generated successfully." 
+        message: "ZPL generated successfully."
       });
     } catch (error: any) {
       console.error("Print label error:", error);
       res.status(500).json({ error: error.message || "Failed to print label" });
     }
   });
-  
+
   // Get barcode image only (for preview)
   app.get("/api/etiquetas/barcode/:imei", async (req, res) => {
     try {
       const { imei } = req.params;
-      
+
       // Validate IMEI format
       if (!imei || !/^\d{15}$/.test(imei)) {
         return res.status(400).json({ error: "IMEI inválido. Deve ter exatamente 15 dígitos." });
       }
-      
+
       const barcodeBuffer = await bwipjs.toBuffer({
         bcid: "code128",
         text: imei,
@@ -2960,7 +2981,7 @@ export async function registerRoutes(
         paddingheight: 2,
         backgroundcolor: "FFFFFF",
       });
-      
+
       res.set("Content-Type", "image/png");
       res.send(barcodeBuffer);
     } catch (error: any) {
@@ -2970,7 +2991,7 @@ export async function registerRoutes(
   });
 
   // ============== CORREIOS LOGISTICA REVERSA ==============
-  
+
   // Get Correios configuration status
   app.get("/api/correios/config", async (req, res) => {
     try {
@@ -3087,13 +3108,13 @@ export async function registerRoutes(
       const url = `${RENOVSMART_API_BASE}/eligible-devices?${params.toString()}`;
       console.log(`Fetching RenovSmart API: ${url}`);
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         console.warn(`RenovSmart eligible-devices returned ${response.status}: ${errorText}`);
         return res.json({ items: [], currentPage: 1, hasNextPage: false });
       }
-      
+
       const data = await response.json();
       res.json(data);
     } catch (error: any) {
@@ -3154,7 +3175,7 @@ export async function registerRoutes(
   });
 
   // ============== LOCAL PRICING DEVICES API ==============
-  
+
   // Get all local pricing devices
   app.get("/api/pricing/devices", async (req, res) => {
     try {
@@ -3250,7 +3271,7 @@ export async function registerRoutes(
   });
 
   // ============== PRICING ALERTS API ==============
-  
+
   app.get("/api/pricing/alerts", async (req, res) => {
     try {
       const { userId } = req.query;
@@ -3299,7 +3320,7 @@ export async function registerRoutes(
   });
 
   // ============== PRICING ANALYTICS API ==============
-  
+
   // Get deflation indicators
   app.get("/api/pricing/analytics/deflation", async (req, res) => {
     try {
@@ -3311,22 +3332,22 @@ export async function registerRoutes(
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
       const deflationData: any[] = [];
-      
+
       for (const device of devices) {
         const history = await storage.getPricingPriceHistory(device.id);
         if (history.length < 2) continue;
-        
+
         // Sort by date
         const sorted = history.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
+
         // Calculate 30-day change
         const recent = sorted.filter(h => new Date(h.date) >= thirtyDaysAgo);
         if (recent.length < 2) continue;
-        
+
         const oldestPrice = parseFloat(recent[0].avgPrice || "0");
         const newestPrice = parseFloat(recent[recent.length - 1].avgPrice || "0");
         const change = oldestPrice > 0 ? ((newestPrice - oldestPrice) / oldestPrice) * 100 : 0;
-        
+
         // Calculate weekly variation
         const weekRecent = sorted.filter(h => new Date(h.date) >= sevenDaysAgo);
         let weeklyVariation = 0;
@@ -3335,7 +3356,7 @@ export async function registerRoutes(
           const weekNew = parseFloat(weekRecent[weekRecent.length - 1].avgPrice || "0");
           weeklyVariation = weekOld > 0 ? ((weekNew - weekOld) / weekOld) * 100 : 0;
         }
-        
+
         deflationData.push({
           deviceId: device.id,
           deviceName: `${device.manufacturerName} ${device.modelName} ${device.storage}GB`,
@@ -3346,15 +3367,15 @@ export async function registerRoutes(
           weeklyVariation,
         });
       }
-      
+
       // Sort by price change (most negative = biggest drop)
       const sorted = deflationData.sort((a, b) => a.priceChange30d - b.priceChange30d);
-      
+
       // Calculate averages
-      const avgDeflation = deflationData.length > 0 
-        ? deflationData.reduce((acc, d) => acc + d.priceChange30d, 0) / deflationData.length 
+      const avgDeflation = deflationData.length > 0
+        ? deflationData.reduce((acc, d) => acc + d.priceChange30d, 0) / deflationData.length
         : 0;
-      
+
       const avgWeeklyVariation = deflationData.length > 0
         ? deflationData.reduce((acc, d) => acc + d.weeklyVariation, 0) / deflationData.length
         : 0;
@@ -3365,7 +3386,7 @@ export async function registerRoutes(
         if (!byManufacturer[d.manufacturerName]) byManufacturer[d.manufacturerName] = [];
         byManufacturer[d.manufacturerName].push(d.priceChange30d);
       });
-      
+
       const deflationByBrand = Object.entries(byManufacturer).map(([brand, changes]) => ({
         brand,
         avgDeflation: changes.reduce((a, b) => a + b, 0) / changes.length,
@@ -3386,7 +3407,7 @@ export async function registerRoutes(
   });
 
   // ============== METAS (Goals) API ==============
-  
+
   // Meta Areas
   app.get("/api/meta-areas", async (req, res) => {
     try {
@@ -3568,20 +3589,20 @@ export async function registerRoutes(
       if (!meta) {
         return res.status(404).json({ error: "Meta not found" });
       }
-      
+
       const parsed = insertMetaCheckinSchema.parse({
         ...req.body,
         metaId: req.params.id,
         previousValue: meta.currentValue,
       });
-      
+
       const checkin = await storage.createMetaCheckin(parsed);
-      
+
       // Update meta's current value and status
       const targetValue = parseFloat(meta.targetValue || "100");
       const newValue = parseFloat(parsed.newValue);
       let status = "on_track";
-      
+
       if (targetValue > 0) {
         const progress = (newValue / targetValue) * 100;
         if (progress >= 100) {
@@ -3594,12 +3615,12 @@ export async function registerRoutes(
           }
         }
       }
-      
-      await storage.updateMeta(req.params.id, { 
+
+      await storage.updateMeta(req.params.id, {
         currentValue: parsed.newValue,
-        status 
+        status
       });
-      
+
       res.status(201).json(checkin);
     } catch (error: any) {
       console.error("Create meta checkin error:", error);
@@ -3644,7 +3665,7 @@ export async function registerRoutes(
       if (!doc) {
         return res.status(404).json({ error: "Document not found" });
       }
-      
+
       // Log view action
       const userId = req.query.userId as string;
       if (userId) {
@@ -3654,7 +3675,7 @@ export async function registerRoutes(
           acao: "visualizou",
         });
       }
-      
+
       res.json(doc);
     } catch (error: any) {
       console.error("Get knowledge document error:", error);
@@ -3667,14 +3688,14 @@ export async function registerRoutes(
     try {
       const parsed = insertKnowledgeDocumentSchema.parse(req.body);
       const doc = await storage.createKnowledgeDocument(parsed);
-      
+
       // Log creation
       await storage.createKnowledgeAuditLog({
         documentId: doc.id,
         userId: doc.criadorId,
         acao: "criou",
       });
-      
+
       // Create initial version
       await storage.createKnowledgeDocumentVersion({
         documentId: doc.id,
@@ -3684,7 +3705,7 @@ export async function registerRoutes(
         alteradoPor: doc.criadorId,
         resumoAlteracoes: "Versão inicial",
       });
-      
+
       res.status(201).json(doc);
     } catch (error: any) {
       console.error("Create knowledge document error:", error);
@@ -3699,17 +3720,17 @@ export async function registerRoutes(
   app.patch("/api/conhecimento/:id", async (req, res) => {
     try {
       const { userId, ...updateData } = req.body;
-      
+
       const updated = await storage.updateKnowledgeDocument(req.params.id, {
         ...updateData,
         ultimaEdicaoPor: userId,
         ultimaEdicaoEm: new Date(),
       });
-      
+
       if (!updated) {
         return res.status(404).json({ error: "Document not found" });
       }
-      
+
       // Log edit action
       if (userId) {
         await storage.createKnowledgeAuditLog({
@@ -3718,7 +3739,7 @@ export async function registerRoutes(
           acao: "editou",
         });
       }
-      
+
       res.json(updated);
     } catch (error: any) {
       console.error("Update knowledge document error:", error);
@@ -3730,21 +3751,21 @@ export async function registerRoutes(
   app.post("/api/conhecimento/:id/enviar-aprovacao", async (req, res) => {
     try {
       const { userId } = req.body;
-      
+
       const updated = await storage.updateKnowledgeDocument(req.params.id, {
         status: "em_analise",
       });
-      
+
       if (!updated) {
         return res.status(404).json({ error: "Document not found" });
       }
-      
+
       await storage.createKnowledgeAuditLog({
         documentId: req.params.id,
         userId,
         acao: "enviou_aprovacao",
       });
-      
+
       res.json(updated);
     } catch (error: any) {
       console.error("Send for approval error:", error);
@@ -3756,23 +3777,23 @@ export async function registerRoutes(
   app.post("/api/conhecimento/:id/aprovar", async (req, res) => {
     try {
       const { userId } = req.body;
-      
+
       const updated = await storage.updateKnowledgeDocument(req.params.id, {
         status: "aprovado",
         aprovadoPor: userId,
         aprovadoEm: new Date(),
       });
-      
+
       if (!updated) {
         return res.status(404).json({ error: "Document not found" });
       }
-      
+
       await storage.createKnowledgeAuditLog({
         documentId: req.params.id,
         userId,
         acao: "aprovou",
       });
-      
+
       res.json(updated);
     } catch (error: any) {
       console.error("Approve document error:", error);
@@ -3784,25 +3805,25 @@ export async function registerRoutes(
   app.post("/api/conhecimento/:id/rejeitar", async (req, res) => {
     try {
       const { userId, motivo } = req.body;
-      
+
       const updated = await storage.updateKnowledgeDocument(req.params.id, {
         status: "rascunho",
         rejeitadoPor: userId,
         rejeitadoEm: new Date(),
         motivoRejeicao: motivo,
       });
-      
+
       if (!updated) {
         return res.status(404).json({ error: "Document not found" });
       }
-      
+
       await storage.createKnowledgeAuditLog({
         documentId: req.params.id,
         userId,
         acao: "rejeitou",
         detalhes: motivo,
       });
-      
+
       res.json(updated);
     } catch (error: any) {
       console.error("Reject document error:", error);
@@ -3814,21 +3835,21 @@ export async function registerRoutes(
   app.post("/api/conhecimento/:id/arquivar", async (req, res) => {
     try {
       const { userId } = req.body;
-      
+
       const updated = await storage.updateKnowledgeDocument(req.params.id, {
         status: "arquivado",
       });
-      
+
       if (!updated) {
         return res.status(404).json({ error: "Document not found" });
       }
-      
+
       await storage.createKnowledgeAuditLog({
         documentId: req.params.id,
         userId,
         acao: "arquivou",
       });
-      
+
       res.json(updated);
     } catch (error: any) {
       console.error("Archive document error:", error);
@@ -3868,9 +3889,9 @@ export async function registerRoutes(
         ...req.body,
         documentId: req.params.id,
       });
-      
+
       const version = await storage.createKnowledgeDocumentVersion(parsed);
-      
+
       // Update document's current version
       await storage.updateKnowledgeDocument(req.params.id, {
         versao: parsed.versao,
@@ -3879,14 +3900,14 @@ export async function registerRoutes(
         ultimaEdicaoPor: parsed.alteradoPor,
         ultimaEdicaoEm: new Date(),
       });
-      
+
       await storage.createKnowledgeAuditLog({
         documentId: req.params.id,
         userId: parsed.alteradoPor,
         acao: "editou",
         detalhes: `Nova versão: ${parsed.versao}`,
       });
-      
+
       res.status(201).json(version);
     } catch (error: any) {
       console.error("Create document version error:", error);
@@ -3900,11 +3921,11 @@ export async function registerRoutes(
       const { userId } = req.body;
       const versions = await storage.getKnowledgeDocumentVersions(req.params.id);
       const version = versions.find(v => v.id === req.params.versionId);
-      
+
       if (!version) {
         return res.status(404).json({ error: "Version not found" });
       }
-      
+
       // Update document to this version
       const updated = await storage.updateKnowledgeDocument(req.params.id, {
         versao: version.versao,
@@ -3913,14 +3934,14 @@ export async function registerRoutes(
         ultimaEdicaoPor: userId,
         ultimaEdicaoEm: new Date(),
       });
-      
+
       await storage.createKnowledgeAuditLog({
         documentId: req.params.id,
         userId,
         acao: "restaurou",
         detalhes: `Restaurado para versão ${version.versao}`,
       });
-      
+
       res.json(updated);
     } catch (error: any) {
       console.error("Restore version error:", error);
@@ -3954,18 +3975,18 @@ export async function registerRoutes(
   app.post("/api/conhecimento/:id/favoritar", async (req, res) => {
     try {
       const { userId } = req.body;
-      
+
       // Check if already favorited
       const existing = await storage.getKnowledgeFavorite(userId, req.params.id);
       if (existing) {
         return res.status(400).json({ error: "Already favorited" });
       }
-      
+
       const favorite = await storage.createKnowledgeFavorite({
         userId,
         documentId: req.params.id,
       });
-      
+
       res.status(201).json(favorite);
     } catch (error: any) {
       console.error("Add favorite error:", error);
@@ -3980,7 +4001,7 @@ export async function registerRoutes(
       if (!favorite) {
         return res.status(404).json({ error: "Favorite not found" });
       }
-      
+
       await storage.deleteKnowledgeFavorite(favorite.id);
       res.json({ success: true });
     } catch (error: any) {
@@ -3993,7 +4014,7 @@ export async function registerRoutes(
   registerObjectStorageRoutes(app);
 
   // ============== AI CHAT ROUTES ==============
-  
+
   // Get all conversations for a user
   app.get("/api/ai/conversations/:userId", async (req, res) => {
     try {
@@ -4493,6 +4514,124 @@ export async function registerRoutes(
       await storage.markAllNotificationsRead(userId);
       res.json({ success: true });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============== UPDATES / NEWS ROUTES ==============
+
+  // Get all updates (with optional filtering)
+  app.get("/api/updates", async (req, res) => {
+    try {
+      const { tenantId, includeUnpublished } = req.query;
+      const updates = await storage.getUpdates(
+        tenantId as string | undefined,
+        includeUnpublished === "true"
+      );
+      res.json(updates);
+    } catch (error: any) {
+      console.error("Get updates error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get latest published updates
+  app.get("/api/updates/latest", async (req, res) => {
+    try {
+      const { limit, tenantId } = req.query;
+      const updates = await storage.getLatestUpdates(
+        limit ? parseInt(limit as string) : 5,
+        tenantId as string | undefined
+      );
+      res.json(updates);
+    } catch (error: any) {
+      console.error("Get latest updates error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get single update
+  app.get("/api/updates/:id", async (req, res) => {
+    try {
+      const update = await storage.getUpdate(req.params.id);
+      if (!update) {
+        return res.status(404).json({ error: "Update not found" });
+      }
+      res.json(update);
+    } catch (error: any) {
+      console.error("Get update error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Create update
+  app.post("/api/updates", async (req, res) => {
+    try {
+      const data = insertUpdateSchema.parse(req.body);
+      const update = await storage.createUpdate(data);
+      res.status(201).json(update);
+    } catch (error: any) {
+      console.error("Create update error:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Validation error", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update update
+  app.patch("/api/updates/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const existing = await storage.getUpdate(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Update not found" });
+      }
+
+      const data = req.body;
+      // If publishing for the first time, set publishedAt
+      if (data.isPublished && !existing.isPublished) {
+        data.publishedAt = new Date();
+      }
+
+      const update = await storage.updateUpdate(id, data);
+
+      // If published, notify all active users
+      if (data.isPublished && !existing.isPublished && update) {
+        const users = await storage.getUsers();
+        for (const user of users) {
+          if (user.status === 'active') {
+            await storage.createNotification({
+              userId: user.id,
+              title: "Novidade no Sistema! 🚀",
+              message: `A versão ${update.version} foi publicada: ${update.title}`,
+              module: "configuracoes",
+              entityId: update.id,
+              linkUrl: "/updates",
+            }).catch(console.error);
+          }
+        }
+      }
+
+      res.json(update);
+    } catch (error: any) {
+      console.error("Update update error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Delete update
+  app.delete("/api/updates/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const existing = await storage.getUpdate(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Update not found" });
+      }
+      const deleted = await storage.deleteUpdate(id);
+      res.json({ success: deleted });
+    } catch (error: any) {
+      console.error("Delete update error:", error);
       res.status(500).json({ error: error.message });
     }
   });

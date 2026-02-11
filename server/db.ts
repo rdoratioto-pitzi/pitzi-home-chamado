@@ -5,10 +5,20 @@ import * as schema from "@shared/schema";
 const { Pool } = pg;
 
 if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+  console.warn("⚠️  DATABASE_URL not set.");
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle(pool, { schema });
+export const pool = process.env.DATABASE_URL
+  ? new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false // Required for some Neon connections if cert is not provided
+    }
+  })
+  : null;
+
+export const db = pool ? drizzle(pool, { schema }) : null;
+
+if (db) {
+  console.log("✅ Database instance created.");
+}

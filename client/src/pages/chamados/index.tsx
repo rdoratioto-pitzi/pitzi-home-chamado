@@ -245,7 +245,7 @@ const getSlaForTicket = (
   };
 };
 
-type SortField = "code" | "title" | "category" | "priority" | "status" | "createdAt";
+type SortField = "code" | "title" | "category" | "priority" | "status" | "createdAt" | "requesterId";
 type SortOrder = "asc" | "desc";
 
 export default function ChamadosPage() {
@@ -259,6 +259,7 @@ export default function ChamadosPage() {
   const [slaFilter, setSlaFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [periodFilter, setPeriodFilter] = useState<"month" | "year" | "total">("month");
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid">("list");
 
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
@@ -337,6 +338,11 @@ export default function ChamadosPage() {
         // but display is handled by formatDisplayDate
         valA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         valB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      } else if (sortField === "requesterId") {
+        const userA = users.find(u => u.id === a.requesterId)?.name || "";
+        const userB = users.find(u => u.id === b.requesterId)?.name || "";
+        valA = userA.toLowerCase();
+        valB = userB.toLowerCase();
       }
 
       if (valA === null || valA === undefined) valA = "";
@@ -349,23 +355,44 @@ export default function ChamadosPage() {
 
   const getUser = (userId: string | null) => users.find(u => u.id === userId);
 
+  const periodTickets = tickets.filter(t => {
+    if (periodFilter === "total") return true;
+    const ticketDateStr = t.dataAbertura || t.createdAt;
+    if (!ticketDateStr) return false;
+
+    const date = new Date(ticketDateStr);
+    const now = new Date();
+    if (periodFilter === "month") {
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    }
+    if (periodFilter === "year") {
+      return date.getFullYear() === now.getFullYear();
+    }
+    return true;
+  });
+
   const stats = {
-    total: tickets.length,
-    open: tickets.filter(t => t.status === "open").length,
-    inProgress: tickets.filter(t => t.status === "in_progress").length,
-    blocked: tickets.filter(t => t.status === "blocked").length,
-    resolved: tickets.filter(t => t.status === "resolved").length,
-    dentroPrazo: tickets.filter(t => {
+    total: periodTickets.length,
+    open: periodTickets.filter(t => t.status === "open").length,
+    inProgress: periodTickets.filter(t => t.status === "in_progress").length,
+    blocked: periodTickets.filter(t => t.status === "blocked").length,
+    resolved: periodTickets.filter(t => t.status === "resolved").length,
+    dentroPrazo: periodTickets.filter(t => {
       const sla = getSlaForTicket(t, slaRules);
       return sla.status === "dentro_prazo";
     }).length,
-    emAtraso: tickets.filter(t => {
+    emAtraso: periodTickets.filter(t => {
       if (t.status !== "open" && t.status !== "in_progress") return false;
       const sla = getSlaForTicket(t, slaRules);
       return sla.status === "em_atraso";
     }).length,
+    historicalTotal: tickets.length,
   };
 
+  const openPerc = stats.total > 0 ? Math.round((stats.open / stats.total) * 100) : 0;
+  const inProgressPerc = stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0;
+  const blockedPerc = stats.total > 0 ? Math.round((stats.blocked / stats.total) * 100) : 0;
+  const resolvedPerc = stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0;
   const dentroPrazoPerc = stats.total > 0 ? Math.round((stats.dentroPrazo / stats.total) * 100) : 0;
   const emAtrasoPerc = stats.total > 0 ? Math.round((stats.emAtraso / stats.total) * 100) : 0;
 
@@ -423,100 +450,169 @@ export default function ChamadosPage() {
       />
 
       <main className="flex-1 p-6 space-y-6">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-lg border border-border/40">
+            <Button
+              variant={periodFilter === "month" ? "secondary" : "ghost"}
+              size="sm"
+              className={`h-8 px-4 text-[12px] font-bold transition-all ${periodFilter === "month" ? "shadow-sm" : ""}`}
+              onClick={() => setPeriodFilter("month")}
+            >
+              Mês Vigente
+            </Button>
+            <Button
+              variant={periodFilter === "year" ? "secondary" : "ghost"}
+              size="sm"
+              className={`h-8 px-4 text-[12px] font-bold transition-all ${periodFilter === "year" ? "shadow-sm" : ""}`}
+              onClick={() => setPeriodFilter("year")}
+            >
+              Este Ano
+            </Button>
+            <Button
+              variant={periodFilter === "total" ? "secondary" : "ghost"}
+              size="sm"
+              className={`h-8 px-4 text-[12px] font-bold transition-all ${periodFilter === "total" ? "shadow-sm" : ""}`}
+              onClick={() => setPeriodFilter("total")}
+            >
+              Total Histórico
+            </Button>
+          </div>
+          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest bg-primary/5 px-3 py-1 rounded-full border border-primary/10">
+            Visão Estratégica
+          </div>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-7">
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "all" && slaFilter === "all" ? "ring-2 ring-primary" : ""}`}
+            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all duration-300 ${statusFilter === "all" && slaFilter === "all" ? "ring-2 ring-primary bg-primary/5" : "bg-card"}`}
             onClick={() => handleKpiClick("status", "all")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Total</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div className="p-1.5 bg-muted rounded-md tracking-tighter">
+                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold" data-testid="text-total-tickets">{stats.total}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">registrados</p>
+              <div className="text-4xl font-bold tracking-tight mb-2" data-testid="text-total-tickets">{stats.total}</div>
+              <div className="flex items-center gap-1.5 mt-2">
+                <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-primary" style={{ width: `${(stats.total / (stats.historicalTotal || 1)) * 100}%` }} />
+                </div>
+                <p className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">de {stats.historicalTotal}</p>
+              </div>
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "open" ? "ring-2 ring-primary" : ""}`}
+            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-blue-500/30 transition-all duration-300 ${statusFilter === "open" ? "ring-2 ring-blue-500 bg-blue-500/5" : "bg-card"}`}
             onClick={() => handleKpiClick("status", "open")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Abertos</CardTitle>
-              <AlertCircle className="h-4 w-4 text-blue-500" />
+              <div className="p-1.5 bg-blue-500/10 rounded-md">
+                <AlertCircle className="h-3.5 w-3.5 text-blue-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold text-blue-600" data-testid="text-open-tickets">{stats.open}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">aguardando</p>
+              <div className="text-4xl font-bold tracking-tight text-blue-600 mb-1" data-testid="text-open-tickets">{stats.open}</div>
+              <div className="flex items-center gap-1 mt-2">
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-blue-50 text-blue-700 border-blue-200">{openPerc}%</Badge>
+                <p className="text-[11px] font-medium text-muted-foreground">do período</p>
+              </div>
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "in_progress" ? "ring-2 ring-primary" : ""}`}
+            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-yellow-500/30 transition-all duration-300 ${statusFilter === "in_progress" ? "ring-2 ring-yellow-500 bg-yellow-500/5" : "bg-card"}`}
             onClick={() => handleKpiClick("status", "in_progress")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Andamento</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
+              <div className="p-1.5 bg-yellow-500/10 rounded-md">
+                <Clock className="h-3.5 w-3.5 text-yellow-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold text-yellow-600" data-testid="text-progress-tickets">{stats.inProgress}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">resolvendo</p>
+              <div className="text-4xl font-bold tracking-tight text-yellow-600 mb-1" data-testid="text-progress-tickets">{stats.inProgress}</div>
+              <div className="flex items-center gap-1 mt-2">
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-yellow-50 text-yellow-700 border-yellow-200">{inProgressPerc}%</Badge>
+                <p className="text-[11px] font-medium text-muted-foreground">do período</p>
+              </div>
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "blocked" ? "ring-2 ring-primary" : ""}`}
+            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-red-500/30 transition-all duration-300 ${statusFilter === "blocked" ? "ring-2 ring-red-500 bg-red-500/5" : "bg-card"}`}
             onClick={() => handleKpiClick("status", "blocked")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Bloqueados</CardTitle>
-              <Ban className="h-4 w-4 text-red-500" />
+              <div className="p-1.5 bg-red-500/10 rounded-md">
+                <Ban className="h-3.5 w-3.5 text-red-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold text-red-600" data-testid="text-blocked-tickets">{stats.blocked}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">impedidos</p>
+              <div className="text-4xl font-bold tracking-tight text-red-600 mb-1" data-testid="text-blocked-tickets">{stats.blocked}</div>
+              <div className="flex items-center gap-1 mt-2">
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-red-50 text-red-700 border-red-200">{blockedPerc}%</Badge>
+                <p className="text-[11px] font-medium text-muted-foreground">do período</p>
+              </div>
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${statusFilter === "resolved" ? "ring-2 ring-primary" : ""}`}
+            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-green-500/30 transition-all duration-300 ${statusFilter === "resolved" ? "ring-2 ring-green-500 bg-green-500/5" : "bg-card"}`}
             onClick={() => handleKpiClick("status", "resolved")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Resolvidos</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <div className="p-1.5 bg-green-500/10 rounded-md">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold text-green-600" data-testid="text-resolved-tickets">{stats.resolved}</div>
-              <p className="text-[10px] text-muted-foreground mt-1">concluídos</p>
+              <div className="text-4xl font-bold tracking-tight text-green-600 mb-1" data-testid="text-resolved-tickets">{stats.resolved}</div>
+              <div className="flex items-center gap-1 mt-2">
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-green-50 text-green-700 border-green-200">{resolvedPerc}%</Badge>
+                <p className="text-[11px] font-medium text-muted-foreground">do período</p>
+              </div>
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${slaFilter === "dentro_prazo" ? "ring-2 ring-primary" : ""}`}
+            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-green-600/30 transition-all duration-300 ${slaFilter === "dentro_prazo" ? "ring-2 ring-green-600 bg-green-600/5" : "bg-card"}`}
             onClick={() => handleKpiClick("sla", "dentro_prazo")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">No Prazo</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <div className="p-1.5 bg-green-600/10 rounded-md">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold text-green-700" data-testid="text-sla-in-time-tickets">
-                {stats.dentroPrazo} <span className="text-xs font-normal text-muted-foreground ml-1">({dentroPrazoPerc}%)</span>
+              <div className="text-4xl font-bold tracking-tight text-green-700 font-mono mb-1" data-testid="text-sla-in-time-tickets">
+                {stats.dentroPrazo}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">SLA OK</p>
+              <div className="flex items-center gap-1 mt-2">
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-green-50 text-green-800 border-green-300 font-bold">{dentroPrazoPerc}%</Badge>
+                <p className="text-[11px] font-medium text-muted-foreground">taxa de sucesso</p>
+              </div>
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:bg-muted/50 transition-colors ${slaFilter === "em_atraso" ? "ring-2 ring-primary" : ""}`}
+            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-red-600/30 transition-all duration-300 ${slaFilter === "em_atraso" ? "ring-2 ring-red-600 bg-red-600/5" : "bg-card"}`}
             onClick={() => handleKpiClick("sla", "em_atraso")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
               <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Em Atraso</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-600" />
+              <div className="p-1.5 bg-red-600/10 rounded-md">
+                <AlertCircle className="h-3.5 w-3.5 text-red-600" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold text-red-700" data-testid="text-sla-overdue-tickets">
-                {stats.emAtraso} <span className="text-xs font-normal text-muted-foreground ml-1">({emAtrasoPerc}%)</span>
+              <div className="text-4xl font-bold tracking-tight text-red-700 font-mono mb-1" data-testid="text-sla-overdue-tickets">
+                {stats.emAtraso}
               </div>
-              <p className="text-[10px] text-muted-foreground mt-1">SLA Vencido</p>
+              <div className="flex items-center gap-1 mt-2">
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-red-50 text-red-800 border-red-300 font-bold">{emAtrasoPerc}%</Badge>
+                <p className="text-[11px] font-medium text-muted-foreground">em atraso</p>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -683,6 +779,17 @@ export default function ChamadosPage() {
                       </Button>
                     </TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tipo</TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        onClick={() => handleSort("requesterId")}
+                      >
+                        Solicitante
+                        {sortField === "requesterId" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
+                      </Button>
+                    </TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Responsável</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">
                       <Button
@@ -755,6 +862,11 @@ export default function ChamadosPage() {
                             <Badge variant="outline" className={`${getTypeColor(ticket.type || "bug")} text-[10px] font-bold uppercase tracking-wider`}>
                               {ticket.type || "Bug"}
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-[13px]">
+                            <span className="font-medium text-muted-foreground/80">
+                              {users.find(u => u.id === ticket.requesterId)?.name || "—"}
+                            </span>
                           </TableCell>
                           <TableCell className="text-[13px]">
                             {ticket.assigneeId ? (

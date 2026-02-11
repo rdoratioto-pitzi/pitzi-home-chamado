@@ -1,5 +1,8 @@
 import type { Express } from "express";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import fs from "fs";
+import path from "path";
+import { randomUUID } from "crypto";
 
 /**
  * Register object storage routes for file uploads.
@@ -45,21 +48,65 @@ export function registerObjectStorageRoutes(app: Express): void {
         });
       }
 
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      // Check if we are on Replit or have the necessary env vars
+      const isReplit = process.env.REPLIT_SLUG || process.env.REPLIT_ID;
 
-      // Extract object path from the presigned URL for later reference
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      if (isReplit) {
+        try {
+          const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+          const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+          return res.json({
+            uploadURL,
+            objectPath,
+            metadata: { name, size, contentType },
+          });
+        } catch (replitError) {
+          console.warn("Replit upload failed, falling back to local:", replitError);
+        }
+      }
+
+      // Local fallback
+      const objectId = randomUUID();
+      const ext = path.extname(name);
+      const localFilename = `${objectId}${ext}`;
+      const uploadURL = `${req.protocol}://${req.get('host')}/api/uploads/local-put/${localFilename}`;
+      const objectPath = `/objects/uploads/${localFilename}`;
 
       res.json({
         uploadURL,
         objectPath,
-        // Echo back the metadata for client convenience
         metadata: { name, size, contentType },
       });
     } catch (error) {
       console.error("Error generating upload URL:", error);
       res.status(500).json({ error: "Failed to generate upload URL" });
     }
+  });
+
+  /**
+   * Local PUT handler for development
+   */
+  app.put("/api/uploads/local-put/:filename", (req, res) => {
+    const filename = req.params.filename;
+    const uploadDir = path.join(process.cwd(), "uploads");
+
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadDir, filename);
+    const writeStream = fs.createWriteStream(filePath);
+
+    req.pipe(writeStream);
+
+    writeStream.on("finish", () => {
+      res.status(200).json({ success: true, path: `/objects/uploads/${filename}` });
+    });
+
+    writeStream.on("error", (err) => {
+      console.error("Local upload error:", err);
+      res.status(500).json({ error: "Failed to save file locally" });
+    });
   });
 
   /**
@@ -72,14 +119,30 @@ export function registerObjectStorageRoutes(app: Express): void {
    */
   app.get(/^\/objects\/(.+)$/, async (req, res) => {
     try {
-      // req.path should be /objects/uploads/uuid, pass it directly
-      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
-      await objectStorageService.downloadObject(objectFile, res);
+      const objectPath = req.path;
+
+      // Try local filesystem first in development
+      if (objectPath.startsWith("/objects/uploads/")) {
+        const filename = objectPath.replace("/objects/uploads/", "");
+        const localPath = path.join(process.cwd(), "uploads", filename);
+
+        if (fs.existsSync(localPath)) {
+          return res.sendFile(localPath);
+        }
+      }
+
+      // If not found locally, try Replit storage if available
+      try {
+        const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+        await objectStorageService.downloadObject(objectFile, res);
+      } catch (err) {
+        if (err instanceof ObjectNotFoundError) {
+          return res.status(404).json({ error: "Object not found" });
+        }
+        throw err;
+      }
     } catch (error) {
       console.error("Error serving object:", error);
-      if (error instanceof ObjectNotFoundError) {
-        return res.status(404).json({ error: "Object not found" });
-      }
       return res.status(500).json({ error: "Failed to serve object" });
     }
   });
