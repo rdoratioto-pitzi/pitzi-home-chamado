@@ -50,6 +50,7 @@ import ConhecimentoFavoritosPage from "@/pages/conhecimento/favoritos";
 import MacgyverIAPage from "@/pages/macgyver-ia/index";
 import FluxogramasPage from "@/pages/fluxogramas/index";
 import FlowchartEditorPage from "@/pages/fluxogramas/editor";
+import UpdatesPage from "@/pages/updates/index";
 
 function Router() {
   return (
@@ -258,6 +259,11 @@ function Router() {
       <Route path="/configuracoes">
         <ProtectedRoute requiredPermission="configuracoes">
           <ConfiguracoesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/updates">
+        <ProtectedRoute>
+          <UpdatesPage />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />

@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { type Setting } from "@shared/schema";
 import { useTheme } from "@/hooks/use-theme";
@@ -23,7 +24,9 @@ function normalizeObjectPath(path: string): string {
 
 export function RenovLogo({ variant = "auto", size = "md", className = "" }: RenovLogoProps) {
   const { theme } = useTheme();
-  const { data: logoUrlLight } = useQuery<Setting>({ 
+  const [imgError, setImgError] = useState(false);
+
+  const { data: logoUrlLight } = useQuery<Setting>({
     queryKey: ["/api/settings/logo_url_light"],
     queryFn: async () => {
       const res = await fetch("/api/settings/logo_url_light");
@@ -34,7 +37,7 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
     retry: false,
   });
 
-  const { data: logoUrlDark } = useQuery<Setting>({ 
+  const { data: logoUrlDark } = useQuery<Setting>({
     queryKey: ["/api/settings/logo_url_dark"],
     queryFn: async () => {
       const res = await fetch("/api/settings/logo_url_dark");
@@ -45,33 +48,35 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
     retry: false,
   });
 
+  // Reset error state if logo URL changes
+  useEffect(() => {
+    setImgError(false);
+  }, [logoUrlLight?.value, logoUrlDark?.value]);
+
   const { width, height } = sizeMap[size];
 
   const resolvedVariant = variant === "auto" ? theme : variant;
   const logoUrlSetting = resolvedVariant === "dark" || resolvedVariant === "white" ? logoUrlDark : logoUrlLight;
 
-  if (logoUrlSetting?.value) {
+  if (logoUrlSetting?.value && !imgError) {
     const src = normalizeObjectPath(logoUrlSetting.value);
 
     return (
-      <img 
-        src={src} 
-        alt="Renov Logo" 
+      <img
+        src={src}
+        alt="Renov Logo"
         style={{ width, height, objectFit: 'contain' }}
         className={className}
-        onError={(e) => {
-          // If image fails to load, hide it to show SVG fallback
-          (e.target as HTMLImageElement).style.display = 'none';
-        }}
+        onError={() => setImgError(true)}
       />
     );
   }
 
   const textColor = resolvedVariant === "dark" || resolvedVariant === "white" ? "#FFFFFF" : "#000000";
-  
+
   return (
-    <svg 
-      viewBox="0 0 180 50" 
+    <svg
+      viewBox="0 0 180 50"
       width={width}
       height={height}
       className={className}
@@ -134,8 +139,8 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
 
 export function RenovLogoIcon({ className = "" }: { className?: string }) {
   return (
-    <svg 
-      viewBox="0 0 32 32" 
+    <svg
+      viewBox="0 0 32 32"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >

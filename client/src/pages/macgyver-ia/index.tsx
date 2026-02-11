@@ -5,13 +5,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { getCurrentUser } from "@/lib/permissions";
-import { 
-  MessageSquare, 
-  Send, 
-  Plus, 
-  Trash2, 
-  Loader2, 
-  Bot, 
+import {
+  MessageSquare,
+  Send,
+  Plus,
+  Trash2,
+  Loader2,
+  Bot,
   User,
   Clock,
   ArrowLeft,
@@ -171,7 +171,7 @@ function formatDate(date: Date | string | null): string {
   const now = new Date();
   const diff = now.getTime() - d.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  
+
   if (days === 0) return "Hoje";
   if (days === 1) return "Ontem";
   if (days < 7) return `${days} dias atras`;
@@ -180,7 +180,7 @@ function formatDate(date: Date | string | null): string {
 
 function isFreeModel(model: OpenRouterModel): boolean {
   return (
-    model.id.endsWith(":free") || 
+    model.id.endsWith(":free") ||
     (parseFloat(model.pricing.prompt) === 0 && parseFloat(model.pricing.completion) === 0)
   );
 }
@@ -377,7 +377,7 @@ function ModelPickerPopup({
   selectedModel: string;
 }) {
   const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"all" | "free" | "premium">("all");
+  const [tab, setTab] = useState<"all" | "free" | "premium">("free");
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -390,18 +390,50 @@ function ModelPickerPopup({
     if (tab === "premium") list = list.filter(m => !isFreeModel(m));
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter(m => 
-        m.name.toLowerCase().includes(q) || 
+      list = list.filter(m =>
+        m.name.toLowerCase().includes(q) ||
         m.id.toLowerCase().includes(q) ||
         getProviderName(m.id).toLowerCase().includes(q)
       );
     }
-    return list.slice(0, 50);
+
+    const sorted = [...list].sort((a, b) => {
+      // Relevance score: DeepSeek > Gemini > Claude > GPT > Llama > Qwen
+      const getRelevance = (m: OpenRouterModel) => {
+        const id = m.id.toLowerCase();
+        const name = m.name.toLowerCase();
+
+        // Prioritize specific high-value free/open models
+        if (id.includes("deepseek")) return 20;
+        if (id.includes("gemini")) return 18;
+        if (id.includes("claude")) return 16;
+        if (id.includes("gpt")) return 14;
+        if (id.includes("llama")) return 12;
+        if (id.includes("qwen")) return 10;
+        if (id.includes("mistral")) return 8;
+
+        return 0;
+      };
+
+      const relA = getRelevance(a);
+      const relB = getRelevance(b);
+
+      if (relA !== relB) return relB - relA;
+
+      // Secondary sort: free models first if same relevance
+      const freeA = isFreeModel(a) ? 1 : 0;
+      const freeB = isFreeModel(b) ? 1 : 0;
+      if (freeA !== freeB) return freeB - freeA;
+
+      return a.name.localeCompare(b.name);
+    });
+
+    return sorted.slice(0, 50);
   }, [models, search, tab]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div 
+      <div
         className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] flex flex-col"
         onClick={e => e.stopPropagation()}
       >
@@ -457,8 +489,8 @@ function ModelPickerPopup({
                     key={model.id}
                     className={cn(
                       "w-full text-left px-3 py-2.5 rounded-lg transition-colors flex items-start gap-3",
-                      isSelected 
-                        ? "bg-primary/10 border border-primary/30" 
+                      isSelected
+                        ? "bg-primary/10 border border-primary/30"
                         : "hover:bg-muted/70 border border-transparent"
                     )}
                     onClick={() => {
@@ -829,7 +861,7 @@ export default function MacgyverIA() {
   const queryClient = useQueryClient();
   const user = getCurrentUser();
   const userId = user?.id || "default-user";
-  
+
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [inputMessage, setInputMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -980,7 +1012,7 @@ export default function MacgyverIA() {
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     setInputMessage(val);
-    
+
     if (val.trim() === "/model" || val.trim() === "/models") {
       setShowModelPicker(true);
       setInputMessage("");
@@ -1074,7 +1106,7 @@ export default function MacgyverIA() {
           if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
-              
+
               if (data.type === "conversation_id") {
                 actualConversationId = data.id;
                 setSelectedConversationId(data.id);
