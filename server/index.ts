@@ -4,6 +4,8 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase } from "./seed";
 import { setupSession, requireAuth } from "./auth";
+import { startMonitoring } from "./integrations/imei-info-service";
+import { startPromptsSyncJob } from "./jobs/prompts-sync.job";
 
 const app = express();
 const httpServer = createServer(app);
@@ -106,6 +108,14 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      
+      // Start IMEI.info monitoring (hourly updates)
+      startMonitoring().catch(err => {
+        console.error("Failed to start IMEI.info monitoring:", err);
+      });
+      
+      // Start prompts sync job (daily at 03:00)
+      startPromptsSyncJob();
     },
   );
 })();

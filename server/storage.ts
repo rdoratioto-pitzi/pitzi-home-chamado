@@ -13,6 +13,9 @@ import {
   type Shipment, type InsertShipment,
   type ShipmentEvent, type InsertShipmentEvent,
   type Setting, type InsertSetting,
+  type TaskTag, type InsertTaskTag,
+  type TaskTagMember, type InsertTaskTagMember,
+  // Backward compatibility aliases
   type TaskArea, type InsertTaskArea,
   type TaskAreaMember, type InsertTaskAreaMember,
   type Task, type InsertTask,
@@ -46,15 +49,22 @@ import {
   type Flowchart, type InsertFlowchart,
   type FlowchartVersion, type InsertFlowchartVersion,
   type FlowchartComment, type InsertFlowchartComment,
+  type ImeiInfoStats, type InsertImeiInfoStats,
+  type ImeiInfoAlert, type InsertImeiInfoAlert,
+  type PromptLibrary, type InsertPromptLibrary,
+  type PromptUserFavorite, type InsertPromptUserFavorite,
   users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
-  objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskAreas, taskAreaMembers,
+  objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
+  // Backward compatibility
+  taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
   collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules,
   pricingDevices, pricingPriceHistory, pricingAlerts,
   metaAreas, metas, metaCheckins,
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
   flowcharts, flowchartVersions, flowchartComments,
-  aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates
+  aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates, imeiInfoStats, imeiInfoAlerts,
+  promptsLibrary, promptUserFavorites
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, sql } from "drizzle-orm";
@@ -152,14 +162,25 @@ export interface IStorage {
   getSettings(): Promise<Setting[]>;
   setSetting(key: string, value: string): Promise<Setting>;
 
-  // Task Areas
+  // Task Tags (formerly Task Areas)
+  getTaskTag(id: string): Promise<TaskTag | undefined>;
+  getTaskTags(userId: string): Promise<TaskTag[]>;
+  createTaskTag(tag: InsertTaskTag): Promise<TaskTag>;
+  updateTaskTag(id: string, data: Partial<TaskTag>): Promise<TaskTag | undefined>;
+  deleteTaskTag(id: string): Promise<boolean>;
+  // Backward compatibility aliases
   getTaskArea(id: string): Promise<TaskArea | undefined>;
   getTaskAreas(userId: string): Promise<TaskArea[]>;
   createTaskArea(area: InsertTaskArea): Promise<TaskArea>;
   updateTaskArea(id: string, data: Partial<TaskArea>): Promise<TaskArea | undefined>;
   deleteTaskArea(id: string): Promise<boolean>;
 
-  // Task Area Members
+  // Task Tag Members (formerly Task Area Members)
+  getTaskTagMembers(tagId: string): Promise<TaskTagMember[]>;
+  addTaskTagMember(member: InsertTaskTagMember): Promise<TaskTagMember>;
+  updateTaskTagMember(id: string, data: Partial<TaskTagMember>): Promise<TaskTagMember | undefined>;
+  removeTaskTagMember(id: string): Promise<boolean>;
+  // Backward compatibility aliases
   getTaskAreaMembers(areaId: string): Promise<TaskAreaMember[]>;
   addTaskAreaMember(member: InsertTaskAreaMember): Promise<TaskAreaMember>;
   updateTaskAreaMember(id: string, data: Partial<TaskAreaMember>): Promise<TaskAreaMember | undefined>;
@@ -167,7 +188,7 @@ export interface IStorage {
 
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
-  getTasks(filters?: { areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string }): Promise<Task[]>;
+  getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string }): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<boolean>;
@@ -342,6 +363,36 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationRead(id: string): Promise<Notification | undefined>;
   markAllNotificationsRead(userId: string): Promise<void>;
+
+  // IMEI.info Stats
+  getImeiInfoStats(): Promise<ImeiInfoStats[]>;
+  getImeiInfoStat(id: string): Promise<ImeiInfoStats | undefined>;
+  createImeiInfoStats(stats: InsertImeiInfoStats): Promise<ImeiInfoStats>;
+  updateImeiInfoStat(id: string, data: Partial<ImeiInfoStats>): Promise<ImeiInfoStats | undefined>;
+  deleteImeiInfoStat(id: string): Promise<boolean>;
+
+  // IMEI.info Alerts
+  getImeiInfoAlerts(): Promise<ImeiInfoAlert[]>;
+  getImeiInfoAlert(id: string): Promise<ImeiInfoAlert | undefined>;
+  createImeiInfoAlert(alert: InsertImeiInfoAlert): Promise<ImeiInfoAlert>;
+  updateImeiInfoAlert(id: string, data: Partial<ImeiInfoAlert>): Promise<ImeiInfoAlert | undefined>;
+  deleteImeiInfoAlert(id: string): Promise<boolean>;
+
+  // Prompts Library
+  getPrompts(filters?: { category?: string; search?: string; onlyActive?: boolean }): Promise<PromptLibrary[]>;
+  getPrompt(id: string): Promise<PromptLibrary | undefined>;
+  getPromptByName(name: string): Promise<PromptLibrary | undefined>;
+  createPrompt(prompt: InsertPromptLibrary): Promise<PromptLibrary>;
+  updatePrompt(id: string, data: Partial<PromptLibrary>): Promise<PromptLibrary | undefined>;
+  deletePrompt(id: string): Promise<boolean>;
+  incrementPromptUsage(id: string): Promise<void>;
+  getPromptStats(): Promise<{ total: number; byCategory: Record<string, number> }>;
+
+  // Prompt User Favorites
+  getPromptFavorites(userId: string): Promise<PromptUserFavorite[]>;
+  getPromptFavorite(userId: string, promptId: string): Promise<PromptUserFavorite | undefined>;
+  createPromptFavorite(favorite: InsertPromptUserFavorite): Promise<PromptUserFavorite>;
+  deletePromptFavorite(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -735,48 +786,77 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  // Task Areas
-  async getTaskArea(id: string): Promise<TaskArea | undefined> {
-    const [a] = await db.select().from(taskAreas).where(eq(taskAreas.id, id));
-    return a;
+  // Task Tags (formerly Task Areas)
+  async getTaskTag(id: string): Promise<TaskTag | undefined> {
+    const [t] = await db.select().from(taskTags).where(eq(taskTags.id, id));
+    return t;
   }
-  async getTaskAreas(userId: string): Promise<TaskArea[]> {
-    const allAreas = await db.select().from(taskAreas);
-    const memberRecords = await db.select().from(taskAreaMembers).where(eq(taskAreaMembers.userId, userId));
-    const memberAreaIds = new Set(memberRecords.map(m => m.areaId));
-    return allAreas.filter(area =>
-      area.ownerId === userId ||
-      memberAreaIds.has(area.id)
+  async getTaskTags(userId: string): Promise<TaskTag[]> {
+    const allTags = await db.select().from(taskTags);
+    const memberRecords = await db.select().from(taskTagMembers).where(eq(taskTagMembers.userId, userId));
+    const memberTagIds = new Set(memberRecords.map(m => m.tagId));
+    return allTags.filter(tag =>
+      tag.ownerId === userId ||
+      memberTagIds.has(tag.id)
     );
   }
+  async createTaskTag(insertTag: InsertTaskTag): Promise<TaskTag> {
+    const [t] = await db.insert(taskTags).values(insertTag).returning();
+    return t;
+  }
+  async updateTaskTag(id: string, data: Partial<TaskTag>): Promise<TaskTag | undefined> {
+    const [t] = await db.update(taskTags).set(data).where(eq(taskTags.id, id)).returning();
+    return t;
+  }
+  async deleteTaskTag(id: string): Promise<boolean> {
+    const result = await db.delete(taskTags).where(eq(taskTags.id, id)).returning();
+    return result.length > 0;
+  }
+  // Backward compatibility aliases
+  async getTaskArea(id: string): Promise<TaskArea | undefined> {
+    return this.getTaskTag(id);
+  }
+  async getTaskAreas(userId: string): Promise<TaskArea[]> {
+    return this.getTaskTags(userId);
+  }
   async createTaskArea(insertArea: InsertTaskArea): Promise<TaskArea> {
-    const [a] = await db.insert(taskAreas).values(insertArea).returning();
-    return a;
+    return this.createTaskTag(insertArea as InsertTaskTag);
   }
   async updateTaskArea(id: string, data: Partial<TaskArea>): Promise<TaskArea | undefined> {
-    const [a] = await db.update(taskAreas).set(data).where(eq(taskAreas.id, id)).returning();
-    return a;
+    return this.updateTaskTag(id, data as Partial<TaskTag>);
   }
   async deleteTaskArea(id: string): Promise<boolean> {
-    const result = await db.delete(taskAreas).where(eq(taskAreas.id, id)).returning();
-    return result.length > 0;
+    return this.deleteTaskTag(id);
   }
 
-  // Task Area Members
+  // Task Tag Members (formerly Task Area Members)
+  async getTaskTagMembers(tagId: string): Promise<TaskTagMember[]> {
+    return await db.select().from(taskTagMembers).where(eq(taskTagMembers.tagId, tagId));
+  }
+  async addTaskTagMember(member: InsertTaskTagMember): Promise<TaskTagMember> {
+    const [m] = await db.insert(taskTagMembers).values(member).returning();
+    return m;
+  }
+  async updateTaskTagMember(id: string, data: Partial<TaskTagMember>): Promise<TaskTagMember | undefined> {
+    const [m] = await db.update(taskTagMembers).set(data).where(eq(taskTagMembers.id, id)).returning();
+    return m;
+  }
+  async removeTaskTagMember(id: string): Promise<boolean> {
+    const result = await db.delete(taskTagMembers).where(eq(taskTagMembers.id, id)).returning();
+    return result.length > 0;
+  }
+  // Backward compatibility aliases
   async getTaskAreaMembers(areaId: string): Promise<TaskAreaMember[]> {
-    return await db.select().from(taskAreaMembers).where(eq(taskAreaMembers.areaId, areaId));
+    return this.getTaskTagMembers(areaId);
   }
   async addTaskAreaMember(member: InsertTaskAreaMember): Promise<TaskAreaMember> {
-    const [m] = await db.insert(taskAreaMembers).values(member).returning();
-    return m;
+    return this.addTaskTagMember(member as InsertTaskTagMember);
   }
   async updateTaskAreaMember(id: string, data: Partial<TaskAreaMember>): Promise<TaskAreaMember | undefined> {
-    const [m] = await db.update(taskAreaMembers).set(data).where(eq(taskAreaMembers.id, id)).returning();
-    return m;
+    return this.updateTaskTagMember(id, data as Partial<TaskTagMember>);
   }
   async removeTaskAreaMember(id: string): Promise<boolean> {
-    const result = await db.delete(taskAreaMembers).where(eq(taskAreaMembers.id, id)).returning();
-    return result.length > 0;
+    return this.removeTaskTagMember(id);
   }
 
   // Tasks
@@ -784,10 +864,12 @@ export class DatabaseStorage implements IStorage {
     const [t] = await db.select().from(tasks).where(eq(tasks.id, id));
     return t;
   }
-  async getTasks(filters?: { areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string }): Promise<Task[]> {
+  async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string }): Promise<Task[]> {
     let baseQuery = db.select().from(tasks);
     const conditions = [];
-    if (filters?.areaId) conditions.push(eq(tasks.areaId, filters.areaId));
+    // Support both tagId and areaId for backward compatibility
+    if (filters?.tagId) conditions.push(eq(tasks.tagId, filters.tagId));
+    if (filters?.areaId) conditions.push(eq(tasks.tagId, filters.areaId));
     if (filters?.status) conditions.push(eq(tasks.status, filters.status));
     if (filters?.assigneeId) conditions.push(eq(tasks.assigneeId, filters.assigneeId));
     if (filters?.createdBy) conditions.push(eq(tasks.createdBy, filters.createdBy));
@@ -1550,6 +1632,183 @@ export class DatabaseStorage implements IStorage {
     } catch (e) {
       return this.getMockUpdates().slice(0, limit);
     }
+  }
+
+  // IMEI.info Stats
+  async getImeiInfoStats(): Promise<ImeiInfoStats[]> {
+    if (!db) return [];
+    return db.select().from(imeiInfoStats).orderBy(sql`${imeiInfoStats.date} DESC`);
+  }
+
+  async getImeiInfoStat(id: string): Promise<ImeiInfoStats | undefined> {
+    if (!db) return undefined;
+    const [stat] = await db.select().from(imeiInfoStats).where(eq(imeiInfoStats.id, id));
+    return stat;
+  }
+
+  async createImeiInfoStats(stats: InsertImeiInfoStats): Promise<ImeiInfoStats> {
+    if (!db) {
+      const mockStat: ImeiInfoStats = { ...stats, id: crypto.randomUUID() };
+      return mockStat;
+    }
+    const [created] = await db.insert(imeiInfoStats).values(stats).returning();
+    return created;
+  }
+
+  async updateImeiInfoStat(id: string, data: Partial<ImeiInfoStats>): Promise<ImeiInfoStats | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db.update(imeiInfoStats).set(data).where(eq(imeiInfoStats.id, id)).returning();
+    return updated;
+  }
+
+  async deleteImeiInfoStat(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(imeiInfoStats).where(eq(imeiInfoStats.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // IMEI.info Alerts
+  async getImeiInfoAlerts(): Promise<ImeiInfoAlert[]> {
+    if (!db) return [];
+    return db.select().from(imeiInfoAlerts).orderBy(sql`${imeiInfoAlerts.createdAt} DESC`);
+  }
+
+  async getImeiInfoAlert(id: string): Promise<ImeiInfoAlert | undefined> {
+    if (!db) return undefined;
+    const [alert] = await db.select().from(imeiInfoAlerts).where(eq(imeiInfoAlerts.id, id));
+    return alert;
+  }
+
+  async createImeiInfoAlert(alert: InsertImeiInfoAlert): Promise<ImeiInfoAlert> {
+    if (!db) {
+      const mockAlert: ImeiInfoAlert = { ...alert, id: crypto.randomUUID() };
+      return mockAlert;
+    }
+    const [created] = await db.insert(imeiInfoAlerts).values(alert).returning();
+    return created;
+  }
+
+  async updateImeiInfoAlert(id: string, data: Partial<ImeiInfoAlert>): Promise<ImeiInfoAlert | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db.update(imeiInfoAlerts).set(data).where(eq(imeiInfoAlerts.id, id)).returning();
+    return updated;
+  }
+
+  async deleteImeiInfoAlert(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(imeiInfoAlerts).where(eq(imeiInfoAlerts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Prompts Library
+  async getPrompts(filters?: { category?: string; search?: string; onlyActive?: boolean }): Promise<PromptLibrary[]> {
+    if (!db) return [];
+    
+    let query = db.select().from(promptsLibrary);
+    
+    if (filters?.category) {
+      query = query.where(eq(promptsLibrary.category, filters.category));
+    }
+    
+    if (filters?.onlyActive !== false) {
+      query = query.where(eq(promptsLibrary.isActive, true));
+    }
+    
+    if (filters?.search) {
+      const searchTerm = `%${filters.search}%`;
+      query = query.where(
+        sql`(${promptsLibrary.title} ILIKE ${searchTerm} OR ${promptsLibrary.description} ILIKE ${searchTerm} OR ${promptsLibrary.name} ILIKE ${searchTerm})`
+      );
+    }
+    
+    return query.orderBy(sql`${promptsLibrary.usageCount} DESC`);
+  }
+
+  async getPrompt(id: string): Promise<PromptLibrary | undefined> {
+    if (!db) return undefined;
+    const [prompt] = await db.select().from(promptsLibrary).where(eq(promptsLibrary.id, id));
+    return prompt;
+  }
+
+  async getPromptByName(name: string): Promise<PromptLibrary | undefined> {
+    if (!db) return undefined;
+    const [prompt] = await db.select().from(promptsLibrary).where(eq(promptsLibrary.name, name));
+    return prompt;
+  }
+
+  async createPrompt(prompt: InsertPromptLibrary): Promise<PromptLibrary> {
+    if (!db) throw new Error("Database not connected");
+    const [created] = await db.insert(promptsLibrary).values(prompt).returning();
+    return created;
+  }
+
+  async updatePrompt(id: string, data: Partial<PromptLibrary>): Promise<PromptLibrary | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db.update(promptsLibrary).set(data).where(eq(promptsLibrary.id, id)).returning();
+    return updated;
+  }
+
+  async deletePrompt(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(promptsLibrary).where(eq(promptsLibrary.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async incrementPromptUsage(id: string): Promise<void> {
+    if (!db) return;
+    await db
+      .update(promptsLibrary)
+      .set({ usageCount: sql`${promptsLibrary.usageCount} + 1` })
+      .where(eq(promptsLibrary.id, id));
+  }
+
+  async getPromptStats(): Promise<{ total: number; byCategory: Record<string, number> }> {
+    if (!db) return { total: 0, byCategory: {} };
+    
+    const allPrompts = await db.select().from(promptsLibrary).where(eq(promptsLibrary.isActive, true));
+    
+    const byCategory: Record<string, number> = {};
+    for (const prompt of allPrompts) {
+      byCategory[prompt.category] = (byCategory[prompt.category] || 0) + 1;
+    }
+    
+    return {
+      total: allPrompts.length,
+      byCategory,
+    };
+  }
+
+  // Prompt User Favorites
+  async getPromptFavorites(userId: string): Promise<PromptUserFavorite[]> {
+    if (!db) return [];
+    return db
+      .select()
+      .from(promptUserFavorites)
+      .where(eq(promptUserFavorites.userId, userId));
+  }
+
+  async getPromptFavorite(userId: string, promptId: string): Promise<PromptUserFavorite | undefined> {
+    if (!db) return undefined;
+    const [favorite] = await db
+      .select()
+      .from(promptUserFavorites)
+      .where(and(
+        eq(promptUserFavorites.userId, userId),
+        eq(promptUserFavorites.promptId, promptId)
+      ));
+    return favorite;
+  }
+
+  async createPromptFavorite(favorite: InsertPromptUserFavorite): Promise<PromptUserFavorite> {
+    if (!db) throw new Error("Database not connected");
+    const [created] = await db.insert(promptUserFavorites).values(favorite).returning();
+    return created;
+  }
+
+  async deletePromptFavorite(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(promptUserFavorites).where(eq(promptUserFavorites.id, id)).returning();
+    return result.length > 0;
   }
 }
 

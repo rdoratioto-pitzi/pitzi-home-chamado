@@ -14,6 +14,7 @@ import {
 } from "./email-service";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import * as correiosService from "./correios-service";
+import * as imeiInfoService from "./integrations/imei-info-service";
 import bwipjs from "bwip-js";
 import { streamChatCompletion, generateTitle, fetchOpenRouterModels } from "./openrouter";
 import {
@@ -30,6 +31,9 @@ import {
   insertKeyResultUpdateSchema,
   insertShipmentSchema,
   insertShipmentEventSchema,
+  insertTaskTagSchema,
+  insertTaskTagMemberSchema,
+  // Backward compatibility
   insertTaskAreaSchema,
   insertTaskAreaMemberSchema,
   insertTaskSchema,
@@ -53,6 +57,7 @@ import {
   insertAiMessageSchema,
   insertNotificationSchema,
   insertUpdateSchema,
+  insertImeiInfoAlertSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sql } from "drizzle-orm";
@@ -294,7 +299,7 @@ export async function registerRoutes(
       const activeProjects = accessibleProjectIds.length;
 
       const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
-      const userTasks = tasks.filter(t => !t.areaId || accessibleAreaIds.includes(t.areaId));
+      const userTasks = tasks.filter(t => !t.tagId || accessibleAreaIds.includes(t.tagId));
       const pendingTasks = userTasks.filter(t => t.type !== "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
       const scheduledMeetings = userTasks.filter(t => t.type === "meeting_note" && t.status !== "completed" && t.status !== "archived").length;
 
@@ -1377,7 +1382,7 @@ export async function registerRoutes(
   });
 
   // ============== TASK AREAS ==============
-  app.get("/api/task-areas", async (req, res) => {
+  app.get("/api/task-tags", async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
     const scope = (req.query.scope as string) || undefined;
     const areas = await storage.getTaskAreas(userId);
@@ -1385,7 +1390,7 @@ export async function registerRoutes(
     res.json(filtered);
   });
 
-  app.get("/api/task-areas/:id", async (req, res) => {
+  app.get("/api/task-tags/:id", async (req, res) => {
     const { userId } = getSessionUser(req);
     const area = await storage.getTaskArea(req.params.id);
     if (!area) return res.status(404).json({ error: "Area not found" });
@@ -1396,7 +1401,7 @@ export async function registerRoutes(
     res.json(area);
   });
 
-  app.post("/api/task-areas", async (req, res) => {
+  app.post("/api/task-tags", async (req, res) => {
     try {
       const { userId } = getSessionUser(req);
       const { memberIds, ...areaData } = req.body;
@@ -1411,7 +1416,7 @@ export async function registerRoutes(
           try {
             // Create area member
             await storage.addTaskAreaMember({
-              areaId: area.id,
+                tagId: area.id,
               userId,
               role: "member"
             });
@@ -1450,7 +1455,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/task-areas/:id", async (req, res) => {
+  app.put("/api/task-tags/:id", async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
       const existing = await storage.getTaskArea(req.params.id);
@@ -1475,7 +1480,7 @@ export async function registerRoutes(
             try {
               // Add new member
               await storage.addTaskAreaMember({
-                areaId: area.id,
+              tagId: area.id,
                 userId,
                 role: "member"
               });
@@ -1522,7 +1527,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/task-areas/:id", async (req, res) => {
+  app.delete("/api/task-tags/:id", async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
     const area = await storage.getTaskArea(req.params.id);
     if (!area) return res.status(404).json({ error: "Area not found" });
@@ -1535,14 +1540,14 @@ export async function registerRoutes(
   });
 
   // Task Area Members
-  app.get("/api/task-areas/:id/members", async (req, res) => {
+  app.get("/api/task-tags/:id/members", async (req, res) => {
     const members = await storage.getTaskAreaMembers(req.params.id);
     res.json(members);
   });
 
-  app.post("/api/task-areas/:id/members", async (req, res) => {
+  app.post("/api/task-tags/:id/members", async (req, res) => {
     try {
-      const data = { ...req.body, areaId: req.params.id };
+      const data = { ...req.body, tagId: req.params.id };
       const validated = insertTaskAreaMemberSchema.parse(data);
       const member = await storage.addTaskAreaMember(validated);
       res.status(201).json(member);
@@ -1579,7 +1584,7 @@ export async function registerRoutes(
   app.get("/api/tasks", async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
     const filters = {
-      areaId: req.query.area_id as string | undefined,
+      tagId: req.query.tagId as string | undefined,
       status: req.query.status as string | undefined,
       assigneeId: req.query.assignee_id as string | undefined,
       createdBy: req.query.created_by as string | undefined,
@@ -1607,7 +1612,7 @@ export async function registerRoutes(
         } catch (e) { }
       }
 
-      const hasAreaAccess = t.areaId ? accessibleAreaIds.includes(t.areaId) : false;
+      const hasAreaAccess = t.tagId ? accessibleAreaIds.includes(t.tagId) : false;
 
       return isCreator || isAssignee || isMultiAssignee || hasAreaAccess;
     });
@@ -1619,9 +1624,9 @@ export async function registerRoutes(
     const { userId, isAdmin } = getSessionUser(req);
     const task = await storage.getTask(req.params.id);
     if (!task) return res.status(404).json({ error: "Task not found" });
-    if (!isAdmin && task.areaId) {
+    if (!isAdmin && task.tagId) {
       const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
-      if (!accessibleAreaIds.includes(task.areaId)) {
+      if (!accessibleAreaIds.includes(task.tagId)) {
         return res.status(403).json({ error: "Access denied" });
       }
     }
@@ -1753,10 +1758,10 @@ export async function registerRoutes(
       const { userId: sessionUserId, isAdmin } = getSessionUser(req);
       const existingTask = await storage.getTask(req.params.id);
       if (!existingTask) return res.status(404).json({ error: "Task not found" });
-      if (!isAdmin && existingTask.areaId) {
+      if (!isAdmin && existingTask.tagId) {
         const accessibleAreaIds = await getUserAccessibleAreaIds(sessionUserId);
-        if (!accessibleAreaIds.includes(existingTask.areaId)) {
-          return res.status(403).json({ error: "Access denied" });
+        if (!accessibleAreaIds.includes(existingTask.tagId)) {
+          return res.status(403).json({ error: "Access denied to this task" });
         }
       }
       const partialSchema = insertTaskSchema.partial();
@@ -1822,10 +1827,10 @@ export async function registerRoutes(
     const { userId, isAdmin } = getSessionUser(req);
     const task = await storage.getTask(req.params.id);
     if (!task) return res.status(404).json({ error: "Task not found" });
-    if (!isAdmin && task.areaId) {
+    if (!isAdmin && task.tagId) {
       const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
-      if (!accessibleAreaIds.includes(task.areaId)) {
-        return res.status(403).json({ error: "Access denied" });
+      if (!accessibleAreaIds.includes(task.tagId)) {
+        return res.status(403).json({ error: "Access denied to delete this task" });
       }
     }
     const deleted = await storage.deleteTask(req.params.id);
@@ -1983,8 +1988,8 @@ export async function registerRoutes(
   });
 
   // ============== AREA TASKS (convenient endpoint) ==============
-  app.get("/api/task-areas/:id/tasks", async (req, res) => {
-    const tasks = await storage.getTasks({ areaId: req.params.id });
+  app.get("/api/task-tags/:id/tasks", async (req, res) => {
+    const tasks = await storage.getTasks({ tagId: req.params.id });
     res.json(tasks);
   });
 
@@ -4674,6 +4679,260 @@ export async function registerRoutes(
         connected: false,
         error: error.message 
       });
+    }
+  });
+
+  // ============== IMEI.INFO API ROUTES ==============
+  app.get("/api/integrations/imei-info/stats", async (req, res) => {
+    try {
+      const stats = await imeiInfoService.getStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("IMEI.info stats error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/integrations/imei-info/history", async (req, res) => {
+    try {
+      const { days } = req.query;
+      const daysNum = days ? parseInt(days as string) : 30;
+      const stats = await imeiInfoService.getHistoricalStats(undefined, daysNum);
+      res.json(stats);
+    } catch (error: any) {
+      console.error("IMEI.info history error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/integrations/imei-info/test-connection", async (req, res) => {
+    try {
+      const result = await imeiInfoService.testConnection();
+      res.json(result);
+    } catch (error: any) {
+      console.error("IMEI.info connection test error:", error);
+      res.status(500).json({ success: false, message: error.message });
+    }
+  });
+
+  app.post("/api/integrations/imei-info/check-imei", async (req, res) => {
+    try {
+      const { imei, service } = req.body;
+      if (!imei) {
+        return res.status(400).json({ error: "IMEI é obrigatório" });
+      }
+      
+      const result = await imeiInfoService.checkIMEI(imei, service);
+      res.json(result);
+    } catch (error: any) {
+      console.error("IMEI.info check error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/integrations/imei-info/credits", async (req, res) => {
+    try {
+      const credits = await imeiInfoService.getCredits();
+      res.json(credits);
+    } catch (error: any) {
+      console.error("IMEI.info credits error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // IMEI.info Stats Database
+  app.get("/api/integrations/imei-info/db-stats", async (req, res) => {
+    try {
+      const stats = await storage.getImeiInfoStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("IMEI.info DB stats error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // IMEI.info Alerts
+  app.get("/api/integrations/imei-info/alerts", async (req, res) => {
+    try {
+      const alerts = await storage.getImeiInfoAlerts();
+      res.json(alerts);
+    } catch (error: any) {
+      console.error("IMEI.info get alerts error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/integrations/imei-info/alerts", async (req, res) => {
+    try {
+      // Validar o body usando o schema
+      const validatedData = insertImeiInfoAlertSchema.parse(req.body);
+      const alert = await storage.createImeiInfoAlert(validatedData);
+      res.status(201).json(alert);
+    } catch (error: any) {
+      console.error("IMEI.info create alert error:", error);
+      if (error.name === "ZodError") {
+        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/integrations/imei-info/alerts/:id", async (req, res) => {
+    try {
+      const alert = await storage.updateImeiInfoAlert(req.params.id, req.body);
+      if (!alert) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      res.json(alert);
+    } catch (error: any) {
+      console.error("IMEI.info update alert error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/integrations/imei-info/alerts/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteImeiInfoAlert(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Alert not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("IMEI.info delete alert error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ============== PROMPTS LIBRARY ==============
+  
+  // Listar todos os prompts
+  app.get("/api/prompts", async (req, res) => {
+    try {
+      const { category, search } = req.query;
+      const prompts = await storage.getPrompts({
+        category: category as string | undefined,
+        search: search as string | undefined,
+        onlyActive: true,
+      });
+      res.json(prompts);
+    } catch (error: any) {
+      console.error("[prompts] Error listing prompts:", error);
+      res.status(500).json({ error: "Erro ao listar prompts" });
+    }
+  });
+
+  // Estatísticas dos prompts
+  app.get("/api/prompts/stats", async (req, res) => {
+    try {
+      const stats = await storage.getPromptStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("[prompts] Error getting stats:", error);
+      res.status(500).json({ error: "Erro ao obter estatísticas" });
+    }
+  });
+
+  // Obter um prompt específico
+  app.get("/api/prompts/:id", async (req, res) => {
+    try {
+      const prompt = await storage.getPrompt(req.params.id);
+      if (!prompt) {
+        return res.status(404).json({ error: "Prompt não encontrado" });
+      }
+      res.json(prompt);
+    } catch (error: any) {
+      console.error("[prompts] Error getting prompt:", error);
+      res.status(500).json({ error: "Erro ao buscar prompt" });
+    }
+  });
+
+  // Buscar prompt por nome (para o comando /prompt)
+  app.get("/api/prompts/by-name/:name", async (req, res) => {
+    try {
+      const prompt = await storage.getPromptByName(req.params.name);
+      if (!prompt) {
+        return res.status(404).json({ error: "Prompt não encontrado" });
+      }
+      res.json(prompt);
+    } catch (error: any) {
+      console.error("[prompts] Error getting prompt by name:", error);
+      res.status(500).json({ error: "Erro ao buscar prompt" });
+    }
+  });
+
+  // Incrementar contador de uso
+  app.post("/api/prompts/:id/use", async (req, res) => {
+    try {
+      await storage.incrementPromptUsage(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[prompts] Error incrementing usage:", error);
+      res.status(500).json({ error: "Erro ao registrar uso" });
+    }
+  });
+
+  // Favoritos do usuário
+  app.get("/api/prompts/favorites/me", async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      const favorites = await storage.getPromptFavorites(userId);
+      res.json(favorites);
+    } catch (error: any) {
+      console.error("[prompts] Error getting favorites:", error);
+      res.status(500).json({ error: "Erro ao buscar favoritos" });
+    }
+  });
+
+  // Adicionar aos favoritos
+  app.post("/api/prompts/:id/favorite", async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      const favorite = await storage.createPromptFavorite({
+        userId,
+        promptId: req.params.id,
+      });
+      res.status(201).json(favorite);
+    } catch (error: any) {
+      console.error("[prompts] Error adding favorite:", error);
+      res.status(500).json({ error: "Erro ao adicionar favorito" });
+    }
+  });
+
+  // Remover dos favoritos
+  app.delete("/api/prompts/favorites/:id", async (req, res) => {
+    try {
+      const success = await storage.deletePromptFavorite(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Favorito não encontrado" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[prompts] Error removing favorite:", error);
+      res.status(500).json({ error: "Erro ao remover favorito" });
+    }
+  });
+
+  // Sincronização manual (apenas admins)
+  app.post("/api/prompts/sync", async (req, res) => {
+    try {
+      const { isAdmin } = getSessionUser(req);
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      // Importar e executar sincronização
+      const { runPromptsSyncNow } = await import("./jobs/prompts-sync.job");
+      const result = await runPromptsSyncNow();
+      
+      res.json({
+        success: result.success,
+        created: result.created,
+        updated: result.updated,
+        errors: result.errors.length,
+      });
+    } catch (error: any) {
+      console.error("[prompts] Error syncing:", error);
+      res.status(500).json({ error: "Erro ao sincronizar prompts" });
     }
   });
 

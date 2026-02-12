@@ -361,8 +361,8 @@ export const insertSettingSchema = createInsertSchema(settings).omit({ id: true,
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Setting = typeof settings.$inferSelect;
 
-// ============== TAREFAS MODULE - AREAS ==============
-export const taskAreas = pgTable("task_areas", {
+// ============== TAREFAS MODULE - TAGS (formerly AREAS) ==============
+export const taskTags = pgTable("task_tags", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),
   name: text("name").notNull(),
@@ -376,29 +376,41 @@ export const taskAreas = pgTable("task_areas", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertTaskAreaSchema = createInsertSchema(taskAreas).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertTaskArea = z.infer<typeof insertTaskAreaSchema>;
-export type TaskArea = typeof taskAreas.$inferSelect;
+export const insertTaskTagSchema = createInsertSchema(taskTags).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTaskTag = z.infer<typeof insertTaskTagSchema>;
+export type TaskTag = typeof taskTags.$inferSelect;
 
-// ============== TAREFAS MODULE - AREA MEMBERS ==============
-export const taskAreaMembers = pgTable("task_area_members", {
+// Backward compatibility aliases (deprecated, will be removed in future versions)
+export const taskAreas = taskTags;
+export const insertTaskAreaSchema = insertTaskTagSchema;
+export type InsertTaskArea = InsertTaskTag;
+export type TaskArea = TaskTag;
+
+// ============== TAREFAS MODULE - TAG MEMBERS (formerly AREA MEMBERS) ==============
+export const taskTagMembers = pgTable("task_tag_members", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),
-  areaId: varchar("area_id").notNull(),
+  tagId: varchar("tag_id").notNull(),
   userId: varchar("user_id").notNull(),
   role: text("role").notNull().default("viewer"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertTaskAreaMemberSchema = createInsertSchema(taskAreaMembers).omit({ id: true, createdAt: true });
-export type InsertTaskAreaMember = z.infer<typeof insertTaskAreaMemberSchema>;
-export type TaskAreaMember = typeof taskAreaMembers.$inferSelect;
+export const insertTaskTagMemberSchema = createInsertSchema(taskTagMembers).omit({ id: true, createdAt: true });
+export type InsertTaskTagMember = z.infer<typeof insertTaskTagMemberSchema>;
+export type TaskTagMember = typeof taskTagMembers.$inferSelect;
+
+// Backward compatibility aliases (deprecated, will be removed in future versions)
+export const taskAreaMembers = taskTagMembers;
+export const insertTaskAreaMemberSchema = insertTaskTagMemberSchema;
+export type InsertTaskAreaMember = InsertTaskTagMember;
+export type TaskAreaMember = TaskTagMember;
 
 // ============== TAREFAS MODULE - TASKS ==============
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),
-  areaId: varchar("area_id").notNull(),
+  tagId: varchar("tag_id").notNull(),
   title: text("title").notNull(),
   description: text("description"),
   attachments: text("attachments"), // JSON array of attachment URLs
@@ -1040,3 +1052,109 @@ export const updates = pgTable("updates", {
 export const insertUpdateSchema = createInsertSchema(updates).omit({ id: true, createdAt: true, updatedAt: true, publishedAt: true });
 export type InsertUpdate = z.infer<typeof insertUpdateSchema>;
 export type Update = typeof updates.$inferSelect;
+
+// ============== IMEI.INFO INTEGRATION ==============
+export const imeiInfoStats = pgTable("imei_info_stats", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  date: timestamp("date").notNull(),
+  totalOrders: integer("total_orders").default(0),
+  credits: integer("credits").default(0),
+  success: integer("success").default(0),
+  pending: integer("pending").default(0),
+  failed: integer("failed").default(0),
+  numberOfChecks: integer("number_of_checks").default(0),
+  averageTicket: decimal("average_ticket", { precision: 10, scale: 2 }),
+  totalServiceValue: decimal("total_service_value", { precision: 12, scale: 2 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertImeiInfoStatsSchema = createInsertSchema(imeiInfoStats).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertImeiInfoStats = z.infer<typeof insertImeiInfoStatsSchema>;
+export type ImeiInfoStats = typeof imeiInfoStats.$inferSelect;
+
+export const imeiInfoAlerts = pgTable("imei_info_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  thresholdValue: integer("threshold_value").notNull(),
+  alertEmails: text("alert_emails").notNull(),
+  isActive: boolean("is_active").default(true),
+  lastTriggered: timestamp("last_triggered"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertImeiInfoAlertSchema = createInsertSchema(imeiInfoAlerts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertImeiInfoAlert = z.infer<typeof insertImeiInfoAlertSchema>;
+export type ImeiInfoAlert = typeof imeiInfoAlerts.$inferSelect;
+
+// ============== PROMPTS LIBRARY (Biblioteca de Prompts Claude Code) ==============
+export const promptsLibrary = pgTable("prompts_library", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  // Categorização
+  category: text("category").notNull(), // development-team, development-tools, programming-languages, database
+  subcategory: text("subcategory").notNull(), // frontend-developer, code-reviewer, etc
+  name: text("name").notNull(), // nome do arquivo sem extensão
+  // Conteúdo
+  title: text("title").notNull(), // título formatado em português
+  description: text("description").notNull(), // descrição resumida da finalidade
+  content: text("content").notNull(), // conteúdo completo do prompt
+  // Metadados do prompt
+  tools: text("tools"), // JSON array de ferramentas disponíveis
+  model: text("model"), // modelo recomendado (sonnet, haiku, etc)
+  // Origem e sincronização
+  sourceUrl: text("source_url"), // link para o arquivo no GitHub
+  githubRepo: text("github_repo").notNull().default("davila7/claude-code-templates"),
+  githubPath: text("github_path").notNull(), // caminho completo no repo
+  lastSyncedAt: timestamp("last_synced_at").defaultNow(),
+  // Status e uso
+  isActive: boolean("is_active").default(true),
+  usageCount: integer("usage_count").default(0),
+  // Traduções (para prompts que terão versão PT-BR)
+  isTranslated: boolean("is_translated").default(false),
+  originalLanguage: text("original_language").default("en"),
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPromptLibrarySchema = createInsertSchema(promptsLibrary).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true, 
+  lastSyncedAt: true,
+  usageCount: true 
+});
+export type InsertPromptLibrary = z.infer<typeof insertPromptLibrarySchema>;
+export type PromptLibrary = typeof promptsLibrary.$inferSelect;
+
+// ============== PROMPT USER FAVORITES (Favoritos dos Usuários) ==============
+export const promptUserFavorites = pgTable("prompt_user_favorites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  userId: varchar("user_id").notNull(),
+  promptId: varchar("prompt_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPromptUserFavoriteSchema = createInsertSchema(promptUserFavorites).omit({ id: true, createdAt: true });
+export type InsertPromptUserFavorite = z.infer<typeof insertPromptUserFavoriteSchema>;
+export type PromptUserFavorite = typeof promptUserFavorites.$inferSelect;
+
+// Helper types for Prompts
+export type PromptWithFavorite = PromptLibrary & {
+  isFavorite?: boolean;
+  favoriteId?: string;
+};
+
+// Categorias de prompts disponíveis
+export const PROMPT_CATEGORIES = [
+  { id: "development-team", label: "Equipe de Desenvolvimento", icon: "Users" },
+  { id: "development-tools", label: "Ferramentas de Desenvolvimento", icon: "Wrench" },
+  { id: "programming-languages", label: "Linguagens de Programação", icon: "Code" },
+  { id: "database", label: "Banco de Dados", icon: "Database" },
+] as const;
+
+export type PromptCategory = typeof PROMPT_CATEGORIES[number]["id"];

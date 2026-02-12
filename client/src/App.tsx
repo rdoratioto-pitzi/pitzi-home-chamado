@@ -31,6 +31,7 @@ import CorreiosReversaPage from "@/pages/apis/correios-reversa";
 import ApiRsLogisticaPage from "@/pages/apis/api-rs-logistica";
 import ApiAdmLogisticaPage from "@/pages/apis/api-adm-logistica";
 import ApiRelatorioPedidosPage from "@/pages/apis/api-relatorio-pedidos";
+import ApiImeiInfoPage from "@/pages/apis/api-imei-info";
 import LoginPage from "@/pages/login";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
 import PricingOverviewPage from "@/pages/pricing/index";
@@ -47,6 +48,7 @@ import ConhecimentoPage from "@/pages/conhecimento/index";
 import ConhecimentoNovoPage from "@/pages/conhecimento/novo";
 import ConhecimentoDocumentoPage from "@/pages/conhecimento/documento";
 import ConhecimentoFavoritosPage from "@/pages/conhecimento/favoritos";
+import PromptsPage from "@/pages/conhecimento/prompts";
 import MacgyverIAPage from "@/pages/macgyver-ia/index";
 import FluxogramasPage from "@/pages/fluxogramas/index";
 import FlowchartEditorPage from "@/pages/fluxogramas/editor";
@@ -190,6 +192,11 @@ function Router() {
           <ApiRelatorioPedidosPage />
         </ProtectedRoute>
       </Route>
+      <Route path="/apis/imei-info">
+        <ProtectedRoute requiredPermission="apis">
+          <ApiImeiInfoPage />
+        </ProtectedRoute>
+      </Route>
       <Route path="/pricing">
         <ProtectedRoute requiredPermission="pricing">
           <PricingOverviewPage />
@@ -248,6 +255,11 @@ function Router() {
       <Route path="/conhecimento/favoritos">
         <ProtectedRoute requiredPermission="conhecimento">
           <ConhecimentoFavoritosPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/conhecimento/prompts">
+        <ProtectedRoute requiredPermission="conhecimento">
+          <PromptsPage />
         </ProtectedRoute>
       </Route>
       <Route path="/conhecimento/:id">
