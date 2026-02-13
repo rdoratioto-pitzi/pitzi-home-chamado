@@ -1494,7 +1494,6 @@ export async function registerRoutes(
               await storage.addTaskAreaMember({
                 tagId: area.id,
                 userId,
-                userId,
                 role: "member"
               });
 
