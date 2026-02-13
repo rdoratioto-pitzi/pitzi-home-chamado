@@ -189,7 +189,7 @@ export default function TarefasPage() {
   });
 
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", selectedAreaId],
+    queryKey: ["/api/tasks", selectedAreaId, "tasks"],
     queryFn: async () => {
       const url = selectedAreaId 
         ? `/api/tasks?tagId=${selectedAreaId}&type=task` 
