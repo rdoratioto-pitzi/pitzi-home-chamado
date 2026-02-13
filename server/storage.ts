@@ -796,8 +796,9 @@ export class DatabaseStorage implements IStorage {
     const memberRecords = await db.select().from(taskTagMembers).where(eq(taskTagMembers.userId, userId));
     const memberTagIds = new Set(memberRecords.map(m => m.tagId));
     return allTags.filter(tag =>
+      tag.visibility === "public" ||
       tag.ownerId === userId ||
-      memberTagIds.has(tag.id)
+      (tag.visibility === "shared" && memberTagIds.has(tag.id))
     );
   }
   async createTaskTag(insertTag: InsertTaskTag): Promise<TaskTag> {

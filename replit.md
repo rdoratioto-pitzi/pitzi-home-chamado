@@ -30,15 +30,16 @@ Renov Home adopts a client-server architecture with a clear separation of concer
 - **Access Control by Module:**
     - **Macgyver IA:** 100% private per user (no admin bypass).
     - **Chamados (Tickets):** Public - all authenticated users see all tickets.
-    - **Projects & Flowcharts:** Private by default, with optional shared visibility and member management via `projectMembers` table and `permissions` JSON field.
-    - **Task Areas:** Scoped by context (`scope` field: 'tasks' vs 'meetings') to separate Tarefas and Reuniões areas.
+    - **Projects:** 3-way visibility (private/shared/public) with member management via `projectMembers` table. Private = owner only, Shared = owner + members, Public = all tenant users.
+    - **Flowcharts:** Private by default, with optional shared visibility via `permissions` JSON field.
+    - **Tags (formerly Task Areas):** Scoped by context (`scope` field: 'tasks' vs 'meetings'). Tasks scope supports only private/shared visibility. Meetings scope supports private/shared/public. Backend validates that tasks scope cannot have public visibility.
     - **Corporate Modules:** Visibility controlled by user `modulePermissions` JSON field.
     - **Dashboard:** Module cards filtered based on user permissions (`modulePermissions`).
 - **Multi-tenant Architecture:** Designed with multi-tenancy in mind, incorporating a `tenantId` field in all data structures for future scalability.
 - **Module-specific Features:**
     - **Tickets:** Auto-generated codes, categorization, Kanban view, Excel export, automatic assignment, SLA management.
-    - **Tasks:** Kanban view, flexible sorting, support for private and shared areas.
-    - **Meetings:** Standalone module, shared areas, recurring meetings, multi-participant selection, email invitations.
+    - **Tasks:** Kanban view, flexible sorting, Tags with private/shared visibility. Tasks appear only under their assigned tag and in "Todas as Tarefas" view.
+    - **Meetings:** Standalone module, Tags with private/shared/public visibility, recurring meetings, multi-participant selection, email invitations. Meetings appear only under their assigned tag and in "Todas as Reuniões" view.
     - **Pricing:** Dashboard with KPIs, product analysis, historical graphing, price alerts, detailed product information.
     - **Logistics:** Freight simulation, reverse logistics request forms, tracking, label printing (ZPL format), Romaneios search, CEP validation.
     - **Correios Embalagens:** Packaging types matching official Correios documentation.

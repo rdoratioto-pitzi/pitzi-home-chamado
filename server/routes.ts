@@ -84,6 +84,8 @@ export async function registerRoutes(
     for (const project of allProjects) {
       if (project.ownerId === userId) {
         accessibleIds.push(project.id);
+      } else if (project.visibility === "public") {
+        accessibleIds.push(project.id);
       } else if (project.visibility === "shared" && memberProjectIds.has(project.id)) {
         accessibleIds.push(project.id);
       }
@@ -1406,6 +1408,10 @@ export async function registerRoutes(
       const { userId } = getSessionUser(req);
       const { memberIds, ...areaData } = req.body;
       const validated = insertTaskAreaSchema.parse({ ...areaData, ownerId: userId });
+      // Tarefas scope cannot have public visibility
+      if (validated.scope === "tasks" && validated.visibility === "public") {
+        return res.status(400).json({ error: "Tarefas não podem ter visibilidade pública" });
+      }
       const area = await storage.createTaskArea(validated);
 
       // Process shared area members and send invites
@@ -1466,6 +1472,12 @@ export async function registerRoutes(
       const { memberIds, ...areaData } = req.body;
       const partialSchema = insertTaskAreaSchema.partial();
       const validated = partialSchema.parse(areaData);
+      // Tarefas scope cannot have public visibility
+      const effectiveScope = validated.scope || existing.scope;
+      const effectiveVisibility = validated.visibility || existing.visibility;
+      if (effectiveScope === "tasks" && effectiveVisibility === "public") {
+        return res.status(400).json({ error: "Tarefas não podem ter visibilidade pública" });
+      }
       const area = await storage.updateTaskArea(req.params.id, validated);
       if (!area) return res.status(404).json({ error: "Area not found" });
 
