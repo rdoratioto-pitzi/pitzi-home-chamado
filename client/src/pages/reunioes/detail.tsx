@@ -112,7 +112,7 @@ export default function MeetingDetailPage() {
   });
 
   const { data: areas = [] } = useQuery<TaskArea[]>({
-    queryKey: ["/api/task-areas"],
+    queryKey: ["/api/task-tags"],
   });
 
   const { data: users = [] } = useQuery<UserType[]>({
@@ -210,7 +210,7 @@ export default function MeetingDetailPage() {
         type: "task",
         status: "todo",
         priority: "medium",
-        areaId: meeting?.areaId,
+        tagId: meeting?.tagId,
         createdBy: "admin",
         assigneeId: responsibleUser?.id || undefined,
         dueDate: action.deadline || null,
@@ -314,7 +314,7 @@ export default function MeetingDetailPage() {
     );
   }
 
-  const meetingArea = areas.find(a => a.id === meeting.areaId);
+  const meetingArea = areas.find(a => a.id === meeting.tagId);
   const status = statusConfig[meeting.status as keyof typeof statusConfig];
   const priority = priorityConfig[meeting.priority as keyof typeof priorityConfig];
   const StatusIcon = status?.icon || Circle;

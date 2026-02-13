@@ -114,7 +114,7 @@ export function TaskKanban({ tasks, areas }: TaskKanbanProps) {
 
               <div className="space-y-3 min-h-[200px] bg-muted/30 rounded-lg p-2">
               {columnTasks.map((task) => {
-                const taskArea = getArea(task.areaId);
+                const taskArea = task.tagId ? getArea(task.tagId) : undefined;
                 const taskType = typeConfig[task.type as keyof typeof typeConfig];
                 const TypeIcon = taskType?.icon || CheckCircle2;
 
