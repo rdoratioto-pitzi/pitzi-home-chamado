@@ -409,39 +409,29 @@ export default function MeetingDetailPage() {
                 </Badge>
                 {isEditing ? (
                   <Select
-                    value={editedMeeting.status || meeting.status}
-                    onValueChange={(v) => setEditedMeeting({ ...editedMeeting, status: v })}
+                    value={editedMeeting.tagId || ""}
+                    onValueChange={(v) => setEditedMeeting({ ...editedMeeting, tagId: v })}
                   >
-                    <SelectTrigger className="w-36 h-7" data-testid="select-edit-status">
-                      <SelectValue />
+                    <SelectTrigger className="w-40 h-7" data-testid="select-edit-tag">
+                      <SelectValue placeholder="Selecionar Tag" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="todo">Agendada</SelectItem>
-                      <SelectItem value="doing">Em Andamento</SelectItem>
-                      <SelectItem value="done">Concluída</SelectItem>
-                      <SelectItem value="archived">Arquivada</SelectItem>
+                      {areas.map((area) => (
+                        <SelectItem key={area.id} value={area.id}>
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: area.color || "#00A137" }} />
+                            {area.name}
+                          </div>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                ) : (
-                  <Badge className={status?.color}>{status?.label}</Badge>
-                )}
-                {isEditing ? (
-                  <Select
-                    value={editedMeeting.priority || meeting.priority}
-                    onValueChange={(v) => setEditedMeeting({ ...editedMeeting, priority: v })}
-                  >
-                    <SelectTrigger className="w-28 h-7" data-testid="select-edit-priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Baixa</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Badge className={priority?.color}>{priority?.label}</Badge>
-                )}
+                ) : meetingArea ? (
+                  <Badge variant="secondary" className="text-xs">
+                    <div className="h-2 w-2 rounded-full mr-1" style={{ backgroundColor: meetingArea.color || "#00A137" }} />
+                    {meetingArea.name}
+                  </Badge>
+                ) : null}
                 {editedMeetingData.date && (
                   <Badge variant="outline">
                     <Calendar className="h-3 w-3 mr-1" />

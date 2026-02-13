@@ -712,9 +712,6 @@ export default function ReunioesPage() {
                           {meetingArea.name}
                         </Badge>
                       )}
-                      <Badge className={`text-xs ${priority?.color}`}>
-                        {priority?.label}
-                      </Badge>
                       {meetingData.date && (
                         <Badge variant="outline" className="text-xs">
                           <Calendar className="h-3 w-3 mr-1" />
@@ -807,9 +804,6 @@ export default function ReunioesPage() {
                               {meetingArea.name}
                             </Badge>
                           )}
-                          <Badge className={`text-xs ${priority?.color}`}>
-                            {priority?.label}
-                          </Badge>
                           {meetingData.date && (
                             <Badge variant="outline" className="text-xs">
                               <Calendar className="h-3 w-3 mr-1" />
