@@ -410,7 +410,7 @@ export type TaskAreaMember = TaskTagMember;
 export const tasks = pgTable("tasks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),
-  tagId: varchar("tag_id").notNull(),
+  tagId: varchar("tag_id"),
   title: text("title").notNull(),
   description: text("description"),
   attachments: text("attachments"), // JSON array of attachment URLs

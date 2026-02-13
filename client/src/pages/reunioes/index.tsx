@@ -107,9 +107,9 @@ export default function ReunioesPage() {
   const [externalParticipantInput, setExternalParticipantInput] = useState("");
 
   const { data: areas = [], isLoading: areasLoading } = useQuery<TaskArea[]>({
-    queryKey: ["/api/task-areas", "meetings"],
+    queryKey: ["/api/task-tags", "meetings"],
     queryFn: async () => {
-      const res = await fetch("/api/task-areas?scope=meetings");
+      const res = await fetch("/api/task-tags?scope=meetings");
       if (!res.ok) throw new Error("Failed to fetch areas");
       return res.json();
     },
@@ -147,41 +147,41 @@ export default function ReunioesPage() {
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
-      return apiRequest("POST", "/api/task-areas", data);
+      return apiRequest("POST", "/api/task-tags", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "meetings"] });
       setShowAreaDialog(false);
       setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "meetings" });
       setMemberSearchInput("");
-      toast({ title: "Área criada com sucesso!" });
+      toast({ title: "Tag criada com sucesso!" });
     },
     onError: (error: Error) => {
       console.error("Area creation error:", error);
-      toast({ title: "Erro ao criar área", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao criar tag", description: error.message, variant: "destructive" });
     },
   });
 
   const updateAreaMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<TaskArea> }) => {
-      return apiRequest("PUT", `/api/task-areas/${id}`, data);
+      return apiRequest("PUT", `/api/task-tags/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "meetings"] });
       setShowAreaDialog(false);
       setEditingArea(null);
-      toast({ title: "Área atualizada com sucesso!" });
+      toast({ title: "Tag atualizada com sucesso!" });
     },
   });
 
   const deleteAreaMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/task-areas/${id}`);
+      return apiRequest("DELETE", `/api/task-tags/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "meetings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "meetings"] });
       if (selectedAreaId) setSelectedAreaId(null);
-      toast({ title: "Área excluída com sucesso!" });
+      toast({ title: "Tag excluída com sucesso!" });
     },
   });
 
@@ -201,7 +201,7 @@ export default function ReunioesPage() {
         type: "meeting_note",
         status: data.status,
         priority: data.priority,
-        areaId: data.areaId || selectedAreaId || "",
+        tagId: data.areaId || selectedAreaId || undefined,
         createdBy: data.createdBy,
         dueDate: data.meetingData.date || null,
         assigneeId: data.assigneeId || undefined,
@@ -327,7 +327,7 @@ export default function ReunioesPage() {
     if (area) {
       setEditingArea(area);
       try {
-        const response = await fetch(`/api/task-areas/${area.id}/members`);
+        const response = await fetch(`/api/task-tags/${area.id}/members`);
         if (response.ok) {
           const members = await response.json();
           setNewArea({
@@ -487,7 +487,7 @@ export default function ReunioesPage() {
       {/* Sidebar - Areas */}
       <div className="w-56 border-r border-border bg-muted/30 flex flex-col">
         <div className="p-3 border-b border-border flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Áreas</span>
+          <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Tags</span>
           <Button 
             size="icon" 
             variant="ghost" 
@@ -513,7 +513,7 @@ export default function ReunioesPage() {
             </Badge>
           </button>
           {areas.map((area) => {
-            const areaCount = meetings.filter(m => m.areaId === area.id).length;
+            const areaCount = meetings.filter(m => m.tagId === area.id).length;
             return (
               <div
                 key={area.id}
@@ -668,7 +668,7 @@ export default function ReunioesPage() {
                 const status = statusConfig[meeting.status as keyof typeof statusConfig];
                 const priority = priorityConfig[meeting.priority as keyof typeof priorityConfig];
                 const StatusIcon = status?.icon || Circle;
-                const meetingArea = areas.find(a => a.id === meeting.areaId);
+                const meetingArea = areas.find(a => a.id === meeting.tagId);
                 const meetingData = getMeetingData(meeting);
 
                 if (viewMode === "list") {
@@ -867,7 +867,7 @@ export default function ReunioesPage() {
       <Dialog open={showAreaDialog} onOpenChange={setShowAreaDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingArea ? "Editar Área" : "Nova Área"}</DialogTitle>
+            <DialogTitle>{editingArea ? "Editar Tag" : "Nova Tag"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -875,7 +875,7 @@ export default function ReunioesPage() {
               <Input
                 value={newArea.name}
                 onChange={(e) => setNewArea({ ...newArea, name: e.target.value })}
-                placeholder="Nome da área"
+                placeholder="Nome da tag"
                 data-testid="input-area-name"
               />
             </div>
@@ -1007,7 +1007,7 @@ export default function ReunioesPage() {
               disabled={!newArea.name || createAreaMutation.isPending || updateAreaMutation.isPending}
               data-testid="button-save-area"
             >
-              {editingArea ? "Salvar" : "Criar Área"}
+              {editingArea ? "Salvar" : "Criar Tag"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1031,13 +1031,13 @@ export default function ReunioesPage() {
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Área</label>
+              <label className="text-sm font-medium">Tag</label>
               <Select 
                 value={newMeeting.areaId} 
                 onValueChange={(v) => setNewMeeting({ ...newMeeting, areaId: v })}
               >
                 <SelectTrigger data-testid="select-meeting-area">
-                  <SelectValue placeholder="Selecione uma área" />
+                  <SelectValue placeholder="Selecione uma tag (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
                   {areas.map((area) => (
@@ -1348,7 +1348,7 @@ export default function ReunioesPage() {
             </Button>
             <Button
               onClick={() => createMeetingMutation.mutate(newMeeting)}
-              disabled={!newMeeting.title || !newMeeting.areaId || createMeetingMutation.isPending}
+              disabled={!newMeeting.title || createMeetingMutation.isPending}
               data-testid="button-save-meeting"
             >
               Criar Reunião
