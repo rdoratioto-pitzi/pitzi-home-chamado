@@ -179,12 +179,21 @@ export default function TarefasPage() {
     );
   }, [users, participantInput]);
 
+  const { data: globalTasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", "tasks", "all"],
+    queryFn: async () => {
+      const res = await fetch("/api/tasks?type=task");
+      if (!res.ok) throw new Error("Failed to fetch tasks");
+      return res.json();
+    },
+  });
+
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks", selectedAreaId],
     queryFn: async () => {
       const url = selectedAreaId 
-        ? `/api/tasks?tagId=${selectedAreaId}` 
-        : "/api/tasks";
+        ? `/api/tasks?tagId=${selectedAreaId}&type=task` 
+        : "/api/tasks?type=task";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
@@ -555,7 +564,7 @@ export default function TarefasPage() {
               <Folder className="h-4 w-4" />
               <span>Todas as Tarefas</span>
               <Badge variant="secondary" className="ml-auto text-xs">
-                {openTasksOnly.length}
+                {globalTasks.filter(t => t.status === "todo" || t.status === "doing").length}
               </Badge>
             </button>
 
@@ -564,7 +573,9 @@ export default function TarefasPage() {
                 <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
               ) : (
                 areas.map((area) => {
-                  const areaTaskCount = openTasksOnly.filter(t => t.tagId === area.id).length;
+                  const areaTaskCount = globalTasks.filter(t => 
+                    t.tagId === area.id && (t.status === "todo" || t.status === "doing")
+                  ).length;
                   return (
                     <div 
                       key={area.id}
