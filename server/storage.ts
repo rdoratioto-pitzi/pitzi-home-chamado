@@ -409,30 +409,27 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
   async getUserByEmail(email: string): Promise<User | undefined> {
+    const emailLower = email?.toLowerCase();
     if (!db) {
-      if (email === "matheus@renovsmart.com.br" || email === "admin@renov.com.br") {
-        return this.getMockAdmin();
-      }
-      return undefined;
+      const mock = this.getMockUsers().find(u => u.email.toLowerCase() === emailLower);
+      return mock;
     }
     try {
       const [user] = await db.select().from(users).where(eq(users.email, email));
       return user;
     } catch (e) {
       console.warn("[storage] DB query failed, using mock fallback for email:", email);
-      if (email === "matheus@renovsmart.com.br" || email === "admin@renov.com.br") {
-        return this.getMockAdmin();
-      }
-      return undefined;
+      const mock = this.getMockUsers().find(u => u.email.toLowerCase() === emailLower);
+      return mock;
     }
   }
 
   private getMockAdmin(): User {
     return {
       id: "mock-admin-id",
-      name: "Usuário Teste",
-      email: "matheus@renovsmart.com.br",
-      password: "123", // Senha simples para teste local
+      name: "Matheus",
+      email: "Matheus@renovsmart.com.br",
+      password: "ma061184",
       isAdmin: true,
       perfilAcesso: "diretor",
       status: "active",
@@ -447,12 +444,34 @@ export class DatabaseStorage implements IStorage {
       deletedAt: null,
     } as User;
   }
+
+  private getMockUsers(): User[] {
+    return [
+      this.getMockAdmin(),
+      {
+        ...this.getMockAdmin(),
+        id: "mock-admin2-id",
+        name: "Administrador",
+        email: "admin@renov.com.br",
+        password: "admin123",
+        modulePermissions: JSON.stringify({
+          chamados: true,
+          projetos: true,
+          tarefas: true,
+          okrs: true,
+          logistica: true,
+          apis: true,
+          configuracoes: true,
+        }),
+      } as User,
+    ];
+  }
   async getUsers(): Promise<User[]> {
-    if (!db) return [this.getMockAdmin()];
+    if (!db) return this.getMockUsers();
     try {
       return await db.select().from(users);
     } catch (e) {
-      return [this.getMockAdmin()];
+      return this.getMockUsers();
     }
   }
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -745,26 +764,13 @@ export class DatabaseStorage implements IStorage {
     return e;
   }
 
-  // Settings
+  // Settings - usa apenas dados da base (settings table). Sem mocks de logo para evitar paths inexistentes.
   async getSetting(key: string): Promise<Setting | undefined> {
-    if (!db) {
-      if (key === "logo_url_light") return { id: "mock-light", key, tenantId: null, value: "/objects/logo-light.png", updatedAt: new Date() } as Setting;
-      if (key === "logo_url_dark") return { id: "mock-dark", key, tenantId: null, value: "/objects/logo-dark.png", updatedAt: new Date() } as Setting;
-      return undefined;
-    }
+    if (!db) return undefined;
     try {
       const [s] = await db.select().from(settings).where(eq(settings.key, key));
-
-      // Fallback if record not found in DB but expected to exist
-      if (!s) {
-        if (key === "logo_url_light") return { id: "mock-light", key, tenantId: null, value: "/objects/logo-light.png", updatedAt: new Date() } as Setting;
-        if (key === "logo_url_dark") return { id: "mock-dark", key, tenantId: null, value: "/objects/logo-dark.png", updatedAt: new Date() } as Setting;
-      }
-
-      return s;
+      return s ?? undefined;
     } catch (e) {
-      if (key === "logo_url_light") return { id: "mock-light", key, tenantId: null, value: "/objects/logo-light.png", updatedAt: new Date() } as Setting;
-      if (key === "logo_url_dark") return { id: "mock-dark", key, tenantId: null, value: "/objects/logo-dark.png", updatedAt: new Date() } as Setting;
       return undefined;
     }
   }
@@ -788,10 +794,12 @@ export class DatabaseStorage implements IStorage {
 
   // Task Tags (formerly Task Areas)
   async getTaskTag(id: string): Promise<TaskTag | undefined> {
+    if (!db) return undefined;
     const [t] = await db.select().from(taskTags).where(eq(taskTags.id, id));
     return t;
   }
   async getTaskTags(userId: string): Promise<TaskTag[]> {
+    if (!db) return [];
     const allTags = await db.select().from(taskTags);
     const memberRecords = await db.select().from(taskTagMembers).where(eq(taskTagMembers.userId, userId));
     const memberTagIds = new Set(memberRecords.map(m => m.tagId));
@@ -802,14 +810,17 @@ export class DatabaseStorage implements IStorage {
     );
   }
   async createTaskTag(insertTag: InsertTaskTag): Promise<TaskTag> {
+    if (!db) throw new Error("Database not connected");
     const [t] = await db.insert(taskTags).values(insertTag).returning();
     return t;
   }
   async updateTaskTag(id: string, data: Partial<TaskTag>): Promise<TaskTag | undefined> {
+    if (!db) return undefined;
     const [t] = await db.update(taskTags).set(data).where(eq(taskTags.id, id)).returning();
     return t;
   }
   async deleteTaskTag(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(taskTags).where(eq(taskTags.id, id)).returning();
     return result.length > 0;
   }
@@ -832,17 +843,21 @@ export class DatabaseStorage implements IStorage {
 
   // Task Tag Members (formerly Task Area Members)
   async getTaskTagMembers(tagId: string): Promise<TaskTagMember[]> {
+    if (!db) return [];
     return await db.select().from(taskTagMembers).where(eq(taskTagMembers.tagId, tagId));
   }
   async addTaskTagMember(member: InsertTaskTagMember): Promise<TaskTagMember> {
+    if (!db) throw new Error("Database not connected");
     const [m] = await db.insert(taskTagMembers).values(member).returning();
     return m;
   }
   async updateTaskTagMember(id: string, data: Partial<TaskTagMember>): Promise<TaskTagMember | undefined> {
+    if (!db) return undefined;
     const [m] = await db.update(taskTagMembers).set(data).where(eq(taskTagMembers.id, id)).returning();
     return m;
   }
   async removeTaskTagMember(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(taskTagMembers).where(eq(taskTagMembers.id, id)).returning();
     return result.length > 0;
   }
@@ -862,10 +877,12 @@ export class DatabaseStorage implements IStorage {
 
   // Tasks
   async getTask(id: string): Promise<Task | undefined> {
+    if (!db) return undefined;
     const [t] = await db.select().from(tasks).where(eq(tasks.id, id));
     return t;
   }
   async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string }): Promise<Task[]> {
+    if (!db) return [];
     let baseQuery = db.select().from(tasks);
     const conditions = [];
     // Support both tagId and areaId for backward compatibility
@@ -882,20 +899,24 @@ export class DatabaseStorage implements IStorage {
     return await baseQuery;
   }
   async createTask(task: InsertTask): Promise<Task> {
+    if (!db) throw new Error("Database not connected");
     const [t] = await db.insert(tasks).values(task).returning();
     return t;
   }
   async updateTask(id: string, data: Partial<Task>): Promise<Task | undefined> {
+    if (!db) return undefined;
     const [t] = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
     return t;
   }
   async deleteTask(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(tasks).where(eq(tasks.id, id)).returning();
     return result.length > 0;
   }
 
   // Task Comments
   async getTaskComments(taskId: string): Promise<TaskComment[]> {
+    if (!db) return [];
     return await db.select().from(taskComments).where(eq(taskComments.taskId, taskId));
   }
   async getTaskComment(id: string): Promise<TaskComment | undefined> {
@@ -1461,25 +1482,30 @@ export class DatabaseStorage implements IStorage {
 
   // Notifications
   async getNotifications(userId: string): Promise<Notification[]> {
+    if (!db) return [];
     return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(sql`${notifications.createdAt} DESC`).limit(50);
   }
 
   async getUnreadNotificationCount(userId: string): Promise<number> {
+    if (!db) return 0;
     const result = await db.select({ count: sql<number>`count(*)` }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
     return Number(result[0]?.count || 0);
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(notifications).values(notification).returning();
     return created;
   }
 
   async markNotificationRead(id: string): Promise<Notification | undefined> {
+    if (!db) return undefined;
     const [updated] = await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id)).returning();
     return updated;
   }
 
   async markAllNotificationsRead(userId: string): Promise<void> {
+    if (!db) return;
     await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
   }
 
