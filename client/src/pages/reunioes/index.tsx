@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video } from "lucide-react";
+import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { RichTextarea } from "@/components/rich-textarea";
 import {
@@ -68,7 +68,7 @@ export default function ReunioesPage() {
   const [newArea, setNewArea] = useState({
     name: "",
     description: "",
-    visibility: "private" as "private" | "shared",
+    visibility: "private" as "private" | "shared" | "public",
     color: "#00A137",
     ownerId: currentUserId,
     memberIds: [] as string[],
@@ -132,7 +132,7 @@ export default function ReunioesPage() {
     queryKey: ["/api/tasks", selectedAreaId],
     queryFn: async () => {
       const url = selectedAreaId 
-        ? `/api/tasks?area_id=${selectedAreaId}` 
+        ? `/api/tasks?tagId=${selectedAreaId}` 
         : "/api/tasks";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch tasks");
@@ -152,7 +152,7 @@ export default function ReunioesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "meetings"] });
       setShowAreaDialog(false);
-      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "meetings" });
+      setNewArea({ name: "", description: "", visibility: "private" as "private" | "shared" | "public", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "meetings" });
       setMemberSearchInput("");
       toast({ title: "Tag criada com sucesso!" });
     },
@@ -333,7 +333,7 @@ export default function ReunioesPage() {
           setNewArea({
             name: area.name,
             description: area.description || "",
-            visibility: area.visibility as "private" | "shared",
+            visibility: area.visibility as "private" | "shared" | "public",
             color: area.color || "#00A137",
             ownerId: area.ownerId,
             memberIds: members.map((m: any) => m.userId),
@@ -345,7 +345,7 @@ export default function ReunioesPage() {
         setNewArea({
           name: area.name,
           description: area.description || "",
-          visibility: area.visibility as "private" | "shared",
+          visibility: area.visibility as "private" | "shared" | "public",
           color: area.color || "#00A137",
           ownerId: area.ownerId,
           memberIds: [],
@@ -354,7 +354,7 @@ export default function ReunioesPage() {
       }
     } else {
       setEditingArea(null);
-      setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "meetings" });
+      setNewArea({ name: "", description: "", visibility: "private" as "private" | "shared" | "public", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "meetings" });
     }
     setMemberSearchInput("");
     setShowAreaDialog(true);
@@ -527,7 +527,9 @@ export default function ReunioesPage() {
                   className="h-3 w-3 rounded-full flex-shrink-0" 
                   style={{ backgroundColor: area.color || "#00A137" }}
                 />
-                {area.visibility === "shared" ? (
+                {area.visibility === "public" ? (
+                  <Globe className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                ) : area.visibility === "shared" ? (
                   <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                 ) : (
                   <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
@@ -892,7 +894,7 @@ export default function ReunioesPage() {
               <label className="text-sm font-medium">Visibilidade</label>
               <Select 
                 value={newArea.visibility} 
-                onValueChange={(v) => setNewArea({ ...newArea, visibility: v as "private" | "shared" })}
+                onValueChange={(v) => setNewArea({ ...newArea, visibility: v as "private" | "shared" | "public" })}
               >
                 <SelectTrigger data-testid="select-area-visibility">
                   <SelectValue />
@@ -908,6 +910,12 @@ export default function ReunioesPage() {
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
                       Compartilhada
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="public">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Pública
                     </div>
                   </SelectItem>
                 </SelectContent>

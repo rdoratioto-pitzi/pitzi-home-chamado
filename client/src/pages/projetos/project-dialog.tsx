@@ -28,7 +28,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Lock, Globe, X, UserPlus } from "lucide-react";
+import { Lock, Globe, X, UserPlus, Users, User as UserIcon } from "lucide-react";
 import { format } from "date-fns";
 import type { User, Project, ProjectMember } from "@shared/schema";
 
@@ -38,7 +38,7 @@ const formSchema = z.object({
   ownerId: z.string().min(1, "Responsável é obrigatório"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  visibility: z.enum(["private", "shared"]).default("private"),
+  visibility: z.enum(["private", "shared", "public"]).default("private"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -93,7 +93,7 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
         ownerId: project.ownerId,
         startDate: project.startDate ? format(new Date(project.startDate), "yyyy-MM-dd") : "",
         endDate: project.endDate ? format(new Date(project.endDate), "yyyy-MM-dd") : "",
-        visibility: (project.visibility as "private" | "shared") || "private",
+        visibility: (project.visibility as "private" | "shared" | "public") || "private",
       });
       setMemberIds(existingMembers.map(m => m.userId));
     } else {
@@ -220,29 +220,43 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
               name="visibility"
               render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel>Visibilidade</FormLabel>
-                    <div className="flex items-center gap-2">
-                      {field.value === "private" ? (
-                        <Lock className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Globe className="h-4 w-4 text-primary" />
-                      )}
-                      <Label htmlFor="visibility-toggle" className="text-sm text-muted-foreground">
-                        {field.value === "private" ? "Privado" : "Compartilhado"}
-                      </Label>
-                      <Switch
-                        id="visibility-toggle"
-                        data-testid="switch-project-visibility"
-                        checked={field.value === "shared"}
-                        onCheckedChange={(checked) => field.onChange(checked ? "shared" : "private")}
-                      />
-                    </div>
-                  </div>
+                  <FormLabel>Visibilidade</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-project-visibility">
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="private">
+                        <div className="flex items-center gap-2">
+                          <UserIcon className="h-4 w-4" />
+                          Privada
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="shared">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Compartilhada
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="public">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          Pública
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                   <p className="text-xs text-muted-foreground">
                     {field.value === "private" 
                       ? "Apenas o responsável pode ver este projeto." 
-                      : "O responsável e os membros selecionados podem ver este projeto."}
+                      : field.value === "shared"
+                      ? "O responsável e os membros selecionados podem ver este projeto."
+                      : "Todos os usuários podem ver este projeto."}
                   </p>
                 </FormItem>
               )}

@@ -183,7 +183,7 @@ export default function TarefasPage() {
     queryKey: ["/api/tasks", selectedAreaId],
     queryFn: async () => {
       const url = selectedAreaId 
-        ? `/api/tasks?area_id=${selectedAreaId}` 
+        ? `/api/tasks?tagId=${selectedAreaId}` 
         : "/api/tasks";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch tasks");
