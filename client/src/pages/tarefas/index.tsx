@@ -158,9 +158,9 @@ export default function TarefasPage() {
   const [externalParticipantInput, setExternalParticipantInput] = useState("");
 
   const { data: areas = [], isLoading: areasLoading } = useQuery<TaskArea[]>({
-    queryKey: ["/api/task-areas", "tasks"],
+    queryKey: ["/api/task-tags", "tasks"],
     queryFn: async () => {
-      const res = await fetch("/api/task-areas?scope=tasks");
+      const res = await fetch("/api/task-tags?scope=tasks");
       if (!res.ok) throw new Error("Failed to fetch areas");
       return res.json();
     },
@@ -193,41 +193,41 @@ export default function TarefasPage() {
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
-      return apiRequest("POST", "/api/task-areas", data);
+      return apiRequest("POST", "/api/task-tags", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "tasks"] });
       setShowAreaDialog(false);
       setNewArea({ name: "", description: "", visibility: "private", color: "#00A137", ownerId: currentUserId, memberIds: [], scope: "tasks" });
       setMemberSearchInput("");
-      toast({ title: "Área criada com sucesso!" });
+      toast({ title: "Tag criada com sucesso!" });
     },
     onError: (error: Error) => {
       console.error("Area creation error:", error);
-      toast({ title: "Erro ao criar área", description: error.message, variant: "destructive" });
+      toast({ title: "Erro ao criar tag", description: error.message, variant: "destructive" });
     },
   });
 
   const updateAreaMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<TaskArea> }) => {
-      return apiRequest("PUT", `/api/task-areas/${id}`, data);
+      return apiRequest("PUT", `/api/task-tags/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "tasks"] });
       setShowAreaDialog(false);
       setEditingArea(null);
-      toast({ title: "Área atualizada com sucesso!" });
+      toast({ title: "Tag atualizada com sucesso!" });
     },
   });
 
   const deleteAreaMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/task-areas/${id}`);
+      return apiRequest("DELETE", `/api/task-tags/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-areas", "tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "tasks"] });
       if (selectedAreaId) setSelectedAreaId(null);
-      toast({ title: "Área excluída com sucesso!" });
+      toast({ title: "Tag excluída com sucesso!" });
     },
   });
 
@@ -246,7 +246,7 @@ export default function TarefasPage() {
         type: data.type,
         status: data.status,
         priority: data.priority,
-        areaId: data.areaId || selectedAreaId || "",
+        tagId: data.areaId || selectedAreaId || undefined,
         createdBy: data.createdBy,
         dueDate: data.dueDate || null,
         assigneeId: data.assigneeId || undefined,
@@ -408,7 +408,7 @@ export default function TarefasPage() {
       setEditingArea(area);
       // Fetch current members when editing
       try {
-        const response = await fetch(`/api/task-areas/${area.id}/members`);
+        const response = await fetch(`/api/task-tags/${area.id}/members`);
         if (response.ok) {
           const members = await response.json();
           setNewArea({
@@ -519,7 +519,7 @@ export default function TarefasPage() {
         >
           <div className="p-4 border-b border-border flex items-center justify-between">
             <h2 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
-              Áreas
+              Tags
             </h2>
             <div className="flex items-center gap-1">
               <Button 
@@ -564,7 +564,7 @@ export default function TarefasPage() {
                 <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
               ) : (
                 areas.map((area) => {
-                  const areaTaskCount = openTasksOnly.filter(t => t.areaId === area.id).length;
+                  const areaTaskCount = openTasksOnly.filter(t => t.tagId === area.id).length;
                   return (
                     <div 
                       key={area.id}
@@ -640,7 +640,7 @@ export default function TarefasPage() {
                   className="flex items-center gap-2"
                 >
                   <Folder className="h-4 w-4" />
-                  <span>Áreas</span>
+                  <span>Tags</span>
                 </Button>
               )}
               <Button onClick={handleOpenNormalTaskDialog} data-testid="button-new-task">
@@ -779,7 +779,7 @@ export default function TarefasPage() {
                       const status = statusConfig[task.status as keyof typeof statusConfig];
                       const priority = priorityConfig[task.priority as keyof typeof priorityConfig];
                       const taskType = typeConfig[task.type as keyof typeof typeConfig];
-                      const taskArea = areas.find(a => a.id === task.areaId);
+                      const taskArea = areas.find(a => a.id === task.tagId);
                       const StatusIcon = status?.icon || Circle;
                       const TypeIcon = taskType?.icon || CheckCircle2;
 
@@ -978,7 +978,7 @@ export default function TarefasPage() {
       <Dialog open={showAreaDialog} onOpenChange={setShowAreaDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingArea ? "Editar Área" : "Nova Área"}</DialogTitle>
+            <DialogTitle>{editingArea ? "Editar Tag" : "Nova Tag"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -986,7 +986,7 @@ export default function TarefasPage() {
               <Input
                 value={newArea.name}
                 onChange={(e) => setNewArea({ ...newArea, name: e.target.value })}
-                placeholder="Nome da área"
+                placeholder="Nome da tag"
                 data-testid="input-area-name"
               />
             </div>
@@ -1091,7 +1091,7 @@ export default function TarefasPage() {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Os usuários selecionados receberão um email de notificação e poderão acessar as tarefas desta área.
+                  Os usuários selecionados receberão um email de notificação e poderão acessar as tarefas desta tag.
                 </p>
               </div>
             )}
@@ -1121,7 +1121,7 @@ export default function TarefasPage() {
               disabled={!newArea.name || createAreaMutation.isPending || updateAreaMutation.isPending}
               data-testid="button-save-area"
             >
-              {editingArea ? "Salvar" : "Criar Área"}
+              {editingArea ? "Salvar" : "Criar Tag"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1144,13 +1144,13 @@ export default function TarefasPage() {
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-medium">Área</label>
+              <label className="text-sm font-medium">Tag</label>
               <Select 
                 value={newTask.areaId} 
                 onValueChange={(v) => setNewTask({ ...newTask, areaId: v })}
               >
                 <SelectTrigger data-testid="select-task-area">
-                  <SelectValue placeholder="Selecione uma área" />
+                  <SelectValue placeholder="Selecione uma tag (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
                   {areas.map((area) => (
@@ -1617,7 +1617,7 @@ export default function TarefasPage() {
             </Button>
             <Button 
               onClick={() => createTaskMutation.mutate(newTask)} 
-              disabled={!newTask.title || !newTask.areaId || createTaskMutation.isPending}
+              disabled={!newTask.title || createTaskMutation.isPending}
               data-testid="button-save-task"
             >
               {newTask.type === "meeting_note" ? "Criar Reunião" : "Criar Tarefa"}
