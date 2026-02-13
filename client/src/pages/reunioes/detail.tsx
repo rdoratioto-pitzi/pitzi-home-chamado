@@ -112,7 +112,12 @@ export default function MeetingDetailPage() {
   });
 
   const { data: areas = [] } = useQuery<TaskArea[]>({
-    queryKey: ["/api/task-tags"],
+    queryKey: ["/api/task-tags", "meetings"],
+    queryFn: async () => {
+      const res = await fetch("/api/task-tags?scope=meetings");
+      if (!res.ok) throw new Error("Failed to fetch areas");
+      return res.json();
+    },
   });
 
   const { data: users = [] } = useQuery<UserType[]>({
