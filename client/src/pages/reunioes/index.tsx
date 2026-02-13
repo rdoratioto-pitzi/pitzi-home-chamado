@@ -128,12 +128,21 @@ export default function ReunioesPage() {
     );
   }, [users, participantInput]);
 
+  const { data: allMeetings = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", "meetings", "all"],
+    queryFn: async () => {
+      const res = await fetch("/api/tasks?type=meeting_note");
+      if (!res.ok) throw new Error("Failed to fetch meetings");
+      return res.json();
+    },
+  });
+
   const { data: allTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks", selectedAreaId],
     queryFn: async () => {
       const url = selectedAreaId 
-        ? `/api/tasks?tagId=${selectedAreaId}` 
-        : "/api/tasks";
+        ? `/api/tasks?tagId=${selectedAreaId}&type=meeting_note` 
+        : "/api/tasks?type=meeting_note";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
@@ -142,7 +151,7 @@ export default function ReunioesPage() {
 
   // Filter only meetings (type === "meeting_note")
   const meetings = useMemo(() => {
-    return allTasks.filter(task => task.type === "meeting_note");
+    return allTasks;
   }, [allTasks]);
 
   const createAreaMutation = useMutation({
@@ -513,7 +522,7 @@ export default function ReunioesPage() {
             </Badge>
           </button>
           {areas.map((area) => {
-            const areaCount = meetings.filter(m => m.tagId === area.id).length;
+            const areaCount = allMeetings.filter(m => m.tagId === area.id).length;
             return (
               <div
                 key={area.id}
