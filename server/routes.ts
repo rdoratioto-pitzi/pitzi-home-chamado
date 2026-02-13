@@ -1538,5 +1538,6 @@ export async function registerRoutes(
       }
       res.status(400).json({ error: "Failed to update area" });
     }
+  });
   return httpServer;
 }
