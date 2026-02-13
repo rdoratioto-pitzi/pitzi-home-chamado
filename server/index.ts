@@ -110,7 +110,7 @@ app.use((req, res, next) => {
       log(`serving on port ${port}`);
       
       // Start IMEI.info monitoring (hourly updates)
-      startMonitoring().catch(err => {
+      startMonitoring().catch((err: Error) => {
         console.error("Failed to start IMEI.info monitoring:", err);
       });
       
