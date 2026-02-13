@@ -60,7 +60,6 @@ import {
   insertImeiInfoAlertSchema,
 } from "@shared/schema";
 import { z } from "zod";
-export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
@@ -1456,115 +1455,6 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Validation failed", details: error.errors });
       }
       res.status(400).json({ error: "Failed to create area" });
-    }
-  });
-
-  app.put("/api/task-tags/:id", async (req, res) => {
-    try {
-      const { userId, isAdmin } = getSessionUser(req);
-      const existing = await storage.getTaskArea(req.params.id);
-      if (!existing) return res.status(404).json({ error: "Area not found" });
-      if (!isAdmin && existing.ownerId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-      const { memberIds, ...areaData } = req.body;
-      const partialSchema = insertTaskAreaSchema.partial();
-      const validated = partialSchema.parse(areaData);
-      // Tarefas scope cannot have public visibility
-      const effectiveScope = validated.scope || existing.scope;
-      const effectiveVisibility = validated.visibility || existing.visibility;
-      if (effectiveScope === "tasks" && effectiveVisibility === "public") {
-        return res.status(400).json({ error: "Tarefas não podem ter visibilidade pública" });
-      }
-      const area = await storage.updateTaskArea(req.params.id, validated);
-      if (!area) return res.status(404).json({ error: "Area not found" });
-
-      // Process shared area members on update
-      if (memberIds && Array.isArray(memberIds) && validated.visibility === "shared") {
-        const owner = await storage.getUser(area.ownerId);
-        const currentMembers = await storage.getTaskAreaMembers(area.id);
-        const currentMemberUserIds = currentMembers.map(m => m.userId);
-
-        for (const userId of memberIds) {
-          if (!currentMemberUserIds.includes(userId)) {
-            try {
-              // Add new member
-                tagId: area.id,
-                tagId: area.id,
-                userId,
-                role: "member"
-              });
-
-              const member = await storage.getUser(userId);
-              if (member && owner) {
-                sendSharedAreaInviteEmail(
-                  member,
-                  area.name,
-                  area.id,
-                  owner.name
-                ).catch(err => console.error(`[api/task-areas] Error sending email to ${member.email}:`, err));
-
-                storage.createNotification({
-                  userId,
-                  fromUserId: area.ownerId,
-                  title: "Nova área compartilhada",
-                  message: `${owner.name} compartilhou a área "${area.name}" com você`,
-                  module: "tarefas",
-                  entityId: area.id,
-                  linkUrl: `/tarefas?area=${area.id}`,
-                }).catch(console.error);
-              }
-            } catch (memberError) {
-              console.error(`[api/task-areas] Error adding member ${userId} to area ${area.id}:`, memberError);
-            }
-          }
-        }
-
-        // Optional: Remove members not in the new list
-        for (const member of currentMembers) {
-          if (!memberIds.includes(member.userId)) {
-            await storage.removeTaskAreaMember(member.id);
-          }
-        }
-      }
-
-      res.json(area);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Validation failed", details: error.errors });
-      }
-      res.status(400).json({ error: "Failed to update area" });
-    }
-        return res.status(404).json({ error: "Favorito não encontrado" });
-      }
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error("[prompts] Error removing favorite:", error);
-      res.status(500).json({ error: "Erro ao remover favorito" });
-    }
-  });
-
-  // Sincronização manual (apenas admins)
-  app.post("/api/prompts/sync", async (req, res) => {
-    try {
-      const { isAdmin } = getSessionUser(req);
-      if (!isAdmin) {
-        return res.status(403).json({ error: "Acesso negado" });
-      }
-
-      // Importar e executar sincronização
-      const { runPromptsSyncNow } = await import("./jobs/prompts-sync.job");
-      const result = await runPromptsSyncNow();
-      
-      res.json({
-        success: result.success,
-        created: result.created,
-        updated: result.updated,
-        errors: result.errors.length,
-      });
-    } catch (error: any) {
-      console.error("[prompts] Error syncing:", error);
-      res.status(500).json({ error: "Erro ao sincronizar prompts" });
     }
   });
 
