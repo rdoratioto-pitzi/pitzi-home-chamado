@@ -107,7 +107,7 @@ export default function TaskDetailPage() {
   });
 
   const { data: areas = [] } = useQuery<TaskArea[]>({
-    queryKey: ["/api/task-areas"],
+    queryKey: ["/api/task-tags"],
   });
 
   const { data: users = [] } = useQuery<UserType[]>({
@@ -210,7 +210,7 @@ export default function TaskDetailPage() {
         type: "task",
         status: "todo",
         priority: "medium",
-        areaId: task?.areaId,
+        tagId: task?.tagId,
         createdBy: "admin",
         assigneeId: responsibleUser?.id || undefined,
         dueDate: action.deadline || null,
@@ -314,7 +314,7 @@ export default function TaskDetailPage() {
     );
   }
 
-  const taskArea = areas.find(a => a.id === task.areaId);
+  const taskArea = areas.find(a => a.id === task.tagId);
   const status = statusConfig[task.status as keyof typeof statusConfig];
   const priority = priorityConfig[task.priority as keyof typeof priorityConfig];
   const StatusIcon = status?.icon || Circle;
