@@ -311,7 +311,29 @@ export default function ChamadosPage() {
     },
   });
 
-  const filteredTickets = tickets
+  const getUser = (userId: string | null) => users.find(u => u.id === userId);
+
+  const getPeriodTickets = (allTickets: Ticket[]) => {
+    return allTickets.filter(t => {
+      if (periodFilter === "total") return true;
+      const ticketDateStr = t.dataAbertura || t.createdAt;
+      if (!ticketDateStr) return false;
+
+      const date = new Date(ticketDateStr);
+      const now = new Date();
+      if (periodFilter === "month") {
+        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      }
+      if (periodFilter === "year") {
+        return date.getFullYear() === now.getFullYear();
+      }
+      return true;
+    });
+  };
+
+  const periodTickets = getPeriodTickets(tickets);
+
+  const filteredTickets = periodTickets
     .filter((ticket) => {
       const matchesSearch = ticket.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -357,24 +379,6 @@ export default function ChamadosPage() {
       if (valA > valB) return sortOrder === "asc" ? 1 : -1;
       return 0;
     });
-
-  const getUser = (userId: string | null) => users.find(u => u.id === userId);
-
-  const periodTickets = tickets.filter(t => {
-    if (periodFilter === "total") return true;
-    const ticketDateStr = t.dataAbertura || t.createdAt;
-    if (!ticketDateStr) return false;
-
-    const date = new Date(ticketDateStr);
-    const now = new Date();
-    if (periodFilter === "month") {
-      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-    }
-    if (periodFilter === "year") {
-      return date.getFullYear() === now.getFullYear();
-    }
-    return true;
-  });
 
   const stats = {
     total: periodTickets.length,
@@ -435,11 +439,9 @@ export default function ChamadosPage() {
     if (type === "status") {
       setStatusFilter(value);
       setSlaFilter("all");
-      setPeriodFilter("month"); // Resetar período ao clicar em status
     } else {
       setStatusFilter("all");
       setSlaFilter(value);
-      setPeriodFilter("month"); // Resetar período ao clicar em SLA
     }
   };
 

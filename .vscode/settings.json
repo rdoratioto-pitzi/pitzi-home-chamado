@@ -1,0 +1,7 @@
+{
+  "cline.apiProvider": "openai",
+  "cline.openAIBaseUrl": "https://open.bigmodel.cn/api/paas/v4",
+  "cline.openAIApiKey": "24a13a8f08e2477a86f4453160f0f780.kR0Mh6qsviyid8hc",
+  "cline.openAIModelId": "glm-4-flash",
+  "cline.mcpEnabled": false
+}

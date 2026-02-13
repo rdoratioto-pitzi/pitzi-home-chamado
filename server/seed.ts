@@ -143,32 +143,29 @@ export async function seedDatabase() {
   try {
     console.log("[seed] Checking and seeding initial data...");
 
-    let adminId: string;
-    const existingAdmin = await db.select().from(users).where(eq(users.email, "admin@renov.com.br"));
-    if (existingAdmin.length === 0) {
-      console.log("[seed] Creating admin user...");
-      const [newAdmin] = await db.insert(users).values({
-        name: "Administrador",
-        email: "admin@renov.com.br",
-        password: "admin123",
-        status: "active",
-        authMethod: "email",
-        modulePermissions: JSON.stringify({
-          chamados: true,
-          projetos: true,
-          tarefas: true,
-          okrs: true,
-          logistica: true,
-          apis: true,
-          configuracoes: true,
-        }),
-      }).returning();
-      adminId = newAdmin.id;
-      console.log("[seed] Admin user created with ID:", adminId);
-    } else {
-      adminId = existingAdmin[0].id;
-      console.log("[seed] Admin user already exists with ID:", adminId);
+    // Credenciais padrão (consistentes com/sem DB)
+    const DEFAULT_USERS = [
+      { name: "Matheus", email: "Matheus@renovsmart.com.br", password: "ma061184", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true, updates: true } },
+      { name: "Administrador", email: "admin@renov.com.br", password: "admin123", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true } },
+    ];
+
+    for (const u of DEFAULT_USERS) {
+      const existing = await db.select().from(users).where(eq(users.email, u.email));
+      if (existing.length === 0) {
+        console.log(`[seed] Creating user: ${u.email}`);
+        await db.insert(users).values({
+          name: u.name,
+          email: u.email,
+          password: u.password,
+          status: "active",
+          authMethod: "email",
+          modulePermissions: JSON.stringify(u.modulePermissions),
+        }).returning();
+      }
     }
+
+    const [adminRow] = await db.select().from(users).where(eq(users.email, "admin@renov.com.br"));
+    const adminId = adminRow?.id ?? "";
 
     const defaultAreas = [
       { name: "TI", color: "#3B82F6" },
