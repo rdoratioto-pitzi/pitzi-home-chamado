@@ -169,6 +169,50 @@ const formatDisplayDate = (date: Date | string | null): string => {
   return format(toZonedTime(d, TIMEZONE), "dd/MM/yyyy");
 };
 
+// Helper function to calculate business hours between two dates
+const calculateBusinessHours = (start: Date, end: Date): number => {
+  let totalHours = 0;
+  let current = new Date(start);
+  const endDate = new Date(end);
+
+  while (current < endDate) {
+    // Skip weekends (Saturday = 6, Sunday = 0)
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      current.setDate(current.getDate() + 1);
+      current.setHours(WORK_START_HOUR, 0, 0, 0);
+      continue;
+    }
+
+    // Check if we're within business hours (8:00 to 16:00)
+    const currentHour = current.getHours();
+    
+    if (currentHour < WORK_START_HOUR) {
+      // Before business hours, move to start of business day
+      current.setHours(WORK_START_HOUR, 0, 0, 0);
+      continue;
+    } else if (currentHour >= WORK_START_HOUR + WORK_HOURS_PER_DAY) {
+      // After business hours, move to next business day
+      current.setDate(current.getDate() + 1);
+      current.setHours(WORK_START_HOUR, 0, 0, 0);
+      continue;
+    }
+
+    // Calculate hours until end of day or end time
+    const endOfBusinessDay = new Date(current);
+    endOfBusinessDay.setHours(WORK_START_HOUR + WORK_HOURS_PER_DAY, 0, 0, 0);
+    
+    const timeUntilEndOfDay = endOfBusinessDay.getTime() - current.getTime();
+    const timeUntilEndDate = endDate.getTime() - current.getTime();
+    const hoursToAdd = Math.min(timeUntilEndOfDay, timeUntilEndDate) / (1000 * 60 * 60);
+
+    totalHours += hoursToAdd;
+    current = new Date(current.getTime() + Math.min(timeUntilEndOfDay, timeUntilEndDate));
+  }
+
+  return totalHours;
+};
+
 // Helper function to calculate time open with business hours
 const calculateTimeOpen = (createdAt: Date | string | null): { text: string; colorClass: string } => {
   if (!createdAt) return { text: "-", colorClass: "text-muted-foreground" };
@@ -176,25 +220,28 @@ const calculateTimeOpen = (createdAt: Date | string | null): { text: string; col
   const created = new Date(createdAt);
   const now = new Date();
 
-  const diffMs = now.getTime() - created.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffHours / 24);
-  const remainingHours = diffHours % 24;
-  const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  // Calculate business hours (8h per day, Monday to Friday)
+  const businessHours = calculateBusinessHours(created, now);
+
+  // Calculate full business days and remaining hours
+  const businessDays = Math.floor(businessHours / WORK_HOURS_PER_DAY);
+  const remainingHours = Math.round((businessHours % WORK_HOURS_PER_DAY) * 10) / 10; // Round to 1 decimal place
 
   let text: string;
-  if (diffDays > 0) {
-    text = `${diffDays}d ${remainingHours}h`;
-  } else if (diffHours > 0) {
-    text = `${diffHours}h ${diffMinutes}m`;
+  if (businessDays > 0) {
+    // Format: "2d 4.5h" (2 days * 8h = 16h + 4.5h = 20.5h total business hours)
+    text = `${businessDays}d ${remainingHours}h`;
+  } else if (remainingHours > 0) {
+    text = `${remainingHours}h`;
   } else {
-    text = `${diffMinutes}m`;
+    text = "0h";
   }
 
+  // Color based on business hours
   let colorClass: string;
-  if (diffHours < 24) {
+  if (businessHours < 24) {
     colorClass = "text-green-600 dark:text-green-400";
-  } else if (diffHours < 72) {
+  } else if (businessHours < 72) {
     colorClass = "text-yellow-600 dark:text-yellow-400";
   } else {
     colorClass = "text-red-600 dark:text-red-400";

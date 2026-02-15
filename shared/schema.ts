@@ -1053,42 +1053,6 @@ export const insertUpdateSchema = createInsertSchema(updates).omit({ id: true, c
 export type InsertUpdate = z.infer<typeof insertUpdateSchema>;
 export type Update = typeof updates.$inferSelect;
 
-// ============== IMEI.INFO INTEGRATION ==============
-export const imeiInfoStats = pgTable("imei_info_stats", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id"),
-  date: timestamp("date").notNull(),
-  totalOrders: integer("total_orders").default(0),
-  credits: integer("credits").default(0),
-  success: integer("success").default(0),
-  pending: integer("pending").default(0),
-  failed: integer("failed").default(0),
-  numberOfChecks: integer("number_of_checks").default(0),
-  averageTicket: decimal("average_ticket", { precision: 10, scale: 2 }),
-  totalServiceValue: decimal("total_service_value", { precision: 12, scale: 2 }),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const insertImeiInfoStatsSchema = createInsertSchema(imeiInfoStats).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertImeiInfoStats = z.infer<typeof insertImeiInfoStatsSchema>;
-export type ImeiInfoStats = typeof imeiInfoStats.$inferSelect;
-
-export const imeiInfoAlerts = pgTable("imei_info_alerts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id"),
-  thresholdValue: integer("threshold_value").notNull(),
-  alertEmails: text("alert_emails").notNull(),
-  isActive: boolean("is_active").default(true),
-  lastTriggered: timestamp("last_triggered"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-export const insertImeiInfoAlertSchema = createInsertSchema(imeiInfoAlerts).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertImeiInfoAlert = z.infer<typeof insertImeiInfoAlertSchema>;
-export type ImeiInfoAlert = typeof imeiInfoAlerts.$inferSelect;
-
 // ============== PROMPTS LIBRARY (Biblioteca de Prompts Claude Code) ==============
 export const promptsLibrary = pgTable("prompts_library", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -14,6 +14,7 @@ import {
   Bot,
   ArrowRight,
   Workflow,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
@@ -128,6 +129,15 @@ const modules: ModuleCard[] = [
     color: "text-indigo-600 dark:text-indigo-400",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
     permissionKey: "conhecimento",
+  },
+  {
+    title: "Updates",
+    description: "Novidades e atualizações do sistema",
+    icon: Sparkles,
+    href: "/updates",
+    color: "text-pink-600 dark:text-pink-400",
+    bgColor: "bg-pink-100 dark:bg-pink-900/30",
+    permissionKey: "updates",
   },
 ];
 

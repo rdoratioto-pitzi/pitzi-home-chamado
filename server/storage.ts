@@ -49,8 +49,6 @@ import {
   type Flowchart, type InsertFlowchart,
   type FlowchartVersion, type InsertFlowchartVersion,
   type FlowchartComment, type InsertFlowchartComment,
-  type ImeiInfoStats, type InsertImeiInfoStats,
-  type ImeiInfoAlert, type InsertImeiInfoAlert,
   type PromptLibrary, type InsertPromptLibrary,
   type PromptUserFavorite, type InsertPromptUserFavorite,
   users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
@@ -63,7 +61,7 @@ import {
   metaAreas, metas, metaCheckins,
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
   flowcharts, flowchartVersions, flowchartComments,
-  aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates, imeiInfoStats, imeiInfoAlerts,
+  aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates,
   promptsLibrary, promptUserFavorites
 } from "@shared/schema";
 import { db } from "./db";
@@ -1659,72 +1657,6 @@ export class DatabaseStorage implements IStorage {
     } catch (e) {
       return this.getMockUpdates().slice(0, limit);
     }
-  }
-
-  // IMEI.info Stats
-  async getImeiInfoStats(): Promise<ImeiInfoStats[]> {
-    if (!db) return [];
-    return db.select().from(imeiInfoStats).orderBy(sql`${imeiInfoStats.date} DESC`);
-  }
-
-  async getImeiInfoStat(id: string): Promise<ImeiInfoStats | undefined> {
-    if (!db) return undefined;
-    const [stat] = await db.select().from(imeiInfoStats).where(eq(imeiInfoStats.id, id));
-    return stat;
-  }
-
-  async createImeiInfoStats(stats: InsertImeiInfoStats): Promise<ImeiInfoStats> {
-    if (!db) {
-      const mockStat: ImeiInfoStats = { ...stats, id: crypto.randomUUID() };
-      return mockStat;
-    }
-    const [created] = await db.insert(imeiInfoStats).values(stats).returning();
-    return created;
-  }
-
-  async updateImeiInfoStat(id: string, data: Partial<ImeiInfoStats>): Promise<ImeiInfoStats | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(imeiInfoStats).set(data).where(eq(imeiInfoStats.id, id)).returning();
-    return updated;
-  }
-
-  async deleteImeiInfoStat(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(imeiInfoStats).where(eq(imeiInfoStats.id, id)).returning();
-    return result.length > 0;
-  }
-
-  // IMEI.info Alerts
-  async getImeiInfoAlerts(): Promise<ImeiInfoAlert[]> {
-    if (!db) return [];
-    return db.select().from(imeiInfoAlerts).orderBy(sql`${imeiInfoAlerts.createdAt} DESC`);
-  }
-
-  async getImeiInfoAlert(id: string): Promise<ImeiInfoAlert | undefined> {
-    if (!db) return undefined;
-    const [alert] = await db.select().from(imeiInfoAlerts).where(eq(imeiInfoAlerts.id, id));
-    return alert;
-  }
-
-  async createImeiInfoAlert(alert: InsertImeiInfoAlert): Promise<ImeiInfoAlert> {
-    if (!db) {
-      const mockAlert: ImeiInfoAlert = { ...alert, id: crypto.randomUUID() };
-      return mockAlert;
-    }
-    const [created] = await db.insert(imeiInfoAlerts).values(alert).returning();
-    return created;
-  }
-
-  async updateImeiInfoAlert(id: string, data: Partial<ImeiInfoAlert>): Promise<ImeiInfoAlert | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(imeiInfoAlerts).set(data).where(eq(imeiInfoAlerts.id, id)).returning();
-    return updated;
-  }
-
-  async deleteImeiInfoAlert(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(imeiInfoAlerts).where(eq(imeiInfoAlerts.id, id)).returning();
-    return result.length > 0;
   }
 
   // Prompts Library

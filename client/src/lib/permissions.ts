@@ -11,6 +11,7 @@ export interface UserPermissions {
   conhecimento: boolean;
   apis: boolean;
   configuracoes: boolean;
+  updates: boolean;
 }
 
 export interface CurrentUser {
@@ -53,6 +54,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     conhecimento: false,
     apis: false,
     configuracoes: false,
+    updates: false,
   };
 
   if (!user) return defaultPerms;
@@ -71,6 +73,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       conhecimento: true,
       apis: true,
       configuracoes: true,
+      updates: true,
     };
   }
 

@@ -31,7 +31,6 @@ import CorreiosReversaPage from "@/pages/apis/correios-reversa";
 import ApiRsLogisticaPage from "@/pages/apis/api-rs-logistica";
 import ApiAdmLogisticaPage from "@/pages/apis/api-adm-logistica";
 import ApiRelatorioPedidosPage from "@/pages/apis/api-relatorio-pedidos";
-import ApiImeiInfoPage from "@/pages/apis/api-imei-info";
 import LoginPage from "@/pages/login";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
 import PricingOverviewPage from "@/pages/pricing/index";
@@ -190,11 +189,6 @@ function Router() {
       <Route path="/apis/relatorio-pedidos">
         <ProtectedRoute requiredPermission="apis">
           <ApiRelatorioPedidosPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/apis/imei-info">
-        <ProtectedRoute requiredPermission="apis">
-          <ApiImeiInfoPage />
         </ProtectedRoute>
       </Route>
       <Route path="/pricing">
