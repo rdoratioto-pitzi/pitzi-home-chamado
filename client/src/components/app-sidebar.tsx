@@ -34,7 +34,6 @@ import {
   Workflow,
   ClipboardList,
   Sparkles,
-  Smartphone,
 } from "lucide-react";
 import {
   Sidebar,
@@ -130,7 +129,6 @@ const apisSubItems = [
   { title: "API RS - Logística", url: "/apis/rs-logistica", icon: Truck },
   { title: "Adm. Logística", url: "/apis/adm-logistica", icon: Settings2 },
   { title: "Relatório Pedidos", url: "/apis/relatorio-pedidos", icon: FileText },
-  { title: "IMEI.info API", url: "/apis/imei-info", icon: Smartphone },
 ];
 
 const pricingSubItems = [

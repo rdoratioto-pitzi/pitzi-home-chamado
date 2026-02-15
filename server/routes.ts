@@ -14,7 +14,6 @@ import {
 } from "./email-service";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import * as correiosService from "./correios-service";
-import * as imeiInfoService from "./integrations/imei-info-service";
 import bwipjs from "bwip-js";
 import { streamChatCompletion, generateTitle, fetchOpenRouterModels } from "./openrouter";
 import {
@@ -4780,127 +4779,6 @@ export async function registerRoutes(
         connected: false,
         error: error.message 
       });
-    }
-  });
-
-  // ============== IMEI.INFO API ROUTES ==============
-  app.get("/api/integrations/imei-info/stats", async (req, res) => {
-    try {
-      const stats = await imeiInfoService.getStats();
-      res.json(stats);
-    } catch (error: any) {
-      console.error("IMEI.info stats error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/integrations/imei-info/history", async (req, res) => {
-    try {
-      const { days } = req.query;
-      const daysNum = days ? parseInt(days as string) : 30;
-      const stats = await imeiInfoService.getHistoricalStats(undefined, daysNum);
-      res.json(stats);
-    } catch (error: any) {
-      console.error("IMEI.info history error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/integrations/imei-info/test-connection", async (req, res) => {
-    try {
-      const result = await imeiInfoService.testConnection();
-      res.json(result);
-    } catch (error: any) {
-      console.error("IMEI.info connection test error:", error);
-      res.status(500).json({ success: false, message: error.message });
-    }
-  });
-
-  app.post("/api/integrations/imei-info/check-imei", async (req, res) => {
-    try {
-      const { imei, service } = req.body;
-      if (!imei) {
-        return res.status(400).json({ error: "IMEI é obrigatório" });
-      }
-      
-      const result = await imeiInfoService.checkIMEI(imei, service);
-      res.json(result);
-    } catch (error: any) {
-      console.error("IMEI.info check error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.get("/api/integrations/imei-info/credits", async (req, res) => {
-    try {
-      const credits = await imeiInfoService.getCredits();
-      res.json(credits);
-    } catch (error: any) {
-      console.error("IMEI.info credits error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // IMEI.info Stats Database
-  app.get("/api/integrations/imei-info/db-stats", async (req, res) => {
-    try {
-      const stats = await storage.getImeiInfoStats();
-      res.json(stats);
-    } catch (error: any) {
-      console.error("IMEI.info DB stats error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // IMEI.info Alerts
-  app.get("/api/integrations/imei-info/alerts", async (req, res) => {
-    try {
-      const alerts = await storage.getImeiInfoAlerts();
-      res.json(alerts);
-    } catch (error: any) {
-      console.error("IMEI.info get alerts error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post("/api/integrations/imei-info/alerts", async (req, res) => {
-    try {
-      // Validar o body usando o schema
-      const validatedData = insertImeiInfoAlertSchema.parse(req.body);
-      const alert = await storage.createImeiInfoAlert(validatedData);
-      res.status(201).json(alert);
-    } catch (error: any) {
-      console.error("IMEI.info create alert error:", error);
-      if (error.name === "ZodError") {
-        return res.status(400).json({ error: "Dados inválidos", details: error.errors });
-      }
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.patch("/api/integrations/imei-info/alerts/:id", async (req, res) => {
-    try {
-      const alert = await storage.updateImeiInfoAlert(req.params.id, req.body);
-      if (!alert) {
-        return res.status(404).json({ error: "Alert not found" });
-      }
-      res.json(alert);
-    } catch (error: any) {
-      console.error("IMEI.info update alert error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.delete("/api/integrations/imei-info/alerts/:id", async (req, res) => {
-    try {
-      const success = await storage.deleteImeiInfoAlert(req.params.id);
-      if (!success) {
-        return res.status(404).json({ error: "Alert not found" });
-      }
-      res.json({ success: true });
-    } catch (error: any) {
-      console.error("IMEI.info delete alert error:", error);
-      res.status(500).json({ error: error.message });
     }
   });
 
