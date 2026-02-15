@@ -256,10 +256,8 @@ const getSlaForTicket = (
   slaRules: SlaRule[]
 ): { slaHoras: number | null; status: "dentro_prazo" | "em_atraso" | null } => {
   const tipo = ticket.type?.toLowerCase();
-  if (tipo !== "bug" && tipo !== "melhoria") {
-    return { slaHoras: null, status: null };
-  }
-
+  
+  // Buscar regra de SLA para qualquer tipo de ticket que tenha regra correspondente
   const rule = slaRules.find(
     r => r.tipo.toLowerCase() === tipo && r.prioridade === ticket.priority && r.ativo
   );
