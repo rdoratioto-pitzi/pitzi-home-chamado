@@ -146,6 +146,7 @@ export default function ReunioesPage() {
       if (!res.ok) throw new Error("Failed to fetch meetings");
       return res.json();
     },
+    refetchInterval: 5000, // Poll every 5 seconds for shared meetings
   });
 
   const { data: allTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
@@ -158,6 +159,7 @@ export default function ReunioesPage() {
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
     },
+    refetchInterval: 5000, // Poll every 5 seconds for shared meetings
   });
 
   // Filter only meetings (type === "meeting_note")

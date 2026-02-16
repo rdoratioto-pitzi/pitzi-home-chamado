@@ -99,6 +99,7 @@ export default function MeetingDetailPage() {
 
   const { data: meeting, isLoading } = useQuery<Task>({
     queryKey: ["/api/tasks", id],
+    refetchInterval: 5000, // Poll every 5 seconds for shared meetings
   });
 
   const { data: comments = [] } = useQuery<TaskComment[]>({
@@ -109,6 +110,7 @@ export default function MeetingDetailPage() {
       return res.json();
     },
     enabled: !!id,
+    refetchInterval: 5000, // Poll every 5 seconds for comments
   });
 
   const { data: areas = [] } = useQuery<TaskArea[]>({
@@ -135,7 +137,7 @@ export default function MeetingDetailPage() {
         }
       }
     }
-  }, [meeting]);
+  }, [meeting, isEditing]);
 
   const updateMeetingMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
