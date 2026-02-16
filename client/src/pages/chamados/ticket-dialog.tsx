@@ -156,7 +156,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
     },
   });
 
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
   const descriptionValue = form.watch("description") || "";
   const titleValue = form.watch("title") || "";
 
@@ -164,7 +164,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
      mutationFn: async (data: FormData) => {
        const payload: Record<string, unknown> = {
          ...data,
-         attachments: attachments.length > 0 ? JSON.stringify(attachments) : null,
+         attachments: attachments.length > 0 ? JSON.stringify(attachments.map(a => a.url)) : null,
          requesterId: currentUser?.id || "admin",
          status: "open",
          code: "",
