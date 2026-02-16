@@ -395,7 +395,7 @@ export function RichTextarea({
     }
   }, []);
 
-  const toolbarVisible = showToolbar && (isFocused || value.length > 0);
+  const toolbarVisible = showToolbar && (isFocused || value.length > 0 || images.length > 0);
 
   return (
     <div className="space-y-2">

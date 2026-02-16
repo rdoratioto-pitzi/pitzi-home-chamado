@@ -169,7 +169,6 @@ async function createRecurrenceInstance(parentTask: any, nextDate: Date): Promis
     status: "todo", // Nova instância começa como "a fazer"
     priority: parentTask.priority,
     tagId: parentTask.tagId,
-    areaId: parentTask.areaId,
     assigneeId: parentTask.assigneeId,
     assigneeIds: parentTask.assigneeIds,
     dueDate: nextDate, // Usa a data de recorrência
