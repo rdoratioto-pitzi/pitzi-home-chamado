@@ -446,25 +446,23 @@ export function RichTextarea({
       </div>
       
       <div className="flex items-center justify-between flex-wrap gap-1">
-        {(images.length > 0 || !toolbarVisible) && (
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || isUploading}
-              data-testid={dataTestId ? `${dataTestId}-upload-btn-alt` : undefined}
-            >
-              {isUploading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-1" />
-              ) : (
-                <Paperclip className="h-4 w-4" />
-              )}
-              <span className="ml-1">Anexar</span>
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled || isUploading}
+            data-testid={dataTestId ? `${dataTestId}-upload-btn-alt` : undefined}
+          >
+            {isUploading ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+            ) : (
+              <Paperclip className="h-4 w-4" />
+            )}
+            <span className="ml-1">Anexar</span>
+          </Button>
+        </div>
         <span className={cn("text-[10px] text-muted-foreground", toolbarVisible && "ml-auto")}>
           {value.length}
         </span>
