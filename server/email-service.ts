@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import { toZonedTime, fromZonedTime, format } from "date-fns-tz";
 import type { Ticket, User, TicketComment, Task } from "@shared/schema";
 
 const transporter = nodemailer.createTransport({
@@ -553,7 +553,7 @@ export async function sendMeetingInviteEmail(
       isRecurring: task.isRecurring || false,
       recurrenceType: task.recurrenceType || undefined,
       recurrenceWeekdays,
-      recurrenceEndDate: meeting.recurrenceEndDate ? meeting.recurrenceEndDate : undefined
+      recurrenceEndDate: task.recurrenceEndDate ? format(task.recurrenceEndDate, "yyyy-MM-dd") : undefined
     },
     attendees
   );
@@ -805,7 +805,7 @@ export async function sendSharedAreaInviteEmail(
             <p>Agora você pode visualizar e colaborar em tarefas e reuniões desta área.</p>
           </div>
           
-          <a href="${BASE_URL}/tarefas" class="btn">Acessar Área</a>
+          <a href="${BASE_URL}/shared-area/${areaId}" class="btn">Acessar Área</a>
         </div>
         <div class="footer">
           <p>Renov Smart - Inovação em Gestão</p>

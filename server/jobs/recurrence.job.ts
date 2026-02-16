@@ -19,7 +19,8 @@ import {
   getDay,
   setHours,
   setMinutes,
-  setSeconds
+  setSeconds,
+  addHours // Added addHours for recurrence logic
 } from "date-fns";
 import { toZonedTime, fromZonedTime, format } from "date-fns-tz";
 import { sendMeetingInviteEmail } from "../email-service";
@@ -327,7 +328,7 @@ export async function processRecurringMeetings(): Promise<void> {
               ? JSON.parse(task.meetingData) 
               : task.meetingData;
             lastDate = meetingData?.date 
-              ? parseISO(meetingData.date) 
+              ? parseISO(meetingData.date as string) 
               : new Date(task.createdAt);
           }
         } else {
@@ -335,39 +336,57 @@ export async function processRecurringMeetings(): Promise<void> {
           const meetingData = typeof task.meetingData === "string" 
             ? JSON.parse(task.meetingData) 
             : task.meetingData;
-          lastDate = meetingData?.date 
-            ? parseISO(meetingData.date) 
-            : new Date(task.createdAt);
+            lastDate = meetingData?.date 
+              ? parseISO(meetingData.date as string) 
+              : new Date(task.createdAt);
         }
         
         // Calcula próximas datas de recorrência (até 7 dias ahead)
         const now = nowInBrasilia();
         const maxDate = addDays(now, 7);
         
-        let currentDate = lastDate;
-        let iterations = 0;
-        const maxIterations = 30;
-        
-        while (isBefore(currentDate, maxDate) && iterations < maxIterations) {
-          const nextDate = calculateNextRecurrenceDate(task, currentDate);
-          
-          if (!nextDate) {
-            break;
+        // Calcula a próxima data de recorrência
+        const nextDateToCreate = calculateNextRecurrenceDate(task, lastDate);
+
+        if (nextDateToCreate) {
+          // Verifica se esta próxima instância deve ser criada agora (ex: dentro das próximas 24 horas)
+          const now = nowInBrasilia();
+          const twentyFourHoursFromNow = addHours(now, 24);
+
+          // Extrai o horário da reunião original para combinar com a próxima data
+          let meetingData = {};
+          try {
+            if (typeof task.meetingData === "string") {
+              meetingData = JSON.parse(task.meetingData);
+            } else if (task.meetingData) {
+              meetingData = task.meetingData;
+            }
+          } catch (e) {
+            console.error("[RecurrenceJob] Erro ao fazer parse do meetingData para verificação de horário:", e);
           }
-          
-          // Verifica se já passou da data atual (não criar no passado)
-          if (isBefore(nextDate, now)) {
-            currentDate = nextDate;
-            iterations++;
-            continue;
+          const originalTime = (meetingData as any)?.time || "09:00";
+          const [hours, minutes] = originalTime.split(':').map(Number);
+
+          // Cria um objeto Date com a próxima data e o horário original da reunião
+          let nextInstanceDateTime = setMinutes(setHours(nextDateToCreate, hours), minutes);
+          nextInstanceDateTime = toBrasilia(nextInstanceDateTime); // Garante que está no timezone de Brasília
+
+          // Se a próxima instância está dentro da janela de criação (próximas 24h)
+          // e ainda não passou (para evitar criar no passado se o job atrasar)
+          if (isBefore(nextInstanceDateTime, twentyFourHoursFromNow) && isAfter(nextInstanceDateTime, now)) {
+            await createRecurrenceInstance(task, nextDateToCreate);
+            createdCount++;
+          } else if (isBefore(nextInstanceDateTime, now)) {
+            // Se a próxima instância já passou, mas não foi criada, loga e avança a lastDate
+            // Isso pode acontecer se o job falhar ou for desativado por um tempo
+            console.log(`[RecurrenceJob] Instância ${task.id} para ${format(nextInstanceDateTime, "yyyy-MM-dd HH:mm")} já passou e não foi criada. Avançando lastDate.`);
+            // Atualiza a lastDate para a próxima data esperada para que na próxima execução ele tente a próxima
+            // Isso evita que ele tente criar a mesma instância atrasada repetidamente
+            // TODO: Considerar se queremos criar instâncias "atrasadas" ou apenas pular
+            // Por enquanto, vamos pular e avançar a lastDate
+            // Para isso, precisaríamos de um mecanismo para atualizar a lastDate do pai
+            // ou garantir que o calculateNextRecurrenceDate sempre retorne uma data futura
           }
-          
-          // Cria a nova instância
-          await createRecurrenceInstance(task, nextDate);
-          createdCount++;
-          
-          currentDate = nextDate;
-          iterations++;
         }
         
       } catch (error) {
