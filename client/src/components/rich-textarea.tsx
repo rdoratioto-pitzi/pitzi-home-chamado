@@ -1,5 +1,6 @@
-import { useState, useRef, useCallback } from "react";
-import { Textarea } from "@/components/ui/textarea";
+import { useState, useRef, useCallback, useMemo } from "react";
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { Button } from "@/components/ui/button";
 import { 
   ImageIcon, X, Loader2, Maximize2, Video, FileText, Paperclip, FileSpreadsheet, File, Download,
@@ -26,8 +27,6 @@ interface RichTextareaProps {
   images?: string[];
   onImagesChange?: (images: string[]) => void;
   placeholder?: string;
-  rows?: number;
-  maxLength?: number;
   disabled?: boolean;
   showToolbar?: boolean;
   className?: string;
@@ -107,62 +106,50 @@ const TOOLBAR_ACTIONS: ToolbarAction[] = [
 ];
 
 function FormattingToolbar({
-  textareaRef,
-  value,
-  onChange,
+  quillRef,
   disabled,
   onAttach,
   isUploading,
   dataTestId,
 }: {
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-  value: string;
-  onChange: (value: string) => void;
+  quillRef: React.RefObject<ReactQuill | null>;
   disabled: boolean;
   onAttach: () => void;
   isUploading: boolean;
   dataTestId?: string;
 }) {
   const applyFormat = useCallback((action: ToolbarAction) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+    const quill = quillRef.current?.getEditor();
+    if (!quill) return;
 
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = value.substring(start, end);
-    let newValue = value;
-    let newCursorPos = end;
+    const range = quill.getSelection();
+    if (!range) return;
 
     if (action.action === "wrap" && action.wrap) {
-      const w = action.wrap;
-      if (selected) {
-        newValue = value.substring(0, start) + w + selected + w + value.substring(end);
-        newCursorPos = end + w.length * 2;
-      } else {
-        newValue = value.substring(0, start) + w + w + value.substring(end);
-        newCursorPos = start + w.length;
-      }
+      const format = action.wrap === "**" ? "bold" : action.wrap === "_" ? "italic" : action.wrap === "~~" ? "strike" : "code";
+      quill.format(format, !quill.getFormat(range)[format]);
     } else if (action.action === "prefix" && action.prefix) {
-      const lineStart = value.lastIndexOf("\n", start - 1) + 1;
-      const needsNewline = lineStart > 0 && value[lineStart - 1] !== "\n" && start > 0 && value.substring(lineStart, start).trim().length > 0;
-      if (needsNewline && start === end) {
-        newValue = value.substring(0, start) + "\n" + action.prefix + value.substring(end);
-        newCursorPos = start + 1 + action.prefix.length;
-      } else {
-        newValue = value.substring(0, lineStart) + action.prefix + value.substring(lineStart);
-        newCursorPos = end + action.prefix.length;
+      if (action.prefix === "# ") {
+        quill.format("header", quill.getFormat(range).header === 1 ? false : 1);
+      } else if (action.prefix === "## ") {
+        quill.format("header", quill.getFormat(range).header === 2 ? false : 2);
+      } else if (action.prefix === "- ") {
+        quill.format("list", quill.getFormat(range).list === "bullet" ? false : "bullet");
+      } else if (action.prefix === "1. ") {
+        quill.format("list", quill.getFormat(range).list === "ordered" ? false : "ordered");
+      } else if (action.prefix === "- [ ] ") {
+        // Quill doesn't have native checklist, this would require custom blot
+        // For now, we can insert the text directly
+        quill.insertText(range.index, action.prefix);
+        quill.setSelection(range.index + action.prefix.length);
+      } else if (action.prefix === "> ") {
+        quill.format("blockquote", !quill.getFormat(range).blockquote);
       }
     } else if (action.action === "insert" && action.insert) {
-      newValue = value.substring(0, start) + action.insert + value.substring(end);
-      newCursorPos = start + action.insert.length;
+      quill.insertText(range.index, action.insert);
+      quill.setSelection(range.index + action.insert.length);
     }
-
-    onChange(newValue);
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
-    }, 0);
-  }, [textareaRef, value, onChange]);
+  }, [quillRef]);
 
   return (
     <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border bg-muted/30 rounded-t-md overflow-visible flex-wrap" data-testid={dataTestId ? `${dataTestId}-toolbar` : "formatting-toolbar"}>
@@ -222,8 +209,6 @@ export function RichTextarea({
   images = [],
   onImagesChange,
   placeholder,
-  rows = 4,
-  maxLength = 5000,
   disabled = false,
   showToolbar = true,
   className: externalClassName,
@@ -233,8 +218,62 @@ export function RichTextarea({
   const [isUploading, setIsUploading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const quillRef = useRef<ReactQuill>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const modules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, false] }],
+        ['bold', 'italic', 'strike', 'code'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['blockquote'],
+        ['link'],
+        ['clean']
+      ],
+    },
+    keyboard: {
+      bindings: {
+        tab: {
+          key: 9,
+          handler: function (this: any, range: any, context: any) {
+            const quill = this.quill;
+            quill.history.cutoff();
+            quill.history.push('user', 'api');
+            if (context.format.list) {
+              quill.format('indent', '+1', 'user');
+            } else {
+              quill.insertText(range.index, '  ');
+            }
+            quill.history.cutoff();
+            quill.history.push('user', 'api');
+          }
+        },
+        'shift-tab': {
+          key: 9,
+          shiftKey: true,
+          handler: function (this: any, range: any, context: any) {
+            const quill = this.quill;
+            quill.history.cutoff();
+            quill.history.push('user', 'api');
+            if (context.format.list) {
+              quill.format('indent', '-1', 'user');
+            }
+            quill.history.cutoff();
+            quill.history.push('user', 'api');
+          }
+        },
+      },
+    },
+  }), []);
+
+  const formats = [
+    'header',
+    'bold', 'italic', 'strike', 'code',
+    'list', 'blockquote',
+    'link',
+    'indent',
+  ];
 
   const uploadFile = useCallback(async (file: File): Promise<string | null> => {
     const maxSize = 50 * 1024 * 1024;
@@ -290,38 +329,6 @@ export function RichTextarea({
     }
   }, [images, onImagesChange, uploadFile, toast]);
 
-  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
-    const items = e.clipboardData.items;
-    const files: File[] = [];
-    
-    for (let i = 0; i < items.length; i++) {
-      const file = items[i].getAsFile();
-      if (file) files.push(file);
-    }
-
-    if (files.length === 0) return;
-
-    setIsUploading(true);
-    const uploadedUrls: string[] = [];
-
-    for (const file of files) {
-      const url = await uploadFile(file);
-      if (url) {
-        uploadedUrls.push(url);
-      }
-    }
-
-    if (uploadedUrls.length > 0 && onImagesChange) {
-      onImagesChange([...images, ...uploadedUrls]);
-      toast({
-        title: "Arquivo colado",
-        description: `${uploadedUrls.length} arquivo(s) adicionado(s) via area de transferencia.`,
-      });
-    }
-
-    setIsUploading(false);
-  }, [images, onImagesChange, uploadFile, toast]);
-
   const removeAttachment = useCallback((index: number) => {
     if (onImagesChange) {
       const newImages = [...images];
@@ -341,62 +348,46 @@ export function RichTextarea({
     document.body.removeChild(link);
   }, []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key !== "Enter" || e.shiftKey) return;
+  const handleQuillChange = useCallback((content: string, delta: any, source: any, editor: any) => {
+    onChange(content);
+  }, [onChange]);
 
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+  const handleQuillFocus = useCallback(() => setIsFocused(true), []);
+  const handleQuillBlur = useCallback(() => setIsFocused(false), []);
 
-    const cursorPos = textarea.selectionStart;
-    const lineStart = value.lastIndexOf("\n", cursorPos - 1) + 1;
-    const currentLine = value.substring(lineStart, cursorPos);
-
-    const numberedMatch = currentLine.match(/^(\d+)\.\s/);
-    const unorderedMatch = currentLine.match(/^-\s(?!\[[ x]\]\s)/);
-    const checklistMatch = currentLine.match(/^-\s\[[ x]\]\s/);
-    const blockquoteMatch = currentLine.match(/^>\s/);
-
-    let prefix = "";
-    let isEmptyItem = false;
-
-    if (numberedMatch) {
-      const num = parseInt(numberedMatch[0], 10);
-      prefix = `${num + 1}. `;
-      isEmptyItem = currentLine.trim() === `${num}.`;
-    } else if (checklistMatch) {
-      prefix = "- [ ] ";
-      isEmptyItem = currentLine.trim() === "- [ ]" || currentLine.trim() === "- [x]";
-    } else if (unorderedMatch) {
-      prefix = "- ";
-      isEmptyItem = currentLine.trim() === "-";
-    } else if (blockquoteMatch) {
-      prefix = "> ";
-      isEmptyItem = currentLine.trim() === ">";
+  const handleQuillPaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    const files: File[] = [];
+    
+    for (let i = 0; i < items.length; i++) {
+      const file = items[i].getAsFile();
+      if (file) files.push(file);
     }
 
-    if (!prefix) return;
+    if (files.length === 0) return;
 
-    e.preventDefault();
+    e.preventDefault(); // Prevent Quill's default paste behavior for files
 
-    if (isEmptyItem) {
-      const newValue = value.substring(0, lineStart) + "\n" + value.substring(cursorPos);
-      onChange(newValue);
-      const newPos = lineStart + 1;
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(newPos, newPos);
-      }, 0);
-    } else {
-      const insert = "\n" + prefix;
-      const newValue = value.substring(0, cursorPos) + insert + value.substring(cursorPos);
-      onChange(newValue);
-      const newPos = cursorPos + insert.length;
-      setTimeout(() => {
-        textarea.focus();
-        textarea.setSelectionRange(newPos, newPos);
-      }, 0);
+    setIsUploading(true);
+    const uploadedUrls: string[] = [];
+
+    for (const file of files) {
+      const url = await uploadFile(file);
+      if (url) {
+        uploadedUrls.push(url);
+      }
     }
-  }, [value, onChange, textareaRef]);
+
+    if (uploadedUrls.length > 0 && onImagesChange) {
+      onImagesChange([...images, ...uploadedUrls]);
+      toast({
+        title: "Arquivo colado",
+        description: `${uploadedUrls.length} arquivo(s) adicionado(s) via area de transferencia.`,}
+      );
+    }
+
+    setIsUploading(false);
+  }, [images, onImagesChange, uploadFile, toast]);
 
   const handleBlur = useCallback((e: React.FocusEvent) => {
     if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
@@ -419,32 +410,30 @@ export function RichTextarea({
       >
         {toolbarVisible && (
           <FormattingToolbar
-            textareaRef={textareaRef}
-            value={value}
-            onChange={onChange}
+            quillRef={quillRef}
             disabled={disabled}
             onAttach={() => fileInputRef.current?.click()}
             isUploading={isUploading}
             dataTestId={dataTestId}
           />
         )}
-        <Textarea
-          ref={textareaRef}
+        <ReactQuill
+          ref={quillRef}
+          theme="snow"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          onFocus={() => setIsFocused(true)}
+          onChange={handleQuillChange}
+          onFocus={handleQuillFocus}
+          onBlur={handleQuillBlur}
+          readOnly={disabled || isUploading}
           placeholder={placeholder}
-          rows={rows}
-          maxLength={maxLength}
-          disabled={disabled || isUploading}
-          data-testid={dataTestId}
+          modules={modules}
+          formats={formats}
           className={cn(
-            "border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
+            "quill-editor border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
             toolbarVisible ? "rounded-t-none" : "",
             externalClassName
           )}
+          data-testid={dataTestId}
         />
         <input
           ref={fileInputRef}
@@ -477,7 +466,7 @@ export function RichTextarea({
           </div>
         )}
         <span className={cn("text-[10px] text-muted-foreground", toolbarVisible && "ml-auto")}>
-          {value.length}/{maxLength}
+          {value.length}
         </span>
       </div>
 

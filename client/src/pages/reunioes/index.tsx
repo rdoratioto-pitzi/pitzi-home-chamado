@@ -956,12 +956,11 @@ export default function ReunioesPage() {
                         <div className="mt-3">
                           {editingAgendaFor === meeting.id ? (
                             <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
-                              <Textarea
+                              <RichTextarea
                                 value={inlineAgendaText}
-                                onChange={(e) => setInlineAgendaText(e.target.value)}
+                                onChange={(v) => setInlineAgendaText(v)}
                                 placeholder="Adicione os tópicos da agenda..."
-                                className="min-h-[80px] text-sm"
-                                autoFocus
+                                data-testid="input-inline-agenda"
                               />
                               <div className="flex gap-2">
                                 <Button 
@@ -1521,8 +1520,6 @@ export default function ReunioesPage() {
                   images={agendaImages}
                   onImagesChange={setAgendaImages}
                   placeholder="Tópicos a serem discutidos..."
-                  maxLength={5000}
-                  rows={5}
                   data-testid="input-meeting-agenda"
                 />
               </div>

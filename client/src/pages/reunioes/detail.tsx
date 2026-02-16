@@ -562,8 +562,6 @@ export default function MeetingDetailPage() {
                       agendaImages: imgs
                     })}
                     placeholder="Pauta da reunião..."
-                    rows={10}
-                    maxLength={5000}
                     data-testid="input-meeting-agenda"
                   />
                 ) : (
@@ -847,8 +845,6 @@ export default function MeetingDetailPage() {
                 onChange={setNewComment}
                 images={commentImages}
                 onImagesChange={setCommentImages}
-                rows={3}
-                maxLength={5000}
                 data-testid="input-new-comment"
               />
               <Button 
