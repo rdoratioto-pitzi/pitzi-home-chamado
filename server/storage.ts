@@ -186,7 +186,7 @@ export interface IStorage {
 
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
-  getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string }): Promise<Task[]>;
+  getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean }): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<boolean>;
@@ -212,6 +212,7 @@ export interface IStorage {
   getTaskTemplates(type?: string): Promise<TaskTemplate[]>;
   getTaskTemplate(id: string): Promise<TaskTemplate | undefined>;
   createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate>;
+  deleteTaskTemplate(id: string): Promise<boolean>;
 
   // Logistic Operators
   getLogisticOperator(id: string): Promise<LogisticOperator | undefined>;
@@ -879,7 +880,7 @@ export class DatabaseStorage implements IStorage {
     const [t] = await db.select().from(tasks).where(eq(tasks.id, id));
     return t;
   }
-  async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string }): Promise<Task[]> {
+  async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean }): Promise<Task[]> {
     if (!db) return [];
     let baseQuery = db.select().from(tasks);
     const conditions = [];
@@ -890,6 +891,7 @@ export class DatabaseStorage implements IStorage {
     if (filters?.assigneeId) conditions.push(eq(tasks.assigneeId, filters.assigneeId));
     if (filters?.createdBy) conditions.push(eq(tasks.createdBy, filters.createdBy));
     if (filters?.type) conditions.push(eq(tasks.type, filters.type));
+    if (filters?.isRecurring !== undefined) conditions.push(eq(tasks.isRecurring, filters.isRecurring));
 
     if (conditions.length > 0) {
       return await baseQuery.where(and(...conditions));
@@ -974,6 +976,10 @@ export class DatabaseStorage implements IStorage {
   async createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate> {
     const [t] = await db.insert(taskTemplates).values(template).returning();
     return t;
+  }
+  async deleteTaskTemplate(id: string): Promise<boolean> {
+    const result = await db.delete(taskTemplates).where(eq(taskTemplates.id, id)).returning();
+    return result.length > 0;
   }
 
   // Logistic Operators

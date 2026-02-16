@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe } from "lucide-react";
+import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { RichTextarea } from "@/components/rich-textarea";
 import {
@@ -33,6 +33,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -119,6 +120,16 @@ export default function ReunioesPage() {
     queryKey: ["/api/users"],
   });
 
+  // Templates query for meeting templates
+  const { data: templates = [] } = useQuery({
+    queryKey: ["/api/task-templates", "meeting"],
+    queryFn: async () => {
+      const res = await fetch("/api/task-templates?type=meeting");
+      if (!res.ok) throw new Error("Failed to fetch templates");
+      return res.json();
+    },
+  });
+
   const filteredUsers = useMemo(() => {
     if (!participantInput) return users;
     const search = participantInput.toLowerCase();
@@ -156,6 +167,7 @@ export default function ReunioesPage() {
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
+      console.log("[createAreaMutation] Sending data to API:", data);
       return apiRequest("POST", "/api/task-tags", data);
     },
     onSuccess: () => {
@@ -166,7 +178,7 @@ export default function ReunioesPage() {
       toast({ title: "Tag criada com sucesso!" });
     },
     onError: (error: Error) => {
-      console.error("Area creation error:", error);
+      console.error("[createAreaMutation] Area creation error:", error);
       toast({ title: "Erro ao criar tag", description: error.message, variant: "destructive" });
     },
   });
@@ -258,6 +270,135 @@ export default function ReunioesPage() {
     },
   });
 
+  // Template mutations
+  const createTemplateMutation = useMutation({
+    mutationFn: async (data: { name: string; structure: string }) => {
+      return apiRequest("POST", "/api/task-templates", { ...data, type: "meeting" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-templates", "meeting"] });
+      toast({ title: "Template criado com sucesso!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao criar template", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/task-templates/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-templates", "meeting"] });
+      toast({ title: "Template excluído!" });
+    },
+  });
+
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateStructure, setTemplateStructure] = useState("");
+  
+  // Inline editing state
+  const [editingAgendaFor, setEditingAgendaFor] = useState<string | null>(null);
+  const [inlineAgendaText, setInlineAgendaText] = useState("");
+  
+  // Presentation mode state
+  const [presentationMode, setPresentationMode] = useState(false);
+  const [currentPresentationIndex, setCurrentPresentationIndex] = useState(0);
+
+  const applyTemplate = (template: { id: string; name: string; structure: string }) => {
+    try {
+      const structure = JSON.parse(template.structure);
+      setNewMeeting({
+        ...newMeeting,
+        title: structure.title || newMeeting.title,
+        description: structure.description || newMeeting.description,
+        meetingData: {
+          ...newMeeting.meetingData,
+          agenda: structure.agenda || newMeeting.meetingData.agenda,
+          participants: structure.participants || newMeeting.meetingData.participants,
+          externalParticipants: structure.externalParticipants || newMeeting.meetingData.externalParticipants,
+        },
+        isRecurring: structure.isRecurring || false,
+        recurrenceType: structure.recurrenceType || "daily",
+        recurrenceWeekdays: structure.recurrenceWeekdays || [],
+        recurrenceEndDate: structure.recurrenceEndDate || "",
+      });
+      toast({ title: `Template "${template.name}" aplicado!` });
+    } catch {
+      toast({ title: "Erro ao aplicar template", variant: "destructive" });
+    }
+  };
+
+  const handleSaveAsTemplate = () => {
+    const structure = JSON.stringify({
+      title: newMeeting.title,
+      description: newMeeting.description,
+      agenda: newMeeting.meetingData.agenda,
+      participants: newMeeting.meetingData.participants,
+      externalParticipants: newMeeting.meetingData.externalParticipants,
+      isRecurring: newMeeting.isRecurring,
+      recurrenceType: newMeeting.recurrenceType,
+      recurrenceWeekdays: newMeeting.recurrenceWeekdays,
+      recurrenceEndDate: newMeeting.recurrenceEndDate,
+    });
+    createTemplateMutation.mutate({ name: templateName, structure });
+    setShowTemplateDialog(false);
+    setTemplateName("");
+    setTemplateStructure("");
+  };
+
+  // Inline editing handlers
+  const startEditingAgenda = (meeting: Task) => {
+    const data = getMeetingData(meeting);
+    setInlineAgendaText(data.agenda || "");
+    setEditingAgendaFor(meeting.id);
+  };
+
+  const saveInlineAgenda = (meeting: Task) => {
+    const currentData = getMeetingData(meeting);
+    const updatedData = { ...currentData, agenda: inlineAgendaText };
+    updateMeetingMutation.mutate({
+      id: meeting.id,
+      data: { meetingData: JSON.stringify(updatedData) }
+    });
+    setEditingAgendaFor(null);
+  };
+
+  const cancelInlineEdit = () => {
+    setEditingAgendaFor(null);
+    setInlineAgendaText("");
+  };
+
+  const resetMeetingForm = () => {
+    setNewMeeting({
+      title: "",
+      description: "",
+      type: "meeting_note",
+      status: "todo",
+      priority: "medium",
+      areaId: selectedAreaId || (areas[0]?.id || ""),
+      createdBy: currentUserId,
+      assigneeId: "",
+      assigneeIds: [],
+      dueDate: "",
+      meetingData: {
+        date: "",
+        time: "",
+        location: "",
+        participants: [],
+        externalParticipants: [],
+        agenda: "",
+        actions: [],
+      },
+      isRecurring: false,
+      recurrenceType: "daily",
+      recurrenceWeekdays: [],
+      recurrenceEndDate: "",
+    });
+    setAgendaImages([]);
+  };
+
   const [sortBy, setSortBy] = useState<"priority" | "date">("date");
 
   const priorityOrder = { high: 0, medium: 1, low: 2 };
@@ -301,37 +442,6 @@ export default function ReunioesPage() {
 
   const selectedArea = areas.find(a => a.id === selectedAreaId);
 
-  const resetMeetingForm = () => {
-    setNewMeeting({
-      title: "",
-      description: "",
-      type: "meeting_note",
-      status: "todo",
-      priority: "medium",
-      areaId: "",
-      createdBy: currentUserId,
-      assigneeId: "",
-      assigneeIds: [],
-      dueDate: "",
-      meetingData: {
-        date: "",
-        time: "",
-        location: "",
-        participants: [],
-        externalParticipants: [],
-        agenda: "",
-        actions: [],
-      },
-      isRecurring: false,
-      recurrenceType: "daily",
-      recurrenceWeekdays: [],
-      recurrenceEndDate: "",
-    });
-    setAgendaImages([]);
-    setParticipantInput("");
-    setExternalParticipantInput("");
-  };
-
   const handleOpenAreaDialog = async (area?: TaskArea) => {
     if (area) {
       setEditingArea(area);
@@ -370,6 +480,7 @@ export default function ReunioesPage() {
   };
 
   const handleSaveArea = () => {
+    console.log("[handleSaveArea] Saving area with data:", newArea);
     if (editingArea) {
       updateAreaMutation.mutate({ id: editingArea.id, data: newArea });
     } else {
@@ -648,6 +759,21 @@ export default function ReunioesPage() {
             >
               <List className="h-4 w-4" />
             </Button>
+            <Button 
+              size="icon" 
+              variant={presentationMode ? "secondary" : "ghost"}
+              onClick={() => {
+                if (!presentationMode && filteredMeetings.length > 0) {
+                  setCurrentPresentationIndex(0);
+                }
+                setPresentationMode(!presentationMode);
+              }}
+              disabled={filteredMeetings.length === 0}
+              title="Modo Apresentação"
+              data-testid="button-presentation-mode"
+            >
+              <MonitorPlay className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
@@ -824,6 +950,55 @@ export default function ReunioesPage() {
                               <Clock className="h-3 w-3 mr-1" />
                               {meetingData.time}
                             </Badge>
+                          )}
+                        </div>
+                        {/* Inline Agenda Editing */}
+                        <div className="mt-3">
+                          {editingAgendaFor === meeting.id ? (
+                            <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
+                              <Textarea
+                                value={inlineAgendaText}
+                                onChange={(e) => setInlineAgendaText(e.target.value)}
+                                placeholder="Adicione os tópicos da agenda..."
+                                className="min-h-[80px] text-sm"
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => saveInlineAgenda(meeting)}
+                                  disabled={updateMeetingMutation.isPending}
+                                >
+                                  Salvar
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  onClick={cancelInlineEdit}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div 
+                              className="text-sm text-muted-foreground cursor-pointer hover:bg-muted p-2 rounded transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditingAgenda(meeting);
+                              }}
+                            >
+                              {meetingData.agenda ? (
+                                <div className="line-clamp-2 whitespace-pre-wrap">
+                                  {meetingData.agenda}
+                                </div>
+                              ) : (
+                                <span className="italic text-xs flex items-center gap-1">
+                                  <Edit className="h-3 w-3" />
+                                  Adicionar agenda...
+                                </span>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1028,7 +1203,63 @@ export default function ReunioesPage() {
       <Dialog open={showMeetingDialog} onOpenChange={setShowMeetingDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Nova Reunião</DialogTitle>
+            <div className="flex items-center justify-between pr-12">
+              <DialogTitle>Nova Reunião</DialogTitle>
+              <div className="flex gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <LayoutGrid className="h-4 w-4 mr-1" />
+                      Templates
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    {templates.length === 0 ? (
+                      <DropdownMenuItem disabled>Nenhum template disponível</DropdownMenuItem>
+                    ) : (
+                      templates.map((t: any) => (
+                        <DropdownMenuItem 
+                          key={t.id} 
+                          onClick={() => applyTemplate(t)}
+                          className="flex items-center justify-between"
+                        >
+                          <span>{t.name}</span>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-6 w-6"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <MoreHorizontal className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteTemplateMutation.mutate(t.id);
+                                }}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="h-3 w-3 mr-1" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </DropdownMenuItem>
+                      ))
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setShowTemplateDialog(true)}>
+                      <Plus className="h-3 w-3 mr-1" />
+                      Salvar como Template
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -1367,6 +1598,208 @@ export default function ReunioesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Template Save Dialog */}
+      <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Salvar como Template</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nome do Template</label>
+              <Input
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="Ex: Reunião Diária"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              O template irá salvar: título, descrição, agenda, participantes e configurações de recorrência.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveAsTemplate}
+              disabled={!templateName || createTemplateMutation.isPending}
+            >
+              Salvar Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Presentation Mode Dialog */}
+      {presentationMode && filteredMeetings.length > 0 && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 bg-black/50">
+            <div className="text-white">
+              <span className="text-sm text-gray-400">
+                {currentPresentationIndex + 1} de {filteredMeetings.length}
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setPresentationMode(false)}
+              className="text-white hover:bg-white/20"
+            >
+              <XCircle className="h-6 w-6" />
+            </Button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 flex items-center justify-center p-8">
+            {(() => {
+              const meeting = filteredMeetings[currentPresentationIndex];
+              const meetingData = getMeetingData(meeting);
+              const meetingArea = areas.find(a => a.id === meeting.tagId);
+              
+              return (
+                <div className="max-w-4xl w-full bg-card rounded-lg p-8 text-center space-y-6">
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    {meetingArea && (
+                      <Badge 
+                        variant="secondary" 
+                        className="text-sm"
+                        style={{ backgroundColor: meetingArea.color || "#00A137" }}
+                      >
+                        {meetingArea.name}
+                      </Badge>
+                    )}
+                    <Badge variant="outline" className="text-sm">
+                      <Video className="h-4 w-4 mr-1" />
+                      Reunião
+                    </Badge>
+                  </div>
+                  
+                  <h1 className="text-4xl font-bold">
+                    {meeting.title}
+                  </h1>
+                  
+                  {meeting.description && (
+                    <p className="text-xl text-muted-foreground">
+                      {meeting.description}
+                    </p>
+                  )}
+                  
+                  <div className="flex items-center justify-center gap-4 py-4">
+                    {meetingData.date && (
+                      <div className="flex items-center gap-2 text-lg">
+                        <Calendar className="h-5 w-5" />
+                        {new Date(meetingData.date).toLocaleDateString("pt-BR", { 
+                          weekday: 'long', 
+                          year: 'numeric', 
+                          month: 'long', 
+                          day: 'numeric' 
+                        })}
+                      </div>
+                    )}
+                    {meetingData.time && (
+                      <div className="flex items-center gap-2 text-lg">
+                        <Clock className="h-5 w-5" />
+                        {meetingData.time}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {meetingData.location && (
+                    <p className="text-lg text-muted-foreground">
+                      📍 {meetingData.location}
+                    </p>
+                  )}
+                  
+                  {meetingData.agenda && (
+                    <div className="text-left mt-8 p-6 bg-muted rounded-lg">
+                      <h3 className="text-xl font-semibold mb-4">📋 Pauta da Reunião</h3>
+                      <div className="whitespace-pre-wrap text-lg">
+                        {meetingData.agenda}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {meetingData.participants && meetingData.participants.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="text-lg font-semibold mb-2">Participantes Internos</h3>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {meetingData.participants.map((p: string) => {
+                          const user = users.find(u => u.id === p);
+                          return (
+                            <Badge key={p} variant="secondary" className="text-sm py-1">
+                              {user?.name || user?.email || p}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {meetingData.externalParticipants && meetingData.externalParticipants.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-lg font-semibold mb-2">Participantes Externos</h3>
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {meetingData.externalParticipants.map((email: string) => (
+                          <Badge key={email} variant="outline" className="text-sm py-1">
+                            {email}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {meetingData.actions && meetingData.actions.length > 0 && (
+                    <div className="text-left mt-8 p-6 bg-muted rounded-lg">
+                      <h3 className="text-xl font-semibold mb-4">✅ Ações</h3>
+                      <ul className="space-y-2">
+                        {meetingData.actions.map((action: any, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2 text-lg">
+                            <CheckCircle2 className="h-5 w-5 text-green-500 mt-1" />
+                            <span>
+                              {action.description}
+                              {action.responsible && (
+                                <span className="text-muted-foreground"> - Responsável: {action.responsible}</span>
+                              )}
+                              {action.deadline && (
+                                <span className="text-muted-foreground"> - Prazo: {action.deadline}</span>
+                              )}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Navigation */}
+          <div className="flex items-center justify-center gap-8 p-4 bg-black/50">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setCurrentPresentationIndex(i => Math.max(0, i - 1))}
+              disabled={currentPresentationIndex === 0}
+              className="text-white hover:bg-white/20 h-12 w-12"
+            >
+              <ChevronLeft className="h-8 w-8" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setCurrentPresentationIndex(i => Math.min(filteredMeetings.length - 1, i + 1))}
+              disabled={currentPresentationIndex === filteredMeetings.length - 1}
+              className="text-white hover:bg-white/20 h-12 w-12"
+            >
+              <ChevronRight className="h-8 w-8" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

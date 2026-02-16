@@ -75,6 +75,53 @@ interface OpenRouterModel {
   };
 }
 
+// Modelos restritos para o Macgyver IA - Apenas 3 opções simplificadas
+const RESTRICTED_MODELS: OpenRouterModel[] = [
+  {
+    id: "google/gemini-2.0-flash-001",
+    name: "Gemini 2.0 Flash Thinking",
+    description: "Modelo rapido e eficiente do Google com pensamento estruturado",
+    context_length: 1048576,
+    pricing: { prompt: "0", completion: "0" },
+    architecture: { modality: "text->text", tokenizer: "Gemini" }
+  },
+  {
+    id: "deepseek/deepseek-chat",
+    name: "DeepSeek V3",
+    description: "Modelo equilibrado com excelente custo-beneficio",
+    context_length: 64000,
+    pricing: { prompt: "0", completion: "0" },
+    architecture: { modality: "text->text", tokenizer: "DeepSeek" }
+  },
+  {
+    id: "qwen/qwen3-8b",
+    name: "Qwen 3 (8B)",
+    description: "Modelo avancado da Alibaba para tarefas complexas",
+    context_length: 32768,
+    pricing: { prompt: "0", completion: "0" },
+    architecture: { modality: "text->text", tokenizer: "Qwen" }
+  }
+];
+
+// Labels amigáveis para os modelos
+const MODEL_LABELS: Record<string, { emoji: string; label: string; description: string }> = {
+  "google/gemini-2.0-flash-001": {
+    emoji: "⚡",
+    label: "Rápido",
+    description: "Gemini 2.0 Flash - Respostas instantâneas"
+  },
+  "deepseek/deepseek-chat": {
+    emoji: "🎯",
+    label: "Equilibrado",
+    description: "DeepSeek V3 - Melhor custo-benefício"
+  },
+  "qwen/qwen3-8b": {
+    emoji: "🚀",
+    label: "Avançado",
+    description: "Qwen 3 (8B) - Tarefas complexas"
+  }
+};
+
 interface SlashCommand {
   command: string;
   label: string;
@@ -364,176 +411,82 @@ function SlashCommandMenu({
 }
 
 function ModelPickerPopup({
-  models,
-  isLoading,
   onSelect,
   onClose,
   selectedModel,
 }: {
-  models: OpenRouterModel[];
-  isLoading: boolean;
   onSelect: (modelId: string) => void;
   onClose: () => void;
   selectedModel: string;
 }) {
-  const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"all" | "free" | "premium">("free");
-  const searchRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    searchRef.current?.focus();
-  }, []);
-
-  const filtered = useMemo(() => {
-    let list = models;
-    if (tab === "free") list = list.filter(isFreeModel);
-    if (tab === "premium") list = list.filter(m => !isFreeModel(m));
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(m =>
-        m.name.toLowerCase().includes(q) ||
-        m.id.toLowerCase().includes(q) ||
-        getProviderName(m.id).toLowerCase().includes(q)
-      );
-    }
-
-    const sorted = [...list].sort((a, b) => {
-      // Relevance score: DeepSeek > Gemini > Claude > GPT > Llama > Qwen
-      const getRelevance = (m: OpenRouterModel) => {
-        const id = m.id.toLowerCase();
-        const name = m.name.toLowerCase();
-
-        // Prioritize specific high-value free/open models
-        if (id.includes("deepseek")) return 20;
-        if (id.includes("gemini")) return 18;
-        if (id.includes("claude")) return 16;
-        if (id.includes("gpt")) return 14;
-        if (id.includes("llama")) return 12;
-        if (id.includes("qwen")) return 10;
-        if (id.includes("mistral")) return 8;
-
-        return 0;
-      };
-
-      const relA = getRelevance(a);
-      const relB = getRelevance(b);
-
-      if (relA !== relB) return relB - relA;
-
-      // Secondary sort: free models first if same relevance
-      const freeA = isFreeModel(a) ? 1 : 0;
-      const freeB = isFreeModel(b) ? 1 : 0;
-      if (freeA !== freeB) return freeB - freeA;
-
-      return a.name.localeCompare(b.name);
-    });
-
-    return sorted.slice(0, 50);
-  }, [models, search, tab]);
+  // Usa apenas os 3 modelos restritos - sem busca, sem filtros
+  const models = RESTRICTED_MODELS;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] flex flex-col"
+        className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 flex flex-col"
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-4 border-b space-y-3">
+        <div className="p-4 border-b">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-base">Selecionar Modelo</h3>
+            <div>
+              <h3 className="font-semibold text-base">Selecionar Modelo</h3>
+              <p className="text-xs text-muted-foreground mt-1">Escolha o modelo ideal para sua tarefa</p>
+            </div>
             <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-model-picker">
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              ref={searchRef}
-              placeholder="Buscar modelos... (ex: claude, gpt, gemini)"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9"
-              data-testid="input-search-models"
-            />
-          </div>
-          <div className="flex gap-1">
-            {(["all", "free", "premium"] as const).map(t => (
-              <Button
-                key={t}
-                variant={tab === t ? "default" : "outline"}
-                size="sm"
-                onClick={() => setTab(t)}
-                data-testid={`button-tab-${t}`}
+        </div>
+        <div className="p-3 space-y-2">
+          {models.map(model => {
+            const label = MODEL_LABELS[model.id];
+            const isSelected = model.id === selectedModel;
+            return (
+              <button
+                key={model.id}
+                className={cn(
+                  "w-full text-left px-4 py-3 rounded-xl transition-all flex items-center gap-4",
+                  isSelected
+                    ? "bg-primary/10 border-2 border-primary/40 shadow-sm"
+                    : "hover:bg-muted/70 border-2 border-transparent hover:border-border"
+                )}
+                onClick={() => {
+                  onSelect(model.id);
+                  onClose();
+                }}
+                data-testid={`model-option-${model.id}`}
               >
-                {t === "all" ? "Todos" : t === "free" ? "Gratuitos" : "Premium"}
-              </Button>
-            ))}
-          </div>
-        </div>
-        <div className="flex-1 overflow-auto p-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">Carregando modelos...</span>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">
-              Nenhum modelo encontrado
-            </div>
-          ) : (
-            <div className="space-y-1">
-              {filtered.map(model => {
-                const free = isFreeModel(model);
-                const isSelected = model.id === selectedModel;
-                return (
-                  <button
-                    key={model.id}
-                    className={cn(
-                      "w-full text-left px-3 py-2.5 rounded-lg transition-colors flex items-start gap-3",
-                      isSelected
-                        ? "bg-primary/10 border border-primary/30"
-                        : "hover:bg-muted/70 border border-transparent"
-                    )}
-                    onClick={() => {
-                      onSelect(model.id);
-                      onClose();
-                    }}
-                    data-testid={`model-option-${model.id}`}
-                  >
-                    <div className="mt-0.5 shrink-0">
-                      {free ? (
-                        <Zap className="h-4 w-4 text-green-500" />
-                      ) : (
-                        <Sparkles className="h-4 w-4 text-amber-500" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm">{model.name}</span>
-                        <span className="text-xs text-muted-foreground">({getProviderName(model.id)})</span>
-                        {free && (
-                          <span className="text-[10px] font-semibold bg-green-500/10 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">
-                            FREE
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-3 flex-wrap">
-                        <span>{(model.context_length / 1000).toFixed(0)}K ctx</span>
-                        <span>In: {formatPrice(model.pricing.prompt)}</span>
-                        <span>Out: {formatPrice(model.pricing.completion)}</span>
-                      </div>
-                    </div>
+                <div className="text-2xl shrink-0">
+                  {label?.emoji || "🤖"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{label?.label || model.name}</span>
                     {isSelected && (
-                      <Check className="h-4 w-4 text-primary mt-1 shrink-0" />
+                      <span className="text-[10px] font-semibold bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                        Ativo
+                      </span>
                     )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{label?.description || model.description}</p>
+                  <div className="text-[10px] text-muted-foreground mt-1 flex items-center gap-2">
+                    <span className="font-mono">{model.id.split("/")[1]}</span>
+                    <span>•</span>
+                    <span>{(model.context_length / 1000).toFixed(0)}K tokens</span>
+                  </div>
+                </div>
+                {isSelected && (
+                  <Check className="h-5 w-5 text-primary shrink-0" />
+                )}
+              </button>
+            );
+          })}
         </div>
-        <div className="p-3 border-t">
-          <p className="text-xs text-muted-foreground text-center">
-            {models.length} modelos disponiveis via OpenRouter
+        <div className="p-3 border-t bg-muted/30">
+          <p className="text-[11px] text-muted-foreground text-center">
+            💡 Dica: Use <strong>Rápido</strong> para respostas instantâneas, <strong>Equilibrado</strong> para uso geral, e <strong>Avançado</strong> para tarefas complexas.
           </p>
         </div>
       </div>
@@ -902,11 +855,13 @@ export default function MacgyverIA() {
     queryKey: ["/api/ai/spaces", userId],
   });
 
+  // Usa apenas os modelos restritos para informações do modelo selecionado
   const selectedModelInfo = useMemo(() => {
-    return models.find(m => m.id === selectedModel);
-  }, [models, selectedModel]);
+    return RESTRICTED_MODELS.find(m => m.id === selectedModel);
+  }, [selectedModel]);
 
-  const selectedModelName = selectedModelInfo?.name || selectedModel.split("/").pop() || selectedModel;
+  const selectedModelLabel = MODEL_LABELS[selectedModel];
+  const selectedModelName = selectedModelLabel?.label || selectedModel.split("/").pop() || selectedModel;
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1186,51 +1141,36 @@ export default function MacgyverIA() {
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border/60 bg-background hover:bg-muted/50 transition-colors text-xs whitespace-nowrap"
           data-testid="button-model-dropdown"
         >
-          {selectedModelInfo && isFreeModel(selectedModelInfo) ? (
-            <Zap className="h-3 w-3 text-green-500 shrink-0" />
-          ) : (
-            <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />
-          )}
-          <span className="font-medium truncate max-w-[120px]">Modelo</span>
+          <span className="text-sm">{selectedModelLabel?.emoji || "🤖"}</span>
+          <span className="font-medium truncate max-w-[120px]">{selectedModelName}</span>
           <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 max-h-[400px] overflow-auto">
+      <DropdownMenuContent align="end" className="w-56">
         <div className="px-2 py-1.5 border-b">
-          <p className="text-xs font-medium text-muted-foreground">Modelo atual: {selectedModelName}</p>
+          <p className="text-xs font-medium text-muted-foreground">Selecionar Modelo</p>
         </div>
-        {modelsLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin" />
-          </div>
-        ) : (
-          <>
-            {models.slice(0, 15).map(model => {
-              const free = isFreeModel(model);
-              const isSelected = model.id === selectedModel;
-              return (
-                <DropdownMenuItem
-                  key={model.id}
-                  onClick={() => setSelectedModel(model.id)}
-                  className={cn(isSelected && "bg-primary/10")}
-                  data-testid={`dropdown-model-${model.id}`}
-                >
-                  <div className="flex items-center gap-2 w-full">
-                    {free ? <Zap className="h-3 w-3 text-green-500 shrink-0" /> : <Sparkles className="h-3 w-3 text-amber-500 shrink-0" />}
-                    <span className="text-xs font-medium truncate flex-1">{model.name}</span>
-                    {free && <span className="text-[9px] bg-green-500/10 text-green-600 px-1 rounded">FREE</span>}
-                    {isSelected && <Check className="h-3 w-3 text-primary shrink-0" />}
-                  </div>
-                </DropdownMenuItem>
-              );
-            })}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setShowModelPicker(true)} data-testid="button-open-model-picker">
-              <Search className="h-3 w-3 mr-2" />
-              <span className="text-xs">Ver todos os modelos...</span>
+        {RESTRICTED_MODELS.map(model => {
+          const label = MODEL_LABELS[model.id];
+          const isSelected = model.id === selectedModel;
+          return (
+            <DropdownMenuItem
+              key={model.id}
+              onClick={() => setSelectedModel(model.id)}
+              className={cn(isSelected && "bg-primary/10")}
+              data-testid={`dropdown-model-${model.id}`}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <span className="text-sm">{label?.emoji || "🤖"}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-medium truncate block">{label?.label || model.name}</span>
+                  <span className="text-[10px] text-muted-foreground truncate block">{label?.description}</span>
+                </div>
+                {isSelected && <Check className="h-3 w-3 text-primary shrink-0" />}
+              </div>
             </DropdownMenuItem>
-          </>
-        )}
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -1593,8 +1533,6 @@ export default function MacgyverIA() {
 
       {showModelPicker && (
         <ModelPickerPopup
-          models={models}
-          isLoading={modelsLoading}
           onSelect={setSelectedModel}
           onClose={() => setShowModelPicker(false)}
           selectedModel={selectedModel}
