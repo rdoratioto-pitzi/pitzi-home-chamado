@@ -38,7 +38,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { HelpCircle, CheckCircle2, Plus, Eye } from "lucide-react";
-import { PromptCommand } from "../conhecimento/prompts/components/prompt-command";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -307,29 +306,16 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                   </FormLabel>
                   <FormControl>
                     <RichTextarea
-                      placeholder="Descreva detalhadamente o problema ou solicitação... (mínimo 20 caracteres)&#10;💡 Dica: Use /prompt para inserir um prompt pronto"
+                      placeholder="Descreva detalhadamente o problema ou solicitação... (mínimo 20 caracteres)"
                       value={field.value}
                       onChange={field.onChange}
                       images={attachments}
                       onImagesChange={setAttachments}
                       maxLength={5000}
                       data-testid="input-ticket-description"
+                      className="min-h-[180px]"
                     />
                   </FormControl>
-                  
-                  {/* Botão de Prompts */}
-                  <div className="mt-2">
-                    <PromptCommand
-                      onSelectPrompt={(content) => {
-                        const currentValue = field.value || "";
-                        const newValue = currentValue
-                          ? `${currentValue}\n\n${content}`
-                          : content;
-                        field.onChange(newValue);
-                      }}
-                      disabled={mutation.isPending}
-                    />
-                  </div>
                   
                   <FormMessage />
                 </FormItem>
