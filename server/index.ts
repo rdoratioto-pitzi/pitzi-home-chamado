@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { seedDatabase } from "./seed";
 import { setupSession, requireAuth } from "./auth";
 import { startPromptsSyncJob } from "./jobs/prompts-sync.job";
+import { startRecurrenceJob } from "./jobs/recurrence.job";
 
 const app = express();
 const httpServer = createServer(app);
@@ -110,6 +111,9 @@ app.use((req, res, next) => {
       
       // Start prompts sync job (daily at 03:00)
       startPromptsSyncJob();
+      
+      // Start recurrence job (every hour at minute 15)
+      startRecurrenceJob();
     },
   );
 })();
