@@ -1679,7 +1679,7 @@ export default function ReunioesPage() {
                   </h1>
                   
                   {meeting.description && (
-                    <p className="text-xl text-muted-foreground">
+                    <p className="text-xl text-muted-foreground whitespace-pre-wrap">
                       {meeting.description}
                     </p>
                   )}
