@@ -1,4 +1,5 @@
 import { storage } from "./storage";
+import { getExternalDataContext, needsExternalData } from "./external-data";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
@@ -227,6 +228,15 @@ CAPACIDADES ESPECIAIS:
 5. SUGESTOES ESTRATEGICAS: Identifique gargalos, tendencias e oportunidades de melhoria
 6. AUTOMACAO: Sugira automacoes e workflows para otimizar processos
 7. ANALISE DE IMAGENS: Quando o usuario enviar imagens, analise e descreva o conteudo visual
+8. DADOS EXTERNOS EM TEMPO REAL: Quando o usuario perguntar sobre clima/tempo, previsoes meteorologicas, temperatura ou condicoes climaticas de qualquer cidade brasileira, voce recebera dados atualizados automaticamente. Use esses dados para responder com informacoes precisas sobre:
+   - Temperatura atual e sensacao termica
+   - Condicoes do ceu (limpo, nublado, chuva, etc.)
+   - Umidade relativa do ar
+   - Velocidade do vento
+   - Indice UV
+   - Precipitacao
+   - Previsão para os proximos dias
+   Sempre inclua emojis relevan
 
 INSTRUCOES:
 1. Responda em portugues brasileiro de forma clara e objetiva
@@ -263,6 +273,33 @@ export async function* streamChatCompletion(
   const apiMessages: Array<{role: string; content: MessageContent}> = [
     { role: "system", content: systemPrompt },
   ];
+
+  // Check if the last user message needs external data
+  let externalDataContext: string | null = null;
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage && lastMessage.role === "user" && typeof lastMessage.content === "string") {
+    const userQuery = lastMessage.content;
+    
+    // Check if we need external data for this query
+    if (needsExternalData(userQuery)) {
+      try {
+        console.log("[External Data] Detected weather query, fetching external data...");
+        externalDataContext = await getExternalDataContext(userQuery);
+        
+        if (externalDataContext) {
+          console.log("[External Data] Successfully fetched external data");
+          // Add external data as a system message before the user's question
+          apiMessages.push({
+            role: "system",
+            content: `DADOS EXTERNOS RECUPERADOS AUTOMATICAMENTE:\n${externalDataContext}\n\nUse esses dados acima para responder a pergunta do usuário. Se os dados forem sobre clima/tempo, inclua informações atualizadas na sua resposta.`
+          });
+        }
+      } catch (error) {
+        console.error("[External Data] Error fetching external data:", error);
+        // Continue without external data - the AI will handle it gracefully
+      }
+    }
+  }
 
   for (let i = 0; i < messages.length; i++) {
     const msg = messages[i];
