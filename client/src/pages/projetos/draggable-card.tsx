@@ -13,6 +13,18 @@ interface DraggableCardProps {
   onClick: () => void;
 }
 
+function stripHtml(html: string): string {
+  if (!html || typeof html !== 'string') return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
+function truncateText(text: string, maxLength: number = 100): string {
+  if (!text || text.length <= maxLength) return text || '';
+  return text.substring(0, maxLength) + '...';
+}
+
 export function DraggableCard({ 
   card, 
   users, 
@@ -66,7 +78,7 @@ export function DraggableCard({
               </h4>
               {card.objectives && (
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                  {card.objectives}
+                  {truncateText(stripHtml(card.objectives))}
                 </p>
               )}
             </div>
