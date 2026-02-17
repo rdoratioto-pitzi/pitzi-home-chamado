@@ -85,29 +85,33 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
   const visibility = form.watch("visibility");
   const ownerId = form.watch("ownerId");
 
+  // Inicialização do form - roda apenas quando o modal abre com um projeto diferente
   useEffect(() => {
-    if (project) {
-      form.reset({
-        name: project.name,
-        description: project.description || "",
-        ownerId: project.ownerId,
-        startDate: project.startDate ? format(new Date(project.startDate), "yyyy-MM-dd") : "",
-        endDate: project.endDate ? format(new Date(project.endDate), "yyyy-MM-dd") : "",
-        visibility: (project.visibility as "private" | "shared" | "public") || "private",
-      });
-      setMemberIds(existingMembers.map(m => m.userId));
-    } else {
-      form.reset({
-        name: "",
-        description: "",
-        ownerId: "admin",
-        startDate: "",
-        endDate: "",
-        visibility: "private",
-      });
-      setMemberIds([]);
+    if (open) {
+      if (project) {
+        form.reset({
+          name: project.name,
+          description: project.description || "",
+          ownerId: project.ownerId,
+          startDate: project.startDate ? format(new Date(project.startDate), "yyyy-MM-dd") : "",
+          endDate: project.endDate ? format(new Date(project.endDate), "yyyy-MM-dd") : "",
+          visibility: (project.visibility as "private" | "shared" | "public") || "private",
+        });
+        setMemberIds(existingMembers.map(m => m.userId));
+      } else {
+        form.reset({
+          name: "",
+          description: "",
+          ownerId: "admin",
+          startDate: "",
+          endDate: "",
+          visibility: "private",
+        });
+        setMemberIds([]);
+      }
     }
-  }, [project, form, existingMembers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, project?.id]);
 
   const filteredUsersForMembers = useMemo(() => {
     return users.filter(u => {
@@ -161,8 +165,8 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={onOpenChange} modal={true}>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{project ? "Editar Projeto" : "Novo Projeto"}</DialogTitle>
           <DialogDescription>
@@ -182,6 +186,7 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
                     <Input 
                       placeholder="Ex: Lançamento do Produto" 
                       data-testid="input-project-name"
+                      autoFocus
                       {...field} 
                     />
                   </FormControl>
@@ -365,10 +370,10 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
                   <FormControl>
                     <RichTextarea
                       placeholder="Descreva os objetivos do projeto..."
-                      className="min-h-[80px]"
+                      className="min-h-[120px]"
                       data-testid="input-project-description"
-                      value={field.value || ""}
-                      onChange={field.onChange}
+                      value={field.value ?? ""}
+                      onChange={(value) => field.onChange(value)}
                     />
                   </FormControl>
                   <FormMessage />

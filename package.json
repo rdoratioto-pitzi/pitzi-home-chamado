@@ -92,7 +92,7 @@
     "react-hook-form": "^7.55.0",
     "react-icons": "^5.4.0",
     "react-markdown": "^10.1.0",
-    "react-quill": "^2.0.0",
+    "react-quill-new": "^3.8.3",
     "react-resizable-panels": "^2.1.7",
     "react-syntax-highlighter": "^16.1.0",
     "recharts": "^2.15.2",
@@ -114,6 +114,7 @@
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.1.18",
     "@types/connect-pg-simple": "^7.0.3",
+    "@types/dompurify": "^3.0.5",
     "@types/express": "^5.0.0",
     "@types/express-session": "^1.18.2",
     "@types/js-yaml": "^4.0.9",
@@ -141,9 +142,6 @@
   "overrides": {
     "drizzle-kit": {
       "@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"
-    },
-    "react-quill": {
-      "quill": "^2.0.3"
     }
   },
   "optionalDependencies": {

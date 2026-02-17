@@ -221,3 +221,69 @@
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
+
+/* Altura mínima para os editores de card */
+.card-editor .ql-editor {
+  min-height: 150px;
+}
+.card-editor-development .ql-editor {
+  min-height: 180px;
+}
+
+/* Garantir que o editor aceite digitação */
+.ql-editor {
+  min-height: 120px;
+  cursor: text;
+}
+
+/* Estilo base para o container do Quill */
+.quill-editor .ql-container {
+  border: none;
+}
+
+.quill-editor .ql-toolbar {
+  border: none;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Estilos para conteúdo renderizado do Quill */
+.ql-snow .ql-editor {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ql-snow .ql-editor p {
+  margin-bottom: 0.5em;
+}
+
+.ql-snow .ql-editor ol,
+.ql-snow .ql-editor ul {
+  padding-left: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.ql-snow .ql-editor li {
+  margin-bottom: 0.25em;
+}
+
+.ql-snow .ql-editor blockquote {
+  border-left: 4px solid hsl(var(--border));
+  padding-left: 1em;
+  margin-left: 0;
+  margin-bottom: 0.5em;
+  color: hsl(var(--muted-foreground));
+}
+
+.ql-snow .ql-editor code {
+  background-color: hsl(var(--muted));
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.ql-snow .ql-editor pre {
+  background-color: hsl(var(--muted));
+  padding: 1em;
+  border-radius: 6px;
+  overflow-x: auto;
+}

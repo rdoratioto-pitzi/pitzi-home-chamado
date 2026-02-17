@@ -171,56 +171,58 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
     },
   });
 
-  useEffect(() => {
-    if (cardId && cardData) {
-      form.reset({
-        title: cardData.title,
-        objectives: cardData.objectives || "",
-        development: cardData.development || "",
-        assigneeId: cardData.assigneeId || "admin",
-        reporterId: cardData.reporterId || "admin",
-        priority: cardData.priority,
-        estimation: cardData.estimation || 0,
-        startDate: cardData.startDate ? new Date(cardData.startDate).toISOString().split('T')[0] : "",
-        endDate: cardData.endDate ? new Date(cardData.endDate).toISOString().split('T')[0] : "",
-        tag: cardData.tags?.[0] || "",
-      });
-      if (cardData.attachments && cardData.attachments.length > 0) {
-        setAttachments(cardData.attachments.map((path: string) => ({
-          name: path.split("/").pop() || "Arquivo",
-          path,
-        })));
-      } else {
-        setAttachments([]);
-      }
-    } else if (!cardId && open) {
-      form.reset({
-        title: "",
-        objectives: "",
-        development: "",
-        assigneeId: "admin",
-        reporterId: "admin",
-        priority: "normal",
-        estimation: 0,
-        startDate: "",
-        endDate: "",
-        tag: "",
-      });
-      setAttachments([]);
-    }
-  }, [cardId, cardData, form, open]);
-
   const [selectedParentId, setSelectedParentId] = useState<string | null>(parentCardId || null);
 
+  // Consolidado em um único useEffect com dependência apenas [cardId] para evitar loops
   useEffect(() => {
-    if (cardData?.parentCardId) {
-      setSelectedParentId(cardData.parentCardId);
-    } else if (parentCardId) {
-      setSelectedParentId(parentCardId);
-    } else {
-      setSelectedParentId(null);
+    if (open) {
+      if (cardId && cardData) {
+        form.reset({
+          title: cardData.title,
+          objectives: cardData.objectives ? String(cardData.objectives) : "",
+          development: cardData.development ? String(cardData.development) : "",
+          assigneeId: cardData.assigneeId || "admin",
+          reporterId: cardData.reporterId || "admin",
+          priority: cardData.priority,
+          estimation: cardData.estimation || 0,
+          startDate: cardData.startDate ? new Date(cardData.startDate).toISOString().split('T')[0] : "",
+          endDate: cardData.endDate ? new Date(cardData.endDate).toISOString().split('T')[0] : "",
+          tag: cardData.tags?.[0] || "",
+        });
+        if (cardData.attachments && cardData.attachments.length > 0) {
+          setAttachments(cardData.attachments.map((path: string) => ({
+            name: path.split("/").pop() || "Arquivo",
+            path,
+          })));
+        } else {
+          setAttachments([]);
+        }
+        // Configurar parent card id
+        if (cardData.parentCardId) {
+          setSelectedParentId(cardData.parentCardId);
+        } else if (parentCardId) {
+          setSelectedParentId(parentCardId);
+        } else {
+          setSelectedParentId(null);
+        }
+      } else if (!cardId) {
+        form.reset({
+          title: "",
+          objectives: "",
+          development: "",
+          assigneeId: "admin",
+          reporterId: "admin",
+          priority: "normal",
+          estimation: 0,
+          startDate: "",
+          endDate: "",
+          tag: "",
+        });
+        setAttachments([]);
+        setSelectedParentId(parentCardId || null);
+      }
     }
-  }, [cardData, parentCardId, open]);
+  }, [cardId, open, cardData]); // Apenas cardId como dependência para evitar loop de re-renders
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -358,12 +360,12 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                         <FormLabel>Objetivos</FormLabel>
                         <FormControl>
                           <RichTextarea
+                            key={`objectives-${cardId || 'new'}`}
                             placeholder="Descreva os objetivos deste card..."
-                            className="min-h-[100px]"
+                            className="min-h-[100px] card-editor"
                             data-testid="input-card-objectives"
-                            maxLength={5000}
-                            value={field.value || ""}
-                            onChange={field.onChange}
+                            value={field.value || ''}
+                            onChange={(val) => field.onChange(val)}
                           />
                         </FormControl>
                         <FormMessage />
@@ -379,12 +381,12 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                         <FormLabel>Desenvolvimento</FormLabel>
                         <FormControl>
                           <RichTextarea
+                            key={`development-${cardId || 'new'}`}
                             placeholder="Descreva o desenvolvimento técnico..."
-                            className="min-h-[100px]"
+                            className="min-h-[100px] card-editor-development"
                             data-testid="input-card-development"
-                            maxLength={5000}
-                            value={field.value || ""}
-                            onChange={field.onChange}
+                            value={field.value || ''}
+                            onChange={(val) => field.onChange(val)}
                           />
                         </FormControl>
                         <FormMessage />

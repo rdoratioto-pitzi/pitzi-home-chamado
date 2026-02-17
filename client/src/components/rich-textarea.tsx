@@ -1,10 +1,9 @@
 import { useState, useRef, useCallback, useMemo } from "react";
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import { Button } from "@/components/ui/button";
 import { 
   ImageIcon, X, Loader2, Maximize2, Video, FileText, Paperclip, FileSpreadsheet, File, Download,
-  Bold, Italic, List, ListOrdered, CheckSquare, Link2, Code, Heading1, Heading2, Strikethrough, Quote, Minus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -15,11 +14,6 @@ import {
 } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface RichTextareaProps {
   value: string;
@@ -28,7 +22,6 @@ interface RichTextareaProps {
   onImagesChange?: (images: string[]) => void;
   placeholder?: string;
   disabled?: boolean;
-  showToolbar?: boolean;
   className?: string;
   "data-testid"?: string;
 }
@@ -80,129 +73,6 @@ function FileIcon({ type }: { type: string }) {
   }
 }
 
-interface ToolbarAction {
-  icon: typeof Bold;
-  label: string;
-  action: "wrap" | "prefix" | "insert";
-  wrap?: string;
-  prefix?: string;
-  insert?: string;
-  testId: string;
-}
-
-const TOOLBAR_ACTIONS: ToolbarAction[] = [
-  { icon: Heading1, label: "Titulo", action: "prefix", prefix: "# ", testId: "toolbar-h1" },
-  { icon: Heading2, label: "Subtitulo", action: "prefix", prefix: "## ", testId: "toolbar-h2" },
-  { icon: Bold, label: "Negrito", action: "wrap", wrap: "**", testId: "toolbar-bold" },
-  { icon: Italic, label: "Italico", action: "wrap", wrap: "_", testId: "toolbar-italic" },
-  { icon: Strikethrough, label: "Riscado", action: "wrap", wrap: "~~", testId: "toolbar-strike" },
-  { icon: Code, label: "Codigo", action: "wrap", wrap: "`", testId: "toolbar-code" },
-  { icon: List, label: "Lista", action: "prefix", prefix: "- ", testId: "toolbar-ul" },
-  { icon: ListOrdered, label: "Lista Numerada", action: "prefix", prefix: "1. ", testId: "toolbar-ol" },
-  { icon: CheckSquare, label: "Checklist", action: "prefix", prefix: "- [ ] ", testId: "toolbar-check" },
-  { icon: Quote, label: "Citacao", action: "prefix", prefix: "> ", testId: "toolbar-quote" },
-  { icon: Minus, label: "Separador", action: "insert", insert: "\n---\n", testId: "toolbar-hr" },
-  { icon: Link2, label: "Link", action: "insert", insert: "[texto](url)", testId: "toolbar-link" },
-];
-
-function FormattingToolbar({
-  quillRef,
-  disabled,
-  onAttach,
-  isUploading,
-  dataTestId,
-}: {
-  quillRef: React.RefObject<ReactQuill | null>;
-  disabled: boolean;
-  onAttach: () => void;
-  isUploading: boolean;
-  dataTestId?: string;
-}) {
-  const applyFormat = useCallback((action: ToolbarAction) => {
-    const quill = quillRef.current?.getEditor();
-    if (!quill) return;
-
-    const range = quill.getSelection();
-    if (!range) return;
-
-    if (action.action === "wrap" && action.wrap) {
-      const format = action.wrap === "**" ? "bold" : action.wrap === "_" ? "italic" : action.wrap === "~~" ? "strike" : "code";
-      quill.format(format, !quill.getFormat(range)[format]);
-    } else if (action.action === "prefix" && action.prefix) {
-      if (action.prefix === "# ") {
-        quill.format("header", quill.getFormat(range).header === 1 ? false : 1);
-      } else if (action.prefix === "## ") {
-        quill.format("header", quill.getFormat(range).header === 2 ? false : 2);
-      } else if (action.prefix === "- ") {
-        quill.format("list", quill.getFormat(range).list === "bullet" ? false : "bullet");
-      } else if (action.prefix === "1. ") {
-        quill.format("list", quill.getFormat(range).list === "ordered" ? false : "ordered");
-      } else if (action.prefix === "- [ ] ") {
-        // Quill doesn't have native checklist, this would require custom blot
-        // For now, we can insert the text directly
-        quill.insertText(range.index, action.prefix);
-        quill.setSelection(range.index + action.prefix.length);
-      } else if (action.prefix === "> ") {
-        quill.format("blockquote", !quill.getFormat(range).blockquote);
-      }
-    } else if (action.action === "insert" && action.insert) {
-      quill.insertText(range.index, action.insert);
-      quill.setSelection(range.index + action.insert.length);
-    }
-  }, [quillRef]);
-
-  return (
-    <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-border bg-muted/30 rounded-t-md overflow-visible flex-wrap" data-testid={dataTestId ? `${dataTestId}-toolbar` : "formatting-toolbar"}>
-      {TOOLBAR_ACTIONS.map((action, idx) => {
-        const Icon = action.icon;
-        const showSep = idx === 1 || idx === 5 || idx === 8 || idx === 9;
-        return (
-          <span key={action.testId} className="contents">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="no-default-hover-elevate no-default-active-elevate [&]:h-7 [&]:w-7 text-muted-foreground"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => applyFormat(action)}
-                  disabled={disabled}
-                  data-testid={action.testId}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                {action.label}
-              </TooltipContent>
-            </Tooltip>
-            {showSep && <div className="w-px h-4 bg-border mx-0.5 shrink-0" />}
-          </span>
-        );
-      })}
-      <div className="w-px h-4 bg-border mx-0.5 shrink-0" />
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="no-default-hover-elevate no-default-active-elevate [&]:h-7 [&]:w-7 text-muted-foreground"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={onAttach}
-            disabled={disabled || isUploading}
-            data-testid={dataTestId ? `${dataTestId}-upload-btn` : "toolbar-attach"}
-          >
-            {isUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paperclip className="h-3.5 w-3.5" />}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">Anexar Arquivo</TooltipContent>
-      </Tooltip>
-    </div>
-  );
-}
-
 export function RichTextarea({
   value,
   onChange,
@@ -210,7 +80,6 @@ export function RichTextarea({
   onImagesChange,
   placeholder,
   disabled = false,
-  showToolbar = true,
   className: externalClassName,
   "data-testid": dataTestId,
 }: RichTextareaProps) {
@@ -226,7 +95,7 @@ export function RichTextarea({
       container: [
         [{ 'header': [1, 2, false] }],
         ['bold', 'italic', 'strike', 'code'],
-        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],  // Ordem correta: ordered (1.) primeiro, bullet (•) depois
         ['blockquote'],
         ['link'],
         ['clean']
@@ -395,28 +264,17 @@ export function RichTextarea({
     }
   }, []);
 
-  const toolbarVisible = showToolbar && (isFocused || value.length > 0 || images.length > 0);
-
   return (
     <div className="space-y-2">
       <div 
         ref={containerRef}
         className={cn(
           "relative border rounded-md transition-all",
-          toolbarVisible ? "border-primary/50 ring-1 ring-primary/20" : "border-input",
+          isFocused ? "border-primary/50 ring-1 ring-primary/20" : "border-input",
           disabled && "opacity-60"
         )}
         onBlur={handleBlur}
       >
-        {toolbarVisible && (
-          <FormattingToolbar
-            quillRef={quillRef}
-            disabled={disabled}
-            onAttach={() => fileInputRef.current?.click()}
-            isUploading={isUploading}
-            dataTestId={dataTestId}
-          />
-        )}
         <ReactQuill
           ref={quillRef}
           theme="snow"
@@ -430,7 +288,6 @@ export function RichTextarea({
           formats={formats}
           className={cn(
             "quill-editor border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
-            toolbarVisible ? "rounded-t-none" : "",
             externalClassName
           )}
           data-testid={dataTestId}
@@ -463,7 +320,7 @@ export function RichTextarea({
             <span className="ml-1">Anexar</span>
           </Button>
         </div>
-        <span className={cn("text-[10px] text-muted-foreground", toolbarVisible && "ml-auto")}>
+        <span className={cn("text-[10px] text-muted-foreground", "ml-auto")}>
           {value.length}
         </span>
       </div>
