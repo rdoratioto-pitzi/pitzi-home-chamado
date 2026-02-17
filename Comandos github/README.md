@@ -6,7 +6,21 @@ Este guia contém todos os comandos essenciais do Git para trabalhar com o repos
 
 ---
 
-## 📋 Índice de Comandos
+## 📚 Ordem de Leitura Recomendada
+
+1. **00-regras-seguranca.md** ⚠️ LEIA PRIMEIRO!
+2. 05-status.md (verificar estado)
+3. 01-pull.md (atualizar antes de trabalhar)
+4. 03-commit.md (salvar mudanças)
+5. 02-push.md (enviar para repositório)
+6. 04-branch.md (trabalhar em features)
+7. 06-merge.md (integrar mudanças)
+8. 07-log.md (ver histórico)
+9. 08-stash.md (guardar mudanças temporariamente)
+
+---
+
+## � Índice de Comandos
 
 | # | Comando | Arquivo | Descrição |
 |---|---------|---------|-----------|
