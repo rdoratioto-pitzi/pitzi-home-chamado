@@ -9,3 +9,29 @@ vite.config.ts.*
 .env
 .env.local
 .env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+server.pid
+
+# OS
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Uploads de usuários (não versionar)
+uploads/
+screenshots/
+
+# Build
+.next/
+build/
+
+# Cache
+.cache/
+.parcel-cache/
