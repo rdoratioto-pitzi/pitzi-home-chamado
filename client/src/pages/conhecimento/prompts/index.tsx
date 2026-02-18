@@ -5,13 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Bot, Wrench, Code, Database } from "lucide-react";
+import { Bot, Wrench, Code, Database, RefreshCw } from "lucide-react";
 import type { PromptLibrary } from "@shared/schema";
 
 export default function PromptsPage() {
   const { toast } = useToast();
   const [prompts, setPrompts] = useState<PromptLibrary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +37,33 @@ export default function PromptsPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const syncPrompts = async () => {
+    try {
+      setSyncing(true);
+      const response = await fetch('/api/prompts/sync', { method: 'POST' });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao sincronizar');
+      }
+      const result = await response.json();
+      
+      toast({
+        title: "Sincronização concluída!",
+        description: `${result.created} criados, ${result.updated} atualizados`,
+      });
+      
+      await loadPrompts(); // Recarregar lista
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível sincronizar.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -74,6 +102,17 @@ export default function PromptsPage() {
       <PageHeader
         title="Biblioteca de Prompts"
         description="Prompts prontos para usar com Claude Code."
+        actions={
+          <Button 
+            onClick={syncPrompts} 
+            variant="outline" 
+            size="sm"
+            disabled={syncing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? "Sincronizando..." : "Sincronizar GitHub"}
+          </Button>
+        }
       />
 
       <div className="flex gap-2 flex-wrap">
