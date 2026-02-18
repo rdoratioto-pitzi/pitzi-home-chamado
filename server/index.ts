@@ -4,8 +4,8 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase } from "./seed";
 import { setupSession, requireAuth } from "./auth";
-import { startPromptsSyncJob } from "./jobs/prompts-sync.job";
 import { startRecurrenceJob } from "./jobs/recurrence.job";
+import { storage } from "./storage";
 
 /**
  * --------------------------------------------------
@@ -189,11 +189,33 @@ export const asyncHandler =
         port,
         host: "0.0.0.0",
       },
-      () => {
+      async () => {
         log(`serving on port ${port}`);
 
-        startPromptsSyncJob();
+        // Iniciar cron job de recorrência
         startRecurrenceJob();
+
+        // Verificar se a tabela de prompts está vazia e executar sincronização inicial
+        // Usando importação dinâmica para evitar erros de módulo na inicialização
+        try {
+          const { startPromptsSyncJob, runPromptsSyncNow } = await import("./jobs/prompts-sync.job");
+          
+          // Iniciar cron job de prompts
+          startPromptsSyncJob();
+          
+          // Verificar se precisa de sincronização inicial
+          const stats = await storage.getPromptStats();
+          if (stats.total === 0) {
+            log("[Prompts] Tabela vazia, executando primeira sincronização...", "prompts-sync");
+            const result = await runPromptsSyncNow();
+            log(`[Prompts] Sincronização inicial concluída: ${result.created} criados, ${result.updated} atualizados`, "prompts-sync");
+          } else {
+            log(`[Prompts] Biblioteca já possui ${stats.total} prompts`, "prompts-sync");
+          }
+        } catch (error) {
+          console.error("[Prompts] Erro na inicialização do módulo de prompts:", error);
+          console.error("[Prompts] O servidor continuará funcionando, mas a sincronização de prompts pode não estar disponível.");
+        }
       },
     );
   } catch (err) {
