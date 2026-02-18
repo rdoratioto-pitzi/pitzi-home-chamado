@@ -1184,7 +1184,8 @@ export default function TarefasPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Descrição</label>
                   <RichTextarea
-                    value={newTask.description}
+                    key={`task-description-${newTask.title || 'new'}`}
+                    value={newTask.description || ''}
                     onChange={(v) => setNewTask({ ...newTask, description: v })}
                     images={(newTask as any).attachments ? JSON.parse((newTask as any).attachments) : []}
                     onImagesChange={(imgs) => setNewTask({ ...newTask, attachments: JSON.stringify(imgs) } as any)}
@@ -1498,7 +1499,8 @@ export default function TarefasPage() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Pauta</label>
                   <RichTextarea
-                    value={newTask.meetingData.agenda}
+                    key={`meeting-agenda-${newTask.title || 'new'}`}
+                    value={newTask.meetingData.agenda || ''}
                     onChange={(v) => setNewTask({ 
                       ...newTask, 
                       meetingData: { 

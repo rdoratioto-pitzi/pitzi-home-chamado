@@ -59,7 +59,9 @@ import {
   insertImeiInfoAlertSchema,
 } from "@shared/schema";
 import { z } from "zod";
-import { sql } from "drizzle-orm";
+import { sql, eq, or, and } from "drizzle-orm";
+import { tasks } from "@shared/schema";
+import { db } from "./db";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1683,41 +1685,92 @@ export async function registerRoutes(
   // ============== TASKS ==============
   app.get("/api/tasks", async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
-    const filters = {
-      tagId: req.query.tagId as string | undefined,
-      status: req.query.status as string | undefined,
-      assigneeId: req.query.assignee_id as string | undefined,
-      createdBy: req.query.created_by as string | undefined,
-      type: req.query.type as string | undefined,
-    };
-    const tasks = await storage.getTasks(filters);
 
-    // Admin vê tudo
-    if (isAdmin) return res.json(tasks);
+    // TODOS os usuários (incluindo admin) seguem a mesma regra de segurança:
+    // Ver apenas tarefas próprias, atribuídas, ou shared/public em áreas acessíveis
 
-    // Filtragem para usuários comuns:
-    // 1. Tarefas criadas pelo usuário
-    // 2. Tarefas atribuídas ao usuário (assigneeId ou na lista de assigneeIds)
-    // 3. Tarefas em áreas que o usuário tem acesso
+    // Usuários comuns: filtro de segurança no banco
+    // Retorna: próprias tarefas + tarefas shared/public de áreas acessíveis
     const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
-    const filtered = tasks.filter(t => {
-      const isCreator = t.createdBy === userId;
-      const isAssignee = t.assigneeId === userId;
 
-      let isMultiAssignee = false;
-      if (t.assigneeIds) {
-        try {
-          const ids = typeof t.assigneeIds === 'string' ? JSON.parse(t.assigneeIds) : t.assigneeIds;
-          if (Array.isArray(ids)) isMultiAssignee = ids.includes(userId);
-        } catch (e) { }
-      }
+    // Construir query segura diretamente no banco
+    let query = db.select().from(tasks);
+    const conditions = [];
 
-      const hasAreaAccess = t.tagId ? accessibleAreaIds.includes(t.tagId) : false;
+    // Aplicar filtros de query string
+    if (req.query.tagId) conditions.push(eq(tasks.tagId, req.query.tagId as string));
+    if (req.query.status) conditions.push(eq(tasks.status, req.query.status as string));
+    if (req.query.assignee_id) conditions.push(eq(tasks.assigneeId, req.query.assignee_id as string));
+    if (req.query.created_by) conditions.push(eq(tasks.createdBy, req.query.created_by as string));
+    if (req.query.type) conditions.push(eq(tasks.type, req.query.type as string));
 
-      return isCreator || isAssignee || isMultiAssignee || hasAreaAccess;
+    // FILTRO DE SEGURANÇA CRÍTICO:
+    // Usuário vê apenas:
+    // 1. Tarefas criadas por ele (próprias)
+    // 2. Tarefas atribuídas a ele
+    // 3. Tarefas compartilhadas (shared) ou públicas (public) em áreas acessíveis
+    const securityConditions = [
+      eq(tasks.createdBy, userId), // próprias tarefas
+      eq(tasks.assigneeId, userId), // atribuídas a ele
+    ];
+
+    // Adicionar condição para tarefas shared/public em áreas acessíveis
+    if (accessibleAreaIds.length > 0) {
+      securityConditions.push(
+        and(
+          or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public')),
+          sql`${tasks.tagId} = ANY(${accessibleAreaIds})`
+        )
+      );
+    } else {
+      // Sem acesso a áreas, só vê próprias e atribuídas
+      securityConditions.push(
+        and(
+          or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public')),
+          sql`FALSE` // nenhuma área acessível
+        )
+      );
+    }
+
+    conditions.push(or(...securityConditions));
+
+    const userTasks = await query.where(and(...conditions));
+
+    // Filtrar por multi-assignee em memória (não é possível fazer no SQL diretamente)
+    const multiAssigneeTasks = await db.select().from(tasks).where(
+      and(
+        sql`${tasks.assigneeIds} IS NOT NULL`,
+        or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public'))
+      )
+    );
+
+    const filteredMultiAssignee = multiAssigneeTasks.filter(t => {
+      if (!t.assigneeIds) return false;
+      try {
+        const ids = typeof t.assigneeIds === 'string' ? JSON.parse(t.assigneeIds) : t.assigneeIds;
+        return Array.isArray(ids) && ids.includes(userId);
+      } catch (e) { return false; }
     });
 
-    res.json(filtered);
+    // Combinar resultados sem duplicatas
+    const taskMap = new Map();
+    userTasks.forEach(t => taskMap.set(t.id, t));
+    filteredMultiAssignee.forEach(t => taskMap.set(t.id, t));
+    const finalTasks = Array.from(taskMap.values());
+
+    // Logs de auditoria
+    const ownTasks = finalTasks.filter(t => t.createdBy === userId).length;
+    const assignedTasks = finalTasks.filter(t => t.assigneeId === userId).length;
+    const sharedTasks = finalTasks.filter(t => t.visibility === 'shared' && t.createdBy !== userId).length;
+    const publicTasks = finalTasks.filter(t => t.visibility === 'public' && t.createdBy !== userId).length;
+
+    console.log(`[AUDIT] User ${userId} acessou ${finalTasks.length} tarefas:`);
+    console.log(`[AUDIT]   - Próprias: ${ownTasks}`);
+    console.log(`[AUDIT]   - Atribuídas: ${assignedTasks}`);
+    console.log(`[AUDIT]   - Compartilhadas: ${sharedTasks}`);
+    console.log(`[AUDIT]   - Públicas: ${publicTasks}`);
+
+    res.json(finalTasks);
   });
 
   app.get("/api/tasks/:id", async (req, res) => {

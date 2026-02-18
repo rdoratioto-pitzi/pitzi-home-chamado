@@ -58,6 +58,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Task, TaskComment, TaskArea, User as UserType } from "@shared/schema";
 
+// Função para remover tags HTML e retornar texto puro
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  const tmp = document.createElement('DIV');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
 const statusConfig = {
   todo: { label: "Agendada", icon: Circle, color: "bg-gray-100 text-gray-700" },
   doing: { label: "Em Andamento", icon: Clock, color: "bg-blue-100 text-blue-700" },
@@ -568,9 +576,15 @@ export default function MeetingDetailPage() {
                   />
                 ) : (
                   <div className="mt-1 space-y-4">
-                    <div className="whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                      {editedMeetingData.agenda || <span className="text-muted-foreground">Nenhuma pauta definida</span>}
-                    </div>
+                    {editedMeetingData.agenda ? (
+                      <div 
+                        className="prose prose-sm max-w-none break-words overflow-hidden"
+                        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                        dangerouslySetInnerHTML={{ __html: editedMeetingData.agenda }}
+                      />
+                    ) : (
+                      <span className="text-muted-foreground">Nenhuma pauta definida</span>
+                    )}
                     {editedMeetingData.agendaImages && editedMeetingData.agendaImages.length > 0 && (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
                         {editedMeetingData.agendaImages.map((url, i) => (
