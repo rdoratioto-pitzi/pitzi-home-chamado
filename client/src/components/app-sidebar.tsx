@@ -150,12 +150,30 @@ const conhecimentoSubItems = [
 
 function getCurrentUser() {
   try {
-    const userStr = sessionStorage.getItem("user");
-    if (userStr) {
-      return JSON.parse(userStr);
+    // Primeiro tenta buscar do localStorage (novo sistema de auth)
+    const localStorageUser = localStorage.getItem("user_data");
+    if (localStorageUser) {
+      const user = JSON.parse(localStorageUser);
+      // Padroniza verificação de isAdmin
+      if (user) {
+        const adminValue = user.isAdmin ?? user.is_admin;
+        user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
+      }
+      return user;
+    }
+    
+    // Fallback para sessionStorage (compatibilidade com sistema antigo)
+    const sessionUserStr = sessionStorage.getItem("user");
+    if (sessionUserStr) {
+      const user = JSON.parse(sessionUserStr);
+      if (user) {
+        const adminValue = user.isAdmin ?? user.is_admin;
+        user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
+      }
+      return user;
     }
   } catch (e) {
-    console.error("Error parsing user from session:", e);
+    console.error("Error parsing user from storage:", e);
   }
   return null;
 }
@@ -249,10 +267,11 @@ export function AppSidebar() {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch { }
+    // Usa clearAuth do novo sistema de autenticação
+    const { clearAuth } = await import("@/lib/auth");
+    clearAuth();
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("modulePermissions");
-    localStorage.removeItem("user");
-    localStorage.removeItem("modulePermissions");
     toast({
       title: "Saindo...",
       description: "Você foi desconectado com sucesso.",
@@ -568,10 +587,11 @@ export function UserProfileMenu() {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch { }
+    // Usa clearAuth do novo sistema de autenticação
+    const { clearAuth } = await import("@/lib/auth");
+    clearAuth();
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("modulePermissions");
-    localStorage.removeItem("user");
-    localStorage.removeItem("modulePermissions");
     toast({
       title: "Saindo...",
       description: "Você foi desconectado com sucesso.",
