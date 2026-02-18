@@ -7,6 +7,26 @@ import { setupSession, requireAuth } from "./auth";
 import { startPromptsSyncJob } from "./jobs/prompts-sync.job";
 import { startRecurrenceJob } from "./jobs/recurrence.job";
 
+/**
+ * --------------------------------------------------
+ * GLOBAL ERROR CAPTURE (elimina erros silenciosos)
+ * --------------------------------------------------
+ */
+process.on("unhandledRejection", (reason: any) => {
+  console.error("🚨 UNHANDLED REJECTION");
+  console.error(reason);
+});
+
+process.on("uncaughtException", (error: any) => {
+  console.error("🚨 UNCAUGHT EXCEPTION");
+  console.error(error);
+});
+
+/**
+ * --------------------------------------------------
+ * APP INIT
+ * --------------------------------------------------
+ */
 const app = express();
 const httpServer = createServer(app);
 
@@ -16,6 +36,11 @@ declare module "http" {
   }
 }
 
+/**
+ * --------------------------------------------------
+ * BODY PARSERS
+ * --------------------------------------------------
+ */
 app.use(
   express.json({
     limit: "50mb",
@@ -27,9 +52,27 @@ app.use(
 
 app.use(express.urlencoded({ limit: "50mb", extended: false }));
 
+/**
+ * --------------------------------------------------
+ * SESSION + AUTH
+ * --------------------------------------------------
+ */
 setupSession(app);
-app.use(requireAuth);
 
+// Protege tudo depois disso
+app.use((req, res, next) => {
+  try {
+    requireAuth(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * --------------------------------------------------
+ * LOGGER
+ * --------------------------------------------------
+ */
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -44,7 +87,7 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let capturedJsonResponse: Record<string, any> | undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -54,9 +97,11 @@ app.use((req, res, next) => {
 
   res.on("finish", () => {
     const duration = Date.now() - start;
+
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
+
+      if (capturedJsonResponse && res.statusCode >= 400) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
 
@@ -67,53 +112,92 @@ app.use((req, res, next) => {
   next();
 });
 
+/**
+ * --------------------------------------------------
+ * ASYNC WRAPPER (use nas rotas)
+ * --------------------------------------------------
+ */
+export const asyncHandler =
+  (fn: any) =>
+  (req: Request, res: Response, next: NextFunction) =>
+    Promise.resolve(fn(req, res, next)).catch(next);
+
+/**
+ * --------------------------------------------------
+ * BOOTSTRAP
+ * --------------------------------------------------
+ */
 (async () => {
-  // Seed database with initial data if not exists
-  await seedDatabase();
+  try {
+    await seedDatabase();
+    await registerRoutes(httpServer, app);
 
-  await registerRoutes(httpServer, app);
+    /**
+     * ----------------------------------------------
+     * ERROR MIDDLEWARE (sempre por último)
+     * ----------------------------------------------
+     */
+    app.use(
+      (err: any, req: Request, res: Response, next: NextFunction) => {
+        const status = err.status || err.statusCode || 500;
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+        console.error("=================================");
+        console.error("🔥 ERROR OCCURRED");
+        console.error("Route:", req.method, req.originalUrl);
+        console.error("Status:", status);
+        console.error("Body:", req.body);
+        console.error("Params:", req.params);
+        console.error("Query:", req.query);
+        console.error("Stack:", err.stack || err);
+        console.error("=================================");
 
-    console.error("Internal Server Error:", err);
+        if (res.headersSent) {
+          return next(err);
+        }
 
-    if (res.headersSent) {
-      return next(err);
+        return res.status(status).json({
+          success: false,
+          message:
+            process.env.NODE_ENV === "production"
+              ? "Internal Server Error"
+              : err.message,
+        });
+      },
+    );
+
+    /**
+     * ----------------------------------------------
+     * STATIC / VITE
+     * ----------------------------------------------
+     */
+    if (process.env.NODE_ENV === "production") {
+      serveStatic(app);
+    } else {
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
     }
 
-    return res.status(status).json({ message });
-  });
+    /**
+     * ----------------------------------------------
+     * SERVER START
+     * ----------------------------------------------
+     */
+    const port = parseInt(process.env.PORT || "5050", 10);
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+    httpServer.listen(
+      {
+        port,
+        host: "0.0.0.0",
+      },
+      () => {
+        log(`serving on port ${port}`);
+
+        startPromptsSyncJob();
+        startRecurrenceJob();
+      },
+    );
+  } catch (err) {
+    console.error("❌ FATAL BOOT ERROR:", err);
+    process.exit(1);
   }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5050", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-    },
-    () => {
-      log(`serving on port ${port}`);
-      
-      // Start prompts sync job (daily at 03:00)
-      startPromptsSyncJob();
-      
-      // Start recurrence job (every hour at minute 15)
-      startRecurrenceJob();
-    },
-  );
 })();
