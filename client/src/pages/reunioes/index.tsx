@@ -149,7 +149,7 @@ export default function ReunioesPage() {
   const { data: allMeetings = [] } = useQuery<Task[]>({
     queryKey: ["/api/tasks", "meetings", "all"],
     queryFn: async () => {
-      const res = await fetch("/api/tasks?type=meeting_note");
+      const res = await fetch("/api/tasks");
       if (!res.ok) throw new Error("Failed to fetch meetings");
       return res.json();
     },
@@ -160,8 +160,8 @@ export default function ReunioesPage() {
     queryKey: ["/api/tasks", selectedAreaId],
     queryFn: async () => {
       const url = selectedAreaId 
-        ? `/api/tasks?tagId=${selectedAreaId}&type=meeting_note` 
-        : "/api/tasks?type=meeting_note";
+        ? `/api/tasks?tagId=${selectedAreaId}` 
+        : "/api/tasks";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
