@@ -56,7 +56,7 @@ import {
   insertAiMessageSchema,
   insertNotificationSchema,
   insertUpdateSchema,
-  insertImeiInfoAlertSchema,
+  insertPricingAlertSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sql, eq, or, and } from "drizzle-orm";
@@ -1719,7 +1719,7 @@ export async function registerRoutes(
       securityConditions.push(
         and(
           or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public')),
-          sql`${tasks.tagId} = ANY(${accessibleAreaIds})`
+          sql`${tasks.tagId} = ANY(${Array.isArray(accessibleAreaIds) ? accessibleAreaIds : []}::text[])`
         )
       );
     } else {

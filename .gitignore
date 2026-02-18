@@ -35,3 +35,7 @@ build/
 # Cache
 .cache/
 .parcel-cache/
+cookies.txt
+*.png
+db.sqlite
+null
