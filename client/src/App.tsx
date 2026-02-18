@@ -9,6 +9,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ProtectedRoute } from "@/components/protected-route";
 import NotFound from "@/pages/not-found";
+import { useAuthSync } from "@/hooks/useAuthSync";
 import Home from "@/pages/home";
 import ChamadosPage from "@/pages/chamados/index";
 import ProjetosPage from "@/pages/projetos/index";
@@ -282,7 +283,7 @@ function App() {
   const isLoginPage = location === "/login";
   
   // Hook para sincronização de autenticação entre abas
-  const { isAuthenticated } = require("@/hooks/useAuthSync").useAuthSync();
+  const { isAuthenticated } = useAuthSync();
 
   useEffect(() => {
     // Verifica autenticação usando localStorage (novo sistema)
@@ -290,7 +291,7 @@ function App() {
     if (!user && !isLoginPage) {
       setLocation("/login");
     }
-  }, [location, isLoginPage, setLocation]);
+  }, [location, isLoginPage, setLocation, isAuthenticated]);
 
   const sidebarStyle = {
     "--sidebar-width": "16rem",
