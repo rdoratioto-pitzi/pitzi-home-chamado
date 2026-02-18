@@ -1719,7 +1719,7 @@ export async function registerRoutes(
       securityConditions.push(
         and(
           or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public')),
-          sql`${tasks.tagId} = ANY(${Array.isArray(accessibleAreaIds) ? accessibleAreaIds : []}::text[])`
+          or(...accessibleAreaIds.map(areaId => eq(tasks.tagId, areaId)))
         )
       );
     } else {
