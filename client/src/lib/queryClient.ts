@@ -1,8 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { clearAuth, getAuthToken } from "./auth";
 
 function handleUnauthorized() {
-  sessionStorage.removeItem("user");
-  sessionStorage.removeItem("modulePermissions");
+  // Limpa dados de autenticação do localStorage
+  clearAuth();
+  
+  // Redireciona para login se não estiver lá
   if (window.location.pathname !== "/login") {
     window.location.href = "/login";
   }

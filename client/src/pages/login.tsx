@@ -127,9 +127,13 @@ export default function LoginPage() {
       if (result.success) {
         setLoginSuccess(true);
         
-        // Store user data
-        sessionStorage.setItem("user", JSON.stringify(result.user));
-        sessionStorage.setItem("modulePermissions", result.user.modulePermissions || "{}");
+        // Store user data and token in localStorage for multi-tab persistence
+        // Import saveAuth from auth library
+        const { saveAuth } = await import("@/lib/auth");
+        saveAuth({
+          token: result.token || `session_${result.user.id}_${Date.now()}`,
+          user: result.user
+        });
         
         // Show success animation before redirect
         setTimeout(() => {
@@ -137,17 +141,17 @@ export default function LoginPage() {
           setLocation("/");
         }, 800);
       } else {
-        toast({ 
-          title: "Erro no login", 
+        toast({
+          title: "Erro no login",
           description: result.message || "Email ou senha incorretos",
-          variant: "destructive" 
+          variant: "destructive"
         });
       }
     } catch (error: any) {
-      toast({ 
-        title: "Erro no login", 
+      toast({
+        title: "Erro no login",
         description: "Email ou senha incorretos",
-        variant: "destructive" 
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);

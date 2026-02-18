@@ -249,10 +249,11 @@ export function AppSidebar() {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch { }
+    // Usa clearAuth do novo sistema de autenticação
+    const { clearAuth } = await import("@/lib/auth");
+    clearAuth();
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("modulePermissions");
-    localStorage.removeItem("user");
-    localStorage.removeItem("modulePermissions");
     toast({
       title: "Saindo...",
       description: "Você foi desconectado com sucesso.",
@@ -568,10 +569,11 @@ export function UserProfileMenu() {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
     } catch { }
+    // Usa clearAuth do novo sistema de autenticação
+    const { clearAuth } = await import("@/lib/auth");
+    clearAuth();
     sessionStorage.removeItem("user");
     sessionStorage.removeItem("modulePermissions");
-    localStorage.removeItem("user");
-    localStorage.removeItem("modulePermissions");
     toast({
       title: "Saindo...",
       description: "Você foi desconectado com sucesso.",
