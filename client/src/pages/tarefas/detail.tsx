@@ -52,6 +52,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import type { Task, TaskComment, TaskReaction, TaskArea, User as UserType } from "@shared/schema";
 
+// Função para remover tags HTML e retornar texto puro
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  const tmp = document.createElement('DIV');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
 const statusConfig = {
   todo: { label: "A Fazer", icon: Circle, color: "bg-gray-100 text-gray-700" },
   doing: { label: "Em Andamento", icon: Clock, color: "bg-blue-100 text-blue-700" },
@@ -465,20 +473,25 @@ export default function TaskDetailPage() {
             <h3 className="font-medium mb-3">Descrição</h3>
             {isEditing ? (
               <RichTextarea
-                value={editedTask.description || ""}
+                key={`task-edit-${task.id}`}
+                value={editedTask.description || ''}
                 onChange={(value) => setEditedTask({ ...editedTask, description: value })}
                 images={editedAttachments}
                 onImagesChange={setEditedAttachments}
                 placeholder="Adicione uma descrição..."
-                rows={4}
-                maxLength={5000}
                 data-testid="input-edit-description"
               />
             ) : (
               <div>
-                <p className="text-muted-foreground whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                  {task.description || "Nenhuma descrição"}
-                </p>
+                {task.description ? (
+                  <div 
+                    className="text-muted-foreground prose prose-sm max-w-none break-words overflow-hidden"
+                    style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                    dangerouslySetInnerHTML={{ __html: task.description }}
+                  />
+                ) : (
+                  <p className="text-muted-foreground">Nenhuma descrição</p>
+                )}
                 {task.attachments && JSON.parse(task.attachments).length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3">
                     {JSON.parse(task.attachments).map((url: string, index: number) => (
@@ -606,8 +619,16 @@ export default function TaskDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-1 whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                      {editedMeetingData.agenda || <span className="text-muted-foreground">Nenhuma pauta definida</span>}
+                    <div>
+                      {editedMeetingData.agenda ? (
+                        <div 
+                          className="mt-1 prose prose-sm max-w-none break-words overflow-hidden"
+                          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                          dangerouslySetInnerHTML={{ __html: editedMeetingData.agenda }}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground">Nenhuma pauta definida</span>
+                      )}
                     </div>
                   )}
                 </div>

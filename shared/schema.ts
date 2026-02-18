@@ -429,6 +429,7 @@ export const tasks = pgTable("tasks", {
   recurrenceWeekdays: text("recurrence_weekdays"), // JSON array of weekday numbers [1,2,3,4,5] for Mon-Fri
   recurrenceEndDate: timestamp("recurrence_end_date"),
   parentTaskId: varchar("parent_task_id"), // Reference to template/parent for recurring instances
+  visibility: text("visibility").notNull().default("private"), // 'private' | 'shared' | 'public'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -186,7 +186,7 @@ export interface IStorage {
 
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
-  getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean }): Promise<Task[]>;
+  getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string }): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<boolean>;
@@ -880,7 +880,7 @@ export class DatabaseStorage implements IStorage {
     const [t] = await db.select().from(tasks).where(eq(tasks.id, id));
     return t;
   }
-  async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean }): Promise<Task[]> {
+  async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string }): Promise<Task[]> {
     if (!db) return [];
     let baseQuery = db.select().from(tasks);
     const conditions = [];
@@ -892,6 +892,7 @@ export class DatabaseStorage implements IStorage {
     if (filters?.createdBy) conditions.push(eq(tasks.createdBy, filters.createdBy));
     if (filters?.type) conditions.push(eq(tasks.type, filters.type));
     if (filters?.isRecurring !== undefined) conditions.push(eq(tasks.isRecurring, filters.isRecurring));
+    if (filters?.visibility) conditions.push(eq(tasks.visibility, filters.visibility));
 
     if (conditions.length > 0) {
       return await baseQuery.where(and(...conditions));

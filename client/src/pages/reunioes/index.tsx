@@ -39,6 +39,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import type { TaskArea, Task } from "@shared/schema";
 
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  const tmp = document.createElement('DIV');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
 const statusConfig = {
   todo: { label: "Agendada", icon: Circle, color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
   doing: { label: "Em Andamento", icon: Clock, color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" },
@@ -991,7 +998,7 @@ export default function ReunioesPage() {
                             >
                               {meetingData.agenda ? (
                                 <div className="line-clamp-2 whitespace-pre-wrap">
-                                  {meetingData.agenda}
+                                  {stripHtml(meetingData.agenda)}
                                 </div>
                               ) : (
                                 <span className="italic text-xs flex items-center gap-1">
@@ -1715,9 +1722,10 @@ export default function ReunioesPage() {
                   {meetingData.agenda && (
                     <div className="text-left mt-8 p-6 bg-muted rounded-lg">
                       <h3 className="text-xl font-semibold mb-4">📋 Pauta da Reunião</h3>
-                      <div className="whitespace-pre-wrap text-lg">
-                        {meetingData.agenda}
-                      </div>
+                      <div 
+                        className="prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: meetingData.agenda }}
+                      />
                     </div>
                   )}
                   
