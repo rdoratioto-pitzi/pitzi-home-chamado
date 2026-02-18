@@ -1,0 +1,89 @@
+commit 41ae393af2c5cb564a0a43b2ac50cedfb0ef9a1b
+Author: Macbook M2 de Matheus <macbookm2@192.168.0.37>
+Date:   Tue Feb 17 23:03:42 2026 -0300
+
+    fix(tarefas+reunioes): corrige segurança e renderização HTML
+    
+    Segurança:
+    - Admin não vê mais tarefas privadas de usuários
+    - Filtros aplicados para todos (campo visibility)
+    - Logs de auditoria adicionados
+    
+    Renderização:
+    - stripHtml nos cards de lista (remove tags HTML)
+    - dangerouslySetInnerHTML no detail view (mantém formatação)
+    - Aplicado em Tarefas e Reuniões
+    
+    Backend:
+    - Campo visibility em tasks (private/shared/public)
+    - Migração SQL criada e executada
+    - Query de tasks filtrada por segurança
+    
+    Arquivos: 6 alterados (tarefas/index.tsx, reunioes/index.tsx, storage.ts,
+    schema.ts, routes.ts, migração)
+
+diff --git a/client/src/pages/reunioes/index.tsx b/client/src/pages/reunioes/index.tsx
+index c7a9238..3f892f7 100644
+--- a/client/src/pages/reunioes/index.tsx
++++ b/client/src/pages/reunioes/index.tsx
+@@ -39,6 +39,13 @@ import { useToast } from "@/hooks/use-toast";
+ import { useLocation } from "wouter";
+ import type { TaskArea, Task } from "@shared/schema";
+ 
++function stripHtml(html: string | null | undefined): string {
++  if (!html) return '';
++  const tmp = document.createElement('DIV');
++  tmp.innerHTML = html;
++  return tmp.textContent || tmp.innerText || '';
++}
++
+ const statusConfig = {
+   todo: { label: "Agendada", icon: Circle, color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+   doing: { label: "Em Andamento", icon: Clock, color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" },
+@@ -991,7 +998,7 @@ export default function ReunioesPage() {
+                             >
+                               {meetingData.agenda ? (
+                                 <div className="line-clamp-2 whitespace-pre-wrap">
+-                                  {meetingData.agenda}
++                                  {stripHtml(meetingData.agenda)}
+                                 </div>
+                               ) : (
+                                 <span className="italic text-xs flex items-center gap-1">
+@@ -1715,9 +1722,10 @@ export default function ReunioesPage() {
+                   {meetingData.agenda && (
+                     <div className="text-left mt-8 p-6 bg-muted rounded-lg">
+                       <h3 className="text-xl font-semibold mb-4">📋 Pauta da Reunião</h3>
+-                      <div className="whitespace-pre-wrap text-lg">
+-                        {meetingData.agenda}
+-                      </div>
++                      <div 
++                        className="prose prose-sm max-w-none"
++                        dangerouslySetInnerHTML={{ __html: meetingData.agenda }}
++                      />
+                     </div>
+                   )}
+                   
+diff --git a/client/src/pages/tarefas/index.tsx b/client/src/pages/tarefas/index.tsx
+index 3b0b919..6dc1de7 100644
+--- a/client/src/pages/tarefas/index.tsx
++++ b/client/src/pages/tarefas/index.tsx
+@@ -1184,7 +1184,8 @@ export default function TarefasPage() {
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium">Descrição</label>
+                   <RichTextarea
+-                    value={newTask.description}
++                    key={`task-description-${newTask.title || 'new'}`}
++                    value={newTask.description || ''}
+                     onChange={(v) => setNewTask({ ...newTask, description: v })}
+                     images={(newTask as any).attachments ? JSON.parse((newTask as any).attachments) : []}
+                     onImagesChange={(imgs) => setNewTask({ ...newTask, attachments: JSON.stringify(imgs) } as any)}
+@@ -1498,7 +1499,8 @@ export default function TarefasPage() {
+                 <div className="space-y-2">
+                   <label className="text-sm font-medium">Pauta</label>
+                   <RichTextarea
+-                    value={newTask.meetingData.agenda}
++                    key={`meeting-agenda-${newTask.title || 'new'}`}
++                    value={newTask.meetingData.agenda || ''}
+                     onChange={(v) => setNewTask({ 
+                       ...newTask, 
+                       meetingData: { 
