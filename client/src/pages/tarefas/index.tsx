@@ -182,7 +182,7 @@ export default function TarefasPage() {
   const { data: globalTasks = [] } = useQuery<Task[]>({
     queryKey: ["/api/tasks", "tasks", "all"],
     queryFn: async () => {
-      const res = await fetch("/api/tasks?type=task");
+      const res = await fetch("/api/tasks");
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
     },
@@ -192,8 +192,8 @@ export default function TarefasPage() {
     queryKey: ["/api/tasks", selectedAreaId, "tasks"],
     queryFn: async () => {
       const url = selectedAreaId 
-        ? `/api/tasks?tagId=${selectedAreaId}&type=task` 
-        : "/api/tasks?type=task";
+        ? `/api/tasks?tagId=${selectedAreaId}` 
+        : "/api/tasks";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
