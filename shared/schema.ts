@@ -1047,6 +1047,8 @@ export const updates = pgTable("updates", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
   createdBy: varchar("created_by"),
+  commitHash: text("commit_hash"),
+  author: text("author").default("Equipe técnica"),
 });
 
 export const insertUpdateSchema = createInsertSchema(updates).omit({ id: true, createdAt: true, updatedAt: true, publishedAt: true });
