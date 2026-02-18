@@ -1,8 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { clearAuth, getAuthToken } from "./auth";
 
 function handleUnauthorized() {
-  sessionStorage.removeItem("user");
-  sessionStorage.removeItem("modulePermissions");
+  // Limpa dados de autenticação do localStorage
+  clearAuth();
+  
+  // Redireciona para login se não estiver lá
   if (window.location.pathname !== "/login") {
     window.location.href = "/login";
   }
@@ -18,14 +21,63 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/**
+ * Wrapper para fetch que inclui token de autenticação automaticamente
+ * @param url - URL da requisição
+ * @param options - Opções do fetch
+ * @returns Response da requisição
+ */
+export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = getAuthToken();
+  
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> || {}),
+  };
+  
+  // Adiciona Content-Type apenas se houver body e não for FormData
+  if (options.body && !(options.body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+  
+  // Adiciona token de autorização se disponível
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  
+  const response = await fetch(url, {
+    ...options,
+    credentials: "include",
+    headers,
+  });
+
+  // Trata resposta não autorizada
+  if (response.status === 401) {
+    handleUnauthorized();
+  }
+
+  return response;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const token = getAuthToken();
+  
+  const headers: Record<string, string> = {};
+  
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -40,8 +92,17 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const token = getAuthToken();
+    
+    const headers: Record<string, string> = {};
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers,
     });
 
     if (res.status === 401) {

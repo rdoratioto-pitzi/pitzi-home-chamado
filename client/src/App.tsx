@@ -9,6 +9,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ProtectedRoute } from "@/components/protected-route";
 import NotFound from "@/pages/not-found";
+import { useAuthSync } from "@/hooks/useAuthSync";
 import Home from "@/pages/home";
 import ChamadosPage from "@/pages/chamados/index";
 import ProjetosPage from "@/pages/projetos/index";
@@ -280,13 +281,17 @@ function Router() {
 function App() {
   const [location, setLocation] = useLocation();
   const isLoginPage = location === "/login";
+  
+  // Hook para sincronização de autenticação entre abas
+  const { isAuthenticated } = useAuthSync();
 
   useEffect(() => {
-    const user = sessionStorage.getItem("user");
+    // Verifica autenticação usando localStorage (novo sistema)
+    const user = localStorage.getItem("user_data") || sessionStorage.getItem("user");
     if (!user && !isLoginPage) {
       setLocation("/login");
     }
-  }, [location, isLoginPage, setLocation]);
+  }, [location, isLoginPage, setLocation, isAuthenticated]);
 
   const sidebarStyle = {
     "--sidebar-width": "16rem",
