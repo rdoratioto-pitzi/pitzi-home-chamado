@@ -280,9 +280,13 @@ function Router() {
 function App() {
   const [location, setLocation] = useLocation();
   const isLoginPage = location === "/login";
+  
+  // Hook para sincronização de autenticação entre abas
+  const { isAuthenticated } = require("@/hooks/useAuthSync").useAuthSync();
 
   useEffect(() => {
-    const user = sessionStorage.getItem("user");
+    // Verifica autenticação usando localStorage (novo sistema)
+    const user = localStorage.getItem("user_data") || sessionStorage.getItem("user");
     if (!user && !isLoginPage) {
       setLocation("/login");
     }

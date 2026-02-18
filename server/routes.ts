@@ -155,8 +155,13 @@ export async function registerRoutes(
         req.session.cookie.maxAge = 24 * 60 * 60 * 1000;
       }
 
+      // Gera um token de sessão para sincronização entre abas
+      // O token é baseado no ID da sessão + timestamp para garantir unicidade
+      const sessionToken = `renov_${req.sessionID}_${Date.now()}`;
+
       res.json({
         success: true,
+        token: sessionToken,
         user: {
           id: user.id,
           name: user.name,

@@ -25,12 +25,23 @@ export interface CurrentUser {
 
 export function getCurrentUser(): CurrentUser | null {
   try {
-    const userStr = sessionStorage.getItem("user");
-    if (!userStr) return null;
-    const user = JSON.parse(userStr);
-    // Standardize isAdmin check - handle multiple formats
+    // Primeiro tenta buscar do localStorage (novo sistema de auth)
+    const userStr = localStorage.getItem("user_data");
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      // Padroniza verificação de isAdmin
+      if (user) {
+        const adminValue = user.isAdmin ?? user.is_admin;
+        user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
+      }
+      return user;
+    }
+    
+    // Fallback para sessionStorage (compatibilidade com sistema antigo)
+    const sessionUserStr = sessionStorage.getItem("user");
+    if (!sessionUserStr) return null;
+    const user = JSON.parse(sessionUserStr);
     if (user) {
-      // Check for is_admin (snake_case from DB) or isAdmin (camelCase from API)
       const adminValue = user.isAdmin ?? user.is_admin;
       user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
     }
