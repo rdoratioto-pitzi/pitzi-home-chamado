@@ -27,10 +27,12 @@ interface RichTextareaProps {
 }
 
 function getFileTypeFromDataUrl(url: string): "image" | "video" | "pdf" | "excel" | "document" | "other" {
+  // Garantir que url não seja null/undefined antes de usar startsWith/endsWith
+  if (!url || typeof url !== 'string') return "other";
   if (url.startsWith("data:image/")) return "image";
   if (url.startsWith("data:video/")) return "video";
   if (url.startsWith("data:application/pdf")) return "pdf";
-  if (url.startsWith("data:application/vnd.ms-excel") || 
+  if (url.startsWith("data:application/vnd.ms-excel") ||
       url.startsWith("data:application/vnd.openxmlformats-officedocument.spreadsheet") ||
       url.startsWith("data:text/csv")) return "excel";
   if (url.startsWith("data:application/vnd.openxmlformats-officedocument.wordprocessing") ||
@@ -278,7 +280,7 @@ export function RichTextarea({
         <ReactQuill
           ref={quillRef}
           theme="snow"
-          value={value}
+          value={value || ''}
           onChange={handleQuillChange}
           onFocus={handleQuillFocus}
           onBlur={handleQuillBlur}
@@ -321,7 +323,7 @@ export function RichTextarea({
           </Button>
         </div>
         <span className={cn("text-[10px] text-muted-foreground", "ml-auto")}>
-          {value.length}
+          {(value || '').length}
         </span>
       </div>
 
