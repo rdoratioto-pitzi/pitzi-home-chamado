@@ -1,41 +1,42 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Bot, Wrench, Code, Database } from "lucide-react";
-import type { PromptLibrary } from "@shared/schema";
+import { usePrompts, useSyncPrompts } from "@/hooks/use-prompts";
+import { Bot, Wrench, Code, Database, RefreshCw, Copy } from "lucide-react";
 
 export default function PromptsPage() {
   const { toast } = useToast();
-  const [prompts, setPrompts] = useState<PromptLibrary[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadPrompts();
-  }, [selectedCategory]);
+  // Usar o hook usePrompts com credenciais corretas
+  const { data: prompts = [], isLoading, refetch } = usePrompts({
+    category: selectedCategory ?? undefined,
+  });
 
-  const loadPrompts = async () => {
-    setLoading(true);
+  // Hook de sincronização
+  const syncMutation = useSyncPrompts();
+
+  const syncPrompts = async () => {
     try {
-      const url = selectedCategory 
-        ? `/api/prompts?category=${selectedCategory}`
-        : '/api/prompts';
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Erro ao carregar prompts');
-      const data = await response.json();
-      setPrompts(data);
-    } catch (error) {
+      const result = await syncMutation.mutateAsync();
+      
+      toast({
+        title: "Sincronização concluída!",
+        description: `${result.created} criados, ${result.updated} atualizados`,
+      });
+      
+      // Recarregar lista
+      await refetch();
+    } catch (error: any) {
       toast({
         title: "Erro",
-        description: "Não foi possível carregar os prompts.",
+        description: error.message || "Não foi possível sincronizar.",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -69,11 +70,29 @@ export default function PromptsPage() {
     }
   };
 
+  // Debug log
+  console.log("[PromptsPage] Dados carregados:", { 
+    promptsCount: prompts.length, 
+    isLoading,
+    selectedCategory 
+  });
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <PageHeader
         title="Biblioteca de Prompts"
         description="Prompts prontos para usar com Claude Code."
+        actions={
+          <Button 
+            onClick={syncPrompts} 
+            variant="outline" 
+            size="sm"
+            disabled={syncMutation.isPending}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+            {syncMutation.isPending ? "Sincronizando..." : "Sincronizar GitHub"}
+          </Button>
+        }
       />
 
       <div className="flex gap-2 flex-wrap">
@@ -96,12 +115,20 @@ export default function PromptsPage() {
         ))}
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-[200px]" />
           ))}
         </div>
+      ) : prompts.length === 0 ? (
+        <Card>
+          <CardContent className="pt-6 text-center">
+            <p className="text-muted-foreground">
+              Nenhum prompt encontrado. Clique em "Sincronizar GitHub" para carregar os prompts.
+            </p>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {prompts.map((prompt) => (
@@ -113,7 +140,7 @@ export default function PromptsPage() {
                   </div>
                   <div className="flex-1">
                     <Badge variant="secondary" className="mb-1">
-                      {categoryLabels[prompt.category]}
+                      {categoryLabels[prompt.category] || prompt.category}
                     </Badge>
                     <h3 className="font-semibold">{prompt.title}</h3>
                   </div>
@@ -129,6 +156,7 @@ export default function PromptsPage() {
                   className="w-full"
                   onClick={() => copyPrompt(prompt.content)}
                 >
+                  <Copy className="h-4 w-4 mr-2" />
                   Copiar Prompt
                 </Button>
               </CardContent>

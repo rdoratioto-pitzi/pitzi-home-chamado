@@ -1668,26 +1668,68 @@ export class DatabaseStorage implements IStorage {
 
   // Prompts Library
   async getPrompts(filters?: { category?: string; search?: string; onlyActive?: boolean }): Promise<PromptLibrary[]> {
-    if (!db) return [];
-    
-    let query = db.select().from(promptsLibrary);
-    
-    if (filters?.category) {
-      query = query.where(eq(promptsLibrary.category, filters.category));
+    if (!db) {
+      console.log("[Storage.getPrompts] DB não disponível");
+      return [];
     }
     
-    if (filters?.onlyActive !== false) {
-      query = query.where(eq(promptsLibrary.isActive, true));
+    try {
+      console.log("[Storage.getPrompts] Iniciando busca com filtros:", filters);
+      
+      // Primeiro, verificar o que existe no banco (debug)
+      const debugResult = await db.execute(sql`
+        SELECT COUNT(*) as total,
+               COUNT(CASE WHEN is_active = true THEN 1 END) as active_true,
+               COUNT(CASE WHEN is_active = false THEN 1 END) as active_false,
+               COUNT(CASE WHEN is_active IS NULL THEN 1 END) as active_null
+        FROM prompts_library
+      `);
+      console.log("[Storage.getPrompts] Debug - Status do banco:", debugResult.rows[0]);
+      
+      // Query simples - buscar todos os prompts sem filtro de is_active primeiro
+      const result = await db.execute(sql`
+        SELECT * FROM prompts_library
+        ORDER BY usage_count DESC
+      `);
+      
+      console.log(`[Storage.getPrompts] Query sem filtro retornou ${result.rows.length} prompts`);
+      
+      // Se não há filtros de onlyActive, mostrar todos
+      let prompts = result.rows as PromptLibrary[];
+      
+      // Filtrar apenas ativos se necessário (padrão é true)
+      // Nota: SQL retorna snake_case (is_active), não camelCase (isActive)
+      if (filters?.onlyActive !== false) {
+        prompts = prompts.filter(p => {
+          const isActive = (p as any).is_active ?? (p as any).isActive;
+          return isActive === true || isActive === 'true' || isActive === 1 || isActive === '1';
+        });
+        console.log(`[Storage.getPrompts] Após filtro is_active=true: ${prompts.length}`);
+      }
+      
+      // Aplicar filtros em memória
+      if (filters?.category) {
+        prompts = prompts.filter(p => p.category === filters.category);
+        console.log(`[Storage.getPrompts] Após filtro de categoria: ${prompts.length}`);
+      }
+      
+      if (filters?.search) {
+        const searchLower = filters.search.toLowerCase();
+        prompts = prompts.filter(p =>
+          p.title?.toLowerCase().includes(searchLower) ||
+          p.description?.toLowerCase().includes(searchLower) ||
+          p.name?.toLowerCase().includes(searchLower)
+        );
+        console.log(`[Storage.getPrompts] Após filtro de busca: ${prompts.length}`);
+      }
+      
+      console.log(`[Storage.getPrompts] Retornando ${prompts.length} prompts`);
+      
+      return prompts;
+    } catch (error) {
+      console.error("[Storage.getPrompts] Erro:", error);
+      return [];
     }
-    
-    if (filters?.search) {
-      const searchTerm = `%${filters.search}%`;
-      query = query.where(
-        sql`(${promptsLibrary.title} ILIKE ${searchTerm} OR ${promptsLibrary.description} ILIKE ${searchTerm} OR ${promptsLibrary.name} ILIKE ${searchTerm})`
-      );
-    }
-    
-    return query.orderBy(sql`${promptsLibrary.usageCount} DESC`);
   }
 
   async getPrompt(id: string): Promise<PromptLibrary | undefined> {

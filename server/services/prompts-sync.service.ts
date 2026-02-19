@@ -248,13 +248,31 @@ export class PromptsSyncService {
    */
   private async markInactivePrompts(activePaths: string[]): Promise<void> {
     if (!db) return;
-    await db
-      .update(promptsLibrary)
-      .set({
-        isActive: false,
-        updatedAt: new Date(),
-      })
-      .where(sql`${promptsLibrary.githubPath} NOT IN (${activePaths.join(",")})`);
+    if (activePaths.length === 0) return;
+    
+    // Usar parâmetros corretos para o NOT IN
+    // Primeiro, buscar todos os prompts ativos
+    const allPrompts = await db
+      .select({ id: promptsLibrary.id, githubPath: promptsLibrary.githubPath })
+      .from(promptsLibrary)
+      .where(eq(promptsLibrary.isActive, true));
+    
+    // Identificar prompts que não estão mais no repositório
+    const promptsToDeactivate = allPrompts.filter(p => !activePaths.includes(p.githubPath));
+    
+    if (promptsToDeactivate.length > 0) {
+      console.log(`[PromptsSync] Desativando ${promptsToDeactivate.length} prompts removidos do repositório`);
+      
+      for (const prompt of promptsToDeactivate) {
+        await db
+          .update(promptsLibrary)
+          .set({
+            isActive: false,
+            updatedAt: new Date(),
+          })
+          .where(eq(promptsLibrary.id, prompt.id));
+      }
+    }
   }
 
   /**
