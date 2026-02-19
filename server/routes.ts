@@ -1398,6 +1398,29 @@ export async function registerRoutes(
     res.json(filtered);
   });
 
+  // Buscar tag padrão - DEVE estar antes da rota /:id
+  app.get("/api/task-tags/default", async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      const { scope } = req.query; // 'tasks' ou 'meetings'
+
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const userTags = await storage.getTaskAreas(userId);
+      const defaultTag = userTags.find(t =>
+        t.isDefault === true &&
+        (!scope || t.scope === scope)
+      );
+
+      res.json(defaultTag || null);
+    } catch (error) {
+      console.error("Erro ao buscar tag padrão:", error);
+      res.status(500).json({ error: "Erro ao buscar tag padrão" });
+    }
+  });
+
   app.get("/api/task-tags/:id", async (req, res) => {
     const { userId } = getSessionUser(req);
     const area = await storage.getTaskArea(req.params.id);
@@ -1791,29 +1814,6 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Erro ao reordenar tags:", error);
       res.status(500).json({ error: "Erro ao reordenar tags" });
-    }
-  });
-
-  // Buscar tag padrão
-  app.get("/api/task-tags/default", async (req, res) => {
-    try {
-      const { userId } = getSessionUser(req);
-      const { scope } = req.query; // 'tasks' ou 'meetings'
-
-      if (!userId) {
-        return res.status(401).json({ error: "Não autenticado" });
-      }
-
-      const userTags = await storage.getTaskAreas(userId);
-      const defaultTag = userTags.find(t =>
-        t.isDefault === true &&
-        (!scope || t.scope === scope)
-      );
-
-      res.json(defaultTag || null);
-    } catch (error) {
-      console.error("Erro ao buscar tag padrão:", error);
-      res.status(500).json({ error: "Erro ao buscar tag padrão" });
     }
   });
 
