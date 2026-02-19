@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RichTextarea } from "@/components/rich-textarea";
+import { DataTable } from "@/components/data-table";
+import { cn } from "@/lib/utils";
 import DOMPurify from "dompurify";
 import {
   Plus,
@@ -35,7 +37,8 @@ import {
   X,
   GripVertical,
   Maximize2,
-  Star
+  Star,
+  Table
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -95,7 +98,7 @@ export default function TarefasPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list" | "kanban">("list");
+  const [viewMode, setViewMode] = useState<"table" | "grid" | "list" | "kanban">("table");
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const sidebarResizing = useRef(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -206,6 +209,100 @@ export default function TarefasPage() {
       return res.json();
     },
   });
+
+  // Definição das colunas da tabela de tarefas
+  const taskTableColumns = useMemo(() => [
+    {
+      key: 'title',
+      label: 'Nome da Tarefa',
+      render: (value: string, row: Task) => (
+        <div className={cn(
+          "font-medium",
+          row.status === 'done' && 'line-through text-muted-foreground'
+        )}>
+          {value}
+        </div>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      className: 'w-[130px]',
+      render: (value: string) => {
+        const config = statusConfig[value as keyof typeof statusConfig] || statusConfig.todo;
+        const Icon = config.icon;
+        return (
+          <Badge className={cn("gap-1", config.color)}>
+            <Icon className="h-3 w-3" />
+            {config.label}
+          </Badge>
+        );
+      }
+    },
+    {
+      key: 'assigneeId',
+      label: 'Responsável',
+      className: 'w-[150px]',
+      render: (value: string) => {
+        const user = users?.find(u => u.id === value);
+        return user?.name || '-';
+      }
+    },
+    {
+      key: 'dueDate',
+      label: 'Vencimento',
+      className: 'w-[120px]',
+      render: (value: string) => value ? new Date(value).toLocaleDateString('pt-BR') : '-'
+    },
+    {
+      key: 'priority',
+      label: 'Prioridade',
+      className: 'w-[110px]',
+      render: (value: string) => {
+        const config = priorityConfig[value as keyof typeof priorityConfig] || priorityConfig.medium;
+        return <Badge className={config.color}>{config.label}</Badge>;
+      }
+    },
+    {
+      key: 'tagId',
+      label: 'Tag',
+      className: 'w-[120px]',
+      render: (value: string) => {
+        const area = areas?.find(a => a.id === value);
+        return area ? (
+          <Badge 
+            variant="secondary" 
+            className="gap-1"
+          >
+            <div 
+              className="h-2 w-2 rounded-full" 
+              style={{ backgroundColor: area.color || "#00A137" }}
+            />
+            {area.name}
+          </Badge>
+        ) : '-';
+      }
+    }
+  ], [users, areas]);
+
+  // Handler para checkbox de conclusão de tarefa
+  const handleTaskComplete = useCallback(async (taskId: string, checked: boolean) => {
+    try {
+      const newStatus = checked ? 'done' : 'todo';
+      await apiRequest("PATCH", `/api/tasks/${taskId}`, { status: newStatus });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      toast({ 
+        title: checked ? "Tarefa concluída!" : "Tarefa reaberta",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('Erro ao atualizar tarefa:', error);
+      toast({ 
+        title: "Erro ao atualizar tarefa", 
+        variant: "destructive" 
+      });
+    }
+  }, [toast]);
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
@@ -855,13 +952,14 @@ export default function TarefasPage() {
 
               <div className="flex items-center border rounded-md p-1 bg-muted/50 ml-auto">
                 <Button
-                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  variant={viewMode === "table" ? "secondary" : "ghost"}
                   size="sm"
                   className="h-8 px-2"
-                  onClick={() => setViewMode("grid")}
-                  data-testid="button-view-grid"
+                  onClick={() => setViewMode("table")}
+                  data-testid="button-view-table"
+                  title="Visualização em Tabela"
                 >
-                  <Folder className="h-4 w-4" />
+                  <Table className="h-4 w-4" />
                 </Button>
                 <Button
                   variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -869,8 +967,19 @@ export default function TarefasPage() {
                   className="h-8 px-2"
                   onClick={() => setViewMode("list")}
                   data-testid="button-view-list"
+                  title="Visualização em Lista"
                 >
                   <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={() => setViewMode("grid")}
+                  data-testid="button-view-grid"
+                  title="Visualização em Cards"
+                >
+                  <Folder className="h-4 w-4" />
                 </Button>
                 <Button
                   variant={viewMode === "kanban" ? "secondary" : "ghost"}
@@ -878,6 +987,7 @@ export default function TarefasPage() {
                   className="h-8 px-2"
                   onClick={() => setViewMode("kanban")}
                   data-testid="button-view-kanban"
+                  title="Visualização em Quadro"
                 >
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
@@ -912,6 +1022,17 @@ export default function TarefasPage() {
             </Card>
           ) : viewMode === "kanban" ? (
             <TaskKanban tasks={filteredTasks} areas={areas} />
+          ) : viewMode === "table" ? (
+            <DataTable
+              columns={taskTableColumns}
+              data={filteredTasks}
+              onRowClick={(task) => navigate(`/tarefas/${task.id}`)}
+              onCheckboxChange={handleTaskComplete}
+              showCheckbox={true}
+              checkboxChecked={(row) => row.status === 'done'}
+              isLoading={tasksLoading}
+              emptyMessage="Nenhuma tarefa encontrada."
+            />
           ) : (
             <DragDropContext onDragEnd={onDragEnd}>
               <Droppable droppableId="tasks-list">
