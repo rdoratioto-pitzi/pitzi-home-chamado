@@ -12,9 +12,40 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const BASE_URL = process.env.REPLIT_DEV_DOMAIN 
-  ? `https://${process.env.REPLIT_DEV_DOMAIN}` 
-  : "https://home.renovsmart.com.br";
+/**
+ * Função auxiliar para gerar URL do chamado
+ * Usa APP_URL como prioridade, depois REPLIT_DEV_DOMAIN, e por fim o fallback
+ */
+function getBaseUrl(): string {
+  if (process.env.APP_URL) {
+    return process.env.APP_URL;
+  }
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  }
+  return "https://home.renovsmart.com.br";
+}
+
+/**
+ * Gera URL direta para um chamado específico
+ */
+function getTicketUrl(ticketCode: string): string {
+  const baseUrl = getBaseUrl();
+  const url = `${baseUrl}/chamados?id=${ticketCode}`;
+  
+  // Log para debug em produção
+  console.log('🔗 [EMAIL] Gerando URL do chamado:', {
+    code: ticketCode,
+    baseUrl: baseUrl,
+    finalUrl: url,
+    env_APP_URL: process.env.APP_URL || '(não definido)',
+    env_REPLIT_DEV_DOMAIN: process.env.REPLIT_DEV_DOMAIN || '(não definido)'
+  });
+  
+  return url;
+}
+
+const BASE_URL = getBaseUrl();
 
 const emailStyles = `
   <style>
@@ -128,6 +159,7 @@ export async function sendTicketCreatedEmail(
     return;
   }
 
+  const ticketUrl = getTicketUrl(ticket.code);
   const recipients = [requester.email];
   if (assignee && assignee.email !== requester.email) {
     recipients.push(assignee.email);
@@ -160,7 +192,11 @@ export async function sendTicketCreatedEmail(
           <p><strong>Descrição:</strong></p>
           <p>${ticket.description}</p>
           
-          <a href="${BASE_URL}/chamados?id=${ticket.code}" class="btn">Ver Chamado</a>
+          <a href="${ticketUrl}" class="btn">Ver Chamado</a>
+          
+          <p style="margin-top: 20px; font-size: 12px; color: #666;">
+            Link direto: <a href="${ticketUrl}" style="color: #00A137;">${ticketUrl}</a>
+          </p>
         </div>
         <div class="footer">
           <p>Renov Home - Sistema de Gestão Interna</p>
@@ -178,7 +214,7 @@ export async function sendTicketCreatedEmail(
       subject: `[${ticket.code}] Novo Chamado: ${ticket.title}`,
       html,
     });
-    console.log(`Email sent for ticket ${ticket.code} to ${recipients.join(", ")}`);
+    console.log(`✅ [EMAIL] E-mail de criação enviado para ${recipients.join(", ")} - URL: ${ticketUrl}`);
   } catch (error) {
     console.error("Failed to send email:", error);
   }
@@ -193,6 +229,8 @@ export async function sendTicketAssignedEmail(
     return;
   }
 
+  const ticketUrl = getTicketUrl(ticket.code);
+  
   const html = `
     <!DOCTYPE html>
     <html>
@@ -218,7 +256,11 @@ export async function sendTicketAssignedEmail(
           <p><strong>Descrição:</strong></p>
           <p>${ticket.description}</p>
           
-          <a href="${BASE_URL}/chamados?id=${ticket.code}" class="btn">Ver Chamado</a>
+          <a href="${ticketUrl}" class="btn">Ver Chamado</a>
+          
+          <p style="margin-top: 20px; font-size: 12px; color: #666;">
+            Link direto: <a href="${ticketUrl}" style="color: #00A137;">${ticketUrl}</a>
+          </p>
         </div>
         <div class="footer">
           <p>Renov Home - Sistema de Gestão Interna</p>
@@ -236,7 +278,7 @@ export async function sendTicketAssignedEmail(
       subject: `[${ticket.code}] Chamado Atribuído: ${ticket.title}`,
       html,
     });
-    console.log(`Assignment email sent for ticket ${ticket.code} to ${assignee.email}`);
+    console.log(`✅ [EMAIL] E-mail de atribuição enviado para ${assignee.email} - URL: ${ticketUrl}`);
   } catch (error) {
     console.error("Failed to send email:", error);
   }
@@ -254,6 +296,7 @@ export async function sendTicketStatusChangedEmail(
     return;
   }
 
+  const ticketUrl = getTicketUrl(ticket.code);
   const recipients = [requester.email];
   if (assignee && assignee.email !== requester.email) {
     recipients.push(assignee.email);
@@ -281,7 +324,11 @@ export async function sendTicketStatusChangedEmail(
             </p>
           </div>
           
-          <a href="${BASE_URL}/chamados?id=${ticket.code}" class="btn">Ver Chamado</a>
+          <a href="${ticketUrl}" class="btn">Ver Chamado</a>
+          
+          <p style="margin-top: 20px; font-size: 12px; color: #666;">
+            Link direto: <a href="${ticketUrl}" style="color: #00A137;">${ticketUrl}</a>
+          </p>
         </div>
         <div class="footer">
           <p>Renov Home - Sistema de Gestão Interna</p>
@@ -299,7 +346,7 @@ export async function sendTicketStatusChangedEmail(
       subject: `[${ticket.code}] Status Alterado: ${getStatusLabel(oldStatus)} → ${getStatusLabel(newStatus)}`,
       html,
     });
-    console.log(`Status change email sent for ticket ${ticket.code}`);
+    console.log(`✅ [EMAIL] E-mail de mudança de status enviado para ${recipients.join(", ")} - URL: ${ticketUrl}`);
   } catch (error) {
     console.error("Failed to send email:", error);
   }
@@ -321,6 +368,7 @@ export async function sendTicketCommentEmail(
     return;
   }
 
+  const ticketUrl = getTicketUrl(ticket.code);
   const recipients = new Set<string>();
   if (requester.email !== commenter.email) {
     recipients.add(requester.email);
@@ -352,7 +400,11 @@ export async function sendTicketCommentEmail(
             <p style="margin: 0; white-space: pre-wrap;">${comment.content}</p>
           </div>
           
-          <a href="${BASE_URL}/chamados?id=${ticket.code}" class="btn">Ver Chamado</a>
+          <a href="${ticketUrl}" class="btn">Ver Chamado</a>
+          
+          <p style="margin-top: 20px; font-size: 12px; color: #666;">
+            Link direto: <a href="${ticketUrl}" style="color: #00A137;">${ticketUrl}</a>
+          </p>
         </div>
         <div class="footer">
           <p>Renov Home - Sistema de Gestão Interna</p>
@@ -370,7 +422,7 @@ export async function sendTicketCommentEmail(
       subject: `[${ticket.code}] Novo Comentário: ${ticket.title}`,
       html,
     });
-    console.log(`Comment email sent for ticket ${ticket.code}`);
+    console.log(`✅ [EMAIL] E-mail de comentário enviado para ${Array.from(recipients).join(", ")} - URL: ${ticketUrl}`);
   } catch (error) {
     console.error("Failed to send email:", error);
   }
