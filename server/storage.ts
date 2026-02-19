@@ -65,7 +65,7 @@ import {
   promptsLibrary, promptUserFavorites
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql } from "drizzle-orm";
+import { eq, and, or, sql, asc } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -799,7 +799,7 @@ export class DatabaseStorage implements IStorage {
   }
   async getTaskTags(userId: string): Promise<TaskTag[]> {
     if (!db) return [];
-    const allTags = await db.select().from(taskTags);
+    const allTags = await db.select().from(taskTags).orderBy(asc(taskTags.displayOrder));
     const memberRecords = await db.select().from(taskTagMembers).where(eq(taskTagMembers.userId, userId));
     const memberTagIds = new Set(memberRecords.map(m => m.tagId));
     return allTags.filter(tag =>

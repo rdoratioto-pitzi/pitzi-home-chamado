@@ -13,11 +13,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RichTextarea } from "@/components/rich-textarea";
 import DOMPurify from "dompurify";
-import { 
-  Plus, 
-  Folder, 
-  Users, 
-  User, 
+import {
+  Plus,
+  Folder,
+  Users,
+  User,
   Search,
   Filter,
   MoreHorizontal,
@@ -34,9 +34,13 @@ import {
   Repeat,
   X,
   GripVertical,
-  Maximize2
+  Maximize2,
+  Star
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { User as UserType } from "@shared/schema";
 import {
   Dialog,
@@ -242,6 +246,162 @@ export default function TarefasPage() {
       toast({ title: "Tag excluída com sucesso!" });
     },
   });
+
+  // Mutation para definir tag como padrão
+  const setDefaultTagMutation = useMutation({
+    mutationFn: async ({ id, isDefault }: { id: string; isDefault: boolean }) => {
+      if (isDefault) {
+        return apiRequest("DELETE", `/api/task-tags/${id}/set-default`);
+      } else {
+        return apiRequest("POST", `/api/task-tags/${id}/set-default`, { scope: "tasks" });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "tasks"] });
+      toast({ title: "Tag padrão atualizada!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar tag padrão", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Mutation para reordenar tags
+  const reorderTagsMutation = useMutation({
+    mutationFn: async (tagIds: string[]) => {
+      return apiRequest("POST", "/api/task-tags/reorder", { tagIds, scope: "tasks" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "tasks"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao reordenar tags", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Query para buscar tag padrão
+  const { data: defaultTag } = useQuery<TaskArea | null>({
+    queryKey: ["/api/task-tags/default", "tasks"],
+    queryFn: async () => {
+      const res = await fetch("/api/task-tags/default?scope=tasks");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  // Sensors para drag and drop do dnd-kit
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  // Handler para drag end das tags
+  const handleTagDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = areas.findIndex(t => t.id === active.id);
+      const newIndex = areas.findIndex(t => t.id === over.id);
+      
+      const newOrder = arrayMove(areas, oldIndex, newIndex);
+      reorderTagsMutation.mutate(newOrder.map(t => t.id));
+    }
+  };
+
+  // Componente para tag ordenável
+  function SortableTag({ area, areaTaskCount }: { area: TaskArea; areaTaskCount: number }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: area.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+          selectedAreaId === area.id
+            ? "bg-primary/10 text-primary"
+            : "hover:bg-muted"
+        }`}
+        onClick={() => setSelectedAreaId(area.id)}
+        data-testid={`button-area-${area.id}`}
+      >
+        <button
+          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-muted rounded"
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-3 w-3 text-muted-foreground" />
+        </button>
+        <div
+          className="h-3 w-3 rounded-full flex-shrink-0"
+          style={{ backgroundColor: area.color || "#00A137" }}
+        />
+        {area.visibility === "shared" ? (
+          <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        ) : (
+          <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        )}
+        <span className="flex-1 truncate">{area.name}</span>
+        {area.isDefault && (
+          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 flex-shrink-0" />
+        )}
+        <Badge variant="secondary" className="text-xs flex-shrink-0">
+          {areaTaskCount}
+        </Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`button-area-menu-${area.id}`}
+            >
+              <MoreHorizontal className="h-3 w-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setDefaultTagMutation.mutate({
+                  id: area.id,
+                  isDefault: area.isDefault || false
+                });
+              }}
+            >
+              <Star className={`h-4 w-4 mr-2 ${area.isDefault ? "fill-yellow-400 text-yellow-400" : ""}`} />
+              {area.isDefault ? "Remover como Padrão" : "Definir como Padrão"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleOpenAreaDialog(area)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => deleteAreaMutation.mutate(area.id)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  }
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: typeof newTask) => {
@@ -468,7 +628,7 @@ export default function TarefasPage() {
       type,
       status: "todo",
       priority: "medium",
-      areaId: selectedAreaId || (areas[0]?.id || ""),
+      areaId: selectedAreaId || (defaultTag?.id || (areas[0]?.id || "")),
       createdBy: currentUserId,
       assigneeId: "",
       assigneeIds: [],
@@ -574,62 +734,34 @@ export default function TarefasPage() {
             <div className="mt-4 space-y-1">
               {areasLoading ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
+              ) : areas.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleTagDragEnd}
+                >
+                  <SortableContext
+                    items={areas.map(t => t.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {areas.map((area) => {
+                      const areaTaskCount = globalTasks.filter(t =>
+                        t.tagId === area.id && (t.status === "todo" || t.status === "doing")
+                      ).length;
+                      return (
+                        <SortableTag
+                          key={area.id}
+                          area={area}
+                          areaTaskCount={areaTaskCount}
+                        />
+                      );
+                    })}
+                  </SortableContext>
+                </DndContext>
               ) : (
-                areas.map((area) => {
-                  const areaTaskCount = globalTasks.filter(t => 
-                    t.tagId === area.id && (t.status === "todo" || t.status === "doing")
-                  ).length;
-                  return (
-                    <div 
-                      key={area.id}
-                      className={`group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                        selectedAreaId === area.id 
-                          ? "bg-primary/10 text-primary" 
-                          : "hover:bg-muted"
-                      }`}
-                      onClick={() => setSelectedAreaId(area.id)}
-                      data-testid={`button-area-${area.id}`}
-                    >
-                      <div 
-                        className="h-3 w-3 rounded-full" 
-                        style={{ backgroundColor: area.color || "#00A137" }}
-                      />
-                      {area.visibility === "shared" ? (
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <User className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span className="flex-1 truncate">{area.name}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {areaTaskCount}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button 
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded"
-                            onClick={(e) => e.stopPropagation()}
-                            data-testid={`button-area-menu-${area.id}`}
-                          >
-                            <MoreHorizontal className="h-3 w-3" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenAreaDialog(area)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-destructive"
-                            onClick={() => deleteAreaMutation.mutate(area.id)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  );
-                })
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  Nenhuma tag criada
+                </div>
               )}
             </div>
           </div>

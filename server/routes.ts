@@ -59,8 +59,8 @@ import {
   insertPricingAlertSchema,
 } from "@shared/schema";
 import { z } from "zod";
-import { sql, eq, or, and } from "drizzle-orm";
-import { tasks } from "@shared/schema";
+import { sql, eq, or, and, asc } from "drizzle-orm";
+import { tasks, taskTags } from "@shared/schema";
 import { db } from "./db";
 
 export async function registerRoutes(
@@ -1685,6 +1685,136 @@ export async function registerRoutes(
     const deleted = await storage.removeTaskAreaMember(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Member not found" });
     res.status(204).send();
+  });
+
+  // ============== TASK TAGS - DEFAULT & REORDER ==============
+  // Definir tag como padrão
+  app.post("/api/task-tags/:id/set-default", async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { id } = req.params;
+      const { scope } = req.body; // 'tasks' ou 'meetings'
+
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      // Verificar se a tag existe e pertence ao usuário
+      const tag = await storage.getTaskArea(id);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag não encontrada" });
+      }
+
+      if (!isAdmin && tag.ownerId !== userId) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      // Remover padrão de todas as tags do usuário no mesmo escopo
+      const userTags = await storage.getTaskAreas(userId);
+      const tagsOfSameScope = userTags.filter(t => t.scope === (scope || tag.scope));
+      
+      for (const t of tagsOfSameScope) {
+        if (t.isDefault) {
+          await db.update(taskTags).set({ isDefault: false }).where(eq(taskTags.id, t.id));
+        }
+      }
+
+      // Definir esta tag como padrão
+      await db.update(taskTags).set({ isDefault: true }).where(eq(taskTags.id, id));
+
+      res.json({ success: true, message: "Tag definida como padrão" });
+    } catch (error) {
+      console.error("Erro ao definir tag padrão:", error);
+      res.status(500).json({ error: "Erro ao definir tag padrão" });
+    }
+  });
+
+  // Remover tag como padrão
+  app.delete("/api/task-tags/:id/set-default", async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { id } = req.params;
+
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const tag = await storage.getTaskArea(id);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag não encontrada" });
+      }
+
+      if (!isAdmin && tag.ownerId !== userId) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      await db.update(taskTags).set({ isDefault: false }).where(eq(taskTags.id, id));
+
+      res.json({ success: true, message: "Tag removida como padrão" });
+    } catch (error) {
+      console.error("Erro ao remover tag padrão:", error);
+      res.status(500).json({ error: "Erro ao remover tag padrão" });
+    }
+  });
+
+  // Reordenar tags
+  app.post("/api/task-tags/reorder", async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { tagIds, scope } = req.body; // Array de IDs na nova ordem
+
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (!Array.isArray(tagIds)) {
+        return res.status(400).json({ error: "tagIds deve ser um array" });
+      }
+
+      // Atualizar displayOrder de cada tag
+      for (let i = 0; i < tagIds.length; i++) {
+        const tag = await storage.getTaskArea(tagIds[i]);
+        if (!tag) continue;
+        
+        // Verificar permissão
+        if (!isAdmin && tag.ownerId !== userId) {
+          continue; // Pular tags que não pertencem ao usuário
+        }
+
+        await db
+          .update(taskTags)
+          .set({ displayOrder: i })
+          .where(eq(taskTags.id, tagIds[i]));
+      }
+
+      res.json({ success: true, message: "Ordem das tags atualizada" });
+    } catch (error) {
+      console.error("Erro ao reordenar tags:", error);
+      res.status(500).json({ error: "Erro ao reordenar tags" });
+    }
+  });
+
+  // Buscar tag padrão
+  app.get("/api/task-tags/default", async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      const { scope } = req.query; // 'tasks' ou 'meetings'
+
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const userTags = await storage.getTaskAreas(userId);
+      const defaultTag = userTags.find(t =>
+        t.isDefault === true &&
+        (!scope || t.scope === scope)
+      );
+
+      res.json(defaultTag || null);
+    } catch (error) {
+      console.error("Erro ao buscar tag padrão:", error);
+      res.status(500).json({ error: "Erro ao buscar tag padrão" });
+    }
   });
 
   // ============== TASKS ==============
