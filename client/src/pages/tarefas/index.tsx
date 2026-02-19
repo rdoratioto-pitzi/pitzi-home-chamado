@@ -15,6 +15,10 @@ import { RichTextarea } from "@/components/rich-textarea";
 import { DataTable } from "@/components/data-table";
 import { cn } from "@/lib/utils";
 import DOMPurify from "dompurify";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import {
   Plus,
   Folder,
@@ -79,14 +83,210 @@ const statusConfig = {
 };
 
 const priorityConfig = {
-  low: { label: "Baixa", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
-  medium: { label: "Média", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300" },
-  high: { label: "Alta", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
+  low: { label: "Baixa", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", emoji: "🟢" },
+  medium: { label: "Média", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300", emoji: "🟡" },
+  high: { label: "Alta", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300", emoji: "🔴" },
 };
 
 const typeConfig = {
   task: { label: "Tarefa", icon: CheckCircle2 },
 };
+
+// Componente de Status editável inline
+function EditableStatus({ task, onUpdate }: { task: Task; onUpdate: (id: string, updates: Partial<Task>) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const config = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.todo;
+  const Icon = config.icon;
+
+  console.log('🎯 EditableStatus render:', { taskId: task.id, status: task.status });
+
+  return (
+    <Select
+      value={task.status}
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      onValueChange={(value) => {
+        console.log('📝 Status mudando de', task.status, 'para', value);
+        onUpdate(task.id, { status: value });
+        setIsOpen(false);
+      }}
+    >
+      <SelectTrigger
+        className="h-7 w-auto border-0 bg-transparent p-0 hover:bg-muted/50 focus:ring-0 focus:ring-offset-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+      >
+        <Badge className={cn("gap-1 cursor-pointer", config.color)}>
+          <Icon className="h-3 w-3" />
+          <span>{config.label}</span>
+        </Badge>
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        <SelectItem value="todo">
+          <div className="flex items-center gap-2">
+            <Circle className="h-3 w-3" />
+            A Fazer
+          </div>
+        </SelectItem>
+        <SelectItem value="doing">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3" />
+            Em Andamento
+          </div>
+        </SelectItem>
+        <SelectItem value="done">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-3 w-3" />
+            Concluído
+          </div>
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+// Componente de Prioridade editável inline
+function EditablePriority({ task, onUpdate }: { task: Task; onUpdate: (id: string, updates: Partial<Task>) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const config = priorityConfig[task.priority as keyof typeof priorityConfig] || priorityConfig.medium;
+
+  console.log('🎯 EditablePriority render:', { taskId: task.id, priority: task.priority });
+
+  return (
+    <Select
+      value={task.priority}
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      onValueChange={(value) => {
+        console.log('📝 Prioridade mudando de', task.priority, 'para', value);
+        onUpdate(task.id, { priority: value });
+        setIsOpen(false);
+      }}
+    >
+      <SelectTrigger
+        className="h-7 w-auto border-0 bg-transparent p-0 hover:bg-muted/50 focus:ring-0 focus:ring-offset-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+      >
+        <Badge className={cn("cursor-pointer", config.color)}>{config.label}</Badge>
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        <SelectItem value="low">
+          <div className="flex items-center gap-2">
+            🟢 Baixa
+          </div>
+        </SelectItem>
+        <SelectItem value="medium">
+          <div className="flex items-center gap-2">
+            🟡 Média
+          </div>
+        </SelectItem>
+        <SelectItem value="high">
+          <div className="flex items-center gap-2">
+            🔴 Alta
+          </div>
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+// Componente de Data editável inline
+function EditableDate({ task, onUpdate }: { task: Task; onUpdate: (id: string, updates: Partial<Task>) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const date = task.dueDate ? new Date(task.dueDate) : undefined;
+
+  console.log('🎯 EditableDate render:', { taskId: task.id, dueDate: task.dueDate });
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="text-sm text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(true);
+          }}
+        >
+          <Calendar className="h-3 w-3" />
+          {date ? format(date, 'dd/MM/yyyy', { locale: ptBR }) : 'Selecionar'}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start" onClick={(e) => e.stopPropagation()}>
+        <CalendarComponent
+          mode="single"
+          selected={date}
+          onSelect={(newDate) => {
+            console.log('📝 Data mudando de', task.dueDate, 'para', newDate);
+            if (newDate) {
+              onUpdate(task.id, { dueDate: newDate.toISOString() });
+            }
+            setIsOpen(false);
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Componente de Tag editável inline
+function EditableTag({ task, tags, onUpdate }: { task: Task; tags: TaskArea[]; onUpdate: (id: string, updates: Partial<Task>) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const currentTag = tags.find(t => t.id === task.tagId);
+
+  console.log('🎯 EditableTag render:', { taskId: task.id, tagId: task.tagId, currentTag: currentTag?.name });
+
+  return (
+    <Select
+      value={task.tagId || ""}
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      onValueChange={(value) => {
+        console.log('📝 Tag mudando de', task.tagId, 'para', value);
+        onUpdate(task.id, { tagId: value || null });
+        setIsOpen(false);
+      }}
+    >
+      <SelectTrigger
+        className="h-7 w-auto border-0 bg-transparent p-0 hover:bg-muted/50 focus:ring-0 focus:ring-offset-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+      >
+        {currentTag ? (
+          <Badge variant="secondary" className="gap-1 cursor-pointer">
+            <div
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: currentTag.color || "#00A137" }}
+            />
+            {currentTag.name}
+          </Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        )}
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        {tags.map(tag => (
+          <SelectItem key={tag.id} value={tag.id}>
+            <div className="flex items-center gap-2">
+              <div
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: tag.color || "#00A137" }}
+              />
+              {tag.name}
+            </div>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export default function TarefasPage() {
   const [, navigate] = useLocation();
@@ -210,7 +410,45 @@ export default function TarefasPage() {
     },
   });
 
-  // Definição das colunas da tabela de tarefas
+  // Handler de atualização inline
+  const handleInlineUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    try {
+      console.log('🔄 Atualizando tarefa:', taskId, updates);
+      
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(updates)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao atualizar');
+      }
+
+      console.log('✅ Tarefa atualizada com sucesso');
+      
+      // Invalidar queries para recarregar dados
+      await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      
+      toast({ 
+        title: "✅ Atualizado!",
+        description: "Tarefa atualizada com sucesso."
+      });
+    } catch (error) {
+      console.error('❌ Erro ao atualizar tarefa:', error);
+      toast({
+        title: "❌ Erro ao atualizar",
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
+  // Definição das colunas da tabela de tarefas com edição inline
+  // Ordem: Nome, Status, Prioridade, Data de Entrega, Tag (Responsável removido)
   const taskTableColumns = useMemo(() => [
     {
       key: 'title',
@@ -227,78 +465,68 @@ export default function TarefasPage() {
     {
       key: 'status',
       label: 'Status',
-      className: 'w-[130px]',
-      render: (value: string) => {
-        const config = statusConfig[value as keyof typeof statusConfig] || statusConfig.todo;
-        const Icon = config.icon;
-        return (
-          <Badge className={cn("gap-1", config.color)}>
-            <Icon className="h-3 w-3" />
-            {config.label}
-          </Badge>
-        );
-      }
-    },
-    {
-      key: 'assigneeId',
-      label: 'Responsável',
       className: 'w-[150px]',
-      render: (value: string) => {
-        const user = users?.find(u => u.id === value);
-        return user?.name || '-';
-      }
-    },
-    {
-      key: 'dueDate',
-      label: 'Vencimento',
-      className: 'w-[120px]',
-      render: (value: string) => value ? new Date(value).toLocaleDateString('pt-BR') : '-'
+      render: (value: string, row: Task) => (
+        <EditableStatus task={row} onUpdate={handleInlineUpdate} />
+      )
     },
     {
       key: 'priority',
       label: 'Prioridade',
-      className: 'w-[110px]',
-      render: (value: string) => {
-        const config = priorityConfig[value as keyof typeof priorityConfig] || priorityConfig.medium;
-        return <Badge className={config.color}>{config.label}</Badge>;
-      }
+      className: 'w-[130px]',
+      render: (value: string, row: Task) => (
+        <EditablePriority task={row} onUpdate={handleInlineUpdate} />
+      )
+    },
+    {
+      key: 'dueDate',
+      label: 'Data de Entrega',
+      className: 'w-[140px]',
+      render: (value: string, row: Task) => (
+        <EditableDate task={row} onUpdate={handleInlineUpdate} />
+      )
     },
     {
       key: 'tagId',
       label: 'Tag',
-      className: 'w-[120px]',
-      render: (value: string) => {
-        const area = areas?.find(a => a.id === value);
-        return area ? (
-          <Badge 
-            variant="secondary" 
-            className="gap-1"
-          >
-            <div 
-              className="h-2 w-2 rounded-full" 
-              style={{ backgroundColor: area.color || "#00A137" }}
-            />
-            {area.name}
-          </Badge>
-        ) : '-';
-      }
+      className: 'w-[130px]',
+      render: (value: string, row: Task) => (
+        <EditableTag task={row} tags={areas} onUpdate={handleInlineUpdate} />
+      )
     }
-  ], [users, areas]);
+  ], [areas, handleInlineUpdate]);
 
   // Handler para checkbox de conclusão de tarefa
   const handleTaskComplete = useCallback(async (taskId: string, checked: boolean) => {
     try {
+      console.log('☑️ Marcando tarefa como', checked ? 'concluída' : 'não concluída', { taskId });
+      
       const newStatus = checked ? 'done' : 'todo';
-      await apiRequest("PATCH", `/api/tasks/${taskId}`, { status: newStatus });
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao atualizar');
+      }
+
+      console.log('✅ Status da tarefa atualizado');
+      await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      
       toast({ 
-        title: checked ? "Tarefa concluída!" : "Tarefa reaberta",
+        title: checked ? "✅ Tarefa concluída!" : "🔄 Tarefa reaberta",
+        description: checked ? "A tarefa foi marcada como concluída." : "A tarefa foi reaberta.",
         variant: "default"
       });
     } catch (error) {
-      console.error('Erro ao atualizar tarefa:', error);
+      console.error('❌ Erro ao atualizar tarefa:', error);
       toast({ 
-        title: "Erro ao atualizar tarefa", 
+        title: "❌ Erro ao atualizar tarefa",
+        description: error instanceof Error ? error.message : 'Erro desconhecido', 
         variant: "destructive" 
       });
     }
@@ -908,16 +1136,15 @@ export default function TarefasPage() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40" data-testid="select-status-filter">
+                <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
                   <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder="Filtrar status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Em Aberto</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="todo">A Fazer</SelectItem>
                   <SelectItem value="doing">Em Andamento</SelectItem>
-                  <SelectItem value="done">Concluídas</SelectItem>
-                  <SelectItem value="archived">Arquivado</SelectItem>
+                  <SelectItem value="done">Concluído</SelectItem>
                 </SelectContent>
               </Select>
               

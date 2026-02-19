@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/data-table";
 import { cn } from "@/lib/utils";
-import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle, GripVertical, Star, Table } from "lucide-react";
+import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle, GripVertical, Star, Table, Tag } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -34,6 +34,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,6 +80,7 @@ export default function ReunioesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"table" | "grid" | "list">("table");
+  const [showTagsSidebar, setShowTagsSidebar] = useState(true);
 
   const currentUser = getCurrentUser();
   const currentUserId = currentUser?.id || "";
@@ -178,6 +184,7 @@ export default function ReunioesPage() {
   });
 
   // Definição das colunas da tabela de reuniões
+  // Colunas removidas: Responsável, Status, Local
   const meetingTableColumns = useMemo(() => [
     {
       key: 'title',
@@ -208,34 +215,49 @@ export default function ReunioesPage() {
       }
     },
     {
-      key: 'assigneeId',
-      label: 'Responsável',
-      className: 'w-[150px]',
-      render: (value: string) => {
-        const user = users?.find(u => u.id === value);
-        return user?.name || '-';
-      }
-    },
-    {
       key: 'assigneeIds',
       label: 'Participantes',
-      className: 'w-[130px]',
-      render: (value: string[]) => {
-        if (!value || value.length === 0) return '-';
-        if (value.length === 1) {
-          const user = users?.find(u => u.id === value[0]);
-          return user?.name || '-';
-        }
-        return `+${value.length} pessoas`;
-      }
-    },
-    {
-      key: 'meetingData',
-      label: 'Local',
       className: 'w-[150px]',
-      render: (value: any, row: Task) => {
-        const meetingData = row.meetingData as any;
-        return meetingData?.location || '-';
+      render: (value: string[], row: Task) => {
+        // Parse meetingData to get participants
+        const meetingData = row.meetingData ? JSON.parse(row.meetingData as string) : {};
+        const participantIds = meetingData?.participants || [];
+        const externalParticipants = meetingData?.externalParticipants || [];
+        
+        if (participantIds.length === 0 && externalParticipants.length === 0) return '-';
+        
+        // Get names of internal participants
+        const participantNames = participantIds
+          .map((id: string) => {
+            const user = users?.find(u => u.id === id);
+            return user?.name;
+          })
+          .filter(Boolean);
+        
+        // Combine with external participants
+        const allParticipants = [...participantNames, ...externalParticipants];
+        
+        if (allParticipants.length === 0) return '-';
+        if (allParticipants.length === 1) return allParticipants[0];
+        
+        return (
+          <Popover>
+            <PopoverTrigger className="text-primary hover:underline cursor-pointer text-sm">
+              +{allParticipants.length} pessoas
+            </PopoverTrigger>
+            <PopoverContent className="w-64">
+              <div className="text-sm font-medium mb-2">Participantes</div>
+              <ul className="text-sm space-y-1">
+                {allParticipants.map((name: string, i: number) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-primary" />
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
+        );
       }
     },
     {
@@ -245,12 +267,12 @@ export default function ReunioesPage() {
       render: (value: string) => {
         const area = areas?.find(a => a.id === value);
         return area ? (
-          <Badge 
-            variant="secondary" 
+          <Badge
+            variant="secondary"
             className="gap-1"
           >
-            <div 
-              className="h-2 w-2 rounded-full" 
+            <div
+              className="h-2 w-2 rounded-full"
               style={{ backgroundColor: area.color || "#00A137" }}
             />
             {area.name}
@@ -867,74 +889,99 @@ export default function ReunioesPage() {
 
   return (
     <div className="flex h-full">
-      {/* Sidebar - Areas */}
-      <div className="w-56 border-r border-border bg-muted/30 flex flex-col">
-        <div className="p-3 border-b border-border flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Tags</span>
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            className="h-6 w-6"
-            onClick={() => handleOpenAreaDialog()}
-            data-testid="button-add-area"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          <button
-            className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 mb-1 ${
-              !selectedAreaId ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
-            }`}
-            onClick={() => setSelectedAreaId(null)}
-            data-testid="button-all-meetings"
-          >
-            <Folder className="h-4 w-4" />
-            Todas as Reuniões
-            <Badge variant="secondary" className="ml-auto text-xs">
-              {meetings.length}
-            </Badge>
-          </button>
-          {areas.length > 0 ? (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleTagDragEnd}
-            >
-              <SortableContext
-                items={areas.map(t => t.id)}
-                strategy={verticalListSortingStrategy}
+      {/* Sidebar - Areas (condicional) */}
+      {showTagsSidebar && (
+        <div className="w-56 border-r border-border bg-muted/30 flex flex-col">
+          <div className="p-3 border-b border-border flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Tags</span>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() => handleOpenAreaDialog()}
+                data-testid="button-add-area"
               >
-                {areas.map((area) => {
-                  const areaCount = allMeetings.filter(m => m.tagId === area.id).length;
-                  return (
-                    <SortableTag
-                      key={area.id}
-                      area={area}
-                      areaMeetingCount={areaCount}
-                    />
-                  );
-                })}
-              </SortableContext>
-            </DndContext>
-          ) : (
-            <div className="px-3 py-2 text-sm text-muted-foreground">
-              Nenhuma tag criada
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() => setShowTagsSidebar(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          )}
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            <button
+              className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 mb-1 ${
+                !selectedAreaId ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
+              }`}
+              onClick={() => setSelectedAreaId(null)}
+              data-testid="button-all-meetings"
+            >
+              <Folder className="h-4 w-4" />
+              Todas as Reuniões
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {meetings.length}
+              </Badge>
+            </button>
+            {areas.length > 0 ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleTagDragEnd}
+              >
+                <SortableContext
+                  items={areas.map(t => t.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {areas.map((area) => {
+                    const areaCount = allMeetings.filter(m => m.tagId === area.id).length;
+                    return (
+                      <SortableTag
+                        key={area.id}
+                        area={area}
+                        areaMeetingCount={areaCount}
+                      />
+                    );
+                  })}
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                Nenhuma tag criada
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <PageHeader 
+        <PageHeader
           title={selectedArea ? selectedArea.name : "Todas as Reuniões"}
           description={selectedArea?.description || "Gerencie suas reuniões e anotações"}
           actions={
-            <Button onClick={handleOpenMeetingDialog} data-testid="button-new-meeting">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Reunião
-            </Button>
+            <div className="flex items-center gap-2">
+              {!showTagsSidebar && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTagsSidebar(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Tag className="h-4 w-4" />
+                  <span>Tags</span>
+                </Button>
+              )}
+              <Button onClick={handleOpenMeetingDialog} data-testid="button-new-meeting">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Reunião
+              </Button>
+            </div>
           }
         />
 
