@@ -135,13 +135,14 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
 
   useEffect(() => {
     if (ticket) {
+      console.log('[TicketDetailSheet] Carregando ticket:', ticket.id);
       setComment("");
       setCommentImages([]);
-      setEditedDescription(ticket.description);
+      setEditedDescription(ticket.description || '');
       setEditedAttachments(ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : []);
       setIsEditingDescription(false);
     }
-  }, [ticket]);
+  }, [ticket?.id]);
 
   const { data: comments = [] } = useQuery<TicketComment[]>({
     queryKey: ["/api/tickets", ticket?.id, "comments"],
@@ -173,12 +174,29 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     updateMutation.mutate({ assigneeId: userId === "none" ? null : userId });
   };
 
+  const handleEditDescription = () => {
+    try {
+      if (!ticket) {
+        throw new Error('Nenhum chamado selecionado');
+      }
+      console.log('[TicketDetailSheet] Iniciando edição da descrição');
+      setIsEditingDescription(true);
+    } catch (error) {
+      console.error('[TicketDetailSheet] Erro ao abrir edição:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível abrir o editor",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSaveDescription = () => {
     if (!ticket) return;
-    updateMutation.mutate({ 
+    updateMutation.mutate({
       description: editedDescription,
       attachments: editedAttachments.length > 0 ? JSON.stringify(editedAttachments) : null,
-      descriptionLastEditedBy: "admin", 
+      descriptionLastEditedBy: "admin",
       descriptionLastEditedAt: new Date().toISOString() as any
     });
     setIsEditingDescription(false);
@@ -323,11 +341,11 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-medium">Descrição</h4>
               {!isEditingDescription && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-8 px-2" 
-                  onClick={() => setIsEditingDescription(true)}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={handleEditDescription}
                 >
                   <Edit2 className="h-3.5 w-3.5 mr-1" />
                   Editar
@@ -370,9 +388,11 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
               </div>
             ) : (
               <>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words overflow-hidden mb-1" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                  {ticket.description}
-                </p>
+                <div
+                  className="text-sm text-muted-foreground prose prose-sm max-w-none break-words overflow-hidden mb-1"
+                  style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                  dangerouslySetInnerHTML={{ __html: ticket.description || '' }}
+                />
                 {ticket.descriptionLastEditedAt && (
                   <p className="text-[10px] text-muted-foreground mb-4 italic">
                     Editado por {users.find(u => u.id === ticket.descriptionLastEditedBy || u.email === ticket.descriptionLastEditedBy)?.name || "Admin"} em {formatDateTime(ticket.descriptionLastEditedAt)}

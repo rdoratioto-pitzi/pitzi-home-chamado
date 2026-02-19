@@ -314,9 +314,9 @@ export default function ChamadosPage() {
   useEffect(() => {
     if (tickets.length === 0 || isLoading) return;
     const params = new URLSearchParams(window.location.search);
-    const ticketId = params.get("ticket");
-    if (ticketId && !selectedTicket) {
-      const ticket = tickets.find((t) => t.id === ticketId);
+    const ticketCode = params.get("id");
+    if (ticketCode && !selectedTicket) {
+      const ticket = tickets.find((t) => t.code === ticketCode);
       if (ticket) {
         setSelectedTicket(ticket);
         window.history.replaceState({}, "", window.location.pathname);
