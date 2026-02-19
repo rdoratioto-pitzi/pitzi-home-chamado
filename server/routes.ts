@@ -2157,6 +2157,54 @@ export async function registerRoutes(
     }
   });
 
+  // PATCH route for partial task updates (inline editing)
+  app.patch("/api/tasks/:id", async (req, res) => {
+    try {
+      console.log('📝 PATCH /api/tasks/:id', { id: req.params.id, updates: req.body });
+      
+      const { userId: sessionUserId, isAdmin } = getSessionUser(req);
+      
+      if (!sessionUserId) {
+        console.log('❌ Usuário não autenticado');
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+      
+      const existingTask = await storage.getTask(req.params.id);
+      if (!existingTask) {
+        console.log('❌ Tarefa não encontrada:', req.params.id);
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      if (!isAdmin && existingTask.tagId) {
+        const accessibleAreaIds = await getUserAccessibleAreaIds(sessionUserId);
+        if (!accessibleAreaIds.includes(existingTask.tagId)) {
+          console.log('❌ Acesso negado à tarefa');
+          return res.status(403).json({ error: "Access denied to this task" });
+        }
+      }
+      
+      const partialSchema = insertTaskSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      
+      console.log('💾 Atualizando tarefa com dados:', validated);
+      const task = await storage.updateTask(req.params.id, validated);
+      
+      if (!task) {
+        console.log('❌ Falha ao atualizar tarefa');
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      console.log('✅ Tarefa atualizada com sucesso:', task);
+      res.json(task);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar tarefa:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update task" });
+    }
+  });
+
   app.delete("/api/tasks/:id", async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
     const task = await storage.getTask(req.params.id);
