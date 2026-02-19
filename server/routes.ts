@@ -1691,11 +1691,14 @@ export async function registerRoutes(
   app.get("/api/tasks", async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
 
-    // TODOS os usuários (incluindo admin) seguem a mesma regra de segurança:
-    // Ver apenas tarefas próprias, atribuídas, ou shared/public em áreas acessíveis
+    // TODOS os usuários (incluindo admin) seguem a MESMA regra de segurança:
+    // Admin NÃO tem acesso especial a itens privados de outros usuários
 
-    // Usuários comuns: filtro de segurança no banco
-    // Retorna: próprias tarefas + tarefas shared/public de áreas acessíveis
+    // Regras de visibilidade:
+    // - private: Apenas o criador vê
+    // - shared: Criador + usuários em áreas acessíveis
+    // - public: Todos veem
+
     const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
 
     // Construir query segura diretamente no banco
@@ -1710,47 +1713,52 @@ export async function registerRoutes(
     if (req.query.type) conditions.push(eq(tasks.type, req.query.type as string));
 
     // FILTRO DE SEGURANÇA CRÍTICO:
-    // Usuário vê apenas:
-    // 1. Tarefas criadas por ele (próprias)
-    // 2. Tarefas atribuídas a ele
-    // 3. Tarefas compartilhadas (shared) ou públicas (public) em áreas acessíveis
+    // Usuário (incluindo admin) vê apenas:
+    // 1. Tarefas criadas por ele (todas, incluindo privadas)
+    // 2. Tarefas atribuídas a ele (exceto privadas de outros)
+    // 3. Tarefas compartilhadas (shared) em áreas acessíveis
+    // 4. Tarefas públicas (public) de qualquer área
     const securityConditions = [
-      eq(tasks.createdBy, userId), // próprias tarefas
-      eq(tasks.assigneeId, userId), // atribuídas a ele
+      // 1. Próprias tarefas (incluindo privadas) - sempre visíveis para o criador
+      eq(tasks.createdBy, userId),
+      
+      // 2. Tarefas atribuídas ao usuário, mas NÃO privadas de outros
+      and(
+        eq(tasks.assigneeId, userId),
+        sql`${tasks.createdBy} = ${userId} OR ${tasks.visibility} != 'private'`
+      ),
     ];
 
-    // Adicionar condição para tarefas shared/public em áreas acessíveis
+    // 3. Tarefas shared em áreas acessíveis
     if (accessibleAreaIds.length > 0) {
       securityConditions.push(
         and(
-          or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public')),
+          eq(tasks.visibility, 'shared'),
           or(...accessibleAreaIds.map(areaId => eq(tasks.tagId, areaId)))
         )
       );
-    } else {
-      // Sem acesso a áreas, só vê próprias e atribuídas
-      securityConditions.push(
-        and(
-          or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public')),
-          sql`FALSE` // nenhuma área acessível
-        )
-      );
     }
+
+    // 4. Tarefas públicas - todos podem ver
+    securityConditions.push(eq(tasks.visibility, 'public'));
 
     conditions.push(or(...securityConditions));
 
     const userTasks = await query.where(and(...conditions));
 
     // Filtrar por multi-assignee em memória (não é possível fazer no SQL diretamente)
+    // Apenas tarefas não-privadas onde o usuário está na lista de assigneeIds
     const multiAssigneeTasks = await db.select().from(tasks).where(
       and(
         sql`${tasks.assigneeIds} IS NOT NULL`,
-        or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public'))
+        sql`${tasks.visibility} != 'private' OR ${tasks.createdBy} = ${userId}`
       )
     );
 
     const filteredMultiAssignee = multiAssigneeTasks.filter(t => {
       if (!t.assigneeIds) return false;
+      // Não incluir tarefas privadas de outros usuários
+      if (t.visibility === 'private' && t.createdBy !== userId) return false;
       try {
         const ids = typeof t.assigneeIds === 'string' ? JSON.parse(t.assigneeIds) : t.assigneeIds;
         return Array.isArray(ids) && ids.includes(userId);
@@ -1765,11 +1773,11 @@ export async function registerRoutes(
 
     // Logs de auditoria
     const ownTasks = finalTasks.filter(t => t.createdBy === userId).length;
-    const assignedTasks = finalTasks.filter(t => t.assigneeId === userId).length;
+    const assignedTasks = finalTasks.filter(t => t.assigneeId === userId && t.createdBy !== userId).length;
     const sharedTasks = finalTasks.filter(t => t.visibility === 'shared' && t.createdBy !== userId).length;
     const publicTasks = finalTasks.filter(t => t.visibility === 'public' && t.createdBy !== userId).length;
 
-    console.log(`[AUDIT] User ${userId} acessou ${finalTasks.length} tarefas:`);
+    console.log(`[AUDIT] User ${userId} (isAdmin: ${isAdmin}) acessou ${finalTasks.length} tarefas:`);
     console.log(`[AUDIT]   - Próprias: ${ownTasks}`);
     console.log(`[AUDIT]   - Atribuídas: ${assignedTasks}`);
     console.log(`[AUDIT]   - Compartilhadas: ${sharedTasks}`);
@@ -1782,13 +1790,51 @@ export async function registerRoutes(
     const { userId, isAdmin } = getSessionUser(req);
     const task = await storage.getTask(req.params.id);
     if (!task) return res.status(404).json({ error: "Task not found" });
-    if (!isAdmin && task.tagId) {
+
+    // Verificar acesso seguindo as mesmas regras de visibilidade (incluindo admin)
+    // Private: apenas o criador
+    // Shared: criador + usuários em áreas acessíveis
+    // Public: todos
+    
+    // Se for o criador, sempre tem acesso
+    if (task.createdBy === userId) {
+      return res.json(task);
+    }
+
+    // Se for privada e não for o criador, negar acesso (mesmo para admin)
+    if (task.visibility === 'private') {
+      return res.status(403).json({ error: "Access denied - private task" });
+    }
+
+    // Se for pública, permitir acesso
+    if (task.visibility === 'public') {
+      return res.json(task);
+    }
+
+    // Se for compartilhada (shared), verificar acesso à área
+    if (task.visibility === 'shared' && task.tagId) {
       const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
-      if (!accessibleAreaIds.includes(task.tagId)) {
-        return res.status(403).json({ error: "Access denied" });
+      if (accessibleAreaIds.includes(task.tagId)) {
+        return res.json(task);
       }
     }
-    res.json(task);
+
+    // Verificar se está atribuída ao usuário (exceto privadas)
+    if (task.assigneeId === userId && task.visibility !== 'private') {
+      return res.json(task);
+    }
+
+    // Verificar multi-assignee
+    if (task.assigneeIds && task.visibility !== 'private') {
+      try {
+        const ids = typeof task.assigneeIds === 'string' ? JSON.parse(task.assigneeIds) : task.assigneeIds;
+        if (Array.isArray(ids) && ids.includes(userId)) {
+          return res.json(task);
+        }
+      } catch (e) { }
+    }
+
+    return res.status(403).json({ error: "Access denied" });
   });
 
   app.post("/api/tasks", async (req, res) => {

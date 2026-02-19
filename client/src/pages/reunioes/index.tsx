@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
 import { RichTextarea } from "@/components/rich-textarea";
+import DOMPurify from "dompurify";
 import {
   Dialog,
   DialogContent,
@@ -149,30 +150,27 @@ export default function ReunioesPage() {
   const { data: allMeetings = [] } = useQuery<Task[]>({
     queryKey: ["/api/tasks", "meetings", "all"],
     queryFn: async () => {
-      const res = await fetch("/api/tasks");
+      // Filtrar apenas reuniões (type=meeting_note)
+      const res = await fetch("/api/tasks?type=meeting_note");
       if (!res.ok) throw new Error("Failed to fetch meetings");
       return res.json();
     },
     refetchInterval: 5000, // Poll every 5 seconds for shared meetings
   });
 
-  const { data: allTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", selectedAreaId],
+  const { data: meetings = [], isLoading: tasksLoading } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", selectedAreaId, "meetings"],
     queryFn: async () => {
-      const url = selectedAreaId 
-        ? `/api/tasks?tagId=${selectedAreaId}` 
-        : "/api/tasks";
+      // Filtrar apenas reuniões (type=meeting_note)
+      const url = selectedAreaId
+        ? `/api/tasks?tagId=${selectedAreaId}&type=meeting_note`
+        : "/api/tasks?type=meeting_note";
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch tasks");
+      if (!res.ok) throw new Error("Failed to fetch meetings");
       return res.json();
     },
     refetchInterval: 5000, // Poll every 5 seconds for shared meetings
   });
-
-  // Filter only meetings (type === "meeting_note")
-  const meetings = useMemo(() => {
-    return allTasks;
-  }, [allTasks]);
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
@@ -1688,9 +1686,10 @@ export default function ReunioesPage() {
                   </h1>
                   
                   {meeting.description && (
-                    <p className="text-xl text-muted-foreground whitespace-pre-wrap">
-                      {meeting.description}
-                    </p>
+                    <div
+                      className="text-xl text-muted-foreground"
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(meeting.description) }}
+                    />
                   )}
                   
                   <div className="flex items-center justify-center gap-4 py-4">
