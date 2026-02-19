@@ -4846,15 +4846,29 @@ export async function registerRoutes(
   app.get("/api/prompts", async (req, res) => {
     try {
       const { category, search } = req.query;
+      
+      console.log("[API /prompts] Requisição recebida:", {
+        category,
+        search,
+        hasSession: !!req.session,
+        userId: (req as any).session?.userId
+      });
+      
       const prompts = await storage.getPrompts({
         category: category as string | undefined,
         search: search as string | undefined,
         onlyActive: true,
       });
+      
+      console.log(`[API /prompts] Retornando ${prompts.length} prompts`);
+      
       res.json(prompts);
     } catch (error: any) {
       console.error("[prompts] Error listing prompts:", error);
-      res.status(500).json({ error: "Erro ao listar prompts" });
+      res.status(500).json({
+        error: "Erro ao listar prompts",
+        details: error.message
+      });
     }
   });
 
@@ -4970,6 +4984,41 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[prompts] Error syncing:", error);
       res.status(500).json({ error: "Erro ao sincronizar prompts" });
+    }
+  });
+
+  // Rota temporária para corrigir prompts existentes (definir is_active = true)
+  app.post("/api/prompts/fix-active", async (req, res) => {
+    try {
+      const userId = req.session?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      console.log("[prompts] Corrigindo prompts existentes...");
+
+      // Usar SQL direto para atualizar todos os prompts para is_active = true
+      const { db } = await import("./db");
+      const result = await db.execute(sql`
+        UPDATE prompts_library
+        SET is_active = true, updated_at = NOW()
+        WHERE is_active = false
+      `);
+
+      console.log(`[prompts] ${result.rowCount} prompts corrigidos`);
+
+      res.json({
+        success: true,
+        fixed: result.rowCount,
+      });
+    } catch (error: any) {
+      console.error("[prompts] Error fixing:", error);
+      res.status(500).json({ error: "Erro ao corrigir prompts" });
     }
   });
 
