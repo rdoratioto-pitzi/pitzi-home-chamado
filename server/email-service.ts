@@ -160,7 +160,7 @@ export async function sendTicketCreatedEmail(
           <p><strong>Descrição:</strong></p>
           <p>${ticket.description}</p>
           
-          <a href="${BASE_URL}/chamados" class="btn">Ver Chamado</a>
+          <a href="${BASE_URL}/chamados?id=${ticket.code}" class="btn">Ver Chamado</a>
         </div>
         <div class="footer">
           <p>Renov Home - Sistema de Gestão Interna</p>
@@ -218,7 +218,7 @@ export async function sendTicketAssignedEmail(
           <p><strong>Descrição:</strong></p>
           <p>${ticket.description}</p>
           
-          <a href="${BASE_URL}/chamados" class="btn">Ver Chamado</a>
+          <a href="${BASE_URL}/chamados?id=${ticket.code}" class="btn">Ver Chamado</a>
         </div>
         <div class="footer">
           <p>Renov Home - Sistema de Gestão Interna</p>
@@ -281,7 +281,7 @@ export async function sendTicketStatusChangedEmail(
             </p>
           </div>
           
-          <a href="${BASE_URL}/chamados" class="btn">Ver Chamado</a>
+          <a href="${BASE_URL}/chamados?id=${ticket.code}" class="btn">Ver Chamado</a>
         </div>
         <div class="footer">
           <p>Renov Home - Sistema de Gestão Interna</p>
@@ -352,7 +352,7 @@ export async function sendTicketCommentEmail(
             <p style="margin: 0; white-space: pre-wrap;">${comment.content}</p>
           </div>
           
-          <a href="${BASE_URL}/chamados" class="btn">Ver Chamado</a>
+          <a href="${BASE_URL}/chamados?id=${ticket.code}" class="btn">Ver Chamado</a>
         </div>
         <div class="footer">
           <p>Renov Home - Sistema de Gestão Interna</p>
