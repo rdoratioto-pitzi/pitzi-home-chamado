@@ -59,6 +59,29 @@ app.use(express.urlencoded({ limit: "50mb", extended: false }));
  */
 setupSession(app);
 
+// ============== ROTA DE TESTE PÚBLICA (TEMPORÁRIA) ==============
+// Rota para validar geração de URLs de chamados para e-mails
+// Testar acessando: GET /api/test-email-url/CHA-0054
+app.get("/api/test-email-url/:code", (req, res) => {
+  const { code } = req.params;
+  const baseUrl = process.env.APP_URL 
+    || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null)
+    || "https://home.renovsmart.com.br";
+  const ticketUrl = `${baseUrl}/chamados?id=${code}`;
+  
+  res.json({ 
+    code,
+    url: ticketUrl,
+    env: {
+      APP_URL: process.env.APP_URL || "(não definido)",
+      REPLIT_DEV_DOMAIN: process.env.REPLIT_DEV_DOMAIN || "(não definido)",
+      resolvedBaseUrl: baseUrl
+    },
+    expectedFormat: "https://home.renovsmart.com.br/chamados?id=CHA-XXXX",
+    isCorrect: ticketUrl.includes("?id=")
+  });
+});
+
 // Protege tudo depois disso
 app.use((req, res, next) => {
   try {
