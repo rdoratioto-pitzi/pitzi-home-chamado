@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/permissions";
@@ -11,7 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle, GripVertical, Star } from "lucide-react";
+import { DataTable } from "@/components/data-table";
+import { cn } from "@/lib/utils";
+import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle, GripVertical, Star, Table } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -72,7 +74,7 @@ export default function ReunioesPage() {
   const [editingArea, setEditingArea] = useState<TaskArea | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"table" | "grid" | "list">("table");
 
   const currentUser = getCurrentUser();
   const currentUserId = currentUser?.id || "";
@@ -174,6 +176,101 @@ export default function ReunioesPage() {
     },
     refetchInterval: 5000, // Poll every 5 seconds for shared meetings
   });
+
+  // Definição das colunas da tabela de reuniões
+  const meetingTableColumns = useMemo(() => [
+    {
+      key: 'title',
+      label: 'Nome da Reunião',
+      render: (value: string) => (
+        <div className="font-medium">
+          {value}
+        </div>
+      )
+    },
+    {
+      key: 'meetingData',
+      label: 'Data',
+      className: 'w-[120px]',
+      render: (value: any, row: Task) => {
+        const meetingData = row.meetingData as any;
+        const date = meetingData?.date || row.dueDate;
+        return date ? new Date(date).toLocaleDateString('pt-BR') : '-';
+      }
+    },
+    {
+      key: 'meetingData',
+      label: 'Horário',
+      className: 'w-[100px]',
+      render: (value: any, row: Task) => {
+        const meetingData = row.meetingData as any;
+        return meetingData?.time || '-';
+      }
+    },
+    {
+      key: 'assigneeId',
+      label: 'Responsável',
+      className: 'w-[150px]',
+      render: (value: string) => {
+        const user = users?.find(u => u.id === value);
+        return user?.name || '-';
+      }
+    },
+    {
+      key: 'assigneeIds',
+      label: 'Participantes',
+      className: 'w-[130px]',
+      render: (value: string[]) => {
+        if (!value || value.length === 0) return '-';
+        if (value.length === 1) {
+          const user = users?.find(u => u.id === value[0]);
+          return user?.name || '-';
+        }
+        return `+${value.length} pessoas`;
+      }
+    },
+    {
+      key: 'meetingData',
+      label: 'Local',
+      className: 'w-[150px]',
+      render: (value: any, row: Task) => {
+        const meetingData = row.meetingData as any;
+        return meetingData?.location || '-';
+      }
+    },
+    {
+      key: 'tagId',
+      label: 'Tag',
+      className: 'w-[120px]',
+      render: (value: string) => {
+        const area = areas?.find(a => a.id === value);
+        return area ? (
+          <Badge 
+            variant="secondary" 
+            className="gap-1"
+          >
+            <div 
+              className="h-2 w-2 rounded-full" 
+              style={{ backgroundColor: area.color || "#00A137" }}
+            />
+            {area.name}
+          </Badge>
+        ) : '-';
+      }
+    },
+    {
+      key: 'recurrence',
+      label: 'Recorrência',
+      className: 'w-[120px]',
+      render: (value: any, row: Task) => {
+        if (row.isRecurring) {
+          const recurrenceType = row.recurrenceType === 'weekly' ? 'Semanal' : 'Diária';
+          return `🔄 ${recurrenceType}`;
+        }
+        return '-';
+      }
+    }
+  ], [users, areas]);
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
@@ -878,19 +975,30 @@ export default function ReunioesPage() {
           <div className="flex items-center gap-1 ml-auto">
             <Button 
               size="icon" 
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              onClick={() => setViewMode("grid")}
-              data-testid="button-view-grid"
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              onClick={() => setViewMode("table")}
+              data-testid="button-view-table"
+              title="Visualização em Tabela"
             >
-              <LayoutGrid className="h-4 w-4" />
+              <Table className="h-4 w-4" />
             </Button>
             <Button 
               size="icon" 
               variant={viewMode === "list" ? "secondary" : "ghost"}
               onClick={() => setViewMode("list")}
               data-testid="button-view-list"
+              title="Visualização em Lista"
             >
               <List className="h-4 w-4" />
+            </Button>
+            <Button 
+              size="icon" 
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              onClick={() => setViewMode("grid")}
+              data-testid="button-view-grid"
+              title="Visualização em Cards"
+            >
+              <LayoutGrid className="h-4 w-4" />
             </Button>
             <Button 
               size="icon" 
@@ -932,6 +1040,15 @@ export default function ReunioesPage() {
                 </Button>
               )}
             </div>
+          ) : viewMode === "table" ? (
+            <DataTable
+              columns={meetingTableColumns}
+              data={filteredMeetings}
+              onRowClick={(meeting) => navigate(`/reunioes/${meeting.id}`)}
+              showCheckbox={false}
+              isLoading={tasksLoading}
+              emptyMessage="Nenhuma reunião encontrada."
+            />
           ) : (
             <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-2"}>
               {filteredMeetings.map((meeting) => {
