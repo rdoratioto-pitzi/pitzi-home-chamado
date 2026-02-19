@@ -408,6 +408,8 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                     const attachments = JSON.parse(ticket.attachments);
                     if (Array.isArray(attachments)) {
                       return attachments.map((url: string, i: number) => {
+                        // Garantir que url não seja null/undefined antes de usar startsWith/endsWith
+                        if (!url || typeof url !== 'string') return null;
                         const isVideo = url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
                         const isImage = url.startsWith("data:image/") || url.endsWith(".jpg") || url.endsWith(".jpeg") || url.endsWith(".png") || url.endsWith(".gif") || url.endsWith(".webp");
                         const isPdf = url.startsWith("data:application/pdf") || url.endsWith(".pdf");
@@ -710,6 +712,8 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                               const attachments = JSON.parse(c.attachments);
                               if (Array.isArray(attachments)) {
                                 return attachments.map((url, i) => {
+                                  // Garantir que url não seja null/undefined antes de usar startsWith/endsWith
+                                  if (!url || typeof url !== 'string') return null;
                                   const isVideo = url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
                                   return (
                                     <Dialog key={i}>
