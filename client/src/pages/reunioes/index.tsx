@@ -11,7 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
+import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle, GripVertical, Star } from "lucide-react";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { User as UserType } from "@shared/schema";
 import { RichTextarea } from "@/components/rich-textarea";
 import DOMPurify from "dompurify";
@@ -213,6 +216,162 @@ export default function ReunioesPage() {
     },
   });
 
+  // Mutation para definir tag como padrão
+  const setDefaultTagMutation = useMutation({
+    mutationFn: async ({ id, isDefault }: { id: string; isDefault: boolean }) => {
+      if (isDefault) {
+        return apiRequest("DELETE", `/api/task-tags/${id}/set-default`);
+      } else {
+        return apiRequest("POST", `/api/task-tags/${id}/set-default`, { scope: "meetings" });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "meetings"] });
+      toast({ title: "Tag padrão atualizada!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar tag padrão", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Mutation para reordenar tags
+  const reorderTagsMutation = useMutation({
+    mutationFn: async (tagIds: string[]) => {
+      return apiRequest("POST", "/api/task-tags/reorder", { tagIds, scope: "meetings" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "meetings"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao reordenar tags", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Query para buscar tag padrão
+  const { data: defaultTag } = useQuery<TaskArea | null>({
+    queryKey: ["/api/task-tags/default", "meetings"],
+    queryFn: async () => {
+      const res = await fetch("/api/task-tags/default?scope=meetings");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  // Sensors para drag and drop do dnd-kit
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  // Handler para drag end das tags
+  const handleTagDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = areas.findIndex(t => t.id === active.id);
+      const newIndex = areas.findIndex(t => t.id === over.id);
+      
+      const newOrder = arrayMove(areas, oldIndex, newIndex);
+      reorderTagsMutation.mutate(newOrder.map(t => t.id));
+    }
+  };
+
+  // Componente para tag ordenável
+  function SortableTag({ area, areaMeetingCount }: { area: TaskArea; areaMeetingCount: number }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: area.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+          selectedAreaId === area.id
+            ? "bg-primary/10 text-primary"
+            : "hover:bg-muted"
+        }`}
+        onClick={() => setSelectedAreaId(area.id)}
+        data-testid={`button-area-${area.id}`}
+      >
+        <button
+          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-muted rounded"
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-3 w-3 text-muted-foreground" />
+        </button>
+        <div
+          className="h-3 w-3 rounded-full flex-shrink-0"
+          style={{ backgroundColor: area.color || "#00A137" }}
+        />
+        {area.visibility === "shared" ? (
+          <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        ) : (
+          <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        )}
+        <span className="flex-1 truncate">{area.name}</span>
+        {area.isDefault && (
+          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 flex-shrink-0" />
+        )}
+        <Badge variant="secondary" className="text-xs flex-shrink-0">
+          {areaMeetingCount}
+        </Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`button-area-menu-${area.id}`}
+            >
+              <MoreHorizontal className="h-3 w-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setDefaultTagMutation.mutate({
+                  id: area.id,
+                  isDefault: area.isDefault || false
+                });
+              }}
+            >
+              <Star className={`h-4 w-4 mr-2 ${area.isDefault ? "fill-yellow-400 text-yellow-400" : ""}`} />
+              {area.isDefault ? "Remover como Padrão" : "Definir como Padrão"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleOpenAreaDialog(area)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => deleteAreaMutation.mutate(area.id)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  }
+
   const createMeetingMutation = useMutation({
     mutationFn: async (data: typeof newMeeting) => {
       const meetingDataPayload = {
@@ -384,7 +543,7 @@ export default function ReunioesPage() {
       type: "meeting_note",
       status: "todo",
       priority: "medium",
-      areaId: selectedAreaId || (areas[0]?.id || ""),
+      areaId: selectedAreaId || (defaultTag?.id || (areas[0]?.id || "")),
       createdBy: currentUserId,
       assigneeId: "",
       assigneeIds: [],
@@ -498,7 +657,7 @@ export default function ReunioesPage() {
   const handleOpenMeetingDialog = () => {
     setNewMeeting({
       ...newMeeting,
-      areaId: selectedAreaId || (areas[0]?.id || ""),
+      areaId: selectedAreaId || (defaultTag?.id || (areas[0]?.id || "")),
     });
     setShowMeetingDialog(true);
   };
@@ -639,66 +798,33 @@ export default function ReunioesPage() {
               {meetings.length}
             </Badge>
           </button>
-          {areas.map((area) => {
-            const areaCount = allMeetings.filter(m => m.tagId === area.id).length;
-            return (
-              <div
-                key={area.id}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 mb-1 group cursor-pointer ${
-                  selectedAreaId === area.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
-                }`}
-                onClick={() => setSelectedAreaId(area.id)}
-                data-testid={`button-area-${area.id}`}
+          {areas.length > 0 ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleTagDragEnd}
+            >
+              <SortableContext
+                items={areas.map(t => t.id)}
+                strategy={verticalListSortingStrategy}
               >
-                <div 
-                  className="h-3 w-3 rounded-full flex-shrink-0" 
-                  style={{ backgroundColor: area.color || "#00A137" }}
-                />
-                {area.visibility === "public" ? (
-                  <Globe className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                ) : area.visibility === "shared" ? (
-                  <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                ) : (
-                  <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                )}
-                <span className="truncate flex-1">{area.name}</span>
-                <Badge variant="secondary" className="text-xs">
-                  {areaCount}
-                </Badge>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenAreaDialog(area);
-                    }}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      className="text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteAreaMutation.mutate(area.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            );
-          })}
+                {areas.map((area) => {
+                  const areaCount = allMeetings.filter(m => m.tagId === area.id).length;
+                  return (
+                    <SortableTag
+                      key={area.id}
+                      area={area}
+                      areaMeetingCount={areaCount}
+                    />
+                  );
+                })}
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              Nenhuma tag criada
+            </div>
+          )}
         </div>
       </div>
 
