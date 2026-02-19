@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RichTextarea } from "@/components/rich-textarea";
+import DOMPurify from "dompurify";
 import { 
   Plus, 
   Folder, 
@@ -182,7 +183,8 @@ export default function TarefasPage() {
   const { data: globalTasks = [] } = useQuery<Task[]>({
     queryKey: ["/api/tasks", "tasks", "all"],
     queryFn: async () => {
-      const res = await fetch("/api/tasks");
+      // Filtrar apenas tarefas (excluir reuniões)
+      const res = await fetch("/api/tasks?type=task");
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
     },
@@ -191,9 +193,10 @@ export default function TarefasPage() {
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks", selectedAreaId, "tasks"],
     queryFn: async () => {
-      const url = selectedAreaId 
-        ? `/api/tasks?tagId=${selectedAreaId}` 
-        : "/api/tasks";
+      // Filtrar apenas tarefas (excluir reuniões)
+      const url = selectedAreaId
+        ? `/api/tasks?tagId=${selectedAreaId}&type=task`
+        : "/api/tasks?type=task";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
@@ -912,9 +915,11 @@ export default function TarefasPage() {
                                         </Badge>
                                       </div>
                                       {task.description && (
-                                        <p className="text-sm text-muted-foreground line-clamp-1 mb-2 break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                                          {task.description}
-                                        </p>
+                                        <div
+                                          className="text-sm text-muted-foreground line-clamp-1 mb-2 break-words"
+                                          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(task.description) }}
+                                        />
                                       )}
                                       <div className="flex items-center gap-2 flex-wrap">
                                         {taskArea && !selectedAreaId && (
