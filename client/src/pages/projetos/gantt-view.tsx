@@ -241,8 +241,13 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                     </Badge>
                   )}
                   {assignee && (
-                    <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <UserIcon className="h-3 w-3 text-primary" />
+                    <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
+                      <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <UserIcon className="h-3 w-3 text-primary" />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[60px]">
+                        {assignee.name.split(' ')[0]}
+                      </span>
                     </div>
                   )}
                 </div>
