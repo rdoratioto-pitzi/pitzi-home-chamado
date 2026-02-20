@@ -371,6 +371,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                             <div className="flex items-center h-full px-2 gap-1 overflow-hidden">
                               <span className="text-[10px] font-medium text-white truncate">
                                 {card.title}
+                                {assignee && ` • ${assignee.name.split(' ')[0]}`}
                               </span>
                             </div>
                             {card.progress != null && card.progress > 0 && (
