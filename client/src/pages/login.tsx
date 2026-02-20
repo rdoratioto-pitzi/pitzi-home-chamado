@@ -327,7 +327,8 @@ export default function LoginPage() {
                             data-testid="input-login-password"
                             aria-label="Senha para login"
                             aria-describedby="password-strength"
-                            {...field} 
+                            {...field}
+                            value={field.value || ""}
                           />
                           <Button
                             type="button"
