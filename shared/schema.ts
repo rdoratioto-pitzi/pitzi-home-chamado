@@ -122,6 +122,11 @@ export const insertTicketCommentSchema = createInsertSchema(ticketComments).omit
 export type InsertTicketComment = z.infer<typeof insertTicketCommentSchema>;
 export type TicketComment = typeof ticketComments.$inferSelect;
 
+// Ticket Comment with User data for JOIN queries
+export type TicketCommentWithUser = typeof ticketComments.$inferSelect & {
+  author: { id: string; name: string; email: string };
+};
+
 // ============== PROJECTS ==============
 export const projects = pgTable("projects", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -461,6 +466,11 @@ export const taskComments = pgTable("task_comments", {
 export const insertTaskCommentSchema = createInsertSchema(taskComments).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTaskComment = z.infer<typeof insertTaskCommentSchema>;
 export type TaskComment = typeof taskComments.$inferSelect;
+
+// Task Comment with User data for JOIN queries
+export type TaskCommentWithUser = typeof taskComments.$inferSelect & {
+  user: { id: string; name: string; email: string };
+};
 
 // ============== TAREFAS MODULE - TASK REACTIONS ==============
 export const taskReactions = pgTable("task_reactions", {

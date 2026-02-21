@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { RichTextarea } from "@/components/rich-textarea";
+import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -20,9 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Maximize2, Edit2, Check, X, Video, FileText, FileSpreadsheet, File, Download } from "lucide-react";
-import type { Ticket, TicketComment, User, Setting } from "@shared/schema";
+import type { Ticket, TicketComment, TicketCommentWithUser, User, Setting } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { format } from "date-fns";
 import {
   Dialog,
   DialogContent,
@@ -126,7 +127,6 @@ const getTimeOpenInfo = (createdAt: Date | string | null): { text: string; color
 
 export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   const [comment, setComment] = useState("");
-  const [commentImages, setCommentImages] = useState<string[]>([]);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
   const [editedAttachments, setEditedAttachments] = useState<string[]>([]);
@@ -137,14 +137,13 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     if (ticket) {
       console.log('[TicketDetailSheet] Carregando ticket:', ticket.id);
       setComment("");
-      setCommentImages([]);
       setEditedDescription(ticket.description || '');
       setEditedAttachments(ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : []);
       setIsEditingDescription(false);
     }
   }, [ticket?.id]);
 
-  const { data: comments = [] } = useQuery<TicketComment[]>({
+  const { data: comments = [] } = useQuery<TicketCommentWithUser[]>({
     queryKey: ["/api/tickets", ticket?.id, "comments"],
     enabled: !!ticket?.id,
   });
@@ -207,8 +206,6 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
       return apiRequest("POST", `/api/tickets/${ticket?.id}/comments`, {
         content: data.content,
         attachments: data.images.length > 0 ? JSON.stringify(data.images) : null,
-        userId: "admin",
-        ticketId: ticket?.id,
       });
     },
     onSuccess: () => {
@@ -222,9 +219,39 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     },
   });
 
-  const handleSubmitComment = () => {
-    if (comment.trim() || commentImages.length > 0) {
-      commentMutation.mutate({ content: comment, images: commentImages });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmitComment = async () => {
+    if (!comment.trim()) return;
+    
+    setIsSubmitting(true);
+    try {
+      console.log('Enviando comentário ticket:', { content: comment.trim() });
+      
+      const response = await fetch(`/api/tickets/${ticket?.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content: comment.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Erro response:', errorData);
+        throw new Error(errorData.error || 'Erro ao criar comentário');
+      }
+
+      const commentData = await response.json();
+      console.log('Comentário criado:', commentData);
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticket?.id, "comments"] });
+      setComment('');
+      toast({ title: "Comentário adicionado!" });
+    } catch (error: any) {
+      console.error('Erro:', error);
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -693,13 +720,15 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                 {comments.map((c) => (
                   <div key={c.id} className="flex gap-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs">AD</AvatarFallback>
+                      <AvatarFallback className="text-xs">
+                        {c.author.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">Admin</span>
+                        <span className="text-sm font-medium">{c.author.name}</span>
                         <span className="text-xs text-muted-foreground">
-                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString("pt-BR") : "-"}
+                          {c.createdAt ? format(new Date(c.createdAt), "dd/MM/yyyy HH:mm") : "-"}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
@@ -767,24 +796,22 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
         </div>
 
         <div className="border-t pt-4 space-y-2">
-          <RichTextarea
+          <Textarea
             placeholder="Adicione um comentário..."
             value={comment}
-            onChange={setComment}
-            images={commentImages}
-            onImagesChange={setCommentImages}
+            onChange={(e) => setComment(e.target.value)}
             rows={3}
-            maxLength={5000}
+            className="resize-none"
             data-testid="input-comment"
           />
-          <Button 
+          <Button
             onClick={handleSubmitComment}
-            disabled={(!comment.trim() && commentImages.length === 0) || commentMutation.isPending}
+            disabled={!comment.trim() || isSubmitting}
             className="w-full"
             data-testid="button-submit-comment"
           >
             <Send className="h-4 w-4 mr-2" />
-            {commentMutation.isPending ? "Enviando..." : "Enviar Comentário"}
+            {isSubmitting ? "Enviando..." : "Enviar Comentário"}
           </Button>
         </div>
       </SheetContent>

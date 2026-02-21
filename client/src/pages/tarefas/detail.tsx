@@ -50,7 +50,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import type { Task, TaskComment, TaskReaction, TaskArea, User as UserType } from "@shared/schema";
+import { format } from "date-fns";
+import type { Task, TaskComment, TaskCommentWithUser, TaskReaction, TaskArea, User as UserType } from "@shared/schema";
 
 // Função para remover tags HTML e retornar texto puro
 function stripHtml(html: string | null | undefined): string {
@@ -104,7 +105,7 @@ export default function TaskDetailPage() {
     queryKey: ["/api/tasks", id],
   });
 
-  const { data: comments = [] } = useQuery<TaskComment[]>({
+  const { data: comments = [] } = useQuery<TaskCommentWithUser[]>({
     queryKey: ["/api/tasks", id, "comments"],
     queryFn: async () => {
       const res = await fetch(`/api/tasks/${id}/comments`);
@@ -170,10 +171,7 @@ export default function TaskDetailPage() {
 
   const createCommentMutation = useMutation({
     mutationFn: async (data: { content: string; parentCommentId?: string }) => {
-      return apiRequest("POST", `/api/tasks/${id}/comments`, {
-        ...data,
-        authorId: "admin",
-      });
+      return apiRequest("POST", `/api/tasks/${id}/comments`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "comments"] });
@@ -201,12 +199,40 @@ export default function TaskDetailPage() {
     updateTaskMutation.mutate(data);
   };
 
-  const handleSubmitComment = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmitComment = async () => {
     if (!newComment.trim()) return;
-    createCommentMutation.mutate({
-      content: newComment,
-      parentCommentId: replyingTo || undefined,
-    });
+    
+    setIsSubmitting(true);
+    try {
+      console.log('Enviando comentário:', { content: newComment.trim() });
+      
+      const response = await fetch(`/api/tasks/${id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content: newComment.trim() }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Erro response:', errorData);
+        throw new Error(errorData.error || 'Erro ao criar comentário');
+      }
+
+      const comment = await response.json();
+      console.log('Comentário criado:', comment);
+      
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "comments"] });
+      setNewComment('');
+      toast({ title: "Comentário adicionado!" });
+    } catch (error: any) {
+      console.error('Erro:', error);
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const convertActionToTask = async (action: { description: string; responsible: string; deadline: string }, _index: number) => {
@@ -834,7 +860,7 @@ export default function TaskDetailPage() {
                   <Button 
                     size="sm" 
                     onClick={handleSubmitComment}
-                    disabled={!newComment.trim() || createCommentMutation.isPending}
+                    disabled={!newComment.trim() || isSubmitting}
                     data-testid="button-submit-comment"
                   >
                     <Send className="h-4 w-4 mr-2" />
@@ -857,29 +883,29 @@ function CommentItem({
   onReact,
   users,
   isReply = false 
-}: { 
-  comment: TaskComment; 
-  replies: TaskComment[];
+}: {
+  comment: TaskCommentWithUser;
+  replies: TaskCommentWithUser[];
   onReply: () => void;
   onReact: (emoji: string) => void;
   users: UserType[];
   isReply?: boolean;
 }) {
-  const author = users.find(u => u.id === comment.authorId);
+  const author = comment.user;
   
   return (
     <div className={`${isReply ? "ml-10 mt-3" : ""}`}>
       <div className="flex items-start gap-3">
         <Avatar className="h-8 w-8">
           <AvatarFallback className="bg-primary/20 text-primary text-xs">
-            {author?.name?.slice(0, 2).toUpperCase() || "??"}
+            {author?.name.split(' ').map(n => n[0]).join('').toUpperCase()}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-medium text-sm">{author?.name || "Usuário"}</span>
+            <span className="font-medium text-sm">{author?.name}</span>
             <span className="text-xs text-muted-foreground">
-              {comment.createdAt ? new Date(comment.createdAt).toLocaleString("pt-BR") : ""}
+              {comment.createdAt ? format(new Date(comment.createdAt), "dd/MM/yyyy HH:mm") : "-"}
             </span>
           </div>
           <p className="text-sm whitespace-pre-wrap">{comment.content}</p>

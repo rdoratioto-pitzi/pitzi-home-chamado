@@ -3,6 +3,7 @@ import {
   type Ticket, type InsertTicket,
   type TicketResponsavel, type InsertTicketResponsavel,
   type TicketComment, type InsertTicketComment,
+  type TicketCommentWithUser,
   type Project, type InsertProject,
   type KanbanColumn, type InsertKanbanColumn,
   type KanbanCard, type InsertKanbanCard,
@@ -20,6 +21,7 @@ import {
   type TaskAreaMember, type InsertTaskAreaMember,
   type Task, type InsertTask,
   type TaskComment, type InsertTaskComment,
+  type TaskCommentWithUser,
   type TaskReaction, type InsertTaskReaction,
   type TaskAttachment, type InsertTaskAttachment,
   type TaskTemplate, type InsertTaskTemplate,
@@ -65,7 +67,7 @@ import {
   promptsLibrary, promptUserFavorites
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql } from "drizzle-orm";
+import { eq, and, or, sql, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -92,7 +94,7 @@ export interface IStorage {
   findResponsavelForTicket(categoria: string, tipo: string): Promise<string | null>;
 
   // Ticket Comments
-  getTicketComments(ticketId: string): Promise<TicketComment[]>;
+  getTicketComments(ticketId: string): Promise<TicketCommentWithUser[]>;
   createTicketComment(comment: InsertTicketComment): Promise<TicketComment>;
 
   // Projects
@@ -192,7 +194,7 @@ export interface IStorage {
   deleteTask(id: string): Promise<boolean>;
 
   // Task Comments
-  getTaskComments(taskId: string): Promise<TaskComment[]>;
+  getTaskComments(taskId: string): Promise<TaskCommentWithUser[]>;
   getTaskComment(id: string): Promise<TaskComment | undefined>;
   createTaskComment(comment: InsertTaskComment): Promise<TaskComment>;
   updateTaskComment(id: string, data: Partial<TaskComment>): Promise<TaskComment | undefined>;
@@ -580,8 +582,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Ticket Comments
-  async getTicketComments(ticketId: string): Promise<TicketComment[]> {
-    return await db.select().from(ticketComments).where(eq(ticketComments.ticketId, ticketId));
+  async getTicketComments(ticketId: string): Promise<TicketCommentWithUser[]> {
+    return await db
+      .select({
+        id: ticketComments.id,
+        tenantId: ticketComments.tenantId,
+        ticketId: ticketComments.ticketId,
+        userId: ticketComments.userId,
+        content: ticketComments.content,
+        attachments: ticketComments.attachments,
+        isInternal: ticketComments.isInternal,
+        createdAt: ticketComments.createdAt,
+        author: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(ticketComments)
+      .innerJoin(users, eq(ticketComments.userId, users.id))
+      .where(eq(ticketComments.ticketId, ticketId))
+      .orderBy(desc(ticketComments.createdAt));
   }
   async createTicketComment(insertComment: InsertTicketComment): Promise<TicketComment> {
     const [comment] = await db.insert(ticketComments).values(insertComment).returning();
@@ -916,9 +937,28 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Task Comments
-  async getTaskComments(taskId: string): Promise<TaskComment[]> {
+  async getTaskComments(taskId: string): Promise<TaskCommentWithUser[]> {
     if (!db) return [];
-    return await db.select().from(taskComments).where(eq(taskComments.taskId, taskId));
+    return await db
+      .select({
+        id: taskComments.id,
+        tenantId: taskComments.tenantId,
+        taskId: taskComments.taskId,
+        authorId: taskComments.authorId,
+        content: taskComments.content,
+        parentCommentId: taskComments.parentCommentId,
+        createdAt: taskComments.createdAt,
+        updatedAt: taskComments.updatedAt,
+        user: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(taskComments)
+      .innerJoin(users, eq(taskComments.authorId, users.id))
+      .where(eq(taskComments.taskId, taskId))
+      .orderBy(desc(taskComments.createdAt));
   }
   async getTaskComment(id: string): Promise<TaskComment | undefined> {
     const [c] = await db.select().from(taskComments).where(eq(taskComments.id, id));
