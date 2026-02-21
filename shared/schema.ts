@@ -372,6 +372,8 @@ export const taskTags = pgTable("task_tags", {
   scope: text("scope").notNull().default("tasks"),
   color: text("color").default("#00A137"),
   icon: text("icon").default("folder"),
+  isDefault: boolean("is_default").default(false),
+  displayOrder: integer("display_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

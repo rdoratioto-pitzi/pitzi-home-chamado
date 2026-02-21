@@ -59,8 +59,8 @@ import {
   insertPricingAlertSchema,
 } from "@shared/schema";
 import { z } from "zod";
-import { sql, eq, or, and } from "drizzle-orm";
-import { tasks } from "@shared/schema";
+import { sql, eq, or, and, asc } from "drizzle-orm";
+import { tasks, taskTags } from "@shared/schema";
 import { db } from "./db";
 
 export async function registerRoutes(
@@ -69,8 +69,30 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   function getSessionUser(req: any) {
-    return { userId: req.session.userId!, isAdmin: req.session.isAdmin === true };
+    if (!req.session?.userId) {
+      const err = new Error("Unauthorized: No session found");
+      (err as any).status = 401;
+      throw err;
+    }
+    return { userId: req.session.userId, isAdmin: req.session.isAdmin === true };
   }
+
+  const requireAuth = (req: any, res: any, next: any) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "Unauthorized: No session found" });
+    }
+    next();
+  };
+
+  const requireAdmin = (req: any, res: any, next: any) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "Unauthorized: No session found" });
+    }
+    if (req.session.isAdmin !== true) {
+      return res.status(403).json({ error: "Forbidden: Admin access required" });
+    }
+    next();
+  };
 
   async function getUserAccessibleAreaIds(userId: string): Promise<string[]> {
     const areas = await storage.getTaskAreas(userId);
@@ -342,18 +364,20 @@ export async function registerRoutes(
   });
 
   // ============== USERS ==============
-  app.get("/api/users", async (req, res) => {
+  app.get("/api/users", requireAdmin, async (req, res) => {
     const users = await storage.getUsers();
-    res.json(users);
+    const safeUsers = users.map(({ password, ...user }) => user);
+    res.json(safeUsers);
   });
 
-  app.get("/api/users/:id", async (req, res) => {
+  app.get("/api/users/:id", requireAdmin, async (req, res) => {
     const user = await storage.getUser(req.params.id);
     if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
+    const { password, ...safeUser } = user;
+    res.json(safeUser);
   });
 
-  app.post("/api/users", async (req, res) => {
+  app.post("/api/users", requireAdmin, async (req, res) => {
     try {
       const validated = insertUserSchema.parse(req.body);
       const user = await storage.createUser(validated);
@@ -405,7 +429,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/users/:id", async (req, res) => {
+  app.patch("/api/users/:id", requireAdmin, async (req, res) => {
     try {
       const partialSchema = insertUserSchema.partial();
       const validated = partialSchema.parse(req.body);
@@ -420,13 +444,8 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/users/:id/reset-password", async (req, res) => {
+  app.post("/api/users/:id/reset-password", requireAdmin, async (req, res) => {
     try {
-      const { isAdmin } = getSessionUser(req);
-      if (!isAdmin) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
       const user = await storage.getUser(req.params.id);
       if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -452,24 +471,49 @@ export async function registerRoutes(
   });
 
   // ============== TICKETS ==============
-  app.get("/api/tickets", async (req, res) => {
-    const tickets = await storage.getTickets();
-    res.json(tickets);
-  });
-
-  app.get("/api/tickets/:id", async (req, res) => {
-    const ticket = await storage.getTicket(req.params.id);
-    if (!ticket) return res.status(404).json({ error: "Ticket not found" });
-    res.json(ticket);
-  });
-
-  app.post("/api/tickets", async (req, res) => {
+  app.get("/api/tickets", requireAuth, async (req, res) => {
     try {
-      const data = { ...req.body };
-      // Preencher solicitante automaticamente se não enviado
-      if (!data.requesterId && req.user) {
-        data.requesterId = req.user.id;
+      const { userId, isAdmin } = getSessionUser(req);
+      
+      if (isAdmin) {
+        const tickets = await storage.getTickets();
+        return res.json(tickets);
       }
+      
+      const tickets = await storage.getTickets({ requesterId: userId, assigneeId: userId });
+      res.json(tickets);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tickets/:id", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const ticket = await storage.getTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      res.json(ticket);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tickets", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const data = { ...req.body };
+
+      // For non-admin users, the requesterId is ALWAYS set to the current user's ID.
+      // Admins can specify a requesterId, but if they don't, use their own.
+      if (!isAdmin || !data.requesterId) {
+        data.requesterId = userId;
+      }
+
       const validated = insertTicketSchema.parse(data);
 
       if (!validated.assigneeId && validated.category && validated.type) {
@@ -513,7 +557,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/tickets/:id", async (req, res) => {
+  app.patch("/api/tickets/:id", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
       const oldTicket = await storage.getTicket(req.params.id);
@@ -523,7 +567,20 @@ export async function registerRoutes(
       }
 
       // Auto-fill timestamp fields based on status changes
-      const updateData: any = { ...req.body };
+      let updateData: any = { ...req.body };
+
+      // Restrict field updates for non-admins (whitelist approach)
+      if (!isAdmin) {
+        const allowedFields = ["status", "title", "description", "attachments", "location", "impact", "dueDate"];
+        const filteredData: any = {};
+        allowedFields.forEach(field => {
+          if (updateData[field] !== undefined) {
+            filteredData[field] = updateData[field];
+          }
+        });
+        updateData = filteredData;
+      }
+
       if (req.body.status && req.body.status !== oldTicket.status) {
         if (req.body.status === "resolved" && !oldTicket.dataResolucao) {
           updateData.dataResolucao = new Date();
@@ -585,7 +642,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/tickets/:id", async (req, res) => {
+  app.delete("/api/tickets/:id", requireAuth, async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
     const ticket = await storage.getTicket(req.params.id);
     if (!ticket) return res.status(404).json({ error: "Ticket not found" });
@@ -598,20 +655,40 @@ export async function registerRoutes(
   });
 
   // Ticket Comments
-  app.get("/api/tickets/:id/comments", async (req, res) => {
-    const comments = await storage.getTicketComments(req.params.id);
-    res.json(comments);
+  app.get("/api/tickets/:id/comments", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const ticket = await storage.getTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const comments = await storage.getTicketComments(req.params.id);
+      res.json(comments);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
   });
 
-  app.post("/api/tickets/:id/comments", async (req, res) => {
+  app.post("/api/tickets/:id/comments", requireAuth, async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const ticket = await storage.getTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+      // Only admins, the ticket's requester, or the ticket's assignee should be allowed to post comments.
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       const validated = insertTicketCommentSchema.parse({
         ...req.body,
         ticketId: req.params.id,
       });
       const comment = await storage.createTicketComment(validated);
 
-      const ticket = await storage.getTicket(req.params.id);
       if (ticket) {
         // Set first response timestamp if assignee comments and it's not set yet
         if (ticket.assigneeId && comment.userId === ticket.assigneeId && !ticket.dataPrimeiraResposta) {
@@ -692,18 +769,18 @@ export async function registerRoutes(
   });
 
   // ============== TICKET RESPONSAVEIS (Assignment Rules) ==============
-  app.get("/api/ticket-responsaveis", async (req, res) => {
+  app.get("/api/ticket-responsaveis", requireAuth, async (req, res) => {
     const responsaveis = await storage.getTicketResponsaveis();
     res.json(responsaveis);
   });
 
-  app.get("/api/ticket-responsaveis/:id", async (req, res) => {
+  app.get("/api/ticket-responsaveis/:id", requireAuth, async (req, res) => {
     const responsavel = await storage.getTicketResponsavel(req.params.id);
     if (!responsavel) return res.status(404).json({ error: "Responsavel not found" });
     res.json(responsavel);
   });
 
-  app.post("/api/ticket-responsaveis", async (req, res) => {
+  app.post("/api/ticket-responsaveis", requireAdmin, async (req, res) => {
     try {
       const validated = insertTicketResponsavelSchema.parse(req.body);
       const responsavel = await storage.createTicketResponsavel(validated);
@@ -716,7 +793,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/ticket-responsaveis/:id", async (req, res) => {
+  app.patch("/api/ticket-responsaveis/:id", requireAdmin, async (req, res) => {
     try {
       const partialSchema = insertTicketResponsavelSchema.partial();
       const validated = partialSchema.parse(req.body);
@@ -731,13 +808,13 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/ticket-responsaveis/:id", async (req, res) => {
+  app.delete("/api/ticket-responsaveis/:id", requireAdmin, async (req, res) => {
     const deleted = await storage.deleteTicketResponsavel(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Responsavel not found" });
     res.status(204).send();
   });
 
-  app.get("/api/ticket-responsaveis/find/:categoria/:tipo", async (req, res) => {
+  app.get("/api/ticket-responsaveis/find/:categoria/:tipo", requireAuth, async (req, res) => {
     const responsavelId = await storage.findResponsavelForTicket(req.params.categoria, req.params.tipo);
     res.json({ responsavelId });
   });
@@ -1398,6 +1475,29 @@ export async function registerRoutes(
     res.json(filtered);
   });
 
+  // Buscar tag padrão - DEVE estar antes da rota /:id
+  app.get("/api/task-tags/default", async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      const { scope } = req.query; // 'tasks' ou 'meetings'
+
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const userTags = await storage.getTaskAreas(userId);
+      const defaultTag = userTags.find(t =>
+        t.isDefault === true &&
+        (!scope || t.scope === scope)
+      );
+
+      res.json(defaultTag || null);
+    } catch (error) {
+      console.error("Erro ao buscar tag padrão:", error);
+      res.status(500).json({ error: "Erro ao buscar tag padrão" });
+    }
+  });
+
   app.get("/api/task-tags/:id", async (req, res) => {
     const { userId } = getSessionUser(req);
     const area = await storage.getTaskArea(req.params.id);
@@ -1687,15 +1787,125 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  // ============== TASK TAGS - DEFAULT & REORDER ==============
+  // Definir tag como padrão
+  app.post("/api/task-tags/:id/set-default", async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { id } = req.params;
+      const { scope } = req.body; // 'tasks' ou 'meetings'
+
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      // Verificar se a tag existe e pertence ao usuário
+      const tag = await storage.getTaskArea(id);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag não encontrada" });
+      }
+
+      if (!isAdmin && tag.ownerId !== userId) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      // Remover padrão de todas as tags do usuário no mesmo escopo
+      const userTags = await storage.getTaskAreas(userId);
+      const tagsOfSameScope = userTags.filter(t => t.scope === (scope || tag.scope));
+      
+      for (const t of tagsOfSameScope) {
+        if (t.isDefault) {
+          await db.update(taskTags).set({ isDefault: false }).where(eq(taskTags.id, t.id));
+        }
+      }
+
+      // Definir esta tag como padrão
+      await db.update(taskTags).set({ isDefault: true }).where(eq(taskTags.id, id));
+
+      res.json({ success: true, message: "Tag definida como padrão" });
+    } catch (error) {
+      console.error("Erro ao definir tag padrão:", error);
+      res.status(500).json({ error: "Erro ao definir tag padrão" });
+    }
+  });
+
+  // Remover tag como padrão
+  app.delete("/api/task-tags/:id/set-default", async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { id } = req.params;
+
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      const tag = await storage.getTaskArea(id);
+      if (!tag) {
+        return res.status(404).json({ error: "Tag não encontrada" });
+      }
+
+      if (!isAdmin && tag.ownerId !== userId) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      await db.update(taskTags).set({ isDefault: false }).where(eq(taskTags.id, id));
+
+      res.json({ success: true, message: "Tag removida como padrão" });
+    } catch (error) {
+      console.error("Erro ao remover tag padrão:", error);
+      res.status(500).json({ error: "Erro ao remover tag padrão" });
+    }
+  });
+
+  // Reordenar tags
+  app.post("/api/task-tags/reorder", async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { tagIds, scope } = req.body; // Array de IDs na nova ordem
+
+      if (!userId) {
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+
+      if (!Array.isArray(tagIds)) {
+        return res.status(400).json({ error: "tagIds deve ser um array" });
+      }
+
+      // Atualizar displayOrder de cada tag
+      for (let i = 0; i < tagIds.length; i++) {
+        const tag = await storage.getTaskArea(tagIds[i]);
+        if (!tag) continue;
+        
+        // Verificar permissão
+        if (!isAdmin && tag.ownerId !== userId) {
+          continue; // Pular tags que não pertencem ao usuário
+        }
+
+        await db
+          .update(taskTags)
+          .set({ displayOrder: i })
+          .where(eq(taskTags.id, tagIds[i]));
+      }
+
+      res.json({ success: true, message: "Ordem das tags atualizada" });
+    } catch (error) {
+      console.error("Erro ao reordenar tags:", error);
+      res.status(500).json({ error: "Erro ao reordenar tags" });
+    }
+  });
+
   // ============== TASKS ==============
   app.get("/api/tasks", async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
 
-    // TODOS os usuários (incluindo admin) seguem a mesma regra de segurança:
-    // Ver apenas tarefas próprias, atribuídas, ou shared/public em áreas acessíveis
+    // TODOS os usuários (incluindo admin) seguem a MESMA regra de segurança:
+    // Admin NÃO tem acesso especial a itens privados de outros usuários
 
-    // Usuários comuns: filtro de segurança no banco
-    // Retorna: próprias tarefas + tarefas shared/public de áreas acessíveis
+    // Regras de visibilidade:
+    // - private: Apenas o criador vê
+    // - shared: Criador + usuários em áreas acessíveis
+    // - public: Todos veem
+
     const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
 
     // Construir query segura diretamente no banco
@@ -1710,47 +1920,52 @@ export async function registerRoutes(
     if (req.query.type) conditions.push(eq(tasks.type, req.query.type as string));
 
     // FILTRO DE SEGURANÇA CRÍTICO:
-    // Usuário vê apenas:
-    // 1. Tarefas criadas por ele (próprias)
-    // 2. Tarefas atribuídas a ele
-    // 3. Tarefas compartilhadas (shared) ou públicas (public) em áreas acessíveis
+    // Usuário (incluindo admin) vê apenas:
+    // 1. Tarefas criadas por ele (todas, incluindo privadas)
+    // 2. Tarefas atribuídas a ele (exceto privadas de outros)
+    // 3. Tarefas compartilhadas (shared) em áreas acessíveis
+    // 4. Tarefas públicas (public) de qualquer área
     const securityConditions = [
-      eq(tasks.createdBy, userId), // próprias tarefas
-      eq(tasks.assigneeId, userId), // atribuídas a ele
+      // 1. Próprias tarefas (incluindo privadas) - sempre visíveis para o criador
+      eq(tasks.createdBy, userId),
+      
+      // 2. Tarefas atribuídas ao usuário, mas NÃO privadas de outros
+      and(
+        eq(tasks.assigneeId, userId),
+        sql`${tasks.createdBy} = ${userId} OR ${tasks.visibility} != 'private'`
+      ),
     ];
 
-    // Adicionar condição para tarefas shared/public em áreas acessíveis
+    // 3. Tarefas shared em áreas acessíveis
     if (accessibleAreaIds.length > 0) {
       securityConditions.push(
         and(
-          or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public')),
+          eq(tasks.visibility, 'shared'),
           or(...accessibleAreaIds.map(areaId => eq(tasks.tagId, areaId)))
         )
       );
-    } else {
-      // Sem acesso a áreas, só vê próprias e atribuídas
-      securityConditions.push(
-        and(
-          or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public')),
-          sql`FALSE` // nenhuma área acessível
-        )
-      );
     }
+
+    // 4. Tarefas públicas - todos podem ver
+    securityConditions.push(eq(tasks.visibility, 'public'));
 
     conditions.push(or(...securityConditions));
 
     const userTasks = await query.where(and(...conditions));
 
     // Filtrar por multi-assignee em memória (não é possível fazer no SQL diretamente)
+    // Apenas tarefas não-privadas onde o usuário está na lista de assigneeIds
     const multiAssigneeTasks = await db.select().from(tasks).where(
       and(
         sql`${tasks.assigneeIds} IS NOT NULL`,
-        or(eq(tasks.visibility, 'shared'), eq(tasks.visibility, 'public'))
+        sql`${tasks.visibility} != 'private' OR ${tasks.createdBy} = ${userId}`
       )
     );
 
     const filteredMultiAssignee = multiAssigneeTasks.filter(t => {
       if (!t.assigneeIds) return false;
+      // Não incluir tarefas privadas de outros usuários
+      if (t.visibility === 'private' && t.createdBy !== userId) return false;
       try {
         const ids = typeof t.assigneeIds === 'string' ? JSON.parse(t.assigneeIds) : t.assigneeIds;
         return Array.isArray(ids) && ids.includes(userId);
@@ -1765,11 +1980,11 @@ export async function registerRoutes(
 
     // Logs de auditoria
     const ownTasks = finalTasks.filter(t => t.createdBy === userId).length;
-    const assignedTasks = finalTasks.filter(t => t.assigneeId === userId).length;
+    const assignedTasks = finalTasks.filter(t => t.assigneeId === userId && t.createdBy !== userId).length;
     const sharedTasks = finalTasks.filter(t => t.visibility === 'shared' && t.createdBy !== userId).length;
     const publicTasks = finalTasks.filter(t => t.visibility === 'public' && t.createdBy !== userId).length;
 
-    console.log(`[AUDIT] User ${userId} acessou ${finalTasks.length} tarefas:`);
+    console.log(`[AUDIT] User ${userId} (isAdmin: ${isAdmin}) acessou ${finalTasks.length} tarefas:`);
     console.log(`[AUDIT]   - Próprias: ${ownTasks}`);
     console.log(`[AUDIT]   - Atribuídas: ${assignedTasks}`);
     console.log(`[AUDIT]   - Compartilhadas: ${sharedTasks}`);
@@ -1782,13 +1997,51 @@ export async function registerRoutes(
     const { userId, isAdmin } = getSessionUser(req);
     const task = await storage.getTask(req.params.id);
     if (!task) return res.status(404).json({ error: "Task not found" });
-    if (!isAdmin && task.tagId) {
+
+    // Verificar acesso seguindo as mesmas regras de visibilidade (incluindo admin)
+    // Private: apenas o criador
+    // Shared: criador + usuários em áreas acessíveis
+    // Public: todos
+    
+    // Se for o criador, sempre tem acesso
+    if (task.createdBy === userId) {
+      return res.json(task);
+    }
+
+    // Se for privada e não for o criador, negar acesso (mesmo para admin)
+    if (task.visibility === 'private') {
+      return res.status(403).json({ error: "Access denied - private task" });
+    }
+
+    // Se for pública, permitir acesso
+    if (task.visibility === 'public') {
+      return res.json(task);
+    }
+
+    // Se for compartilhada (shared), verificar acesso à área
+    if (task.visibility === 'shared' && task.tagId) {
       const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
-      if (!accessibleAreaIds.includes(task.tagId)) {
-        return res.status(403).json({ error: "Access denied" });
+      if (accessibleAreaIds.includes(task.tagId)) {
+        return res.json(task);
       }
     }
-    res.json(task);
+
+    // Verificar se está atribuída ao usuário (exceto privadas)
+    if (task.assigneeId === userId && task.visibility !== 'private') {
+      return res.json(task);
+    }
+
+    // Verificar multi-assignee
+    if (task.assigneeIds && task.visibility !== 'private') {
+      try {
+        const ids = typeof task.assigneeIds === 'string' ? JSON.parse(task.assigneeIds) : task.assigneeIds;
+        if (Array.isArray(ids) && ids.includes(userId)) {
+          return res.json(task);
+        }
+      } catch (e) { }
+    }
+
+    return res.status(403).json({ error: "Access denied" });
   });
 
   app.post("/api/tasks", async (req, res) => {
@@ -1974,6 +2227,54 @@ export async function registerRoutes(
 
       res.json(task);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update task" });
+    }
+  });
+
+  // PATCH route for partial task updates (inline editing)
+  app.patch("/api/tasks/:id", async (req, res) => {
+    try {
+      console.log('📝 PATCH /api/tasks/:id', { id: req.params.id, updates: req.body });
+      
+      const { userId: sessionUserId, isAdmin } = getSessionUser(req);
+      
+      if (!sessionUserId) {
+        console.log('❌ Usuário não autenticado');
+        return res.status(401).json({ error: "Não autenticado" });
+      }
+      
+      const existingTask = await storage.getTask(req.params.id);
+      if (!existingTask) {
+        console.log('❌ Tarefa não encontrada:', req.params.id);
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      if (!isAdmin && existingTask.tagId) {
+        const accessibleAreaIds = await getUserAccessibleAreaIds(sessionUserId);
+        if (!accessibleAreaIds.includes(existingTask.tagId)) {
+          console.log('❌ Acesso negado à tarefa');
+          return res.status(403).json({ error: "Access denied to this task" });
+        }
+      }
+      
+      const partialSchema = insertTaskSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      
+      console.log('💾 Atualizando tarefa com dados:', validated);
+      const task = await storage.updateTask(req.params.id, validated);
+      
+      if (!task) {
+        console.log('❌ Falha ao atualizar tarefa');
+        return res.status(404).json({ error: "Task not found" });
+      }
+      
+      console.log('✅ Tarefa atualizada com sucesso:', task);
+      res.json(task);
+    } catch (error) {
+      console.error('❌ Erro ao atualizar tarefa:', error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation failed", details: error.errors });
       }

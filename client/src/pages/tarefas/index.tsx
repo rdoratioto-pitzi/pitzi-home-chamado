@@ -12,11 +12,18 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RichTextarea } from "@/components/rich-textarea";
-import { 
-  Plus, 
-  Folder, 
-  Users, 
-  User, 
+import { DataTable } from "@/components/data-table";
+import { cn } from "@/lib/utils";
+import DOMPurify from "dompurify";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
+  Plus,
+  Folder,
+  Users,
+  User,
   Search,
   Filter,
   MoreHorizontal,
@@ -33,9 +40,14 @@ import {
   Repeat,
   X,
   GripVertical,
-  Maximize2
+  Maximize2,
+  Star,
+  Table
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { User as UserType } from "@shared/schema";
 import {
   Dialog,
@@ -71,14 +83,210 @@ const statusConfig = {
 };
 
 const priorityConfig = {
-  low: { label: "Baixa", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400" },
-  medium: { label: "Média", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300" },
-  high: { label: "Alta", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300" },
+  low: { label: "Baixa", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", emoji: "🟢" },
+  medium: { label: "Média", color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300", emoji: "🟡" },
+  high: { label: "Alta", color: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300", emoji: "🔴" },
 };
 
 const typeConfig = {
   task: { label: "Tarefa", icon: CheckCircle2 },
 };
+
+// Componente de Status editável inline
+function EditableStatus({ task, onUpdate }: { task: Task; onUpdate: (id: string, updates: Partial<Task>) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const config = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.todo;
+  const Icon = config.icon;
+
+  console.log('🎯 EditableStatus render:', { taskId: task.id, status: task.status });
+
+  return (
+    <Select
+      value={task.status}
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      onValueChange={(value) => {
+        console.log('📝 Status mudando de', task.status, 'para', value);
+        onUpdate(task.id, { status: value });
+        setIsOpen(false);
+      }}
+    >
+      <SelectTrigger
+        className="h-7 w-auto border-0 bg-transparent p-0 hover:bg-muted/50 focus:ring-0 focus:ring-offset-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+      >
+        <Badge className={cn("gap-1 cursor-pointer", config.color)}>
+          <Icon className="h-3 w-3" />
+          <span>{config.label}</span>
+        </Badge>
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        <SelectItem value="todo">
+          <div className="flex items-center gap-2">
+            <Circle className="h-3 w-3" />
+            A Fazer
+          </div>
+        </SelectItem>
+        <SelectItem value="doing">
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3" />
+            Em Andamento
+          </div>
+        </SelectItem>
+        <SelectItem value="done">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-3 w-3" />
+            Concluído
+          </div>
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+// Componente de Prioridade editável inline
+function EditablePriority({ task, onUpdate }: { task: Task; onUpdate: (id: string, updates: Partial<Task>) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const config = priorityConfig[task.priority as keyof typeof priorityConfig] || priorityConfig.medium;
+
+  console.log('🎯 EditablePriority render:', { taskId: task.id, priority: task.priority });
+
+  return (
+    <Select
+      value={task.priority}
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      onValueChange={(value) => {
+        console.log('📝 Prioridade mudando de', task.priority, 'para', value);
+        onUpdate(task.id, { priority: value });
+        setIsOpen(false);
+      }}
+    >
+      <SelectTrigger
+        className="h-7 w-auto border-0 bg-transparent p-0 hover:bg-muted/50 focus:ring-0 focus:ring-offset-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+      >
+        <Badge className={cn("cursor-pointer", config.color)}>{config.label}</Badge>
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        <SelectItem value="low">
+          <div className="flex items-center gap-2">
+            🟢 Baixa
+          </div>
+        </SelectItem>
+        <SelectItem value="medium">
+          <div className="flex items-center gap-2">
+            🟡 Média
+          </div>
+        </SelectItem>
+        <SelectItem value="high">
+          <div className="flex items-center gap-2">
+            🔴 Alta
+          </div>
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+// Componente de Data editável inline
+function EditableDate({ task, onUpdate }: { task: Task; onUpdate: (id: string, updates: Partial<Task>) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const date = task.dueDate ? new Date(task.dueDate) : undefined;
+
+  console.log('🎯 EditableDate render:', { taskId: task.id, dueDate: task.dueDate });
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="text-sm text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsOpen(true);
+          }}
+        >
+          <Calendar className="h-3 w-3" />
+          {date ? format(date, 'dd/MM/yyyy', { locale: ptBR }) : 'Selecionar'}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start" onClick={(e) => e.stopPropagation()}>
+        <CalendarComponent
+          mode="single"
+          selected={date}
+          onSelect={(newDate) => {
+            console.log('📝 Data mudando de', task.dueDate, 'para', newDate);
+            if (newDate) {
+              onUpdate(task.id, { dueDate: newDate.toISOString() });
+            }
+            setIsOpen(false);
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Componente de Tag editável inline
+function EditableTag({ task, tags, onUpdate }: { task: Task; tags: TaskArea[]; onUpdate: (id: string, updates: Partial<Task>) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const currentTag = tags.find(t => t.id === task.tagId);
+
+  console.log('🎯 EditableTag render:', { taskId: task.id, tagId: task.tagId, currentTag: currentTag?.name });
+
+  return (
+    <Select
+      value={task.tagId || ""}
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      onValueChange={(value) => {
+        console.log('📝 Tag mudando de', task.tagId, 'para', value);
+        onUpdate(task.id, { tagId: value || null });
+        setIsOpen(false);
+      }}
+    >
+      <SelectTrigger
+        className="h-7 w-auto border-0 bg-transparent p-0 hover:bg-muted/50 focus:ring-0 focus:ring-offset-0"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+      >
+        {currentTag ? (
+          <Badge variant="secondary" className="gap-1 cursor-pointer">
+            <div
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: currentTag.color || "#00A137" }}
+            />
+            {currentTag.name}
+          </Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">-</span>
+        )}
+      </SelectTrigger>
+      <SelectContent onClick={(e) => e.stopPropagation()}>
+        {tags.map(tag => (
+          <SelectItem key={tag.id} value={tag.id}>
+            <div className="flex items-center gap-2">
+              <div
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: tag.color || "#00A137" }}
+              />
+              {tag.name}
+            </div>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 export default function TarefasPage() {
   const [, navigate] = useLocation();
@@ -90,7 +298,7 @@ export default function TarefasPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list" | "kanban">("list");
+  const [viewMode, setViewMode] = useState<"table" | "grid" | "list" | "kanban">("table");
   const [sidebarWidth, setSidebarWidth] = useState(256);
   const sidebarResizing = useRef(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -182,7 +390,8 @@ export default function TarefasPage() {
   const { data: globalTasks = [] } = useQuery<Task[]>({
     queryKey: ["/api/tasks", "tasks", "all"],
     queryFn: async () => {
-      const res = await fetch("/api/tasks");
+      // Filtrar apenas tarefas (excluir reuniões)
+      const res = await fetch("/api/tasks?type=task");
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
     },
@@ -191,14 +400,137 @@ export default function TarefasPage() {
   const { data: tasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
     queryKey: ["/api/tasks", selectedAreaId, "tasks"],
     queryFn: async () => {
-      const url = selectedAreaId 
-        ? `/api/tasks?tagId=${selectedAreaId}` 
-        : "/api/tasks";
+      // Filtrar apenas tarefas (excluir reuniões)
+      const url = selectedAreaId
+        ? `/api/tasks?tagId=${selectedAreaId}&type=task`
+        : "/api/tasks?type=task";
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch tasks");
       return res.json();
     },
   });
+
+  // Handler de atualização inline
+  const handleInlineUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
+    try {
+      console.log('🔄 Atualizando tarefa:', taskId, updates);
+      
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify(updates)
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao atualizar');
+      }
+
+      console.log('✅ Tarefa atualizada com sucesso');
+      
+      // Invalidar queries para recarregar dados
+      await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      
+      toast({ 
+        title: "✅ Atualizado!",
+        description: "Tarefa atualizada com sucesso."
+      });
+    } catch (error) {
+      console.error('❌ Erro ao atualizar tarefa:', error);
+      toast({
+        title: "❌ Erro ao atualizar",
+        description: error instanceof Error ? error.message : 'Erro desconhecido',
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
+
+  // Definição das colunas da tabela de tarefas com edição inline
+  // Ordem: Nome, Status, Prioridade, Data de Entrega, Tag (Responsável removido)
+  const taskTableColumns = useMemo(() => [
+    {
+      key: 'title',
+      label: 'Nome da Tarefa',
+      render: (value: string, row: Task) => (
+        <div className={cn(
+          "font-medium",
+          row.status === 'done' && 'line-through text-muted-foreground'
+        )}>
+          {value}
+        </div>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      className: 'w-[150px]',
+      render: (value: string, row: Task) => (
+        <EditableStatus task={row} onUpdate={handleInlineUpdate} />
+      )
+    },
+    {
+      key: 'priority',
+      label: 'Prioridade',
+      className: 'w-[130px]',
+      render: (value: string, row: Task) => (
+        <EditablePriority task={row} onUpdate={handleInlineUpdate} />
+      )
+    },
+    {
+      key: 'dueDate',
+      label: 'Data de Entrega',
+      className: 'w-[140px]',
+      render: (value: string, row: Task) => (
+        <EditableDate task={row} onUpdate={handleInlineUpdate} />
+      )
+    },
+    {
+      key: 'tagId',
+      label: 'Tag',
+      className: 'w-[130px]',
+      render: (value: string, row: Task) => (
+        <EditableTag task={row} tags={areas} onUpdate={handleInlineUpdate} />
+      )
+    }
+  ], [areas, handleInlineUpdate]);
+
+  // Handler para checkbox de conclusão de tarefa
+  const handleTaskComplete = useCallback(async (taskId: string, checked: boolean) => {
+    try {
+      console.log('☑️ Marcando tarefa como', checked ? 'concluída' : 'não concluída', { taskId });
+      
+      const newStatus = checked ? 'done' : 'todo';
+      
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Erro ao atualizar');
+      }
+
+      console.log('✅ Status da tarefa atualizado');
+      await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      
+      toast({ 
+        title: checked ? "✅ Tarefa concluída!" : "🔄 Tarefa reaberta",
+        description: checked ? "A tarefa foi marcada como concluída." : "A tarefa foi reaberta.",
+        variant: "default"
+      });
+    } catch (error) {
+      console.error('❌ Erro ao atualizar tarefa:', error);
+      toast({ 
+        title: "❌ Erro ao atualizar tarefa",
+        description: error instanceof Error ? error.message : 'Erro desconhecido', 
+        variant: "destructive" 
+      });
+    }
+  }, [toast]);
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
@@ -239,6 +571,162 @@ export default function TarefasPage() {
       toast({ title: "Tag excluída com sucesso!" });
     },
   });
+
+  // Mutation para definir tag como padrão
+  const setDefaultTagMutation = useMutation({
+    mutationFn: async ({ id, isDefault }: { id: string; isDefault: boolean }) => {
+      if (isDefault) {
+        return apiRequest("DELETE", `/api/task-tags/${id}/set-default`);
+      } else {
+        return apiRequest("POST", `/api/task-tags/${id}/set-default`, { scope: "tasks" });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "tasks"] });
+      toast({ title: "Tag padrão atualizada!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar tag padrão", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Mutation para reordenar tags
+  const reorderTagsMutation = useMutation({
+    mutationFn: async (tagIds: string[]) => {
+      return apiRequest("POST", "/api/task-tags/reorder", { tagIds, scope: "tasks" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "tasks"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao reordenar tags", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Query para buscar tag padrão
+  const { data: defaultTag } = useQuery<TaskArea | null>({
+    queryKey: ["/api/task-tags/default", "tasks"],
+    queryFn: async () => {
+      const res = await fetch("/api/task-tags/default?scope=tasks");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  // Sensors para drag and drop do dnd-kit
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  // Handler para drag end das tags
+  const handleTagDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = areas.findIndex(t => t.id === active.id);
+      const newIndex = areas.findIndex(t => t.id === over.id);
+      
+      const newOrder = arrayMove(areas, oldIndex, newIndex);
+      reorderTagsMutation.mutate(newOrder.map(t => t.id));
+    }
+  };
+
+  // Componente para tag ordenável
+  function SortableTag({ area, areaTaskCount }: { area: TaskArea; areaTaskCount: number }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: area.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+          selectedAreaId === area.id
+            ? "bg-primary/10 text-primary"
+            : "hover:bg-muted"
+        }`}
+        onClick={() => setSelectedAreaId(area.id)}
+        data-testid={`button-area-${area.id}`}
+      >
+        <button
+          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-muted rounded"
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-3 w-3 text-muted-foreground" />
+        </button>
+        <div
+          className="h-3 w-3 rounded-full flex-shrink-0"
+          style={{ backgroundColor: area.color || "#00A137" }}
+        />
+        {area.visibility === "shared" ? (
+          <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        ) : (
+          <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        )}
+        <span className="flex-1 truncate">{area.name}</span>
+        {area.isDefault && (
+          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 flex-shrink-0" />
+        )}
+        <Badge variant="secondary" className="text-xs flex-shrink-0">
+          {areaTaskCount}
+        </Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`button-area-menu-${area.id}`}
+            >
+              <MoreHorizontal className="h-3 w-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setDefaultTagMutation.mutate({
+                  id: area.id,
+                  isDefault: area.isDefault || false
+                });
+              }}
+            >
+              <Star className={`h-4 w-4 mr-2 ${area.isDefault ? "fill-yellow-400 text-yellow-400" : ""}`} />
+              {area.isDefault ? "Remover como Padrão" : "Definir como Padrão"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleOpenAreaDialog(area)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => deleteAreaMutation.mutate(area.id)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  }
 
   const createTaskMutation = useMutation({
     mutationFn: async (data: typeof newTask) => {
@@ -465,7 +953,7 @@ export default function TarefasPage() {
       type,
       status: "todo",
       priority: "medium",
-      areaId: selectedAreaId || (areas[0]?.id || ""),
+      areaId: selectedAreaId || (defaultTag?.id || (areas[0]?.id || "")),
       createdBy: currentUserId,
       assigneeId: "",
       assigneeIds: [],
@@ -571,62 +1059,34 @@ export default function TarefasPage() {
             <div className="mt-4 space-y-1">
               {areasLoading ? (
                 <div className="px-3 py-2 text-sm text-muted-foreground">Carregando...</div>
+              ) : areas.length > 0 ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleTagDragEnd}
+                >
+                  <SortableContext
+                    items={areas.map(t => t.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {areas.map((area) => {
+                      const areaTaskCount = globalTasks.filter(t =>
+                        t.tagId === area.id && (t.status === "todo" || t.status === "doing")
+                      ).length;
+                      return (
+                        <SortableTag
+                          key={area.id}
+                          area={area}
+                          areaTaskCount={areaTaskCount}
+                        />
+                      );
+                    })}
+                  </SortableContext>
+                </DndContext>
               ) : (
-                areas.map((area) => {
-                  const areaTaskCount = globalTasks.filter(t => 
-                    t.tagId === area.id && (t.status === "todo" || t.status === "doing")
-                  ).length;
-                  return (
-                    <div 
-                      key={area.id}
-                      className={`group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                        selectedAreaId === area.id 
-                          ? "bg-primary/10 text-primary" 
-                          : "hover:bg-muted"
-                      }`}
-                      onClick={() => setSelectedAreaId(area.id)}
-                      data-testid={`button-area-${area.id}`}
-                    >
-                      <div 
-                        className="h-3 w-3 rounded-full" 
-                        style={{ backgroundColor: area.color || "#00A137" }}
-                      />
-                      {area.visibility === "shared" ? (
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <User className="h-4 w-4 text-muted-foreground" />
-                      )}
-                      <span className="flex-1 truncate">{area.name}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {areaTaskCount}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button 
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded"
-                            onClick={(e) => e.stopPropagation()}
-                            data-testid={`button-area-menu-${area.id}`}
-                          >
-                            <MoreHorizontal className="h-3 w-3" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenAreaDialog(area)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-destructive"
-                            onClick={() => deleteAreaMutation.mutate(area.id)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  );
-                })
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  Nenhuma tag criada
+                </div>
               )}
             </div>
           </div>
@@ -676,16 +1136,15 @@ export default function TarefasPage() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40" data-testid="select-status-filter">
+                <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
                   <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder="Filtrar status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Em Aberto</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="todo">A Fazer</SelectItem>
                   <SelectItem value="doing">Em Andamento</SelectItem>
-                  <SelectItem value="done">Concluídas</SelectItem>
-                  <SelectItem value="archived">Arquivado</SelectItem>
+                  <SelectItem value="done">Concluído</SelectItem>
                 </SelectContent>
               </Select>
               
@@ -720,13 +1179,14 @@ export default function TarefasPage() {
 
               <div className="flex items-center border rounded-md p-1 bg-muted/50 ml-auto">
                 <Button
-                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  variant={viewMode === "table" ? "secondary" : "ghost"}
                   size="sm"
                   className="h-8 px-2"
-                  onClick={() => setViewMode("grid")}
-                  data-testid="button-view-grid"
+                  onClick={() => setViewMode("table")}
+                  data-testid="button-view-table"
+                  title="Visualização em Tabela"
                 >
-                  <Folder className="h-4 w-4" />
+                  <Table className="h-4 w-4" />
                 </Button>
                 <Button
                   variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -734,8 +1194,19 @@ export default function TarefasPage() {
                   className="h-8 px-2"
                   onClick={() => setViewMode("list")}
                   data-testid="button-view-list"
+                  title="Visualização em Lista"
                 >
                   <List className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === "grid" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={() => setViewMode("grid")}
+                  data-testid="button-view-grid"
+                  title="Visualização em Cards"
+                >
+                  <Folder className="h-4 w-4" />
                 </Button>
                 <Button
                   variant={viewMode === "kanban" ? "secondary" : "ghost"}
@@ -743,6 +1214,7 @@ export default function TarefasPage() {
                   className="h-8 px-2"
                   onClick={() => setViewMode("kanban")}
                   data-testid="button-view-kanban"
+                  title="Visualização em Quadro"
                 >
                   <LayoutGrid className="h-4 w-4" />
                 </Button>
@@ -777,6 +1249,17 @@ export default function TarefasPage() {
             </Card>
           ) : viewMode === "kanban" ? (
             <TaskKanban tasks={filteredTasks} areas={areas} />
+          ) : viewMode === "table" ? (
+            <DataTable
+              columns={taskTableColumns}
+              data={filteredTasks}
+              onRowClick={(task) => navigate(`/tarefas/${task.id}`)}
+              onCheckboxChange={handleTaskComplete}
+              showCheckbox={true}
+              checkboxChecked={(row) => row.status === 'done'}
+              isLoading={tasksLoading}
+              emptyMessage="Nenhuma tarefa encontrada."
+            />
           ) : (
             <DragDropContext onDragEnd={onDragEnd}>
               <Droppable droppableId="tasks-list">
@@ -912,9 +1395,11 @@ export default function TarefasPage() {
                                         </Badge>
                                       </div>
                                       {task.description && (
-                                        <p className="text-sm text-muted-foreground line-clamp-1 mb-2 break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                                          {task.description}
-                                        </p>
+                                        <div
+                                          className="text-sm text-muted-foreground line-clamp-1 mb-2 break-words"
+                                          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(task.description) }}
+                                        />
                                       )}
                                       <div className="flex items-center gap-2 flex-wrap">
                                         {taskArea && !selectedAreaId && (
