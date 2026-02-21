@@ -675,7 +675,6 @@ export default function MetasVisaoGeralPage() {
                 value={metaForm.description}
                 onChange={(val: string) => setMetaForm(prev => ({ ...prev, description: val }))}
                 placeholder="Descreva a meta..."
-                rows={2}
                 data-testid="input-meta-description"
               />
             </div>
@@ -852,7 +851,6 @@ export default function MetasVisaoGeralPage() {
                     value={checkinForm.comment}
                     onChange={(val: string) => setCheckinForm(prev => ({ ...prev, comment: val }))}
                     placeholder="O que mudou? Obstáculos encontrados?"
-                    rows={3}
                     data-testid="input-checkin-comment"
                   />
                 </div>
