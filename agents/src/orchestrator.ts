@@ -1,47 +1,36 @@
 import { StateGraph, END } from '@langchain/langgraph';
-import { AgentState, initialState } from './types/agent-state';
+import { AgentState } from './types/agent-state';
 import { atlas } from './agents/atlas';
-import { neo } from './agents/neo';
-import { ada } from './agents/ada';
+import { turing } from './agents/turing';
+import { giter } from './agents/giter';
 
 export async function createOrchestrator() {
-  const workflow = new StateGraph<AgentState>({
-    channels: {
-      requisito: { value: (x: string, y?: string) => y ?? x, default: () => '' },
-      contextoAdicional: { value: (x: string | undefined, y?: string) => y ?? x },
-      planoDetalhado: { value: (x: string | null, y?: string | null) => y ?? x, default: () => null },
-      planoAprovado: { value: (x: boolean, y?: boolean) => y ?? x, default: () => false },
-      prompts: { value: (x: Record<string, string>, y?: Record<string, string>) => ({ ...x, ...y }), default: () => ({}) },
-      arquivosGerados: { value: (x: string[], y?: string[]) => y ?? x, default: () => [] },
-      relatorioValidacao: { value: (x: string | null, y?: string | null) => y ?? x, default: () => null },
-      validacaoAprovada: { value: (x: boolean, y?: boolean) => y ?? x, default: () => false },
-      branchName: { value: (x: string | null, y?: string | null) => y ?? x, default: () => null },
-      commits: { value: (x: any[], y?: any[]) => y ?? x, default: () => [] },
-      prUrl: { value: (x: string | null, y?: string | null) => y ?? x, default: () => null },
-      etapaAtual: { value: (x: string, y?: string) => y ?? x, default: () => 'planejamento' },
-      aguardandoAprovacao: { value: (x: boolean, y?: boolean) => y ?? x, default: () => false },
-    }
-  });
-
+  const workflow = new StateGraph({ channels: {
+    requisito: { value: (x, y) => y ?? x, default: () => '' },
+    planoDetalhado: { value: (x, y) => y ?? x, default: () => null },
+    planoAprovado: { value: (x, y) => y ?? x, default: () => false },
+    etapaAtual: { value: (x, y) => y ?? x, default: () => 'planejamento' },
+    aguardandoAprovacao: { value: (x, y) => y ?? x, default: () => false },
+    device: { value: (x, y) => y ?? x, default: () => 'unknown' },
+  }});
   workflow.addNode('atlas', atlas);
-  workflow.addNode('neo', neo);
-  workflow.addNode('ada', ada);
-
   workflow.setEntryPoint('atlas');
-  
-  workflow.addConditionalEdges(
-    'atlas',
-    (state) => state.planoAprovado ? 'neo' : 'aguardar',
-    { neo: 'neo', aguardar: END }
-  );
+  workflow.addEdge('atlas', END);
+  return workflow.compile();
+}
 
-  workflow.addEdge('neo', 'ada');
-  
-  workflow.addConditionalEdges(
-    'ada',
-    (state) => state.validacaoAprovada ? 'concluido' : 'aguardar',
-    { concluido: END, aguardar: END }
-  );
-
+export async function createQAGitWorkflow() {
+  const workflow = new StateGraph({ channels: {
+    requisito: { value: (x, y) => y ?? x, default: () => '' },
+    relatorioQA: { value: (x, y) => y ?? x, default: () => null },
+    qaAprovado: { value: (x, y) => y ?? x, default: () => false },
+    branchName: { value: (x, y) => y ?? x, default: () => null },
+    etapaAtual: { value: (x, y) => y ?? x, default: () => 'qa' },
+  }});
+  workflow.addNode('turing', turing);
+  workflow.addNode('giter', giter);
+  workflow.setEntryPoint('turing');
+  workflow.addConditionalEdges('turing', (s) => s.qaAprovado ? 'giter' : 'fim', { giter: 'giter', fim: END });
+  workflow.addEdge('giter', END);
   return workflow.compile();
 }

@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "clean": "rm -rf dist logs/*.log",
-    "agents": "tsx src/index.ts"
+    "agents": "tsx src/index.ts",
+    "qa-git": "tsx src/qa-git.ts"
   },
   "keywords": [
     "agents",
