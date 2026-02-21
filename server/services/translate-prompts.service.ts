@@ -192,6 +192,6 @@ export async function checkTranslationStatus() {
 // Executar se chamado diretamente
 if (require.main === module) {
   checkTranslationStatus().then(() => {
-    console.log('\n💡 Execute: node -e "import('./translate-prompts.service.ts').then(m => m.translateAllPrompts())"');
+    console.log(`\n💡 Execute: node -e "import('./translate-prompts.service.ts').then(m => m.translateAllPrompts())"`);
   });
 }
