@@ -4851,13 +4851,46 @@ export async function registerRoutes(
     }
   });
 
-  // Obter um prompt específico
+  // Obter um prompt específico (com suporte a tradução via query param)
   app.get("/api/prompts/:id", async (req, res) => {
     try {
-      const prompt = await storage.getPrompt(req.params.id);
+      const { id } = req.params;
+      const translate = req.query.translate === 'true';
+      
+      const prompt = await storage.getPrompt(id);
       if (!prompt) {
         return res.status(404).json({ error: "Prompt não encontrado" });
       }
+      
+      // Se pediu tradução E não tem tradução em cache
+      if (translate && !prompt.translatedContent) {
+        try {
+          const { translatePromptContent } = await import("./lib/translate");
+          const result = await translatePromptContent(
+            prompt.id,
+            prompt.content,
+            null,
+            `Prompt: ${prompt.title} - ${prompt.description}`
+          );
+          
+          // Salvar tradução no banco
+          await storage.updatePrompt(prompt.id, {
+            translatedContent: result.translatedText,
+            translatedAt: new Date(),
+            isTranslated: true,
+          });
+          
+          prompt.translatedContent = result.translatedText;
+          prompt.translatedAt = new Date();
+          prompt.isTranslated = true;
+          
+          console.log(`[prompts] Prompt ${id} traduzido com sucesso`);
+        } catch (translateError) {
+          console.error(`[prompts] Erro ao traduzir prompt ${id}:`, translateError);
+          // Continua retornando o prompt sem tradução
+        }
+      }
+      
       res.json(prompt);
     } catch (error: any) {
       console.error("[prompts] Error getting prompt:", error);
@@ -4987,6 +5020,49 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("[prompts] Error fixing:", error);
       res.status(500).json({ error: "Erro ao corrigir prompts" });
+    }
+  });
+
+  // Traduzir prompt para PT-BR usando Claude via OpenRouter
+  app.get("/api/prompts/:id/translate", async (req, res) => {
+    try {
+      const prompt = await storage.getPrompt(req.params.id);
+      if (!prompt) {
+        return res.status(404).json({ error: "Prompt não encontrado" });
+      }
+
+      // Importar serviço de tradução
+      const { translatePromptContent } = await import("./lib/translate");
+      
+      // Traduzir (com cache se já existir tradução)
+      const result = await translatePromptContent(
+        prompt.id,
+        prompt.content,
+        prompt.translatedContent,
+        `Prompt: ${prompt.title} - ${prompt.description}`
+      );
+
+      // Se não estava em cache, salvar no banco
+      if (!result.cached) {
+        await storage.updatePrompt(prompt.id, {
+          translatedContent: result.translatedText,
+          translatedAt: new Date(),
+          isTranslated: true,
+        });
+        console.log(`[prompts] Tradução salva para prompt ${prompt.id}`);
+      }
+
+      res.json({
+        success: true,
+        translatedContent: result.translatedText,
+        cached: result.cached,
+      });
+    } catch (error: any) {
+      console.error("[prompts] Error translating:", error);
+      res.status(500).json({ 
+        error: "Erro ao traduzir prompt",
+        details: error.message 
+      });
     }
   });
 

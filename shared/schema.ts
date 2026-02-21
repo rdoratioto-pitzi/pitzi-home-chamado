@@ -1135,3 +1135,10 @@ export const PROMPT_CATEGORIES = [
 ] as const;
 
 export type PromptCategory = typeof PROMPT_CATEGORIES[number]["id"];
+
+// Campos de tradução para prompts_library
+export const promptsLibraryWithTranslation = pgTable('prompts_library', {
+  // Campos existentes permanecem inalterados
+  translatedContent: text('translated_content'),
+  translatedAt: timestamp('translated_at'),
+});

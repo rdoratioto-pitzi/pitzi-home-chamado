@@ -1,78 +1,45 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { config } from '../config';
-import { renovHomeContext } from '../config/renov-context';
 import { AgentState } from '../types/agent-state';
 
 export async function atlas(state: AgentState): Promise<Partial<AgentState>> {
-  console.log('\n🗺️  Atlas está analisando seu requisito...\n');
+  console.log('\n🗺️  Atlas analisando...\n');
   
   const llm = new ChatAnthropic({
     apiKey: config.anthropic.apiKey,
     modelName: config.anthropic.model,
-    temperature: 0.3,
+    temperature: 0,
+    maxTokens: 300,
   });
 
-  const prompt = `
-${renovHomeContext}
+  const prompt = `Planejador técnico minimalista.
 
-# Seu Papel: Atlas - Arquiteto de Software da Renov
+Requisito: ${state.requisito}
 
-Você é o planejador estratégico. Transforma requisitos do CEO em planos técnicos detalhados.
+Plano ENXUTO (150 tokens):
 
-## Requisito do CEO
-${state.requisito}
+## Objetivo
+[1 frase]
 
-${state.contextoAdicional ? `\n## Contexto Adicional\n${state.contextoAdicional}` : ''}
+## Arquivos
+- Backend: arquivo.ts - ação
+- Frontend: arquivo.tsx - ação
 
-## Seu Plano Deve Incluir
+## Fluxo
+A → B → C
 
-### 1. 📊 Resumo Executivo
-- Objetivo em 2-3 frases
-- Complexidade: Baixa/Média/Alta
-- Tempo estimado: X horas/dias
+## Checklist
+- [ ] Item 1
+- [ ] Item 2
 
-### 2. 🎯 Análise de Impacto
-- Módulos afetados
-- Tabelas do banco
-- Integrações externas
-- Dependências
-
-### 3. 📁 Arquivos a Modificar/Criar
-Para CADA arquivo:
-- Caminho: \`shared/schema.ts\`
-- Ação: ✏️ Modificar / ➕ Criar
-- Mudanças detalhadas
-- Dependências
-
-### 4. 🔄 Fluxo de Dados
-Frontend → Validação → API → Storage → Database → Response
-
-### 5. ✅ Checklist de Validação
-- [ ] Migration
-- [ ] Zod schema
-- [ ] Tipos TypeScript
-- [ ] Permissões
-- [ ] Componentes
-
-### 6. ⚠️ Pontos de Atenção
-- Incompatibilidades
-- Edge cases
-- Performance
-
-### 7. 🧪 Testes Manuais
-1. Testar com admin
-2. Testar sem permissão
-3. Testar inputs inválidos
-
-Formato: Markdown estruturado com emojis.
-`;
+LIMITE: 150 tokens. Sempre sugira OpenRouter para APIs pagas.`;
 
   const response = await llm.invoke(prompt);
   const plano = typeof response.content === 'string' 
     ? response.content 
     : response.content.map(c => c.type === 'text' ? c.text : '').join('\n');
 
-  console.log('\n✅ Atlas finalizou o plano!\n');
+  console.log('\n✅ Atlas finalizou!\n');
 
   return {
     planoDetalhado: plano,
