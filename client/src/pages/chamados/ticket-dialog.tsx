@@ -495,11 +495,14 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="auto">Atribuição automática</SelectItem>
-                        {users.filter(u => u.status === "active").map((user) => (
-                          <SelectItem key={user.id} value={user.id}>
-                            {user.name}
-                          </SelectItem>
-                        ))}
+                        {users
+                          .filter(u => u.status === "active")
+                          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                          .map((user) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

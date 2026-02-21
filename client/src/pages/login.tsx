@@ -26,7 +26,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { RenovLogo } from "@/components/renov-logo";
 import { Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
-import { PasswordStrengthIndicator } from "@/components/auth/password-strength-indicator";
 import { PasswordRequirements } from "@/components/auth/password-requirements";
 
 const loginSchema = z.object({
@@ -319,15 +318,14 @@ export default function LoginPage() {
                       </div>
                       <FormControl>
                         <div className="relative">
-                          <Input 
+                          <Input
                             id="password-input"
                             type={showPassword ? "text" : "password"}
-                            placeholder="Digite sua senha" 
+                            placeholder="Digite sua senha"
                             className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
                             data-testid="input-login-password"
                             aria-label="Senha para login"
-                            aria-describedby="password-strength"
-                            {...field} 
+                            {...field}
                           />
                           <Button
                             type="button"
@@ -348,10 +346,6 @@ export default function LoginPage() {
                       </FormControl>
                       <FormMessage className="text-xs" />
                       
-                      {/* Password strength indicator */}
-                      <div id="password-strength" className="mt-2">
-                        <PasswordStrengthIndicator password={field.value} />
-                      </div>
                     </FormItem>
                   )}
                 />
