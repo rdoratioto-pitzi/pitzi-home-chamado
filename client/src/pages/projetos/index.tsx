@@ -11,6 +11,7 @@ import { ProjectDialog } from "./project-dialog";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { stripHtml, isEmptyHtml } from "@/lib/utils";
 
 const statusColors: Record<string, string> = {
   active: "bg-green-500/10 text-green-600 dark:text-green-400",
@@ -154,9 +155,9 @@ export default function ProjetosPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <CardTitle className="text-[18px] font-bold">{project.name}</CardTitle>
-                          <CardDescription className="text-[13px] mt-1 line-clamp-2">
-                            {project.description || "Sem descrição"}
-                          </CardDescription>
+                           <CardDescription className="text-[13px] mt-1 line-clamp-2">
+                             {isEmptyHtml(project.description) ? "Sem descrição" : stripHtml(project.description)}
+                           </CardDescription>
                         </div>
                         <Badge variant="outline" className={statusColors[project.status]}>
                           {statusLabels[project.status]}
