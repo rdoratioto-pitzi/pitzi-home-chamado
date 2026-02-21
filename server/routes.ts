@@ -69,8 +69,30 @@ export async function registerRoutes(
 ): Promise<Server> {
 
   function getSessionUser(req: any) {
-    return { userId: req.session.userId!, isAdmin: req.session.isAdmin === true };
+    if (!req.session?.userId) {
+      const err = new Error("Unauthorized: No session found");
+      (err as any).status = 401;
+      throw err;
+    }
+    return { userId: req.session.userId, isAdmin: req.session.isAdmin === true };
   }
+
+  const requireAuth = (req: any, res: any, next: any) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "Unauthorized: No session found" });
+    }
+    next();
+  };
+
+  const requireAdmin = (req: any, res: any, next: any) => {
+    if (!req.session?.userId) {
+      return res.status(401).json({ error: "Unauthorized: No session found" });
+    }
+    if (req.session.isAdmin !== true) {
+      return res.status(403).json({ error: "Forbidden: Admin access required" });
+    }
+    next();
+  };
 
   async function getUserAccessibleAreaIds(userId: string): Promise<string[]> {
     const areas = await storage.getTaskAreas(userId);
@@ -342,18 +364,20 @@ export async function registerRoutes(
   });
 
   // ============== USERS ==============
-  app.get("/api/users", async (req, res) => {
+  app.get("/api/users", requireAdmin, async (req, res) => {
     const users = await storage.getUsers();
-    res.json(users);
+    const safeUsers = users.map(({ password, ...user }) => user);
+    res.json(safeUsers);
   });
 
-  app.get("/api/users/:id", async (req, res) => {
+  app.get("/api/users/:id", requireAdmin, async (req, res) => {
     const user = await storage.getUser(req.params.id);
     if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
+    const { password, ...safeUser } = user;
+    res.json(safeUser);
   });
 
-  app.post("/api/users", async (req, res) => {
+  app.post("/api/users", requireAdmin, async (req, res) => {
     try {
       const validated = insertUserSchema.parse(req.body);
       const user = await storage.createUser(validated);
@@ -405,7 +429,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/users/:id", async (req, res) => {
+  app.patch("/api/users/:id", requireAdmin, async (req, res) => {
     try {
       const partialSchema = insertUserSchema.partial();
       const validated = partialSchema.parse(req.body);
@@ -420,13 +444,8 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/users/:id/reset-password", async (req, res) => {
+  app.post("/api/users/:id/reset-password", requireAdmin, async (req, res) => {
     try {
-      const { isAdmin } = getSessionUser(req);
-      if (!isAdmin) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-
       const user = await storage.getUser(req.params.id);
       if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -452,24 +471,49 @@ export async function registerRoutes(
   });
 
   // ============== TICKETS ==============
-  app.get("/api/tickets", async (req, res) => {
-    const tickets = await storage.getTickets();
-    res.json(tickets);
-  });
-
-  app.get("/api/tickets/:id", async (req, res) => {
-    const ticket = await storage.getTicket(req.params.id);
-    if (!ticket) return res.status(404).json({ error: "Ticket not found" });
-    res.json(ticket);
-  });
-
-  app.post("/api/tickets", async (req, res) => {
+  app.get("/api/tickets", requireAuth, async (req, res) => {
     try {
-      const data = { ...req.body };
-      // Preencher solicitante automaticamente se não enviado
-      if (!data.requesterId && req.user) {
-        data.requesterId = req.user.id;
+      const { userId, isAdmin } = getSessionUser(req);
+      
+      if (isAdmin) {
+        const tickets = await storage.getTickets();
+        return res.json(tickets);
       }
+      
+      const tickets = await storage.getTickets({ requesterId: userId, assigneeId: userId });
+      res.json(tickets);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/tickets/:id", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const ticket = await storage.getTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      res.json(ticket);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/tickets", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const data = { ...req.body };
+
+      // For non-admin users, the requesterId is ALWAYS set to the current user's ID.
+      // Admins can specify a requesterId, but if they don't, use their own.
+      if (!isAdmin || !data.requesterId) {
+        data.requesterId = userId;
+      }
+
       const validated = insertTicketSchema.parse(data);
 
       if (!validated.assigneeId && validated.category && validated.type) {
@@ -513,7 +557,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/tickets/:id", async (req, res) => {
+  app.patch("/api/tickets/:id", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
       const oldTicket = await storage.getTicket(req.params.id);
@@ -523,7 +567,20 @@ export async function registerRoutes(
       }
 
       // Auto-fill timestamp fields based on status changes
-      const updateData: any = { ...req.body };
+      let updateData: any = { ...req.body };
+
+      // Restrict field updates for non-admins (whitelist approach)
+      if (!isAdmin) {
+        const allowedFields = ["status", "title", "description", "attachments", "location", "impact", "dueDate"];
+        const filteredData: any = {};
+        allowedFields.forEach(field => {
+          if (updateData[field] !== undefined) {
+            filteredData[field] = updateData[field];
+          }
+        });
+        updateData = filteredData;
+      }
+
       if (req.body.status && req.body.status !== oldTicket.status) {
         if (req.body.status === "resolved" && !oldTicket.dataResolucao) {
           updateData.dataResolucao = new Date();
@@ -585,7 +642,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/tickets/:id", async (req, res) => {
+  app.delete("/api/tickets/:id", requireAuth, async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
     const ticket = await storage.getTicket(req.params.id);
     if (!ticket) return res.status(404).json({ error: "Ticket not found" });
@@ -598,20 +655,40 @@ export async function registerRoutes(
   });
 
   // Ticket Comments
-  app.get("/api/tickets/:id/comments", async (req, res) => {
-    const comments = await storage.getTicketComments(req.params.id);
-    res.json(comments);
+  app.get("/api/tickets/:id/comments", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const ticket = await storage.getTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const comments = await storage.getTicketComments(req.params.id);
+      res.json(comments);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
   });
 
-  app.post("/api/tickets/:id/comments", async (req, res) => {
+  app.post("/api/tickets/:id/comments", requireAuth, async (req, res) => {
     try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const ticket = await storage.getTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+      // Only admins, the ticket's requester, or the ticket's assignee should be allowed to post comments.
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
       const validated = insertTicketCommentSchema.parse({
         ...req.body,
         ticketId: req.params.id,
       });
       const comment = await storage.createTicketComment(validated);
 
-      const ticket = await storage.getTicket(req.params.id);
       if (ticket) {
         // Set first response timestamp if assignee comments and it's not set yet
         if (ticket.assigneeId && comment.userId === ticket.assigneeId && !ticket.dataPrimeiraResposta) {
@@ -692,18 +769,18 @@ export async function registerRoutes(
   });
 
   // ============== TICKET RESPONSAVEIS (Assignment Rules) ==============
-  app.get("/api/ticket-responsaveis", async (req, res) => {
+  app.get("/api/ticket-responsaveis", requireAuth, async (req, res) => {
     const responsaveis = await storage.getTicketResponsaveis();
     res.json(responsaveis);
   });
 
-  app.get("/api/ticket-responsaveis/:id", async (req, res) => {
+  app.get("/api/ticket-responsaveis/:id", requireAuth, async (req, res) => {
     const responsavel = await storage.getTicketResponsavel(req.params.id);
     if (!responsavel) return res.status(404).json({ error: "Responsavel not found" });
     res.json(responsavel);
   });
 
-  app.post("/api/ticket-responsaveis", async (req, res) => {
+  app.post("/api/ticket-responsaveis", requireAdmin, async (req, res) => {
     try {
       const validated = insertTicketResponsavelSchema.parse(req.body);
       const responsavel = await storage.createTicketResponsavel(validated);
@@ -716,7 +793,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/ticket-responsaveis/:id", async (req, res) => {
+  app.patch("/api/ticket-responsaveis/:id", requireAdmin, async (req, res) => {
     try {
       const partialSchema = insertTicketResponsavelSchema.partial();
       const validated = partialSchema.parse(req.body);
@@ -731,13 +808,13 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/ticket-responsaveis/:id", async (req, res) => {
+  app.delete("/api/ticket-responsaveis/:id", requireAdmin, async (req, res) => {
     const deleted = await storage.deleteTicketResponsavel(req.params.id);
     if (!deleted) return res.status(404).json({ error: "Responsavel not found" });
     res.status(204).send();
   });
 
-  app.get("/api/ticket-responsaveis/find/:categoria/:tipo", async (req, res) => {
+  app.get("/api/ticket-responsaveis/find/:categoria/:tipo", requireAuth, async (req, res) => {
     const responsavelId = await storage.findResponsavelForTicket(req.params.categoria, req.params.tipo);
     res.json({ responsavelId });
   });
