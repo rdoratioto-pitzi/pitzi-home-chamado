@@ -45,6 +45,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -383,10 +389,19 @@ export default function TaskDetailPage() {
               </>
             ) : (
               <>
-                <Button variant="outline" onClick={() => setIsEditing(true)} data-testid="button-edit-task">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" onClick={() => setIsEditing(true)} data-testid="button-edit-task">
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p>Editar tarefa</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" data-testid="button-task-actions">
