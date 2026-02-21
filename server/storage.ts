@@ -65,7 +65,7 @@ import {
   promptsLibrary, promptUserFavorites
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql, asc } from "drizzle-orm";
+import { eq, and, or, sql, asc, type SQL } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -77,7 +77,7 @@ export interface IStorage {
 
   // Tickets
   getTicket(id: string): Promise<Ticket | undefined>;
-  getTickets(): Promise<Ticket[]>;
+  getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]>;
   createTicket(ticket: InsertTicket): Promise<Ticket>;
   updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined>;
   deleteTicket(id: string): Promise<boolean>;
@@ -490,11 +490,28 @@ export class DatabaseStorage implements IStorage {
     const [ticket] = await db.select().from(tickets).where(eq(tickets.id, id));
     return ticket;
   }
-  async getTickets(): Promise<Ticket[]> {
+  async getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]> {
     if (!db) return [];
     try {
-      return await db.select().from(tickets);
+      const query = db.select().from(tickets);
+      if (filters) {
+        const conditions: SQL[] = [];
+        if (filters.requesterId && filters.assigneeId) {
+          const condition = or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId));
+          if (condition) conditions.push(condition);
+        } else if (filters.requesterId) {
+          conditions.push(eq(tickets.requesterId, filters.requesterId));
+        } else if (filters.assigneeId) {
+          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
+        }
+        
+        if (conditions.length > 0) {
+          return await query.where(and(...conditions));
+        }
+      }
+      return await query;
     } catch (e) {
+      console.error("[storage] Error fetching tickets:", e);
       return [];
     }
   }

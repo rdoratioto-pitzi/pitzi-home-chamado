@@ -385,7 +385,7 @@ export default function ChamadosPage() {
         ticket.code?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
       const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
-      const matchesType = typeFilter === "all" || ticket.type === typeFilter;
+      const matchesType = typeFilter === "all" || (ticket.type || "").toLowerCase() === typeFilter.toLowerCase();
       const matchesAssignee = assigneeFilter === "all" || ticket.assigneeId === assigneeFilter;
 
       let matchesSla = true;
@@ -772,9 +772,12 @@ export default function ChamadosPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Responsável</SelectItem>
-                    {users.filter(u => u.status === "active").map(user => (
-                      <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                    ))}
+                    {users
+                      .filter(u => u.status === "active")
+                      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                      .map(user => (
+                        <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

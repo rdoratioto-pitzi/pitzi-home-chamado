@@ -34,6 +34,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, MoreHorizontal, Eye, EyeOff, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { PasswordStrengthIndicator } from "@/components/auth/password-strength-indicator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -579,6 +580,9 @@ export function UsersSettings() {
                       </div>
                     </FormControl>
                     <FormMessage />
+                    <div className="mt-2">
+                      <PasswordStrengthIndicator password={field.value} />
+                    </div>
                   </FormItem>
                 )}
               />
