@@ -26,7 +26,7 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
   const { theme } = useTheme();
   const [imgError, setImgError] = useState(false);
 
-  const { data: logoUrlLight } = useQuery<Setting>({
+  const { data: logoUrlLight, isLoading: isLoadingLight } = useQuery<Setting>({
     queryKey: ["/api/settings/logo_url_light"],
     queryFn: async () => {
       const res = await fetch("/api/settings/logo_url_light");
@@ -37,7 +37,7 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
     retry: false,
   });
 
-  const { data: logoUrlDark } = useQuery<Setting>({
+  const { data: logoUrlDark, isLoading: isLoadingDark } = useQuery<Setting>({
     queryKey: ["/api/settings/logo_url_dark"],
     queryFn: async () => {
       const res = await fetch("/api/settings/logo_url_dark");
@@ -57,6 +57,11 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
 
   const resolvedVariant = variant === "auto" ? theme : variant;
   const logoUrlSetting = resolvedVariant === "dark" || resolvedVariant === "white" ? logoUrlDark : logoUrlLight;
+  const isLoading = resolvedVariant === "dark" || resolvedVariant === "white" ? isLoadingDark : isLoadingLight;
+
+  if (isLoading) {
+    return <div style={{ width, height }} className={className} />;
+  }
 
   if (logoUrlSetting?.value && !imgError) {
     const src = normalizeObjectPath(logoUrlSetting.value);
