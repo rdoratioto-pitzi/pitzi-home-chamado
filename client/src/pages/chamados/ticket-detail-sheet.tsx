@@ -127,6 +127,7 @@ const getTimeOpenInfo = (createdAt: Date | string | null): { text: string; color
 
 export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   const [comment, setComment] = useState("");
+  const [commentImages, setCommentImages] = useState<string[]>([]);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
   const [editedAttachments, setEditedAttachments] = useState<string[]>([]);
@@ -382,11 +383,9 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             
             {isEditingDescription ? (
               <div className="space-y-2 mb-4">
-                <RichTextarea
+                <Textarea
                   value={editedDescription}
-                  onChange={setEditedDescription}
-                  images={editedAttachments}
-                  onImagesChange={setEditedAttachments}
+                  onChange={(e) => setEditedDescription(e.target.value)}
                   maxLength={5000}
                   rows={6}
                 />
