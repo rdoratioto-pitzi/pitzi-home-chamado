@@ -6,11 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { usePrompts, useSyncPrompts } from "@/hooks/use-prompts";
-import { Bot, Wrench, Code, Database, RefreshCw, Copy } from "lucide-react";
+import { PromptModal } from "@/components/PromptModal";
+import { Bot, Wrench, Code, Database, RefreshCw, Eye } from "lucide-react";
 
 export default function PromptsPage() {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedPrompt, setSelectedPrompt] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    content: string;
+    category: string;
+    translatedContent?: string | null;
+    isTranslated?: boolean;
+  } | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   // Usar o hook usePrompts com credenciais corretas
   const { data: prompts = [], isLoading, refetch } = usePrompts({
@@ -40,6 +51,19 @@ export default function PromptsPage() {
     }
   };
 
+  const openPromptModal = (prompt: typeof prompts[0]) => {
+    setSelectedPrompt({
+      id: prompt.id,
+      title: prompt.title,
+      description: prompt.description,
+      content: prompt.content,
+      category: prompt.category,
+      translatedContent: (prompt as any).translatedContent || null,
+      isTranslated: (prompt as any).isTranslated || false,
+    });
+    setModalOpen(true);
+  };
+
   const categoryIcons: Record<string, React.ReactNode> = {
     "development-team": <Bot className="h-5 w-5" />,
     "development-tools": <Wrench className="h-5 w-5" />,
@@ -54,22 +78,6 @@ export default function PromptsPage() {
     "database": "Banco de Dados",
   };
 
-  const copyPrompt = async (content: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      toast({
-        title: "Copiado!",
-        description: "Prompt copiado para a área de transferência.",
-      });
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível copiar.",
-        variant: "destructive",
-      });
-    }
-  };
-
   // Debug log
   console.log("[PromptsPage] Dados carregados:", { 
     promptsCount: prompts.length, 
@@ -81,7 +89,7 @@ export default function PromptsPage() {
     <div className="container mx-auto py-6 space-y-6">
       <PageHeader
         title="Biblioteca de Prompts"
-        description="Prompts prontos para usar com Claude Code."
+        description="Prompts prontos para usar com Claude Code. Clique em 'Ver Prompt' para visualizar, traduzir e copiar."
         actions={
           <Button 
             onClick={syncPrompts} 
@@ -151,19 +159,25 @@ export default function PromptsPage() {
                 </p>
 
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
                   className="w-full"
-                  onClick={() => copyPrompt(prompt.content)}
+                  onClick={() => openPromptModal(prompt)}
                 >
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copiar Prompt
+                  <Eye className="h-4 w-4 mr-2" />
+                  Ver Prompt
                 </Button>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
+
+      <PromptModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        prompt={selectedPrompt}
+      />
     </div>
   );
 }
