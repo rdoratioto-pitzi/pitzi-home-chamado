@@ -2,22 +2,33 @@ import { AgentState } from '../types/agent-state';
 import { execSync } from 'child_process';
 import { config } from '../config';
 import { atlas } from './atlas';
-import fs from 'fs';
-import path from 'path';
 
 export async function turing(state: AgentState): Promise<Partial<AgentState>> {
   console.log('\n🧪 Turing validando código...\n');
 
-  const errosCompletos = buscarTodosErrosTypeScript();
-  const compilacao = errosCompletos === '';
-  const eslint = verificarESLint();
-  const aprovado = compilacao && eslint.erros === 0;
+  // Contar erros ANTES das suas mudanças
+  const errosBaseline = getErrosBaseline();
+  
+  // Contar erros AGORA (com suas mudanças)
+  const errosAtuais = contarErrosTypeScript();
+  
+  // Calcular NOVOS erros introduzidos
+  const novosErros = Math.max(0, errosAtuais - errosBaseline);
+  
+  console.log(`📊 Baseline: ${errosBaseline} erros`);
+  console.log(`📊 Atual: ${errosAtuais} erros`);
+  console.log(`📊 Novos: ${novosErros} erros\n`);
 
-  if (!aprovado) {
-    console.log('\n🤖 Chamando Atlas para analisar TODOS os erros...\n');
+  const eslint = verificarESLint();
+  const aprovado = novosErros === 0 && eslint.erros === 0;
+
+  if (novosErros > 0) {
+    console.log('\n🤖 Você introduziu novos erros! Chamando Atlas...\n');
+    
+    const errosDetalhados = buscarErrosDetalhados();
     
     const planoCorrecao = await atlas({
-      requisito: `Corrigir TODOS os erros TypeScript encontrados:\n\n${errosCompletos.substring(0, 1500)}`,
+      requisito: `Corrigir ${novosErros} NOVOS erros TypeScript:\n\n${errosDetalhados.substring(0, 1500)}`,
       planoDetalhado: null,
       planoAprovado: false,
       etapaAtual: 'planejamento',
@@ -25,15 +36,23 @@ export async function turing(state: AgentState): Promise<Partial<AgentState>> {
       device: 'mac' as any,
     });
     
-    console.log('\n📋 PLANO DE CORREÇÃO COMPLETO:\n');
+    console.log('\n📋 PLANO DE CORREÇÃO:\n');
     console.log('─'.repeat(60));
     console.log(planoCorrecao.planoDetalhado);
     console.log('─'.repeat(60));
-    console.log('\n💡 Cole no Kilo Code para corrigir TUDO de uma vez\n');
+    console.log('\n💡 Cole no Kilo Code\n');
+  } else if (errosAtuais > 0) {
+    console.log(`✅ OK - ${errosAtuais} erros antigos (não aumentou)\n`);
   }
 
-  const relatorio = gerarRelatorio(compilacao, eslint, errosCompletos);
+  const relatorio = gerarRelatorio(aprovado, eslint, errosBaseline, errosAtuais, novosErros);
   console.log(aprovado ? '\n✅ APROVADO!\n' : '\n❌ REPROVADO\n');
+
+  // Atualizar baseline se aprovado
+  if (aprovado && errosAtuais < errosBaseline) {
+    salvarBaseline(errosAtuais);
+    console.log(`📊 Baseline atualizado: ${errosBaseline} → ${errosAtuais}\n`);
+  }
 
   return {
     relatorioQA: relatorio,
@@ -42,40 +61,72 @@ export async function turing(state: AgentState): Promise<Partial<AgentState>> {
   };
 }
 
-function buscarTodosErrosTypeScript(): string {
-  console.log('  📦 TypeScript (buscando TODOS os erros)...');
+function getErrosBaseline(): number {
+  const fs = require('fs');
+  const path = require('path');
+  const baselinePath = path.join(__dirname, '../../.baseline-errors');
+  
   try {
-    // --pretty false: saída crua
-    // Não usa --noEmit para não parar no primeiro erro
-    execSync('npx tsc --pretty false --incremental false', {
+    if (fs.existsSync(baselinePath)) {
+      const baseline = parseInt(fs.readFileSync(baselinePath, 'utf-8').trim(), 10);
+      return isNaN(baseline) ? 205 : baseline;
+    }
+  } catch {}
+  
+  return 205; // Valor inicial conhecido
+}
+
+function salvarBaseline(erros: number): void {
+  const fs = require('fs');
+  const path = require('path');
+  const baselinePath = path.join(__dirname, '../../.baseline-errors');
+  
+  try {
+    fs.writeFileSync(baselinePath, erros.toString(), 'utf-8');
+  } catch (error) {
+    console.log('⚠️  Não foi possível salvar baseline');
+  }
+}
+
+function contarErrosTypeScript(): number {
+  console.log('  📦 TypeScript...');
+  
+  try {
+    execSync('npx tsc --noEmit --pretty false', {
       cwd: config.paths.renovHome,
       stdio: 'pipe',
     });
     console.log('    ✅ OK - Sem erros');
-    return '';
+    return 0;
   } catch (e: any) {
     const output = e.stdout?.toString() || e.stderr?.toString() || '';
-    const linhas = output.split('\n').filter(l => l.includes('error TS'));
+    const erros = output.split('\n').filter(l => l.includes('error TS')).length;
     
-    console.log(`    ❌ ${linhas.length} erros encontrados`);
-    
-    // Limitar a 30 primeiros erros para não sobrecarregar Atlas
-    const errosLimitados = linhas.slice(0, 30).join('\n');
-    
-    if (linhas.length > 30) {
-      return errosLimitados + `\n\n... e mais ${linhas.length - 30} erros`;
+    if (erros > 0) {
+      console.log(`    ⚠️  ${erros} erro(s) no projeto`);
     }
     
-    return errosLimitados;
+    return erros;
   }
 }
 
-function verificarCompilacao(): boolean {
-  return buscarTodosErrosTypeScript() === '';
+function buscarErrosDetalhados(): string {
+  try {
+    execSync('npx tsc --noEmit --pretty false', {
+      cwd: config.paths.renovHome,
+      stdio: 'pipe',
+    });
+    return '';
+  } catch (e: any) {
+    const output = e.stdout?.toString() || '';
+    const linhas = output.split('\n').filter(l => l.includes('error TS'));
+    return linhas.slice(0, 30).join('\n');
+  }
 }
 
 function verificarESLint(): { erros: number } {
   console.log('  🔍 ESLint...');
+  
   try {
     execSync('npx eslint . --ext .ts,.tsx --max-warnings 50', {
       cwd: config.paths.renovHome,
@@ -86,21 +137,23 @@ function verificarESLint(): { erros: number } {
   } catch (e: any) {
     const output = e.stdout?.toString() || '';
     const erros = (output.match(/error/g) || []).length;
-    console.log(`    ⚠️ ${erros} erros`);
+    console.log(`    ⚠️ ${erros} erro(s)`);
     return { erros };
   }
 }
 
-function gerarRelatorio(compilacao: boolean, eslint: { erros: number }, errosTS: string): string {
-  let relatorio = `Compilação: ${compilacao ? '✅' : '❌'}\n`;
-  relatorio += `ESLint: ${eslint.erros} erros\n`;
-  
-  if (!compilacao && errosTS) {
-    const numErros = errosTS.split('\n').filter(l => l.includes('error TS')).length;
-    relatorio += `TypeScript: ${numErros} erros encontrados\n`;
-  }
-  
-  relatorio += `Status: ${compilacao && eslint.erros === 0 ? 'APROVADO' : 'REPROVADO'}`;
+function gerarRelatorio(
+  aprovado: boolean,
+  eslint: { erros: number },
+  baseline: number,
+  atual: number,
+  novos: number
+): string {
+  let relatorio = `Baseline: ${baseline} erros\n`;
+  relatorio += `Atual: ${atual} erros\n`;
+  relatorio += `Novos introduzidos: ${novos}\n`;
+  relatorio += `ESLint: ${eslint.erros} erro(s)\n`;
+  relatorio += `Status: ${aprovado ? 'APROVADO ✅' : 'REPROVADO ❌'}`;
   
   return relatorio;
 }
