@@ -63,6 +63,15 @@ import { sql, eq, or, and } from "drizzle-orm";
 import { tasks } from "@shared/schema";
 import { db } from "./db";
 
+// Comment validation schemas (only content needed, userId comes from session)
+const taskCommentSchema = z.object({
+  content: z.string().min(1, "Comentário não pode ser vazio").max(5000),
+});
+
+const ticketCommentSchema = z.object({
+  content: z.string().min(1, "Comentário não pode ser vazio").max(5000),
+});
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -603,91 +612,49 @@ export async function registerRoutes(
     res.json(comments);
   });
 
-  app.post("/api/tickets/:id/comments", async (req, res) => {
+  app.post('/api/tickets/:id/comments', async (req, res) => {
     try {
-      const validated = insertTicketCommentSchema.parse({
-        ...req.body,
-        ticketId: req.params.id,
+      console.log('📝 REQ TICKET RECEBIDO:', {
+        session: req.session,
+        body: req.body,
+        params: req.params,
       });
-      const comment = await storage.createTicketComment(validated);
 
-      const ticket = await storage.getTicket(req.params.id);
-      if (ticket) {
-        // Set first response timestamp if assignee comments and it's not set yet
-        if (ticket.assigneeId && comment.userId === ticket.assigneeId && !ticket.dataPrimeiraResposta) {
-          await storage.updateTicket(ticket.id, { dataPrimeiraResposta: new Date() });
-        }
-
-        const commenter = await storage.getUser(comment.userId);
-        const requester = await storage.getUser(ticket.requesterId);
-        const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
-
-        if (commenter && requester) {
-          sendTicketCommentEmail(ticket, comment, commenter, requester, assignee || null).catch(console.error);
-        }
-
-        if (requester && commenter && commenter.id !== requester.id) {
-          storage.createNotification({
-            userId: requester.id,
-            fromUserId: commenter.id,
-            title: "Novo comentário no chamado",
-            message: `${commenter.name} comentou no chamado "${ticket.title}"`,
-            module: "chamados",
-            entityId: ticket.id,
-            linkUrl: `/chamados?ticket=${ticket.id}`,
-          }).catch(console.error);
-        }
-        if (assignee && commenter && commenter.id !== assignee.id && assignee.id !== requester?.id) {
-          storage.createNotification({
-            userId: assignee.id,
-            fromUserId: commenter.id,
-            title: "Novo comentário no chamado",
-            message: `${commenter.name} comentou no chamado "${ticket.title}"`,
-            module: "chamados",
-            entityId: ticket.id,
-            linkUrl: `/chamados?ticket=${ticket.id}`,
-          }).catch(console.error);
-        }
-
-        // Process @mentions and send notifications
-        const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
-        if (mentionMatches) {
-          const users = await storage.getUsers();
-
-          for (const mention of mentionMatches) {
-            const mentionedName = mention.slice(1).trim();
-            const mentionedUser = users.find(u =>
-              u.name.toLowerCase() === mentionedName.toLowerCase() && u.status === "active"
-            );
-
-            if (mentionedUser && commenter) {
-              sendMentionNotificationEmail(
-                mentionedUser,
-                commenter.name,
-                ticket.title,
-                ticket.id,
-                validated.content
-              ).catch(console.error);
-              storage.createNotification({
-                userId: mentionedUser.id,
-                fromUserId: commenter.id,
-                title: "Menção em chamado",
-                message: `${commenter.name} mencionou você em um comentário no chamado "${ticket.title}"`,
-                module: "chamados",
-                entityId: ticket.id,
-                linkUrl: `/chamados?ticket=${ticket.id}`,
-              }).catch(console.error);
-            }
-          }
-        }
+      if (!req.session?.userId) {
+        return res.status(401).json({ error: 'Não autenticado' });
       }
 
-      res.status(201).json(comment);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      const ticketId = req.params.id;
+      const content = req.body.content;
+
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ error: 'Conteúdo obrigatório' });
       }
-      res.status(400).json({ error: "Failed to create comment" });
+
+      // Verifica se tem texto (remove HTML para validar)
+      const textoLimpo = content.replace(/<[^>]*>/g, '').trim();
+      if (textoLimpo.length === 0) {
+        return res.status(400).json({ error: '  vazio' });
+      }
+
+      console.log('🚀 Criando comentário ticket...');
+      
+      // Cria comentário (salva com HTML)
+      const comment = await storage.createTicketComment({
+        ticketId,
+        userId: req.session.userId,
+        content: content,
+      });
+      
+      console.log('✅ Comentário ticket criado:', comment);
+      
+      const comments = await storage.getTicketComments(ticketId);
+      const newComment = comments.find(c => c.id === comment.id);
+      
+      res.json(newComment);
+    } catch (error: any) {
+      console.error('💥 ERRO FATAL TICKET:', error);
+      res.status(500).json({ error: 'Erro ao criar comentário', details: error.message });
     }
   });
 
@@ -2002,52 +1969,53 @@ export async function registerRoutes(
     res.json(comments);
   });
 
-  app.post("/api/tasks/:id/comments", async (req, res) => {
+  app.post('/api/tasks/:id/comments', async (req, res) => {
     try {
-      const data = { ...req.body, taskId: req.params.id };
-      const validated = insertTaskCommentSchema.parse(data);
-      const comment = await storage.createTaskComment(validated);
+      console.log('📝 REQ RECEBIDO:', {
+        session: req.session,
+        body: req.body,
+        params: req.params,
+      });
 
-      // Process @mentions and send notifications
-      const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
-      if (mentionMatches) {
-        const task = await storage.getTask(req.params.id);
-        const users = await storage.getUsers();
-        const author = await storage.getUser(validated.authorId);
-
-        for (const mention of mentionMatches) {
-          const mentionedName = mention.slice(1).trim();
-          const mentionedUser = users.find(u =>
-            u.name.toLowerCase() === mentionedName.toLowerCase()
-          );
-
-          if (mentionedUser && task && author) {
-            sendMentionNotificationEmail(
-              mentionedUser,
-              author.name,
-              task.title,
-              task.id,
-              validated.content
-            ).catch(console.error);
-            storage.createNotification({
-              userId: mentionedUser.id,
-              fromUserId: author.id,
-              title: "Menção em tarefa",
-              message: `${author.name} mencionou você em um comentário na tarefa "${task.title}"`,
-              module: "tarefas",
-              entityId: task.id,
-              linkUrl: `/tarefas/${task.id}`,
-            }).catch(console.error);
-          }
-        }
+      if (!req.session?.userId) {
+        console.log('❌ Não autenticado');
+        return res.status(401).json({ error: 'Não autenticado' });
       }
 
-      res.status(201).json(comment);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      const taskId = req.params.id;
+      const content = req.body.content;
+
+      console.log('✅ Dados extraídos:', { taskId, userId: req.session.userId, content });
+
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ error: 'Conteúdo obrigatório' });
       }
-      res.status(400).json({ error: "Failed to create comment" });
+
+      // Verifica se tem texto (remove HTML para validar)
+      const textoLimpo = content.replace(/<[^>]*>/g, '').trim();
+      if (textoLimpo.length === 0) {
+        return res.status(400).json({ error: 'Comentário vazio' });
+      }
+
+      console.log('🚀 Criando comentário...');
+      
+      // Cria comentário (salva com HTML)
+      const comment = await storage.createTaskComment({
+        taskId,
+        authorId: req.session.userId,
+        content: content,
+      });
+      
+      console.log('✅ Comentário criado:', comment);
+      
+      const comments = await storage.getTaskComments(taskId);
+      const newComment = comments.find(c => c.id === comment.id);
+      
+      console.log('✅ Retornando:', newComment);
+      res.json(newComment);
+    } catch (error: any) {
+      console.error('💥 ERRO FATAL:', error);
+      res.status(500).json({ error: 'Erro ao criar comentário', details: error.message });
     }
   });
 
