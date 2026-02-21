@@ -166,6 +166,7 @@ export default function KanbanPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [editingColumn, setEditingColumn] = useState<{ id: string; name: string } | null>(null);
   
   const { toast } = useToast();
@@ -327,7 +328,8 @@ export default function KanbanPage() {
                          card.code.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesPriority = filterPriority === "all" || card.priority === filterPriority;
     const matchesAssignee = filterAssignee === "all" || card.assigneeId === filterAssignee;
-    return matchesSearch && matchesPriority && matchesAssignee;
+    const matchesStatus = filterStatus === "all" || card.columnId === filterStatus;
+    return matchesSearch && matchesPriority && matchesAssignee && matchesStatus;
   });
 
   const sortedColumns = [...columns].sort((a, b) => a.order - b.order);
@@ -462,6 +464,18 @@ export default function KanbanPage() {
               <SelectItem value="all">Todos Responsáveis</SelectItem>
               {users.map(u => (
                 <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterStatus} onValueChange={setFilterStatus}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Status</SelectItem>
+              {sortedColumns.map(col => (
+                <SelectItem key={col.id} value={col.id}>{col.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
