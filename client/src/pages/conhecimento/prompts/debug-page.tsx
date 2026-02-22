@@ -1,8 +1,14 @@
 import { useState, useEffect } from "react";
 
+interface Prompt {
+  id: string;
+  title: string;
+  description?: string;
+}
+
 export default function PromptsDebugPage() {
-  const [prompts, setPrompts] = useState([]);
-  const [error, setError] = useState(null);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

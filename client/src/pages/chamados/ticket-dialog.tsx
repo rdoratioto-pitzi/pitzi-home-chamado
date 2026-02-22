@@ -309,9 +309,8 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                       placeholder="Descreva detalhadamente o problema ou solicitação... (mínimo 20 caracteres)"
                       value={field.value}
                       onChange={field.onChange}
-                      images={attachments}
-                      onImagesChange={setAttachments}
-                      maxLength={5000}
+                      images={attachments.map(a => a.url)}
+                      onImagesChange={(urls) => setAttachments(urls.map((url, i) => ({ name: `Arquivo_${i + 1}`, url })))}
                       data-testid="input-ticket-description"
                       className="min-h-[180px]"
                     />

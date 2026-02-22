@@ -135,3 +135,23 @@ export function useSyncPrompts() {
     },
   });
 }
+
+// Traduzir prompt para PT-BR
+export function useTranslatePrompt() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (promptId: string) => {
+      const res = await fetch(`/api/prompts/${promptId}/translate`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Erro ao traduzir prompt");
+      return res.json() as Promise<{ success: boolean; translatedContent: string; cached: boolean }>;
+    },
+    onSuccess: (_, promptId) => {
+      // Invalidar cache do prompt específico para recarregar com tradução
+      queryClient.invalidateQueries({ queryKey: [PROMPTS_QUERY_KEY, promptId] });
+      queryClient.invalidateQueries({ queryKey: [PROMPTS_QUERY_KEY] });
+    },
+  });
+}
