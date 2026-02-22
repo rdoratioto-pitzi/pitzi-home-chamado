@@ -1900,6 +1900,132 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(gitRepositories).where(eq(gitRepositories.id, id)).returning();
     return result.length > 0;
   }
+
+  // ============== GIT ANALYTICS - COMMITS ==============
+
+  async getGitCommits(filters?: {
+    repositoryId?: string;
+    authorName?: string;
+    commitType?: string;
+    branch?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<GitCommit[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitCommits.authorName, filters.authorName));
+      }
+      if (filters?.commitType) {
+        conditions.push(eq(gitCommits.commitType, filters.commitType));
+      }
+      if (filters?.branch) {
+        conditions.push(eq(gitCommits.branch, filters.branch));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select().from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      query = query.orderBy(desc(gitCommits.committedAt)) as any;
+      
+      if (filters?.limit) {
+        query = query.limit(filters.limit) as any;
+      }
+      if (filters?.offset) {
+        query = query.offset(filters.offset) as any;
+      }
+      
+      return await query;
+    } catch (error) {
+      console.error("[storage] getGitCommits error:", error);
+      return [];
+    }
+  }
+
+  async getGitCommitBySha(sha: string): Promise<GitCommit | undefined> {
+    if (!db) return undefined;
+    try {
+      const [commit] = await db.select().from(gitCommits).where(eq(gitCommits.sha, sha));
+      return commit;
+    } catch (error) {
+      console.error("[storage] getGitCommitBySha error:", error);
+      return undefined;
+    }
+  }
+
+  async createGitCommit(data: InsertGitCommit): Promise<GitCommit> {
+    if (!db) throw new Error("Database not available");
+    const [commit] = await db.insert(gitCommits).values(data).returning();
+    return commit;
+  }
+
+  async createGitCommitsBatch(data: InsertGitCommit[]): Promise<number> {
+    if (!db || data.length === 0) return 0;
+    try {
+      const result = await db.insert(gitCommits).values(data).onConflictDoNothing().returning();
+      return result.length;
+    } catch (error) {
+      console.error("[storage] createGitCommitsBatch error:", error);
+      return 0;
+    }
+  }
+
+  async countGitCommits(filters?: {
+    repositoryId?: string;
+    authorName?: string;
+    commitType?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<number> {
+    if (!db) return 0;
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitCommits.authorName, filters.authorName));
+      }
+      if (filters?.commitType) {
+        conditions.push(eq(gitCommits.commitType, filters.commitType));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({ count: sql<number>`count(*)` }).from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const result = await query;
+      return result[0]?.count ?? 0;
+    } catch (error) {
+      console.error("[storage] countGitCommits error:", error);
+      return 0;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
