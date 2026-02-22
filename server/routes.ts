@@ -5342,7 +5342,7 @@ export async function registerRoutes(
   // Sync (sincronização com GitHub)
   app.post("/api/git-analytics/sync", async (req, res) => {
     try {
-      const { repositoryId } = req.body;
+      const repositoryId = req.body?.repositoryId || null;
       
       const { syncRepository, syncAllRepositories } = await import("./services/github-sync");
       
