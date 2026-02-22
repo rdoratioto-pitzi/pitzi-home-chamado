@@ -5233,6 +5233,112 @@ export async function registerRoutes(
     }
   });
 
+  // Stats (agregações para dashboard)
+  app.get("/api/git-analytics/stats", async (req, res) => {
+    try {
+      const { repositoryId, startDate, endDate } = req.query;
+      
+      const stats = await storage.getGitAnalyticsStats({
+        repositoryId: repositoryId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get git analytics stats error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Developer stats
+  app.get("/api/git-analytics/developer-stats", async (req, res) => {
+    try {
+      const { repositoryId, startDate, endDate } = req.query;
+      
+      const stats = await storage.getGitDeveloperStats({
+        repositoryId: repositoryId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Get developer stats error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Volume by day (para gráficos)
+  app.get("/api/git-analytics/commits-by-day", async (req, res) => {
+    try {
+      const { repositoryId, startDate, endDate } = req.query;
+      
+      const data = await storage.getGitCommitsByDay({
+        repositoryId: repositoryId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      
+      res.json(data);
+    } catch (error: any) {
+      console.error("Get commits by day error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/git-analytics/prs-by-day", async (req, res) => {
+    try {
+      const { repositoryId, startDate, endDate } = req.query;
+      
+      const data = await storage.getGitPRsByDay({
+        repositoryId: repositoryId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      
+      res.json(data);
+    } catch (error: any) {
+      console.error("Get PRs by day error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Volume by month
+  app.get("/api/git-analytics/commits-by-month", async (req, res) => {
+    try {
+      const { repositoryId, startDate, endDate } = req.query;
+      
+      const data = await storage.getGitCommitsByMonth({
+        repositoryId: repositoryId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      
+      res.json(data);
+    } catch (error: any) {
+      console.error("Get commits by month error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/git-analytics/prs-by-month", async (req, res) => {
+    try {
+      const { repositoryId, startDate, endDate } = req.query;
+      
+      const data = await storage.getGitPRsByMonth({
+        repositoryId: repositoryId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      
+      res.json(data);
+    } catch (error: any) {
+      console.error("Get PRs by month error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Health check endpoint for database
   app.get("/api/health/db", async (req, res) => {
     try {
