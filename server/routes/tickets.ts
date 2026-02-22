@@ -1,0 +1,354 @@
+import { Router } from "express";
+import { z } from "zod";
+import { storage } from "../storage";
+import {
+  insertTicketSchema,
+  insertTicketResponsavelSchema,
+  insertTicketCommentSchema,
+} from "@shared/schema";
+import { requireAuth, requireAdmin, getSessionUser } from "../middleware/auth";
+import {
+  sendTicketCreatedEmail,
+  sendTicketAssignedEmail,
+  sendTicketStatusChangedEmail,
+  sendTicketCommentEmail,
+  sendMentionNotificationEmail,
+} from "../email-service";
+
+export function registerTicketRoutes(router: Router) {
+  router.get("/api/tickets", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      
+      if (isAdmin) {
+        const tickets = await storage.getTickets();
+        return res.json(tickets);
+      }
+      
+      const tickets = await storage.getTickets({ requesterId: userId, assigneeId: userId });
+      res.json(tickets);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  router.get("/api/tickets/:id", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const ticket = await storage.getTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+      res.json(ticket);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  router.post("/api/tickets", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const data = { ...req.body };
+
+      if (!isAdmin || !data.requesterId) {
+        data.requesterId = userId;
+      }
+
+      const validated = insertTicketSchema.parse(data);
+
+      if (!validated.assigneeId && validated.category && validated.type) {
+        const autoAssignee = await storage.findResponsavelForTicket(validated.category, validated.type);
+        if (autoAssignee) {
+          validated.assigneeId = autoAssignee;
+        }
+      }
+
+      const ticket = await storage.createTicket(validated);
+
+      const requester = await storage.getUser(ticket.requesterId);
+      const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
+
+      if (requester) {
+        sendTicketCreatedEmail(ticket, requester, assignee || null).catch(console.error);
+      }
+
+      if (assignee && assignee.id !== ticket.requesterId) {
+        sendTicketAssignedEmail(ticket, assignee).catch(console.error);
+      }
+
+      if (ticket.assigneeId && ticket.assigneeId !== ticket.requesterId) {
+        storage.createNotification({
+          userId: ticket.assigneeId,
+          fromUserId: ticket.requesterId,
+          title: "Novo chamado atribuído",
+          message: `O chamado "${ticket.title}" (${ticket.code}) foi criado e atribuído a você`,
+          module: "chamados",
+          entityId: ticket.id,
+          linkUrl: `/chamados?ticket=${ticket.id}`,
+        }).catch(console.error);
+      }
+
+      res.status(201).json(ticket);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create ticket" });
+    }
+  });
+
+  router.patch("/api/tickets/:id", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const oldTicket = await storage.getTicket(req.params.id);
+      if (!oldTicket) return res.status(404).json({ error: "Ticket not found" });
+      if (!isAdmin && oldTicket.requesterId !== userId && oldTicket.assigneeId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      let updateData: any = { ...req.body };
+
+      if (!isAdmin) {
+        const allowedFields = ["status", "title", "description", "attachments", "location", "impact", "dueDate"];
+        const filteredData: any = {};
+        allowedFields.forEach(field => {
+          if (updateData[field] !== undefined) {
+            filteredData[field] = updateData[field];
+          }
+        });
+        updateData = filteredData;
+      }
+
+      if (req.body.status && req.body.status !== oldTicket.status) {
+        if (req.body.status === "resolved" && !oldTicket.dataResolucao) {
+          updateData.dataResolucao = new Date();
+        }
+        if (req.body.status === "closed" && !oldTicket.dataFechamento) {
+          updateData.dataFechamento = new Date();
+        }
+      }
+
+      if (updateData.descriptionLastEditedAt) {
+        updateData.descriptionLastEditedAt = new Date(updateData.descriptionLastEditedAt);
+      }
+
+      const ticket = await storage.updateTicket(req.params.id, updateData);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+      if (req.body.status && req.body.status !== oldTicket.status) {
+        const requester = await storage.getUser(ticket.requesterId);
+        const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
+        if (requester) {
+          sendTicketStatusChangedEmail(ticket, oldTicket.status, req.body.status, requester, assignee || null).catch(console.error);
+        }
+        const statusLabels: Record<string, string> = { open: "Aberto", in_progress: "Em andamento", resolved: "Resolvido", closed: "Fechado", pending: "Pendente" };
+        const statusLabel = statusLabels[req.body.status] || req.body.status;
+        if (ticket.requesterId) {
+          storage.createNotification({
+            userId: ticket.requesterId,
+            title: "Status do chamado alterado",
+            message: `O chamado "${ticket.title}" (${ticket.code || ''}) mudou para "${statusLabel}"`,
+            module: "chamados",
+            entityId: ticket.id,
+            linkUrl: `/chamados?ticket=${ticket.id}`,
+          }).catch(console.error);
+        }
+      }
+
+      if (req.body.assigneeId && req.body.assigneeId !== oldTicket.assigneeId) {
+        const assignee = await storage.getUser(req.body.assigneeId);
+        if (assignee) {
+          sendTicketAssignedEmail(ticket, assignee).catch(console.error);
+        }
+        storage.createNotification({
+          userId: req.body.assigneeId,
+          title: "Chamado atribuído a você",
+          message: `O chamado "${ticket.title}" (${ticket.code || ''}) foi atribuído a você`,
+          module: "chamados",
+          entityId: ticket.id,
+          linkUrl: `/chamados?ticket=${ticket.id}`,
+        }).catch(console.error);
+      }
+
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error updating ticket:", error);
+      res.status(400).json({ error: "Failed to update ticket" });
+    }
+  });
+
+  router.delete("/api/tickets/:id", requireAuth, async (req, res) => {
+    const { userId, isAdmin } = getSessionUser(req);
+    const ticket = await storage.getTicket(req.params.id);
+    if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+    if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    const deleted = await storage.deleteTicket(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Ticket not found" });
+    res.status(204).send();
+  });
+
+  router.get("/api/tickets/:id/comments", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const ticket = await storage.getTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const comments = await storage.getTicketComments(req.params.id);
+      res.json(comments);
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  router.post("/api/tickets/:id/comments", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const ticket = await storage.getTicket(req.params.id);
+      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const validated = insertTicketCommentSchema.parse({
+        ...req.body,
+        ticketId: req.params.id,
+      });
+      const comment = await storage.createTicketComment(validated);
+
+      if (ticket) {
+        if (ticket.assigneeId && comment.userId === ticket.assigneeId && !ticket.dataPrimeiraResposta) {
+          await storage.updateTicket(ticket.id, { dataPrimeiraResposta: new Date() });
+        }
+
+        const commenter = await storage.getUser(comment.userId);
+        const requester = await storage.getUser(ticket.requesterId);
+        const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
+
+        if (commenter && requester) {
+          sendTicketCommentEmail(ticket, comment, commenter, requester, assignee || null).catch(console.error);
+        }
+
+        if (requester && commenter && commenter.id !== requester.id) {
+          storage.createNotification({
+            userId: requester.id,
+            fromUserId: commenter.id,
+            title: "Novo comentário no chamado",
+            message: `${commenter.name} comentou no chamado "${ticket.title}"`,
+            module: "chamados",
+            entityId: ticket.id,
+            linkUrl: `/chamados?ticket=${ticket.id}`,
+          }).catch(console.error);
+        }
+        if (assignee && commenter && commenter.id !== assignee.id && assignee.id !== requester?.id) {
+          storage.createNotification({
+            userId: assignee.id,
+            fromUserId: commenter.id,
+            title: "Novo comentário no chamado",
+            message: `${commenter.name} comentou no chamado "${ticket.title}"`,
+            module: "chamados",
+            entityId: ticket.id,
+            linkUrl: `/chamados?ticket=${ticket.id}`,
+          }).catch(console.error);
+        }
+
+        const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
+        if (mentionMatches) {
+          const users = await storage.getUsers();
+
+          for (const mention of mentionMatches) {
+            const mentionedName = mention.slice(1).trim();
+            const mentionedUser = users.find(u =>
+              u.name.toLowerCase() === mentionedName.toLowerCase() && u.status === "active"
+            );
+
+            if (mentionedUser && commenter) {
+              sendMentionNotificationEmail(
+                mentionedUser,
+                commenter.name,
+                ticket.title,
+                ticket.id,
+                validated.content
+              ).catch(console.error);
+              storage.createNotification({
+                userId: mentionedUser.id,
+                fromUserId: commenter.id,
+                title: "Menção em chamado",
+                message: `${commenter.name} mencionou você em um comentário no chamado "${ticket.title}"`,
+                module: "chamados",
+                entityId: ticket.id,
+                linkUrl: `/chamados?ticket=${ticket.id}`,
+              }).catch(console.error);
+            }
+          }
+        }
+      }
+
+      res.status(201).json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create comment" });
+    }
+  });
+
+  router.get("/api/ticket-responsaveis", requireAuth, async (req, res) => {
+    const responsaveis = await storage.getTicketResponsaveis();
+    res.json(responsaveis);
+  });
+
+  router.get("/api/ticket-responsaveis/:id", requireAuth, async (req, res) => {
+    const responsavel = await storage.getTicketResponsavel(req.params.id);
+    if (!responsavel) return res.status(404).json({ error: "Responsavel not found" });
+    res.json(responsavel);
+  });
+
+  router.post("/api/ticket-responsaveis", requireAdmin, async (req, res) => {
+    try {
+      const validated = insertTicketResponsavelSchema.parse(req.body);
+      const responsavel = await storage.createTicketResponsavel(validated);
+      res.status(201).json(responsavel);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create responsavel" });
+    }
+  });
+
+  router.patch("/api/ticket-responsaveis/:id", requireAdmin, async (req, res) => {
+    try {
+      const partialSchema = insertTicketResponsavelSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const responsavel = await storage.updateTicketResponsavel(req.params.id, validated);
+      if (!responsavel) return res.status(404).json({ error: "Responsavel not found" });
+      res.json(responsavel);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update responsavel" });
+    }
+  });
+
+  router.delete("/api/ticket-responsaveis/:id", requireAdmin, async (req, res) => {
+    const deleted = await storage.deleteTicketResponsavel(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Responsavel not found" });
+    res.status(204).send();
+  });
+
+  router.get("/api/ticket-responsaveis/find/:categoria/:tipo", requireAuth, async (req, res) => {
+    const responsavelId = await storage.findResponsavelForTicket(req.params.categoria, req.params.tipo);
+    res.json({ responsavelId });
+  });
+}
