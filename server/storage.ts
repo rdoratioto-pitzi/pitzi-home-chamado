@@ -51,6 +51,11 @@ import {
   type FlowchartComment, type InsertFlowchartComment,
   type PromptLibrary, type InsertPromptLibrary,
   type PromptUserFavorite, type InsertPromptUserFavorite,
+  // Git Analytics
+  type GitRepository, type InsertGitRepository,
+  type GitCommit, type InsertGitCommit,
+  type GitPullRequest, type InsertGitPullRequest,
+  type GitSecurityAlert, type InsertGitSecurityAlert,
   users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
@@ -62,10 +67,12 @@ import {
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
   flowcharts, flowchartVersions, flowchartComments,
   aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates,
-  promptsLibrary, promptUserFavorites
+  promptsLibrary, promptUserFavorites,
+  // Git Analytics
+  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql, asc, type SQL } from "drizzle-orm";
+import { eq, and, or, sql, asc, desc, type SQL } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -1833,6 +1840,64 @@ export class DatabaseStorage implements IStorage {
   async deletePromptFavorite(id: string): Promise<boolean> {
     if (!db) return false;
     const result = await db.delete(promptUserFavorites).where(eq(promptUserFavorites.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // ============== GIT ANALYTICS - REPOSITORIES ==============
+  
+  async getGitRepositories(tenantId?: string): Promise<GitRepository[]> {
+    if (!db) return [];
+    try {
+      if (tenantId) {
+        return await db.select().from(gitRepositories).where(eq(gitRepositories.tenantId, tenantId)).orderBy(desc(gitRepositories.createdAt));
+      }
+      return await db.select().from(gitRepositories).orderBy(desc(gitRepositories.createdAt));
+    } catch (error) {
+      console.error("[storage] getGitRepositories error:", error);
+      return [];
+    }
+  }
+
+  async getGitRepository(id: string): Promise<GitRepository | undefined> {
+    if (!db) return undefined;
+    try {
+      const [repo] = await db.select().from(gitRepositories).where(eq(gitRepositories.id, id));
+      return repo;
+    } catch (error) {
+      console.error("[storage] getGitRepository error:", error);
+      return undefined;
+    }
+  }
+
+  async getGitRepositoryByFullName(fullName: string): Promise<GitRepository | undefined> {
+    if (!db) return undefined;
+    try {
+      const [repo] = await db.select().from(gitRepositories).where(eq(gitRepositories.fullName, fullName));
+      return repo;
+    } catch (error) {
+      console.error("[storage] getGitRepositoryByFullName error:", error);
+      return undefined;
+    }
+  }
+
+  async createGitRepository(data: InsertGitRepository): Promise<GitRepository> {
+    if (!db) throw new Error("Database not available");
+    const [repo] = await db.insert(gitRepositories).values(data).returning();
+    return repo;
+  }
+
+  async updateGitRepository(id: string, data: Partial<InsertGitRepository>): Promise<GitRepository | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db.update(gitRepositories)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(gitRepositories.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteGitRepository(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(gitRepositories).where(eq(gitRepositories.id, id)).returning();
     return result.length > 0;
   }
 }
