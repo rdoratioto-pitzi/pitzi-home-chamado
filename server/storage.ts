@@ -2258,6 +2258,168 @@ export class DatabaseStorage implements IStorage {
       return { total: 0, bySeverity: {} };
     }
   }
+
+  // ============== GIT ANALYTICS - STATS ==============
+
+  async getGitCommitsByDay(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{ date: string; commits: number }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({
+        date: sql<string>`DATE(${gitCommits.committedAt})`,
+        commits: sql<number>`count(*)`
+      }).from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(sql`DATE(${gitCommits.committedAt})`).orderBy(sql`DATE(${gitCommits.committedAt})`);
+      
+      return results.map(r => ({
+        date: String(r.date),
+        commits: Number(r.commits)
+      }));
+    } catch (error) {
+      console.error("[storage] getGitCommitsByDay error:", error);
+      return [];
+    }
+  }
+
+  async getGitPRsByDay(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{ date: string; prs: number }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({
+        date: sql<string>`DATE(${gitPullRequests.createdAt})`,
+        prs: sql<number>`count(*)`
+      }).from(gitPullRequests);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(sql`DATE(${gitPullRequests.createdAt})`).orderBy(sql`DATE(${gitPullRequests.createdAt})`);
+      
+      return results.map(r => ({
+        date: String(r.date),
+        prs: Number(r.prs)
+      }));
+    } catch (error) {
+      console.error("[storage] getGitPRsByDay error:", error);
+      return [];
+    }
+  }
+
+  async getGitCommitsByMonth(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{ month: string; commits: number }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({
+        month: sql<string>`TO_CHAR(${gitCommits.committedAt}, 'YYYY-MM')`,
+        commits: sql<number>`count(*)`
+      }).from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(sql`TO_CHAR(${gitCommits.committedAt}, 'YYYY-MM')`).orderBy(sql`TO_CHAR(${gitCommits.committedAt}, 'YYYY-MM')`);
+      
+      return results.map(r => ({
+        month: String(r.month),
+        commits: Number(r.commits)
+      }));
+    } catch (error) {
+      console.error("[storage] getGitCommitsByMonth error:", error);
+      return [];
+    }
+  }
+
+  async getGitPRsByMonth(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{ month: string; prs: number }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({
+        month: sql<string>`TO_CHAR(${gitPullRequests.createdAt}, 'YYYY-MM')`,
+        prs: sql<number>`count(*)`
+      }).from(gitPullRequests);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(sql`TO_CHAR(${gitPullRequests.createdAt}, 'YYYY-MM')`).orderBy(sql`TO_CHAR(${gitPullRequests.createdAt}, 'YYYY-MM')`);
+      
+      return results.map(r => ({
+        month: String(r.month),
+        prs: Number(r.prs)
+      }));
+    } catch (error) {
+      console.error("[storage] getGitPRsByMonth error:", error);
+      return [];
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
