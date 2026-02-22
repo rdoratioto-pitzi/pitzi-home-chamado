@@ -5339,6 +5339,45 @@ export async function registerRoutes(
     }
   });
 
+  // Sync (sincronização com GitHub)
+  app.post("/api/git-analytics/sync", async (req, res) => {
+    try {
+      const { repositoryId } = req.body;
+      
+      const { syncRepository, syncAllRepositories } = await import("./services/github-sync");
+      
+      if (repositoryId) {
+        await syncRepository(repositoryId);
+        res.json({ success: true, message: "Repositório sincronizado com sucesso" });
+      } else {
+        await syncAllRepositories();
+        res.json({ success: true, message: "Todos os repositórios sincronizados com sucesso" });
+      }
+    } catch (error: any) {
+      console.error("Sync error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add repository (adiciona e sincroniza)
+  app.post("/api/git-analytics/add-repository", async (req, res) => {
+    try {
+      const { fullName } = req.body;
+      
+      if (!fullName) {
+        return res.status(400).json({ error: "fullName é obrigatório (ex: Renov-BD/Renov.Home)" });
+      }
+      
+      const { addRepository } = await import("./services/github-sync");
+      const repo = await addRepository(fullName);
+      
+      res.status(201).json(repo);
+    } catch (error: any) {
+      console.error("Add repository error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Health check endpoint for database
   app.get("/api/health/db", async (req, res) => {
     try {
