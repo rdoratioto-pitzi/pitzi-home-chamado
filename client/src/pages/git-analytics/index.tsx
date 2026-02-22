@@ -64,6 +64,10 @@ export default function GitAnalyticsPage() {
   const [showSecurityModal, setShowSecurityModal] = useState(false);
   const [showDevModal, setShowDevModal] = useState(false);
   const [selectedDev, setSelectedDev] = useState<DeveloperStats | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const { toast } = useToast();
 
   // Fetch repositories
@@ -104,13 +108,40 @@ export default function GitAnalyticsPage() {
     },
   });
 
+  // Funções auxiliares para período
+  const getMonthName = (month: number) => {
+    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    return months[month - 1];
+  };
+
+  const getAvailablePeriods = () => {
+    const periods = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${getMonthName(date.getMonth() + 1)} ${date.getFullYear()}`;
+      periods.push({ value, label });
+    }
+    return periods;
+  };
+
   // Sync handler
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      await apiRequest("POST", "/api/git-analytics/sync");
+      const [year, month] = selectedPeriod.split('-').map(Number);
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+
+      await apiRequest("POST", "/api/git-analytics/sync-period", {
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
+        repositoryId: selectedRepoId !== "all" ? selectedRepoId : undefined,
+      });
+      
       await refetchStats();
-      toast({ title: "Sincronização concluída!", description: "Dados atualizados com sucesso." });
+      toast({ title: "Sincronização concluída!", description: `Dados de ${getMonthName(month)}/${year} atualizados.` });
     } catch (error) {
       toast({ title: "Erro na sincronização", description: String(error), variant: "destructive" });
     } finally {
@@ -165,6 +196,20 @@ export default function GitAnalyticsPage() {
               </Tabs>
 
               <div className="flex items-center gap-3">
+                {/* Filtro de Período */}
+                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                  <SelectTrigger className="w-[130px] h-9">
+                    <SelectValue placeholder="Período" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailablePeriods().map((period) => (
+                      <SelectItem key={period.value} value={period.value}>
+                        {period.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
                 {/* Filtro de Repositório */}
                 <Select value={selectedRepoId} onValueChange={setSelectedRepoId}>
                   <SelectTrigger className="w-[180px] h-9">
