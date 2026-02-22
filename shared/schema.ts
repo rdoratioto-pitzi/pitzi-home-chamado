@@ -1229,3 +1229,25 @@ export const gitSecurityAlerts = pgTable("git_security_alerts", {
 export const insertGitSecurityAlertSchema = createInsertSchema(gitSecurityAlerts).omit({ id: true });
 export type InsertGitSecurityAlert = z.infer<typeof insertGitSecurityAlertSchema>;
 export type GitSecurityAlert = typeof gitSecurityAlerts.$inferSelect;
+
+// Branches
+export const gitBranches = pgTable("git_branches", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: varchar("tenant_id"),
+  repositoryId: varchar("repository_id").notNull(),
+  name: text("name").notNull(),
+  sha: text("sha").notNull(),
+  isDefault: boolean("is_default").default(false),
+  isProtected: boolean("is_protected").default(false),
+  aheadBy: integer("ahead_by").default(0),
+  behindBy: integer("behind_by").default(0),
+  hasOpenPR: boolean("has_open_pr").default(false),
+  lastCommitAt: timestamp("last_commit_at"),
+  lastCommitAuthor: text("last_commit_author"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertGitBranchSchema = createInsertSchema(gitBranches);
+export type InsertGitBranch = z.infer<typeof insertGitBranchSchema>;
+export type GitBranch = typeof gitBranches.$inferSelect;

@@ -69,10 +69,10 @@ import {
   aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates,
   promptsLibrary, promptUserFavorites,
   // Git Analytics
-  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts
+  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql, asc, desc, type SQL } from "drizzle-orm";
+import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -2260,6 +2260,84 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("[storage] countGitSecurityAlerts error:", error);
       return { total: 0, bySeverity: {} };
+    }
+  }
+
+  // ============== GIT ANALYTICS - BRANCHES ==============
+
+  async upsertGitBranch(data: any): Promise<any> {
+    if (!db) throw new Error("Database not available");
+    try {
+      const existing = await db
+        .select()
+        .from(gitBranches)
+        .where(and(
+          eq(gitBranches.repositoryId, data.repositoryId),
+          eq(gitBranches.name, data.name)
+        ))
+        .limit(1);
+
+      if (existing.length > 0) {
+        const [updated] = await db
+          .update(gitBranches)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(gitBranches.id, existing[0].id))
+          .returning();
+        return updated;
+      }
+
+      const [created] = await db.insert(gitBranches).values(data).returning();
+      return created;
+    } catch (error) {
+      console.error("[storage] upsertGitBranch error:", error);
+      throw error;
+    }
+  }
+
+  async getGitBranches(repositoryId?: string): Promise<any[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      if (repositoryId) {
+        conditions.push(eq(gitBranches.repositoryId, repositoryId));
+      }
+      
+      const result = await db
+        .select()
+        .from(gitBranches)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(gitBranches.lastCommitAt));
+      
+      return result;
+    } catch (error) {
+      console.error("[storage] getGitBranches error:", error);
+      return [];
+    }
+  }
+
+  async getPendingBranches(repositoryId?: string): Promise<any[]> {
+    if (!db) return [];
+    try {
+      const conditions = [
+        eq(gitBranches.isDefault, false),
+        eq(gitBranches.hasOpenPR, false),
+        gt(gitBranches.aheadBy, 0),
+      ];
+      
+      if (repositoryId) {
+        conditions.push(eq(gitBranches.repositoryId, repositoryId));
+      }
+      
+      const result = await db
+        .select()
+        .from(gitBranches)
+        .where(and(...conditions))
+        .orderBy(desc(gitBranches.aheadBy));
+      
+      return result;
+    } catch (error) {
+      console.error("[storage] getPendingBranches error:", error);
+      return [];
     }
   }
 
