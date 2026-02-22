@@ -5154,6 +5154,85 @@ export async function registerRoutes(
     }
   });
 
+  // Commits
+  app.get("/api/git-analytics/commits", async (req, res) => {
+    try {
+      const { repositoryId, authorName, commitType, branch, startDate, endDate, limit, offset } = req.query;
+      
+      const commits = await storage.getGitCommits({
+        repositoryId: repositoryId as string,
+        authorName: authorName as string,
+        commitType: commitType as string,
+        branch: branch as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 50,
+        offset: offset ? parseInt(offset as string) : 0,
+      });
+      
+      const total = await storage.countGitCommits({
+        repositoryId: repositoryId as string,
+        authorName: authorName as string,
+        commitType: commitType as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      
+      res.json({ commits, total });
+    } catch (error: any) {
+      console.error("Get git commits error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Pull Requests
+  app.get("/api/git-analytics/pull-requests", async (req, res) => {
+    try {
+      const { repositoryId, authorName, status, prType, startDate, endDate, limit, offset } = req.query;
+      
+      const pullRequests = await storage.getGitPullRequests({
+        repositoryId: repositoryId as string,
+        authorName: authorName as string,
+        status: status as string,
+        prType: prType as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: limit ? parseInt(limit as string) : 50,
+        offset: offset ? parseInt(offset as string) : 0,
+      });
+      
+      const total = await storage.countGitPullRequests({
+        repositoryId: repositoryId as string,
+        status: status as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      });
+      
+      res.json({ pullRequests, total });
+    } catch (error: any) {
+      console.error("Get git pull requests error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Security Alerts
+  app.get("/api/git-analytics/security-alerts", async (req, res) => {
+    try {
+      const { repositoryId, severity, status } = req.query;
+      
+      const alerts = await storage.getGitSecurityAlerts({
+        repositoryId: repositoryId as string,
+        severity: severity as string,
+        status: status as string,
+      });
+      
+      res.json(alerts);
+    } catch (error: any) {
+      console.error("Get git security alerts error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Health check endpoint for database
   app.get("/api/health/db", async (req, res) => {
     try {
