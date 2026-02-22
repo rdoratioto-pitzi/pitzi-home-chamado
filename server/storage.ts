@@ -2122,6 +2122,7 @@ export class DatabaseStorage implements IStorage {
 
   async countGitPullRequests(filters?: {
     repositoryId?: string;
+    authorName?: string;
     status?: string;
     startDate?: Date;
     endDate?: Date;
@@ -2132,6 +2133,9 @@ export class DatabaseStorage implements IStorage {
       
       if (filters?.repositoryId) {
         conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitPullRequests.authorName, filters.authorName));
       }
       if (filters?.status) {
         conditions.push(eq(gitPullRequests.status, filters.status));
@@ -2427,6 +2431,7 @@ export class DatabaseStorage implements IStorage {
     repositoryId?: string;
     startDate?: Date;
     endDate?: Date;
+    authorName?: string;
   }): Promise<{
     name: string;
     email: string | null;
@@ -2449,6 +2454,9 @@ export class DatabaseStorage implements IStorage {
       }
       if (filters?.endDate) {
         conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitCommits.authorName, filters.authorName));
       }
       
       let query = db.select({
@@ -2501,6 +2509,7 @@ export class DatabaseStorage implements IStorage {
     repositoryId?: string;
     startDate?: Date;
     endDate?: Date;
+    authorName?: string;
   }): Promise<{
     totalCommits: number;
     totalPRs: number;
@@ -2524,6 +2533,7 @@ export class DatabaseStorage implements IStorage {
       // Count commits
       const totalCommits = await this.countGitCommits({
         repositoryId: filters?.repositoryId,
+        authorName: filters?.authorName,
         startDate: filters?.startDate,
         endDate: filters?.endDate,
       });
@@ -2531,12 +2541,14 @@ export class DatabaseStorage implements IStorage {
       // Count PRs
       const totalPRs = await this.countGitPullRequests({
         repositoryId: filters?.repositoryId,
+        authorName: filters?.authorName,
         startDate: filters?.startDate,
         endDate: filters?.endDate,
       });
       
       const totalPRsMerged = await this.countGitPullRequests({
         repositoryId: filters?.repositoryId,
+        authorName: filters?.authorName,
         status: 'merged',
         startDate: filters?.startDate,
         endDate: filters?.endDate,
@@ -2544,6 +2556,7 @@ export class DatabaseStorage implements IStorage {
       
       const totalPRsOpen = await this.countGitPullRequests({
         repositoryId: filters?.repositoryId,
+        authorName: filters?.authorName,
         status: 'open',
         startDate: filters?.startDate,
         endDate: filters?.endDate,
