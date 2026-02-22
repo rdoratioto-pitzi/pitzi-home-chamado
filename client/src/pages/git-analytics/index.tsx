@@ -416,29 +416,58 @@ function DashboardView({
         />
       </div>
 
-      {/* Security Alert Banner */}
-      {securityTotal > 0 && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+      {/* Alerts Row */}
+      <div className="flex flex-col gap-3">
+        {/* Security Alert Banner */}
+        {securityTotal > 0 && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 dark:bg-amber-900/50 rounded-lg">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  {securityTotal} vulnerabilidade{securityTotal > 1 ? "s" : ""} de segurança detectada{securityTotal > 1 ? "s" : ""}
+                </p>
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  {securityHigh > 0 && `${securityHigh} high severity`}
+                  {securityHigh > 0 && securityLow > 0 && " • "}
+                  {securityLow > 0 && `${securityLow} low severity`}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium text-amber-800 dark:text-amber-200">
-                {securityTotal} vulnerabilidade{securityTotal > 1 ? "s" : ""} de segurança detectada{securityTotal > 1 ? "s" : ""}
-              </p>
-              <p className="text-sm text-amber-600 dark:text-amber-400">
-                {securityHigh > 0 && `${securityHigh} high severity`}
-                {securityHigh > 0 && securityLow > 0 && " • "}
-                {securityLow > 0 && `${securityLow} low severity`}
-              </p>
-            </div>
+            <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100" onClick={onOpenSecurityModal}>
+              Ver Detalhes
+            </Button>
           </div>
-          <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100" onClick={onOpenSecurityModal}>
-            Ver Detalhes
-          </Button>
-        </div>
-      )}
+        )}
+
+        {/* PRs Pendentes Alert Banner */}
+        {(stats?.totalPRsOpen || 0) > 0 && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                <GitPullRequest className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="font-medium text-blue-800 dark:text-blue-200">
+                  {stats?.totalPRsOpen} Pull Request{(stats?.totalPRsOpen || 0) > 1 ? "s" : ""} aguardando revisão
+                </p>
+                <p className="text-sm text-blue-600 dark:text-blue-400">
+                  PRs abertos precisam de atenção para serem revisados e mergeados
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              className="border-blue-300 text-blue-700 hover:bg-blue-100"
+              onClick={() => window.open(`https://github.com/${repositories[0]?.fullName}/pulls`, "_blank")}
+            >
+              Ver no GitHub
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Row: Distribuição por Tipo + Produtividade por Dev */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
