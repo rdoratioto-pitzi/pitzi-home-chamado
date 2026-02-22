@@ -11,6 +11,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { KPICard, KPI_HELP_TEXTS } from "./components/KPICard";
 import { TYPE_COLORS, TYPE_LABELS } from "./components/Badges";
+import { TypeDistributionChart } from "./components/TypeDistributionChart";
+import { VolumeByDayCharts, VolumeByMonthCharts } from "./components/VolumeCharts";
 
 // Types
 export interface GitRepository {
@@ -313,37 +315,52 @@ function DashboardView({
         </div>
       )}
 
-      {/* Placeholder para gráficos - próximos prompts */}
+      {/* Row: Distribuição por Tipo + Produtividade por Dev */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-card rounded-xl border p-6">
-          <h3 className="text-sm font-semibold mb-4">Distribuição por Tipo</h3>
-          <p className="text-muted-foreground text-center py-12">Gráficos serão adicionados no próximo prompt...</p>
-        </div>
-        <div className="bg-card rounded-xl border p-6">
+        <TypeDistributionChart
+          commitsByType={stats?.commitsByType || {}}
+          totalCommits={totalCommits}
+          totalPRs={stats?.totalPRs || 0}
+        />
+        
+        {/* Produtividade por Desenvolvedor */}
+        <div className="bg-card rounded-xl border p-5">
           <h3 className="text-sm font-semibold mb-4">Produtividade por Desenvolvedor</h3>
           <div className="space-y-3">
             {developerStats.slice(0, 5).map((dev, idx) => (
-              <div key={idx} className="flex items-center gap-3">
+              <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
                 <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
                   {dev.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium truncate">{dev.name}</span>
-                    <span className="text-xs text-muted-foreground">{dev.commits} commits</span>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-muted-foreground">{dev.commits} commits</span>
+                      <span className="text-emerald-600">{dev.prsMerged} merged</span>
+                    </div>
                   </div>
                   <div className="w-full bg-muted rounded-full h-1.5">
-                    <div 
-                      className="bg-blue-500 h-1.5 rounded-full" 
+                    <div
+                      className="bg-blue-500 h-1.5 rounded-full"
                       style={{ width: `${developerStats[0]?.commits ? (dev.commits / developerStats[0].commits) * 100 : 0}%` }}
                     />
                   </div>
                 </div>
               </div>
             ))}
+            {developerStats.length === 0 && (
+              <p className="text-muted-foreground text-center py-4 text-sm">Nenhum desenvolvedor encontrado</p>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Volume por Dia */}
+      <VolumeByDayCharts repositories={repositories} />
+
+      {/* Volume por Mês */}
+      <VolumeByMonthCharts repositories={repositories} />
     </div>
   );
 }
