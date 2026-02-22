@@ -2026,6 +2026,136 @@ export class DatabaseStorage implements IStorage {
       return 0;
     }
   }
+
+  // ============== GIT ANALYTICS - PULL REQUESTS ==============
+
+  async getGitPullRequests(filters?: {
+    repositoryId?: string;
+    authorName?: string;
+    status?: string;
+    prType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<GitPullRequest[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitPullRequests.authorName, filters.authorName));
+      }
+      if (filters?.status) {
+        conditions.push(eq(gitPullRequests.status, filters.status));
+      }
+      if (filters?.prType) {
+        conditions.push(eq(gitPullRequests.prType, filters.prType));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select().from(gitPullRequests);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      query = query.orderBy(desc(gitPullRequests.createdAt)) as any;
+      
+      if (filters?.limit) {
+        query = query.limit(filters.limit) as any;
+      }
+      if (filters?.offset) {
+        query = query.offset(filters.offset) as any;
+      }
+      
+      return await query;
+    } catch (error) {
+      console.error("[storage] getGitPullRequests error:", error);
+      return [];
+    }
+  }
+
+  async createGitPullRequest(data: InsertGitPullRequest): Promise<GitPullRequest> {
+    if (!db) throw new Error("Database not available");
+    const [pr] = await db.insert(gitPullRequests).values(data).returning();
+    return pr;
+  }
+
+  async updateGitPullRequest(id: string, data: Partial<InsertGitPullRequest>): Promise<GitPullRequest | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db.update(gitPullRequests)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(gitPullRequests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async upsertGitPullRequest(data: InsertGitPullRequest): Promise<GitPullRequest> {
+    if (!db) throw new Error("Database not available");
+    
+    const [existing] = await db.select().from(gitPullRequests)
+      .where(and(
+        eq(gitPullRequests.repositoryId, data.repositoryId),
+        eq(gitPullRequests.githubPrNumber, data.githubPrNumber)
+      ));
+    
+    if (existing) {
+      const [updated] = await db.update(gitPullRequests)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(gitPullRequests.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(gitPullRequests).values(data).returning();
+    return created;
+  }
+
+  async countGitPullRequests(filters?: {
+    repositoryId?: string;
+    status?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<number> {
+    if (!db) return 0;
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+      }
+      if (filters?.status) {
+        conditions.push(eq(gitPullRequests.status, filters.status));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({ count: sql<number>`count(*)` }).from(gitPullRequests);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const [result] = await query;
+      return Number(result?.count || 0);
+    } catch (error) {
+      console.error("[storage] countGitPullRequests error:", error);
+      return 0;
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
