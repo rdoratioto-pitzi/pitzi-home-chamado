@@ -2156,6 +2156,108 @@ export class DatabaseStorage implements IStorage {
       return 0;
     }
   }
+
+  // ============== GIT ANALYTICS - SECURITY ALERTS ==============
+
+  async getGitSecurityAlerts(filters?: {
+    repositoryId?: string;
+    severity?: string;
+    status?: string;
+  }): Promise<GitSecurityAlert[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitSecurityAlerts.repositoryId, filters.repositoryId));
+      }
+      if (filters?.severity) {
+        conditions.push(eq(gitSecurityAlerts.severity, filters.severity));
+      }
+      if (filters?.status) {
+        conditions.push(eq(gitSecurityAlerts.status, filters.status));
+      }
+      
+      let query = db.select().from(gitSecurityAlerts);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      return await query.orderBy(desc(gitSecurityAlerts.createdAt));
+    } catch (error) {
+      console.error("[storage] getGitSecurityAlerts error:", error);
+      return [];
+    }
+  }
+
+  async createGitSecurityAlert(data: InsertGitSecurityAlert): Promise<GitSecurityAlert> {
+    if (!db) throw new Error("Database not available");
+    const [alert] = await db.insert(gitSecurityAlerts).values(data).returning();
+    return alert;
+  }
+
+  async upsertGitSecurityAlert(data: InsertGitSecurityAlert): Promise<GitSecurityAlert> {
+    if (!db) throw new Error("Database not available");
+    
+    const [existing] = await db.select().from(gitSecurityAlerts)
+      .where(and(
+        eq(gitSecurityAlerts.repositoryId, data.repositoryId),
+        eq(gitSecurityAlerts.githubAlertNumber, data.githubAlertNumber)
+      ));
+    
+    if (existing) {
+      const [updated] = await db.update(gitSecurityAlerts)
+        .set(data)
+        .where(eq(gitSecurityAlerts.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(gitSecurityAlerts).values(data).returning();
+    return created;
+  }
+
+  async countGitSecurityAlerts(filters?: {
+    repositoryId?: string;
+    status?: string;
+  }): Promise<{ total: number; bySeverity: Record<string, number> }> {
+    if (!db) return { total: 0, bySeverity: {} };
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitSecurityAlerts.repositoryId, filters.repositoryId));
+      }
+      if (filters?.status) {
+        conditions.push(eq(gitSecurityAlerts.status, filters.status));
+      }
+      
+      let query = db.select({
+        severity: gitSecurityAlerts.severity,
+        count: sql<number>`count(*)`
+      }).from(gitSecurityAlerts);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(gitSecurityAlerts.severity);
+      
+      const bySeverity: Record<string, number> = {};
+      let total = 0;
+      
+      for (const row of results) {
+        bySeverity[row.severity] = Number(row.count);
+        total += Number(row.count);
+      }
+      
+      return { total, bySeverity };
+    } catch (error) {
+      console.error("[storage] countGitSecurityAlerts error:", error);
+      return { total: 0, bySeverity: {} };
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
