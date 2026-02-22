@@ -2420,6 +2420,196 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
   }
+
+  // ============== GIT ANALYTICS - DEVELOPER STATS ==============
+
+  async getGitDeveloperStats(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{
+    name: string;
+    email: string | null;
+    avatarUrl: string | null;
+    commits: number;
+    additions: number;
+    deletions: number;
+    prs: number;
+    prsMerged: number;
+  }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({
+        name: gitCommits.authorName,
+        email: gitCommits.authorEmail,
+        avatarUrl: gitCommits.authorAvatarUrl,
+        commits: sql<number>`count(*)`,
+        additions: sql<number>`COALESCE(sum(${gitCommits.additions}), 0)`,
+        deletions: sql<number>`COALESCE(sum(${gitCommits.deletions}), 0)`,
+      }).from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const commitStats = await query.groupBy(gitCommits.authorName, gitCommits.authorEmail, gitCommits.authorAvatarUrl).orderBy(sql`count(*) DESC`);
+      
+      // Get PR stats for each developer
+      const results = await Promise.all(commitStats.map(async (dev) => {
+        const prConditions = [eq(gitPullRequests.authorName, dev.name)];
+        if (filters?.repositoryId) {
+          prConditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+        }
+        
+        const [prStats] = await db.select({
+          total: sql<number>`count(*)`,
+          merged: sql<number>`count(*) FILTER (WHERE ${gitPullRequests.status} = 'merged')`
+        }).from(gitPullRequests).where(and(...prConditions));
+        
+        return {
+          name: dev.name,
+          email: dev.email,
+          avatarUrl: dev.avatarUrl,
+          commits: Number(dev.commits),
+          additions: Number(dev.additions),
+          deletions: Number(dev.deletions),
+          prs: Number(prStats?.total || 0),
+          prsMerged: Number(prStats?.merged || 0),
+        };
+      }));
+      
+      return results;
+    } catch (error) {
+      console.error("[storage] getGitDeveloperStats error:", error);
+      return [];
+    }
+  }
+
+  async getGitAnalyticsStats(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{
+    totalCommits: number;
+    totalPRs: number;
+    totalPRsMerged: number;
+    totalPRsOpen: number;
+    totalDevelopers: number;
+    commitsByType: Record<string, number>;
+    securityAlerts: { total: number; bySeverity: Record<string, number> };
+  }> {
+    if (!db) return {
+      totalCommits: 0,
+      totalPRs: 0,
+      totalPRsMerged: 0,
+      totalPRsOpen: 0,
+      totalDevelopers: 0,
+      commitsByType: {},
+      securityAlerts: { total: 0, bySeverity: {} },
+    };
+    
+    try {
+      // Count commits
+      const totalCommits = await this.countGitCommits({
+        repositoryId: filters?.repositoryId,
+        startDate: filters?.startDate,
+        endDate: filters?.endDate,
+      });
+      
+      // Count PRs
+      const totalPRs = await this.countGitPullRequests({
+        repositoryId: filters?.repositoryId,
+        startDate: filters?.startDate,
+        endDate: filters?.endDate,
+      });
+      
+      const totalPRsMerged = await this.countGitPullRequests({
+        repositoryId: filters?.repositoryId,
+        status: 'merged',
+        startDate: filters?.startDate,
+        endDate: filters?.endDate,
+      });
+      
+      const totalPRsOpen = await this.countGitPullRequests({
+        repositoryId: filters?.repositoryId,
+        status: 'open',
+        startDate: filters?.startDate,
+        endDate: filters?.endDate,
+      });
+      
+      // Count unique developers
+      const conditions = [];
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let devsQuery = db.selectDistinct({ author: gitCommits.authorName }).from(gitCommits);
+      if (conditions.length > 0) {
+        devsQuery = devsQuery.where(and(...conditions)) as any;
+      }
+      const devs = await devsQuery;
+      const totalDevelopers = devs.length;
+      
+      // Commits by type
+      let typeQuery = db.select({
+        type: gitCommits.commitType,
+        count: sql<number>`count(*)`
+      }).from(gitCommits);
+      if (conditions.length > 0) {
+        typeQuery = typeQuery.where(and(...conditions)) as any;
+      }
+      const typeResults = await typeQuery.groupBy(gitCommits.commitType);
+      const commitsByType: Record<string, number> = {};
+      for (const row of typeResults) {
+        commitsByType[row.type || 'other'] = Number(row.count);
+      }
+      
+      // Security alerts
+      const securityAlerts = await this.countGitSecurityAlerts({
+        repositoryId: filters?.repositoryId,
+        status: 'open',
+      });
+      
+      return {
+        totalCommits,
+        totalPRs,
+        totalPRsMerged,
+        totalPRsOpen,
+        totalDevelopers,
+        commitsByType,
+        securityAlerts,
+      };
+    } catch (error) {
+      console.error("[storage] getGitAnalyticsStats error:", error);
+      return {
+        totalCommits: 0,
+        totalPRs: 0,
+        totalPRsMerged: 0,
+        totalPRsOpen: 0,
+        totalDevelopers: 0,
+        commitsByType: {},
+        securityAlerts: { total: 0, bySeverity: {} },
+      };
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
