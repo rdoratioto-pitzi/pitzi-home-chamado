@@ -42,6 +42,7 @@ export function PullRequestsTable({ repositories, selectedRepoId, selectedDevNam
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [hoveredPR, setHoveredPR] = useState<GitPullRequest | null>(null);
   const limit = 15;
 
   const { data, isLoading } = useQuery<{ pullRequests: GitPullRequest[]; total: number }>({
@@ -182,7 +183,12 @@ export function PullRequestsTable({ repositories, selectedRepoId, selectedDevNam
               </TableRow>
             ) : (
               filteredPRs.map((pr) => (
-                <TableRow key={pr.id} className="group">
+                <TableRow 
+                  key={pr.id} 
+                  className="group relative"
+                  onMouseEnter={() => setHoveredPR(pr)}
+                  onMouseLeave={() => setHoveredPR(null)}
+                >
                   <TableCell>
                     <a
                       href={`https://github.com/${repositories[0]?.fullName}/pull/${pr.githubPrNumber}`}
@@ -203,13 +209,28 @@ export function PullRequestsTable({ repositories, selectedRepoId, selectedDevNam
                   <TableCell>
                     <TypeBadge type={pr.prType} showIcon={false} />
                   </TableCell>
-                  <TableCell className="max-w-[250px]">
+                  <TableCell className="max-w-[250px] relative">
                     <div className="truncate font-medium" title={pr.title}>
                       {pr.title}
                     </div>
-                    {pr.description && (
-                      <div className="truncate text-xs text-muted-foreground" title={pr.description}>
-                        {pr.description}
+                    {/* Tooltip com descrição completa */}
+                    {hoveredPR?.id === pr.id && pr.description && (
+                      <div className="absolute z-50 left-0 top-full mt-1 w-[400px] p-3 bg-popover border rounded-lg shadow-xl text-sm">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="font-medium text-blue-500">#{pr.githubPrNumber}</span>
+                          <StatusBadge status={pr.status} />
+                          <TypeBadge type={pr.prType} showIcon={false} />
+                        </div>
+                        <p className="font-semibold mb-2">{pr.title}</p>
+                        <pre className="whitespace-pre-wrap text-xs text-muted-foreground max-h-[150px] overflow-auto">
+                          {pr.description}
+                        </pre>
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t text-xs text-muted-foreground">
+                          <span>{pr.authorName}</span>
+                          <span className="flex items-center gap-2">
+                            <span>{pr.sourceBranch} → {pr.targetBranch}</span>
+                          </span>
+                        </div>
                       </div>
                     )}
                   </TableCell>
