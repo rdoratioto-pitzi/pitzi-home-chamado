@@ -5245,6 +5245,18 @@ export async function registerRoutes(
     }
   });
 
+  // List all branches
+  app.get("/api/git-analytics/branches", async (req, res) => {
+    try {
+      const { repositoryId } = req.query;
+      const branches = await storage.getGitBranches(repositoryId as string);
+      res.json(branches);
+    } catch (error: any) {
+      console.error("Get branches error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Stats (agregações para dashboard)
   app.get("/api/git-analytics/stats", async (req, res) => {
     try {
