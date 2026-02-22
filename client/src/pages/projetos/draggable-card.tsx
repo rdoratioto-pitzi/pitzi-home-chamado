@@ -1,6 +1,7 @@
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Hash, Tag as TagIcon, Calendar, User as UserIcon } from "lucide-react";
 import type { KanbanCard, User } from "@shared/schema";
 
@@ -73,9 +74,16 @@ export function DraggableCard({
             </div>
 
             <div>
-              <h4 className="font-semibold text-sm leading-tight group-hover:text-primary transition-colors">
-                {card.title}
-              </h4>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <h4 className="font-semibold text-sm leading-relaxed group-hover:text-primary transition-colors line-clamp-2 py-1">
+                    {card.title}
+                  </h4>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-sm">{card.title}</p>
+                </TooltipContent>
+              </Tooltip>
               {card.objectives && (
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                   {truncateText(stripHtml(card.objectives))}
