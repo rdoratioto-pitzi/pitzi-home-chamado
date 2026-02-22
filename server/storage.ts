@@ -53,6 +53,11 @@ import {
   type FlowchartComment, type InsertFlowchartComment,
   type PromptLibrary, type InsertPromptLibrary,
   type PromptUserFavorite, type InsertPromptUserFavorite,
+  // Git Analytics
+  type GitRepository, type InsertGitRepository,
+  type GitCommit, type InsertGitCommit,
+  type GitPullRequest, type InsertGitPullRequest,
+  type GitSecurityAlert, type InsertGitSecurityAlert,
   users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
@@ -64,10 +69,12 @@ import {
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
   flowcharts, flowchartVersions, flowchartComments,
   aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates,
-  promptsLibrary, promptUserFavorites
+  promptsLibrary, promptUserFavorites,
+  // Git Analytics
+  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, sql, desc } from "drizzle-orm";
+import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -79,7 +86,7 @@ export interface IStorage {
 
   // Tickets
   getTicket(id: string): Promise<Ticket | undefined>;
-  getTickets(): Promise<Ticket[]>;
+  getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]>;
   createTicket(ticket: InsertTicket): Promise<Ticket>;
   updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined>;
   deleteTicket(id: string): Promise<boolean>;
@@ -492,11 +499,28 @@ export class DatabaseStorage implements IStorage {
     const [ticket] = await db.select().from(tickets).where(eq(tickets.id, id));
     return ticket;
   }
-  async getTickets(): Promise<Ticket[]> {
+  async getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]> {
     if (!db) return [];
     try {
-      return await db.select().from(tickets);
+      const query = db.select().from(tickets);
+      if (filters) {
+        const conditions: SQL[] = [];
+        if (filters.requesterId && filters.assigneeId) {
+          const condition = or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId));
+          if (condition) conditions.push(condition);
+        } else if (filters.requesterId) {
+          conditions.push(eq(tickets.requesterId, filters.requesterId));
+        } else if (filters.assigneeId) {
+          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
+        }
+        
+        if (conditions.length > 0) {
+          return await query.where(and(...conditions));
+        }
+      }
+      return await query;
     } catch (e) {
+      console.error("[storage] Error fetching tickets:", e);
       return [];
     }
   }
@@ -820,7 +844,7 @@ export class DatabaseStorage implements IStorage {
   }
   async getTaskTags(userId: string): Promise<TaskTag[]> {
     if (!db) return [];
-    const allTags = await db.select().from(taskTags);
+    const allTags = await db.select().from(taskTags).orderBy(asc(taskTags.displayOrder));
     const memberRecords = await db.select().from(taskTagMembers).where(eq(taskTagMembers.userId, userId));
     const memberTagIds = new Set(memberRecords.map(m => m.tagId));
     return allTags.filter(tag =>
@@ -1857,6 +1881,865 @@ export class DatabaseStorage implements IStorage {
     if (!db) return false;
     const result = await db.delete(promptUserFavorites).where(eq(promptUserFavorites.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ============== GIT ANALYTICS - REPOSITORIES ==============
+  
+  async getGitRepositories(tenantId?: string): Promise<GitRepository[]> {
+    if (!db) return [];
+    try {
+      if (tenantId) {
+        return await db.select().from(gitRepositories).where(eq(gitRepositories.tenantId, tenantId)).orderBy(desc(gitRepositories.createdAt));
+      }
+      return await db.select().from(gitRepositories).orderBy(desc(gitRepositories.createdAt));
+    } catch (error) {
+      console.error("[storage] getGitRepositories error:", error);
+      return [];
+    }
+  }
+
+  async getGitRepository(id: string): Promise<GitRepository | undefined> {
+    if (!db) return undefined;
+    try {
+      const [repo] = await db.select().from(gitRepositories).where(eq(gitRepositories.id, id));
+      return repo;
+    } catch (error) {
+      console.error("[storage] getGitRepository error:", error);
+      return undefined;
+    }
+  }
+
+  async getGitRepositoryByFullName(fullName: string): Promise<GitRepository | undefined> {
+    if (!db) return undefined;
+    try {
+      const [repo] = await db.select().from(gitRepositories).where(eq(gitRepositories.fullName, fullName));
+      return repo;
+    } catch (error) {
+      console.error("[storage] getGitRepositoryByFullName error:", error);
+      return undefined;
+    }
+  }
+
+  async createGitRepository(data: InsertGitRepository): Promise<GitRepository> {
+    if (!db) throw new Error("Database not available");
+    const [repo] = await db.insert(gitRepositories).values(data).returning();
+    return repo;
+  }
+
+  async updateGitRepository(id: string, data: Partial<InsertGitRepository>): Promise<GitRepository | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db.update(gitRepositories)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(gitRepositories.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteGitRepository(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(gitRepositories).where(eq(gitRepositories.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // ============== GIT ANALYTICS - COMMITS ==============
+
+  async getGitCommits(filters?: {
+    repositoryId?: string;
+    authorName?: string;
+    commitType?: string;
+    branch?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<GitCommit[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitCommits.authorName, filters.authorName));
+      }
+      if (filters?.commitType) {
+        conditions.push(eq(gitCommits.commitType, filters.commitType));
+      }
+      if (filters?.branch) {
+        conditions.push(eq(gitCommits.branch, filters.branch));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select().from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      query = query.orderBy(desc(gitCommits.committedAt)) as any;
+      
+      if (filters?.limit) {
+        query = query.limit(filters.limit) as any;
+      }
+      if (filters?.offset) {
+        query = query.offset(filters.offset) as any;
+      }
+      
+      return await query;
+    } catch (error) {
+      console.error("[storage] getGitCommits error:", error);
+      return [];
+    }
+  }
+
+  async getGitCommitBySha(sha: string): Promise<GitCommit | undefined> {
+    if (!db) return undefined;
+    try {
+      const [commit] = await db.select().from(gitCommits).where(eq(gitCommits.sha, sha));
+      return commit;
+    } catch (error) {
+      console.error("[storage] getGitCommitBySha error:", error);
+      return undefined;
+    }
+  }
+
+  async createGitCommit(data: InsertGitCommit): Promise<GitCommit> {
+    if (!db) throw new Error("Database not available");
+    const [commit] = await db.insert(gitCommits).values(data).returning();
+    return commit;
+  }
+
+  async createGitCommitsBatch(data: InsertGitCommit[]): Promise<number> {
+    if (!db || data.length === 0) return 0;
+    try {
+      const result = await db.insert(gitCommits).values(data).onConflictDoNothing().returning();
+      return result.length;
+    } catch (error) {
+      console.error("[storage] createGitCommitsBatch error:", error);
+      return 0;
+    }
+  }
+
+  async countGitCommits(filters?: {
+    repositoryId?: string;
+    authorName?: string;
+    commitType?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<number> {
+    if (!db) return 0;
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitCommits.authorName, filters.authorName));
+      }
+      if (filters?.commitType) {
+        conditions.push(eq(gitCommits.commitType, filters.commitType));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({ count: sql<number>`count(*)` }).from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const result = await query;
+      return result[0]?.count ?? 0;
+    } catch (error) {
+      console.error("[storage] countGitCommits error:", error);
+      return 0;
+    }
+  }
+
+  // ============== GIT ANALYTICS - PULL REQUESTS ==============
+
+  async getGitPullRequests(filters?: {
+    repositoryId?: string;
+    authorName?: string;
+    status?: string;
+    prType?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }): Promise<GitPullRequest[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitPullRequests.authorName, filters.authorName));
+      }
+      if (filters?.status) {
+        conditions.push(eq(gitPullRequests.status, filters.status));
+      }
+      if (filters?.prType) {
+        conditions.push(eq(gitPullRequests.prType, filters.prType));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select().from(gitPullRequests);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      query = query.orderBy(desc(gitPullRequests.createdAt)) as any;
+      
+      if (filters?.limit) {
+        query = query.limit(filters.limit) as any;
+      }
+      if (filters?.offset) {
+        query = query.offset(filters.offset) as any;
+      }
+      
+      return await query;
+    } catch (error) {
+      console.error("[storage] getGitPullRequests error:", error);
+      return [];
+    }
+  }
+
+  async createGitPullRequest(data: InsertGitPullRequest): Promise<GitPullRequest> {
+    if (!db) throw new Error("Database not available");
+    const [pr] = await db.insert(gitPullRequests).values(data).returning();
+    return pr;
+  }
+
+  async updateGitPullRequest(id: string, data: Partial<InsertGitPullRequest>): Promise<GitPullRequest | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db.update(gitPullRequests)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(gitPullRequests.id, id))
+      .returning();
+    return updated;
+  }
+
+  async upsertGitPullRequest(data: InsertGitPullRequest): Promise<GitPullRequest> {
+    if (!db) throw new Error("Database not available");
+    
+    const [existing] = await db.select().from(gitPullRequests)
+      .where(and(
+        eq(gitPullRequests.repositoryId, data.repositoryId),
+        eq(gitPullRequests.githubPrNumber, data.githubPrNumber)
+      ));
+    
+    if (existing) {
+      const [updated] = await db.update(gitPullRequests)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(gitPullRequests.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(gitPullRequests).values(data).returning();
+    return created;
+  }
+
+  async countGitPullRequests(filters?: {
+    repositoryId?: string;
+    authorName?: string;
+    status?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<number> {
+    if (!db) return 0;
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitPullRequests.authorName, filters.authorName));
+      }
+      if (filters?.status) {
+        conditions.push(eq(gitPullRequests.status, filters.status));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({ count: sql<number>`count(*)` }).from(gitPullRequests);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const [result] = await query;
+      return Number(result?.count || 0);
+    } catch (error) {
+      console.error("[storage] countGitPullRequests error:", error);
+      return 0;
+    }
+  }
+
+  // ============== GIT ANALYTICS - SECURITY ALERTS ==============
+
+  async getGitSecurityAlerts(filters?: {
+    repositoryId?: string;
+    severity?: string;
+    status?: string;
+  }): Promise<GitSecurityAlert[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitSecurityAlerts.repositoryId, filters.repositoryId));
+      }
+      if (filters?.severity) {
+        conditions.push(eq(gitSecurityAlerts.severity, filters.severity));
+      }
+      if (filters?.status) {
+        conditions.push(eq(gitSecurityAlerts.status, filters.status));
+      }
+      
+      let query = db.select().from(gitSecurityAlerts);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      return await query.orderBy(desc(gitSecurityAlerts.createdAt));
+    } catch (error) {
+      console.error("[storage] getGitSecurityAlerts error:", error);
+      return [];
+    }
+  }
+
+  async createGitSecurityAlert(data: InsertGitSecurityAlert): Promise<GitSecurityAlert> {
+    if (!db) throw new Error("Database not available");
+    const [alert] = await db.insert(gitSecurityAlerts).values(data).returning();
+    return alert;
+  }
+
+  async upsertGitSecurityAlert(data: InsertGitSecurityAlert): Promise<GitSecurityAlert> {
+    if (!db) throw new Error("Database not available");
+    
+    const [existing] = await db.select().from(gitSecurityAlerts)
+      .where(and(
+        eq(gitSecurityAlerts.repositoryId, data.repositoryId),
+        eq(gitSecurityAlerts.githubAlertNumber, data.githubAlertNumber)
+      ));
+    
+    if (existing) {
+      const [updated] = await db.update(gitSecurityAlerts)
+        .set(data)
+        .where(eq(gitSecurityAlerts.id, existing.id))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(gitSecurityAlerts).values(data).returning();
+    return created;
+  }
+
+  async countGitSecurityAlerts(filters?: {
+    repositoryId?: string;
+    status?: string;
+  }): Promise<{ total: number; bySeverity: Record<string, number> }> {
+    if (!db) return { total: 0, bySeverity: {} };
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitSecurityAlerts.repositoryId, filters.repositoryId));
+      }
+      if (filters?.status) {
+        conditions.push(eq(gitSecurityAlerts.status, filters.status));
+      }
+      
+      let query = db.select({
+        severity: gitSecurityAlerts.severity,
+        count: sql<number>`count(*)`
+      }).from(gitSecurityAlerts);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(gitSecurityAlerts.severity);
+      
+      const bySeverity: Record<string, number> = {};
+      let total = 0;
+      
+      for (const row of results) {
+        bySeverity[row.severity] = Number(row.count);
+        total += Number(row.count);
+      }
+      
+      return { total, bySeverity };
+    } catch (error) {
+      console.error("[storage] countGitSecurityAlerts error:", error);
+      return { total: 0, bySeverity: {} };
+    }
+  }
+
+  // ============== GIT ANALYTICS - BRANCHES ==============
+
+  async upsertGitBranch(data: any): Promise<any> {
+    if (!db) throw new Error("Database not available");
+    try {
+      const existing = await db
+        .select()
+        .from(gitBranches)
+        .where(and(
+          eq(gitBranches.repositoryId, data.repositoryId),
+          eq(gitBranches.name, data.name)
+        ))
+        .limit(1);
+
+      if (existing.length > 0) {
+        const [updated] = await db
+          .update(gitBranches)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(gitBranches.id, existing[0].id))
+          .returning();
+        return updated;
+      }
+
+      const [created] = await db.insert(gitBranches).values(data).returning();
+      return created;
+    } catch (error) {
+      console.error("[storage] upsertGitBranch error:", error);
+      throw error;
+    }
+  }
+
+  async getGitBranches(repositoryId?: string): Promise<any[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      if (repositoryId) {
+        conditions.push(eq(gitBranches.repositoryId, repositoryId));
+      }
+      
+      const result = await db
+        .select()
+        .from(gitBranches)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(gitBranches.lastCommitAt));
+      
+      return result;
+    } catch (error) {
+      console.error("[storage] getGitBranches error:", error);
+      return [];
+    }
+  }
+
+  async getPendingBranches(repositoryId?: string): Promise<any[]> {
+    if (!db) return [];
+    try {
+      const conditions = [
+        eq(gitBranches.isDefault, false),
+        eq(gitBranches.hasOpenPR, false),
+        gt(gitBranches.aheadBy, 0),
+      ];
+      
+      if (repositoryId) {
+        conditions.push(eq(gitBranches.repositoryId, repositoryId));
+      }
+      
+      const result = await db
+        .select()
+        .from(gitBranches)
+        .where(and(...conditions))
+        .orderBy(desc(gitBranches.aheadBy));
+      
+      return result;
+    } catch (error) {
+      console.error("[storage] getPendingBranches error:", error);
+      return [];
+    }
+  }
+
+  // ============== GIT ANALYTICS - STATS ==============
+
+  async getGitCommitsByDay(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{ date: string; commits: number }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({
+        date: sql<string>`DATE(${gitCommits.committedAt})`,
+        commits: sql<number>`count(*)`
+      }).from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(sql`DATE(${gitCommits.committedAt})`).orderBy(sql`DATE(${gitCommits.committedAt})`);
+      
+      return results.map(r => ({
+        date: String(r.date),
+        commits: Number(r.commits)
+      }));
+    } catch (error) {
+      console.error("[storage] getGitCommitsByDay error:", error);
+      return [];
+    }
+  }
+
+  async getGitPRsByDay(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{ date: string; prs: number }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({
+        date: sql<string>`DATE(${gitPullRequests.createdAt})`,
+        prs: sql<number>`count(*)`
+      }).from(gitPullRequests);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(sql`DATE(${gitPullRequests.createdAt})`).orderBy(sql`DATE(${gitPullRequests.createdAt})`);
+      
+      return results.map(r => ({
+        date: String(r.date),
+        prs: Number(r.prs)
+      }));
+    } catch (error) {
+      console.error("[storage] getGitPRsByDay error:", error);
+      return [];
+    }
+  }
+
+  async getGitCommitsByMonth(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{ month: string; commits: number }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({
+        month: sql<string>`TO_CHAR(${gitCommits.committedAt}, 'YYYY-MM')`,
+        commits: sql<number>`count(*)`
+      }).from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(sql`TO_CHAR(${gitCommits.committedAt}, 'YYYY-MM')`).orderBy(sql`TO_CHAR(${gitCommits.committedAt}, 'YYYY-MM')`);
+      
+      return results.map(r => ({
+        month: String(r.month),
+        commits: Number(r.commits)
+      }));
+    } catch (error) {
+      console.error("[storage] getGitCommitsByMonth error:", error);
+      return [];
+    }
+  }
+
+  async getGitPRsByMonth(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<{ month: string; prs: number }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
+      }
+      
+      let query = db.select({
+        month: sql<string>`TO_CHAR(${gitPullRequests.createdAt}, 'YYYY-MM')`,
+        prs: sql<number>`count(*)`
+      }).from(gitPullRequests);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const results = await query.groupBy(sql`TO_CHAR(${gitPullRequests.createdAt}, 'YYYY-MM')`).orderBy(sql`TO_CHAR(${gitPullRequests.createdAt}, 'YYYY-MM')`);
+      
+      return results.map(r => ({
+        month: String(r.month),
+        prs: Number(r.prs)
+      }));
+    } catch (error) {
+      console.error("[storage] getGitPRsByMonth error:", error);
+      return [];
+    }
+  }
+
+  // ============== GIT ANALYTICS - DEVELOPER STATS ==============
+
+  async getGitDeveloperStats(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    authorName?: string;
+  }): Promise<{
+    name: string;
+    email: string | null;
+    avatarUrl: string | null;
+    commits: number;
+    additions: number;
+    deletions: number;
+    prs: number;
+    prsMerged: number;
+  }[]> {
+    if (!db) return [];
+    try {
+      const conditions = [];
+      
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      if (filters?.authorName) {
+        conditions.push(eq(gitCommits.authorName, filters.authorName));
+      }
+      
+      let query = db.select({
+        name: gitCommits.authorName,
+        email: gitCommits.authorEmail,
+        avatarUrl: gitCommits.authorAvatarUrl,
+        commits: sql<number>`count(*)`,
+        additions: sql<number>`COALESCE(sum(${gitCommits.additions}), 0)`,
+        deletions: sql<number>`COALESCE(sum(${gitCommits.deletions}), 0)`,
+      }).from(gitCommits);
+      
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions)) as any;
+      }
+      
+      const commitStats = await query.groupBy(gitCommits.authorName, gitCommits.authorEmail, gitCommits.authorAvatarUrl).orderBy(sql`count(*) DESC`);
+      
+      // Get PR stats for each developer
+      const results = await Promise.all(commitStats.map(async (dev) => {
+        const prConditions = [eq(gitPullRequests.authorName, dev.name)];
+        if (filters?.repositoryId) {
+          prConditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+        }
+        
+        const [prStats] = await db.select({
+          total: sql<number>`count(*)`,
+          merged: sql<number>`count(*) FILTER (WHERE ${gitPullRequests.status} = 'merged')`
+        }).from(gitPullRequests).where(and(...prConditions));
+        
+        return {
+          name: dev.name,
+          email: dev.email,
+          avatarUrl: dev.avatarUrl,
+          commits: Number(dev.commits),
+          additions: Number(dev.additions),
+          deletions: Number(dev.deletions),
+          prs: Number(prStats?.total || 0),
+          prsMerged: Number(prStats?.merged || 0),
+        };
+      }));
+      
+      return results;
+    } catch (error) {
+      console.error("[storage] getGitDeveloperStats error:", error);
+      return [];
+    }
+  }
+
+  async getGitAnalyticsStats(filters?: {
+    repositoryId?: string;
+    startDate?: Date;
+    endDate?: Date;
+    authorName?: string;
+  }): Promise<{
+    totalCommits: number;
+    totalPRs: number;
+    totalPRsMerged: number;
+    totalPRsOpen: number;
+    totalDevelopers: number;
+    commitsByType: Record<string, number>;
+    securityAlerts: { total: number; bySeverity: Record<string, number> };
+  }> {
+    if (!db) return {
+      totalCommits: 0,
+      totalPRs: 0,
+      totalPRsMerged: 0,
+      totalPRsOpen: 0,
+      totalDevelopers: 0,
+      commitsByType: {},
+      securityAlerts: { total: 0, bySeverity: {} },
+    };
+    
+    try {
+      // Count commits
+      const totalCommits = await this.countGitCommits({
+        repositoryId: filters?.repositoryId,
+        authorName: filters?.authorName,
+        startDate: filters?.startDate,
+        endDate: filters?.endDate,
+      });
+      
+      // Count PRs
+      const totalPRs = await this.countGitPullRequests({
+        repositoryId: filters?.repositoryId,
+        authorName: filters?.authorName,
+        startDate: filters?.startDate,
+        endDate: filters?.endDate,
+      });
+      
+      const totalPRsMerged = await this.countGitPullRequests({
+        repositoryId: filters?.repositoryId,
+        authorName: filters?.authorName,
+        status: 'merged',
+        startDate: filters?.startDate,
+        endDate: filters?.endDate,
+      });
+      
+      const totalPRsOpen = await this.countGitPullRequests({
+        repositoryId: filters?.repositoryId,
+        authorName: filters?.authorName,
+        status: 'open',
+        startDate: filters?.startDate,
+        endDate: filters?.endDate,
+      });
+      
+      // Count unique developers
+      const conditions = [];
+      if (filters?.repositoryId) {
+        conditions.push(eq(gitCommits.repositoryId, filters.repositoryId));
+      }
+      if (filters?.startDate) {
+        conditions.push(sql`${gitCommits.committedAt} >= ${filters.startDate}`);
+      }
+      if (filters?.endDate) {
+        conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
+      }
+      
+      let devsQuery = db.selectDistinct({ author: gitCommits.authorName }).from(gitCommits);
+      if (conditions.length > 0) {
+        devsQuery = devsQuery.where(and(...conditions)) as any;
+      }
+      const devs = await devsQuery;
+      const totalDevelopers = devs.length;
+      
+      // Commits by type
+      let typeQuery = db.select({
+        type: gitCommits.commitType,
+        count: sql<number>`count(*)`
+      }).from(gitCommits);
+      if (conditions.length > 0) {
+        typeQuery = typeQuery.where(and(...conditions)) as any;
+      }
+      const typeResults = await typeQuery.groupBy(gitCommits.commitType);
+      const commitsByType: Record<string, number> = {};
+      for (const row of typeResults) {
+        commitsByType[row.type || 'other'] = Number(row.count);
+      }
+      
+      // Security alerts
+      const securityAlerts = await this.countGitSecurityAlerts({
+        repositoryId: filters?.repositoryId,
+        status: 'open',
+      });
+      
+      return {
+        totalCommits,
+        totalPRs,
+        totalPRsMerged,
+        totalPRsOpen,
+        totalDevelopers,
+        commitsByType,
+        securityAlerts,
+      };
+    } catch (error) {
+      console.error("[storage] getGitAnalyticsStats error:", error);
+      return {
+        totalCommits: 0,
+        totalPRs: 0,
+        totalPRsMerged: 0,
+        totalPRsOpen: 0,
+        totalDevelopers: 0,
+        commitsByType: {},
+        securityAlerts: { total: 0, bySeverity: {} },
+      };
+    }
   }
 }
 
