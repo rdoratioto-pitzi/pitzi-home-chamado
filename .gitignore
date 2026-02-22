@@ -39,3 +39,17 @@ cookies.txt
 *.png
 db.sqlite
 null
+
+# Agentes - Logs e credenciais
+.agents/.env
+.agents/node_modules/
+.agents/dist/
+.agents/logs/*.log
+.agents/logs/*.json
+
+# Agentes - Logs e credenciais
+agents/.env
+agents/node_modules/
+agents/dist/
+agents/logs/*.log
+agents/logs/*.json

@@ -338,8 +338,6 @@ export default function NovoDocumentoPage() {
                 images={conteudoImages}
                 onImagesChange={setConteudoImages}
                 placeholder="Digite o conteúdo do documento aqui..."
-                rows={12}
-                maxLength={50000}
                 data-testid="textarea-conteudo"
               />
             </CardContent>
