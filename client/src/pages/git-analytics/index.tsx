@@ -77,11 +77,18 @@ export default function GitAnalyticsPage() {
 
   // Fetch stats
   const { data: stats, refetch: refetchStats } = useQuery<GitAnalyticsStats>({
-    queryKey: ["/api/git-analytics/stats", selectedRepoId, selectedDevName],
+    queryKey: ["/api/git-analytics/stats", selectedRepoId, selectedDevName, selectedPeriod],
     queryFn: async () => {
+      const [year, month] = selectedPeriod.split('-').map(Number);
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+
       const params = new URLSearchParams();
       if (selectedRepoId !== "all") params.set("repositoryId", selectedRepoId);
       if (selectedDevName !== "all") params.set("authorName", selectedDevName);
+      params.set("startDate", startDate.toISOString());
+      params.set("endDate", endDate.toISOString());
+      
       const res = await fetch(`/api/git-analytics/stats?${params}`);
       return res.json();
     },
@@ -89,11 +96,18 @@ export default function GitAnalyticsPage() {
 
   // Fetch developer stats
   const { data: developerStats = [] } = useQuery<DeveloperStats[]>({
-    queryKey: ["/api/git-analytics/developer-stats", selectedRepoId, selectedDevName],
+    queryKey: ["/api/git-analytics/developer-stats", selectedRepoId, selectedDevName, selectedPeriod],
     queryFn: async () => {
+      const [year, month] = selectedPeriod.split('-').map(Number);
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0, 23, 59, 59);
+
       const params = new URLSearchParams();
       if (selectedRepoId !== "all") params.set("repositoryId", selectedRepoId);
       if (selectedDevName !== "all") params.set("authorName", selectedDevName);
+      params.set("startDate", startDate.toISOString());
+      params.set("endDate", endDate.toISOString());
+      
       const res = await fetch(`/api/git-analytics/developer-stats?${params}`);
       return res.json();
     },
