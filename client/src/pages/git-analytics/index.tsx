@@ -210,6 +210,8 @@ export default function GitAnalyticsPage() {
               setShowDevModal={setShowDevModal}
               selectedDev={selectedDev}
               setSelectedDev={setSelectedDev}
+              selectedRepoId={selectedRepoId}
+              selectedDevName={selectedDevName}
             />
           ) : (
             <DetailedView />
@@ -246,6 +248,8 @@ interface DashboardViewProps {
   setShowDevModal: (open: boolean) => void;
   selectedDev: DeveloperStats | null;
   setSelectedDev: (dev: DeveloperStats | null) => void;
+  selectedRepoId: string;
+  selectedDevName: string;
 }
 
 function DashboardView({
@@ -274,7 +278,13 @@ function DashboardView({
   setShowDevModal,
   selectedDev,
   setSelectedDev,
+  selectedRepoId,
+  selectedDevName,
 }: DashboardViewProps) {
+  // Filtrar desenvolvedores pelo filtro global
+  const filteredDevelopers = selectedDevName === "all"
+    ? developerStats
+    : developerStats.filter(d => d.name === selectedDevName);
   // Calcular commits e PRs por repositório (simplificado - usando proporção)
   const commitsByRepo: Record<string, number> = {};
   const prsByRepo: Record<string, number> = {};
@@ -412,7 +422,7 @@ function DashboardView({
         <div className="bg-card rounded-xl border p-5">
           <h3 className="text-sm font-semibold mb-4">Produtividade por Desenvolvedor</h3>
           <div className="space-y-3">
-            {developerStats.slice(0, 5).map((dev, idx) => (
+            {filteredDevelopers.slice(0, 5).map((dev, idx) => (
               <div
                 key={idx}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
