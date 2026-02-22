@@ -5361,6 +5361,41 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/git-analytics/sync-period", async (req, res) => {
+    try {
+      const { repositoryId, startDate, endDate } = req.body;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate e endDate são obrigatórios" });
+      }
+
+      const { syncRepositoryByPeriod, syncAllRepositories } = await import("./services/github-sync");
+      
+      if (repositoryId) {
+        const result = await syncRepositoryByPeriod(repositoryId, new Date(startDate), new Date(endDate));
+        res.json({ success: true, ...result });
+      } else {
+        // Sync all repositories for the period
+        const repos = await storage.getGitRepositories();
+        let totalCommits = 0;
+        let totalPRs = 0;
+        
+        for (const repo of repos) {
+          if (repo.syncEnabled) {
+            const result = await syncRepositoryByPeriod(repo.id, new Date(startDate), new Date(endDate));
+            totalCommits += result.commits;
+            totalPRs += result.prs;
+          }
+        }
+        
+        res.json({ success: true, commits: totalCommits, prs: totalPRs });
+      }
+    } catch (error: any) {
+      console.error("Sync period error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Add repository (adiciona e sincroniza)
   app.post("/api/git-analytics/add-repository", async (req, res) => {
     try {

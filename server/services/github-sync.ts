@@ -51,44 +51,85 @@ async function githubFetch(endpoint: string): Promise<any> {
   return response.json();
 }
 
-// Sincroniza commits de um repositório
-async function syncCommits(repositoryId: string, fullName: string, since?: Date): Promise<number> {
-  console.log(`[GitSync] Syncing commits for ${fullName}...`);
+async function syncCommits(repositoryId: string, fullName: string, since?: Date, until?: Date): Promise<number> {
+  console.log(`Syncing commits for ${fullName}...`);
   
-  let endpoint = `/repos/${fullName}/commits?per_page=100`;
-  if (since) {
-    endpoint += `&since=${since.toISOString()}`;
+  let allCommits: any[] = [];
+  let page = 1;
+  const perPage = 100;
+  let hasMore = true;
+
+  while (hasMore) {
+    let url = `/repos/${fullName}/commits?per_page=${perPage}&page=${page}`;
+    if (since) url += `&since=${since.toISOString()}`;
+    if (until) url += `&until=${until.toISOString()}`;
+
+    const commitsPage = await githubFetch(url);
+    
+    if (!Array.isArray(commitsPage) || commitsPage.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    allCommits = allCommits.concat(commitsPage);
+    console.log(`Fetched page ${page}: ${commitsPage.length} commits (total: ${allCommits.length})`);
+
+    if (commitsPage.length < perPage) {
+      hasMore = false;
+    } else {
+      page++;
+      if (allCommits.length >= 5000) {
+        console.log("Reached 5000 commits limit, stopping pagination");
+        hasMore = false;
+      }
+    }
   }
-  
-  try {
-    const commits = await githubFetch(endpoint);
-    console.log(`[GitSync] Found ${commits.length} commits`);
-    
-    if (commits.length === 0) return 0;
-    
-    const commitData = commits.map((commit: any) => ({
-      repositoryId,
-      sha: commit.sha,
-      message: commit.commit.message.split('\n')[0].substring(0, 500),
-      fullMessage: commit.commit.message,
-      authorName: commit.commit.author?.name || commit.author?.login || 'Unknown',
-      authorEmail: commit.commit.author?.email || null,
-      authorAvatarUrl: commit.author?.avatar_url || null,
-      commitType: detectCommitType(commit.commit.message),
-      filesChanged: 0,
-      additions: 0,
-      deletions: 0,
-      committedAt: new Date(commit.commit.author?.date || commit.commit.committer?.date),
-    }));
-    
-    const inserted = await storage.createGitCommitsBatch(commitData);
-    console.log(`[GitSync] Inserted ${inserted} new commits`);
-    
-    return inserted;
-  } catch (error) {
-    console.error(`[GitSync] Error syncing commits:`, error);
+
+  if (allCommits.length === 0) {
+    console.log("No commits found");
     return 0;
   }
+
+  console.log(`Total commits fetched: ${allCommits.length}`);
+
+  const commitDataList = allCommits.map((commit: any) => ({
+    tenantId: null,
+    repositoryId,
+    sha: commit.sha,
+    message: commit.commit.message.split("\n")[0].substring(0, 255),
+    fullMessage: commit.commit.message,
+    authorName: commit.commit.author?.name || commit.author?.login || "Unknown",
+    authorEmail: commit.commit.author?.email || null,
+    authorAvatarUrl: commit.author?.avatar_url || null,
+    commitType: detectCommitType(commit.commit.message),
+    branch: null,
+    prNumber: null,
+    filesChanged: 0,
+    additions: 0,
+    deletions: 0,
+    committedAt: new Date(commit.commit.author?.date || new Date()),
+  }));
+
+  const inserted = await storage.createGitCommitsBatch(commitDataList);
+  console.log(`Synced ${inserted} new commits`);
+  return inserted;
+}
+
+export async function syncRepositoryByPeriod(repositoryId: string, startDate: Date, endDate: Date): Promise<{ commits: number; prs: number }> {
+  const repo = await storage.getGitRepository(repositoryId);
+  if (!repo) {
+    throw new Error("Repository not found");
+  }
+
+  console.log(`Syncing ${repo.fullName} for period ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+  const commits = await syncCommits(repositoryId, repo.fullName, startDate, endDate);
+  const prs = await syncPullRequests(repositoryId, repo.fullName);
+
+  await storage.updateGitRepository(repositoryId, { lastSyncAt: new Date() });
+  
+  console.log(`Period sync completed: ${commits} commits, ${prs} PRs`);
+  return { commits, prs };
 }
 
 // Sincroniza PRs de um repositório
