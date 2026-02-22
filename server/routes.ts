@@ -57,6 +57,7 @@ import {
   insertNotificationSchema,
   insertUpdateSchema,
   insertPricingAlertSchema,
+  insertGitRepositorySchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { sql, eq, or, and, asc } from "drizzle-orm";
@@ -5087,6 +5088,69 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Sync git commits error:", error);
       res.status(500).json({ error: error.message || "Erro ao sincronizar commits" });
+    }
+  });
+
+  // ============== GIT ANALYTICS API ==============
+
+  // Repositories
+  app.get("/api/git-analytics/repositories", async (req, res) => {
+    try {
+      const repositories = await storage.getGitRepositories();
+      res.json(repositories);
+    } catch (error: any) {
+      console.error("Get git repositories error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/git-analytics/repositories/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const repository = await storage.getGitRepository(id);
+      if (!repository) {
+        return res.status(404).json({ error: "Repositório não encontrado" });
+      }
+      res.json(repository);
+    } catch (error: any) {
+      console.error("Get git repository error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/git-analytics/repositories", async (req, res) => {
+    try {
+      const data = insertGitRepositorySchema.parse(req.body);
+      const repository = await storage.createGitRepository(data);
+      res.status(201).json(repository);
+    } catch (error: any) {
+      console.error("Create git repository error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/git-analytics/repositories/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updated = await storage.updateGitRepository(id, req.body);
+      if (!updated) {
+        return res.status(404).json({ error: "Repositório não encontrado" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Update git repository error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/git-analytics/repositories/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteGitRepository(id);
+      res.json({ success: deleted });
+    } catch (error: any) {
+      console.error("Delete git repository error:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 
