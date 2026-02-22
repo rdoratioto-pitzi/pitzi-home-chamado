@@ -133,8 +133,13 @@ export function registerObjectStorageRoutes(app: Express): void {
 
       // If not found locally, try Replit storage if available
       try {
-        const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-        await objectStorageService.downloadObject(objectFile, res);
+        const privateDir = objectStorageService.getPrivateObjectDir();
+        if (privateDir) {
+          const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+          await objectStorageService.downloadObject(objectFile, res);
+        } else {
+          return res.status(404).json({ error: "Object not found (Local storage only)" });
+        }
       } catch (err) {
         if (err instanceof ObjectNotFoundError) {
           return res.status(404).json({ error: "Object not found" });
