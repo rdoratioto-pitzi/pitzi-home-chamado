@@ -53,6 +53,7 @@ import MacgyverIAPage from "@/pages/macgyver-ia/index";
 import FluxogramasPage from "@/pages/fluxogramas/index";
 import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 import UpdatesPage from "@/pages/updates/index";
+import GitAnalyticsPage from "@/pages/git-analytics/index";
 
 function Router() {
   return (
@@ -271,6 +272,11 @@ function Router() {
       <Route path="/updates">
         <ProtectedRoute>
           <UpdatesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/git-analytics">
+        <ProtectedRoute>
+          <GitAnalyticsPage />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
