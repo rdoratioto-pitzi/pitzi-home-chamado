@@ -5236,12 +5236,13 @@ export async function registerRoutes(
   // Stats (agregações para dashboard)
   app.get("/api/git-analytics/stats", async (req, res) => {
     try {
-      const { repositoryId, startDate, endDate } = req.query;
+      const { repositoryId, startDate, endDate, authorName } = req.query;
       
       const stats = await storage.getGitAnalyticsStats({
         repositoryId: repositoryId as string,
         startDate: startDate ? new Date(startDate as string) : undefined,
         endDate: endDate ? new Date(endDate as string) : undefined,
+        authorName: authorName as string,
       });
       
       res.json(stats);
@@ -5254,12 +5255,13 @@ export async function registerRoutes(
   // Developer stats
   app.get("/api/git-analytics/developer-stats", async (req, res) => {
     try {
-      const { repositoryId, startDate, endDate } = req.query;
+      const { repositoryId, startDate, endDate, authorName } = req.query;
       
       const stats = await storage.getGitDeveloperStats({
         repositoryId: repositoryId as string,
         startDate: startDate ? new Date(startDate as string) : undefined,
         endDate: endDate ? new Date(endDate as string) : undefined,
+        authorName: authorName as string,
       });
       
       res.json(stats);
