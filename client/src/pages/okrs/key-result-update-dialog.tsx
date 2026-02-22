@@ -185,7 +185,6 @@ export function KeyResultUpdateDialog({ open, onOpenChange, keyResult }: KeyResu
                     <FormControl>
                       <RichTextarea
                         placeholder="O que mudou desde o último check-in? Obstáculos encontrados?"
-                        rows={3}
                         data-testid="input-update-comment"
                         value={field.value || ""}
                         onChange={field.onChange}
