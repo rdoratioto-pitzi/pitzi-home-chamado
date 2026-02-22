@@ -69,14 +69,17 @@ import {
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
   flowcharts, flowchartVersions, flowchartComments,
   aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates,
-  promptsLibrary, promptUserFavorites,
-  // Git Analytics
-  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches
-} from "@shared/schema";
-import { db } from "./db";
-import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
-
-export interface IStorage {
+  promptsLibrary, promptUserFavorites
+ } from "@shared/schema";
+ import { db } from "./db";
+ import { eq, and, or, sql, asc, type SQL } from "drizzle-orm";
+ 
+ export type NotificationPreferences = {
+  emailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
+ };
+ 
+ export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -196,6 +199,7 @@ export interface IStorage {
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
   getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string }): Promise<Task[]>;
+  getTasksWithConditions(conditions: SQL): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<boolean>;
@@ -366,24 +370,32 @@ export interface IStorage {
   deleteFlowchartComment(id: string): Promise<boolean>;
 
   // Notifications
-  getNotifications(userId: string): Promise<Notification[]>;
+  getNotifications(userId: string, limit?: number, offset?: number): Promise<Notification[]>;
   getUnreadNotificationCount(userId: string): Promise<number>;
+  getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined>;
   createNotification(notification: InsertNotification): Promise<Notification>;
-  markNotificationRead(id: string): Promise<Notification | undefined>;
+  updateNotificationPreferences(
+    userId: string,
+    emailNotificationsEnabled?: boolean,
+    pushNotificationsEnabled?: boolean
+  ): Promise<NotificationPreferences>;
+  deleteNotification(id: string, userId: string): Promise<boolean>;
+  clearNotifications(userId: string): Promise<void>;
+  markNotificationRead(id: string, userId: string): Promise<Notification | undefined>;
   markAllNotificationsRead(userId: string): Promise<void>;
 
   // IMEI.info Stats
-  getImeiInfoStats(): Promise<ImeiInfoStats[]>;
-  getImeiInfoStat(id: string): Promise<ImeiInfoStats | undefined>;
-  createImeiInfoStats(stats: InsertImeiInfoStats): Promise<ImeiInfoStats>;
-  updateImeiInfoStat(id: string, data: Partial<ImeiInfoStats>): Promise<ImeiInfoStats | undefined>;
+  getImeiInfoStats(): Promise<any[]>;
+  getImeiInfoStat(id: string): Promise<any | undefined>;
+  createImeiInfoStats(stats: any): Promise<any>;
+  updateImeiInfoStat(id: string, data: Partial<any>): Promise<any | undefined>;
   deleteImeiInfoStat(id: string): Promise<boolean>;
 
   // IMEI.info Alerts
-  getImeiInfoAlerts(): Promise<ImeiInfoAlert[]>;
-  getImeiInfoAlert(id: string): Promise<ImeiInfoAlert | undefined>;
-  createImeiInfoAlert(alert: InsertImeiInfoAlert): Promise<ImeiInfoAlert>;
-  updateImeiInfoAlert(id: string, data: Partial<ImeiInfoAlert>): Promise<ImeiInfoAlert | undefined>;
+  getImeiInfoAlerts(): Promise<any[]>;
+  getImeiInfoAlert(id: string): Promise<any | undefined>;
+  createImeiInfoAlert(alert: any): Promise<any>;
+  updateImeiInfoAlert(id: string, data: Partial<any>): Promise<any | undefined>;
   deleteImeiInfoAlert(id: string): Promise<boolean>;
 
   // Prompts Library
@@ -417,13 +429,14 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const emailLower = email?.toLowerCase();
+    if (!email) return undefined;
+    const emailLower = email.toLowerCase();
     if (!db) {
       const mock = this.getMockUsers().find(u => u.email.toLowerCase() === emailLower);
       return mock;
     }
     try {
-      const [user] = await db.select().from(users).where(eq(users.email, email));
+      const [user] = await db.select().from(users).where(eq(sql`LOWER(${users.email})`, emailLower));
       return user;
     } catch (e) {
       console.warn("[storage] DB query failed, using mock fallback for email:", email);
@@ -444,12 +457,18 @@ export class DatabaseStorage implements IStorage {
       authMethod: "email",
       modulePermissions: JSON.stringify({
         chamados: true,
+        projetos: true,
+        tarefas: true,
+        okrs: true,
+        logistica: true,
+        apis: true,
+        configuracoes: true,
         updates: true,
       }),
       createdAt: new Date(),
-      updatedAt: new Date(),
       tenantId: null,
-      deletedAt: null,
+      avatarUrl: null,
+      areaNegocio: null,
     } as User;
   }
 
@@ -500,14 +519,13 @@ export class DatabaseStorage implements IStorage {
     return ticket;
   }
   async getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]> {
-    if (!db) return [];
+    if (!db) throw new Error("Database not connected");
     try {
-      const query = db.select().from(tickets);
+      let query = db.select().from(tickets);
       if (filters) {
         const conditions: SQL[] = [];
         if (filters.requesterId && filters.assigneeId) {
-          const condition = or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId));
-          if (condition) conditions.push(condition);
+          conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
         } else if (filters.requesterId) {
           conditions.push(eq(tickets.requesterId, filters.requesterId));
         } else if (filters.assigneeId) {
@@ -521,10 +539,11 @@ export class DatabaseStorage implements IStorage {
       return await query;
     } catch (e) {
       console.error("[storage] Error fetching tickets:", e);
-      return [];
+      throw e;
     }
   }
   async createTicket(insertTicket: InsertTicket): Promise<Ticket> {
+    if (!db) throw new Error("Database not connected");
     // Generate sequential code like CHA-0001
     const allTickets = await db.select().from(tickets);
     const nextNumber = allTickets.length + 1;
@@ -534,23 +553,28 @@ export class DatabaseStorage implements IStorage {
     return ticket;
   }
   async updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined> {
+    if (!db) return undefined;
     const [ticket] = await db.update(tickets).set(data).where(eq(tickets.id, id)).returning();
     return ticket;
   }
   async deleteTicket(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(tickets).where(eq(tickets.id, id)).returning();
     return result.length > 0;
   }
 
   // Ticket Responsaveis (Assignment Rules)
   async getTicketResponsaveis(): Promise<TicketResponsavel[]> {
+    if (!db) return [];
     return await db.select().from(ticketResponsaveis);
   }
   async getTicketResponsavel(id: string): Promise<TicketResponsavel | undefined> {
+    if (!db) return undefined;
     const [resp] = await db.select().from(ticketResponsaveis).where(eq(ticketResponsaveis.id, id));
     return resp;
   }
   async getTicketResponsavelByRule(categoria: string, tipo: string): Promise<TicketResponsavel[]> {
+    if (!db) return [];
     return await db.select().from(ticketResponsaveis).where(
       and(
         eq(ticketResponsaveis.categoria, categoria),
@@ -560,18 +584,22 @@ export class DatabaseStorage implements IStorage {
     );
   }
   async createTicketResponsavel(data: InsertTicketResponsavel): Promise<TicketResponsavel> {
+    if (!db) throw new Error("Database not connected");
     const [resp] = await db.insert(ticketResponsaveis).values(data).returning();
     return resp;
   }
   async updateTicketResponsavel(id: string, data: Partial<TicketResponsavel>): Promise<TicketResponsavel | undefined> {
+    if (!db) return undefined;
     const [resp] = await db.update(ticketResponsaveis).set(data).where(eq(ticketResponsaveis.id, id)).returning();
     return resp;
   }
   async deleteTicketResponsavel(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(ticketResponsaveis).where(eq(ticketResponsaveis.id, id)).returning();
     return result.length > 0;
   }
   async findResponsavelForTicket(categoria: string, tipo: string): Promise<string | null> {
+    if (!db) return null;
     const rules = await this.getTicketResponsavelByRule(categoria, tipo);
     if (rules.length === 0) return null;
 
@@ -629,19 +657,23 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(ticketComments.createdAt));
   }
   async createTicketComment(insertComment: InsertTicketComment): Promise<TicketComment> {
+    if (!db) throw new Error("Database not connected");
     const [comment] = await db.insert(ticketComments).values(insertComment).returning();
     return comment;
   }
 
   // Projects
   async getProject(id: string): Promise<Project | undefined> {
+    if (!db) return undefined;
     const [project] = await db.select().from(projects).where(eq(projects.id, id));
     return project;
   }
   async getProjects(): Promise<Project[]> {
+    if (!db) return [];
     return await db.select().from(projects);
   }
   async createProject(insertProject: InsertProject): Promise<Project> {
+    if (!db) throw new Error("Database not connected");
     // Generate sequential code like PRO-0001
     const allProjects = await db.select().from(projects);
     const nextNumber = allProjects.length + 1;
@@ -651,10 +683,12 @@ export class DatabaseStorage implements IStorage {
     return project;
   }
   async updateProject(id: string, data: Partial<Project>): Promise<Project | undefined> {
+    if (!db) return undefined;
     const [project] = await db.update(projects).set(data).where(eq(projects.id, id)).returning();
     return project;
   }
   async deleteProject(id: string): Promise<boolean> {
+    if (!db) return false;
     await db.delete(projectMembers).where(eq(projectMembers.projectId, id));
     const result = await db.delete(projects).where(eq(projects.id, id)).returning();
     return result.length > 0;
@@ -662,148 +696,183 @@ export class DatabaseStorage implements IStorage {
 
   // Project Members
   async getProjectMembers(projectId: string): Promise<ProjectMember[]> {
+    if (!db) return [];
     return await db.select().from(projectMembers).where(eq(projectMembers.projectId, projectId));
   }
   async addProjectMember(member: InsertProjectMember): Promise<ProjectMember> {
+    if (!db) throw new Error("Database not connected");
     const [m] = await db.insert(projectMembers).values(member).returning();
     return m;
   }
   async removeProjectMember(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(projectMembers).where(eq(projectMembers.id, id)).returning();
     return result.length > 0;
   }
   async getProjectMembersByUser(userId: string): Promise<ProjectMember[]> {
+    if (!db) return [];
     return await db.select().from(projectMembers).where(eq(projectMembers.userId, userId));
   }
 
   // Kanban Columns
   async getKanbanColumns(projectId: string): Promise<KanbanColumn[]> {
+    if (!db) return [];
     return await db.select().from(kanbanColumns).where(eq(kanbanColumns.projectId, projectId));
   }
   async createKanbanColumn(insertColumn: InsertKanbanColumn): Promise<KanbanColumn> {
+    if (!db) throw new Error("Database not connected");
     const [column] = await db.insert(kanbanColumns).values(insertColumn).returning();
     return column;
   }
   async updateKanbanColumn(id: string, data: Partial<KanbanColumn>): Promise<KanbanColumn | undefined> {
+    if (!db) return undefined;
     const [column] = await db.update(kanbanColumns).set(data).where(eq(kanbanColumns.id, id)).returning();
     return column;
   }
   async deleteKanbanColumn(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(kanbanColumns).where(eq(kanbanColumns.id, id)).returning();
     return result.length > 0;
   }
 
   // Kanban Cards
   async getKanbanCard(id: string): Promise<KanbanCard | undefined> {
+    if (!db) return undefined;
     const [card] = await db.select().from(kanbanCards).where(eq(kanbanCards.id, id));
     return card;
   }
   async getKanbanCards(projectId: string): Promise<KanbanCard[]> {
+    if (!db) return [];
     return await db.select().from(kanbanCards).where(eq(kanbanCards.projectId, projectId));
   }
   async createKanbanCard(insertCard: InsertKanbanCard): Promise<KanbanCard> {
+    if (!db) throw new Error("Database not connected");
     const [card] = await db.insert(kanbanCards).values(insertCard).returning();
     return card;
   }
   async updateKanbanCard(id: string, data: Partial<KanbanCard>): Promise<KanbanCard | undefined> {
+    if (!db) return undefined;
     const [card] = await db.update(kanbanCards).set(data).where(eq(kanbanCards.id, id)).returning();
     return card;
   }
   async deleteKanbanCard(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(kanbanCards).where(eq(kanbanCards.id, id)).returning();
     return result.length > 0;
   }
 
   // Kanban Comments
   async getKanbanComments(cardId: string): Promise<KanbanComment[]> {
+    if (!db) return [];
     return await db.select().from(kanbanComments).where(eq(kanbanComments.cardId, cardId));
   }
   async createKanbanComment(insertComment: InsertKanbanComment): Promise<KanbanComment> {
+    if (!db) throw new Error("Database not connected");
     const [comment] = await db.insert(kanbanComments).values(insertComment).returning();
     return comment;
   }
 
   // Objectives
   async getObjective(id: string): Promise<Objective | undefined> {
+    if (!db) return undefined;
     const [obj] = await db.select().from(objectives).where(eq(objectives.id, id));
     return obj;
   }
   async getObjectives(): Promise<Objective[]> {
+    if (!db) return [];
     return await db.select().from(objectives);
   }
   async createObjective(insertObjective: InsertObjective): Promise<Objective> {
+    if (!db) throw new Error("Database not connected");
     const [obj] = await db.insert(objectives).values(insertObjective).returning();
     return obj;
   }
   async updateObjective(id: string, data: Partial<Objective>): Promise<Objective | undefined> {
+    if (!db) return undefined;
     const [obj] = await db.update(objectives).set(data).where(eq(objectives.id, id)).returning();
     return obj;
   }
   async deleteObjective(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(objectives).where(eq(objectives.id, id)).returning();
     return result.length > 0;
   }
 
   // Key Results
   async getKeyResult(id: string): Promise<KeyResult | undefined> {
+    if (!db) return undefined;
     const [kr] = await db.select().from(keyResults).where(eq(keyResults.id, id));
     return kr;
   }
   async getKeyResults(): Promise<KeyResult[]> {
+    if (!db) return [];
     return await db.select().from(keyResults);
   }
   async getKeyResultsByObjective(objectiveId: string): Promise<KeyResult[]> {
+    if (!db) return [];
     return await db.select().from(keyResults).where(eq(keyResults.objectiveId, objectiveId));
   }
   async createKeyResult(insertKR: InsertKeyResult): Promise<KeyResult> {
+    if (!db) throw new Error("Database not connected");
     const [kr] = await db.insert(keyResults).values(insertKR).returning();
     return kr;
   }
   async updateKeyResult(id: string, data: Partial<KeyResult>): Promise<KeyResult | undefined> {
+    if (!db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
     const [kr] = await db.update(keyResults).set(updateData).where(eq(keyResults.id, id)).returning();
     return kr;
   }
   async deleteKeyResult(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(keyResults).where(eq(keyResults.id, id)).returning();
     return result.length > 0;
   }
 
   // Key Result Updates (Check-ins)
   async getKeyResultUpdates(keyResultId: string): Promise<KeyResultUpdate[]> {
+    if (!db) return [];
     return await db.select().from(keyResultUpdates).where(eq(keyResultUpdates.keyResultId, keyResultId));
   }
   async createKeyResultUpdate(update: InsertKeyResultUpdate): Promise<KeyResultUpdate> {
+    if (!db) throw new Error("Database not connected");
     const [u] = await db.insert(keyResultUpdates).values(update).returning();
     return u;
   }
 
   // Shipments
   async getShipment(id: string): Promise<Shipment | undefined> {
+    if (!db) return undefined;
     const [s] = await db.select().from(shipments).where(eq(shipments.id, id));
     return s;
   }
   async getShipments(): Promise<Shipment[]> {
+    if (!db) return [];
     return await db.select().from(shipments);
   }
   async createShipment(insertShipment: InsertShipment): Promise<Shipment> {
+    if (!db) throw new Error("Database not connected");
     const [s] = await db.insert(shipments).values(insertShipment).returning();
     return s;
   }
   async updateShipment(id: string, data: Partial<Shipment>): Promise<Shipment | undefined> {
+    if (!db) return undefined;
     const [s] = await db.update(shipments).set(data).where(eq(shipments.id, id)).returning();
     return s;
   }
   async deleteShipment(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(shipments).where(eq(shipments.id, id)).returning();
     return result.length > 0;
   }
 
   // Shipment Events
   async getShipmentEvents(shipmentId: string): Promise<ShipmentEvent[]> {
+    if (!db) return [];
     return await db.select().from(shipmentEvents).where(eq(shipmentEvents.shipmentId, shipmentId));
   }
   async createShipmentEvent(insertEvent: InsertShipmentEvent): Promise<ShipmentEvent> {
+    if (!db) throw new Error("Database not connected");
     const [e] = await db.insert(shipmentEvents).values(insertEvent).returning();
     return e;
   }
@@ -819,14 +888,16 @@ export class DatabaseStorage implements IStorage {
     }
   }
   async getSettings(): Promise<Setting[]> {
-    if (!db) return [];
+    if (!db) throw new Error("Database not connected");
     try {
       return await db.select().from(settings);
     } catch (e) {
-      return [];
+      console.error("[storage] Error fetching settings:", e);
+      throw e;
     }
   }
   async setSetting(key: string, value: string): Promise<Setting> {
+    if (!db) throw new Error("Database not connected");
     const existing = await this.getSetting(key);
     if (existing) {
       const [updated] = await db.update(settings).set({ value, updatedAt: new Date() }).where(eq(settings.id, existing.id)).returning();
@@ -944,6 +1015,10 @@ export class DatabaseStorage implements IStorage {
     }
     return await baseQuery;
   }
+  async getTasksWithConditions(conditions: SQL): Promise<Task[]> {
+    if (!db) return [];
+    return await db.select().from(tasks).where(conditions);
+  }
   async createTask(task: InsertTask): Promise<Task> {
     if (!db) throw new Error("Database not connected");
     const [t] = await db.insert(tasks).values(task).returning();
@@ -985,142 +1060,183 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(taskComments.createdAt));
   }
   async getTaskComment(id: string): Promise<TaskComment | undefined> {
+    if (!db) return undefined;
     const [c] = await db.select().from(taskComments).where(eq(taskComments.id, id));
     return c;
   }
   async createTaskComment(comment: InsertTaskComment): Promise<TaskComment> {
+    if (!db) throw new Error("Database not connected");
     const [c] = await db.insert(taskComments).values(comment).returning();
     return c;
   }
   async updateTaskComment(id: string, data: Partial<TaskComment>): Promise<TaskComment | undefined> {
+    if (!db) return undefined;
     const [c] = await db.update(taskComments).set(data).where(eq(taskComments.id, id)).returning();
     return c;
   }
   async deleteTaskComment(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(taskComments).where(eq(taskComments.id, id)).returning();
     return result.length > 0;
   }
 
   // Task Reactions
   async getTaskReactions(commentId: string): Promise<TaskReaction[]> {
+    if (!db) return [];
     return await db.select().from(taskReactions).where(eq(taskReactions.commentId, commentId));
   }
   async addTaskReaction(reaction: InsertTaskReaction): Promise<TaskReaction> {
+    if (!db) throw new Error("Database not connected");
     const [r] = await db.insert(taskReactions).values(reaction).returning();
     return r;
   }
   async removeTaskReaction(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(taskReactions).where(eq(taskReactions.id, id)).returning();
     return result.length > 0;
   }
 
   // Task Attachments
   async getTaskAttachments(taskId: string): Promise<TaskAttachment[]> {
+    if (!db) return [];
     return await db.select().from(taskAttachments).where(eq(taskAttachments.taskId, taskId));
   }
   async addTaskAttachment(attachment: InsertTaskAttachment): Promise<TaskAttachment> {
+    if (!db) throw new Error("Database not connected");
     const [a] = await db.insert(taskAttachments).values(attachment).returning();
     return a;
   }
   async removeTaskAttachment(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(taskAttachments).where(eq(taskAttachments.id, id)).returning();
     return result.length > 0;
   }
 
   // Task Templates
   async getTaskTemplates(type?: string): Promise<TaskTemplate[]> {
+    if (!db) return [];
     if (type) {
       return await db.select().from(taskTemplates).where(eq(taskTemplates.type, type));
     }
     return await db.select().from(taskTemplates);
   }
   async getTaskTemplate(id: string): Promise<TaskTemplate | undefined> {
+    if (!db) return undefined;
     const [t] = await db.select().from(taskTemplates).where(eq(taskTemplates.id, id));
     return t;
   }
   async createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate> {
+    if (!db) throw new Error("Database not connected");
     const [t] = await db.insert(taskTemplates).values(template).returning();
     return t;
   }
   async deleteTaskTemplate(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(taskTemplates).where(eq(taskTemplates.id, id)).returning();
     return result.length > 0;
   }
 
   // Logistic Operators
   async getLogisticOperator(id: string): Promise<LogisticOperator | undefined> {
+    if (!db) return undefined;
     const [o] = await db.select().from(logisticOperators).where(eq(logisticOperators.id, id));
     return o;
   }
   async getLogisticOperators(): Promise<LogisticOperator[]> {
+    if (!db) return [];
     return await db.select().from(logisticOperators);
   }
   async createLogisticOperator(operator: InsertLogisticOperator): Promise<LogisticOperator> {
+    if (!db) throw new Error("Database not connected");
     const [o] = await db.insert(logisticOperators).values(operator).returning();
     return o;
   }
   async updateLogisticOperator(id: string, data: Partial<LogisticOperator>): Promise<LogisticOperator | undefined> {
+    if (!db) return undefined;
     const [o] = await db.update(logisticOperators).set(data).where(eq(logisticOperators.id, id)).returning();
     return o;
   }
   async deleteLogisticOperator(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(logisticOperators).where(eq(logisticOperators.id, id)).returning();
     return result.length > 0;
   }
 
   // Collection Requests
   async getCollectionRequest(id: string): Promise<CollectionRequest | undefined> {
+    if (!db) return undefined;
     const [r] = await db.select().from(collectionRequests).where(eq(collectionRequests.id, id));
     return r;
   }
   async getCollectionRequests(): Promise<CollectionRequest[]> {
+    if (!db) return [];
     return await db.select().from(collectionRequests);
   }
   async createCollectionRequest(request: InsertCollectionRequest): Promise<CollectionRequest> {
+    if (!db) throw new Error("Database not connected");
     const [r] = await db.insert(collectionRequests).values(request).returning();
     return r;
   }
   async updateCollectionRequest(id: string, data: Partial<CollectionRequest>): Promise<CollectionRequest | undefined> {
+    if (!db) return undefined;
     const [r] = await db.update(collectionRequests).set(data).where(eq(collectionRequests.id, id)).returning();
     return r;
   }
   async deleteCollectionRequest(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(collectionRequests).where(eq(collectionRequests.id, id)).returning();
     return result.length > 0;
   }
 
   // Logistica Reversa Pedidos
   async getLogisticaReversaPedido(id: string): Promise<LogisticaReversaPedido | undefined> {
+    if (!db) return undefined;
     const [p] = await db.select().from(logisticaReversaPedidos).where(eq(logisticaReversaPedidos.id, id));
     return p;
   }
   async getLogisticaReversaPedidos(): Promise<LogisticaReversaPedido[]> {
+    if (!db) return [];
     return await db.select().from(logisticaReversaPedidos);
   }
   async createLogisticaReversaPedido(pedido: InsertLogisticaReversaPedido): Promise<LogisticaReversaPedido> {
+    if (!db) throw new Error("Database not connected");
     const [p] = await db.insert(logisticaReversaPedidos).values(pedido).returning();
     return p;
   }
   async updateLogisticaReversaPedido(id: string, data: Partial<LogisticaReversaPedido>): Promise<LogisticaReversaPedido | undefined> {
+    if (!db) return undefined;
     const [p] = await db.update(logisticaReversaPedidos).set(data).where(eq(logisticaReversaPedidos.id, id)).returning();
     return p;
   }
   async deleteLogisticaReversaPedido(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(logisticaReversaPedidos).where(eq(logisticaReversaPedidos.id, id)).returning();
     return result.length > 0;
   }
 
   // Logistica Reversa Eventos
   async getLogisticaReversaEventos(pedidoId: string): Promise<LogisticaReversaEvento[]> {
+    if (!db) return [];
     return await db.select().from(logisticaReversaEventos).where(eq(logisticaReversaEventos.pedidoId, pedidoId));
   }
   async createLogisticaReversaEvento(evento: InsertLogisticaReversaEvento): Promise<LogisticaReversaEvento> {
+    if (!db) throw new Error("Database not connected");
     const [e] = await db.insert(logisticaReversaEventos).values(evento).returning();
     return e;
   }
 
   // Dashboard Stats
   async getLogisticsDashboardStats(): Promise<LogisticsDashboardStats> {
+    if (!db) {
+      return {
+        totalRequests: 0,
+        totalValue: 0,
+        onTimeRate: 0,
+        savings: 0,
+        pendingRequests: 0,
+        deliveredRequests: 0,
+      };
+    }
     const allRequests = await this.getCollectionRequests();
     return {
       totalRequests: allRequests.length,
@@ -1134,13 +1250,16 @@ export class DatabaseStorage implements IStorage {
 
   // SLA Rules
   async getSlaRules(): Promise<SlaRule[]> {
+    if (!db) return [];
     return await db.select().from(slaRules);
   }
   async getSlaRule(id: string): Promise<SlaRule | undefined> {
+    if (!db) return undefined;
     const [rule] = await db.select().from(slaRules).where(eq(slaRules.id, id));
     return rule;
   }
   async getSlaRuleByTipoAndPrioridade(tipo: string, prioridade: string): Promise<SlaRule | undefined> {
+    if (!db) return undefined;
     const [rule] = await db.select().from(slaRules).where(
       and(
         eq(slaRules.tipo, tipo),
@@ -1151,27 +1270,32 @@ export class DatabaseStorage implements IStorage {
     return rule;
   }
   async createSlaRule(rule: InsertSlaRule): Promise<SlaRule> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(slaRules).values(rule).returning();
     return created;
   }
   async updateSlaRule(id: string, data: Partial<SlaRule>): Promise<SlaRule | undefined> {
+    if (!db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
     const [updated] = await db.update(slaRules).set(updateData).where(eq(slaRules.id, id)).returning();
     return updated;
   }
   async deleteSlaRule(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(slaRules).where(eq(slaRules.id, id)).returning();
     return result.length > 0;
   }
 
   // Pricing Devices
   async getPricingDevice(id: string): Promise<PricingDevice | undefined> {
+    if (!db) return undefined;
     const [device] = await db.select().from(pricingDevices).where(eq(pricingDevices.id, id));
     return device;
   }
   async getPricingDevices(filters?: { categoryId?: string; manufacturerName?: string; isActive?: boolean }): Promise<PricingDevice[]> {
+    if (!db) return [];
     let query = db.select().from(pricingDevices);
-    const conditions: any[] = [];
+    const conditions: SQL[] = [];
     if (filters?.categoryId) {
       conditions.push(eq(pricingDevices.categoryId, filters.categoryId));
     }
@@ -1182,89 +1306,106 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(pricingDevices.isActive, filters.isActive));
     }
     if (conditions.length > 0) {
-      return await db.select().from(pricingDevices).where(and(...conditions));
+      return await query.where(and(...conditions));
     }
-    return await db.select().from(pricingDevices);
+    return await query;
   }
   async createPricingDevice(device: InsertPricingDevice): Promise<PricingDevice> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(pricingDevices).values(device).returning();
     return created;
   }
   async updatePricingDevice(id: string, data: Partial<PricingDevice>): Promise<PricingDevice | undefined> {
+    if (!db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
     const [updated] = await db.update(pricingDevices).set(updateData).where(eq(pricingDevices.id, id)).returning();
     return updated;
   }
   async deletePricingDevice(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(pricingDevices).where(eq(pricingDevices.id, id)).returning();
     return result.length > 0;
   }
 
   // Pricing Price History
   async getPricingPriceHistory(deviceId: string, startDate?: Date, endDate?: Date): Promise<PricingPriceHistory[]> {
+    if (!db) return [];
     return await db.select().from(pricingPriceHistory).where(eq(pricingPriceHistory.deviceId, deviceId));
   }
   async createPricingPriceHistory(history: InsertPricingPriceHistory): Promise<PricingPriceHistory> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(pricingPriceHistory).values(history).returning();
     return created;
   }
 
   // Pricing Alerts
   async getPricingAlerts(userId?: string): Promise<PricingAlert[]> {
+    if (!db) return [];
     if (userId) {
       return await db.select().from(pricingAlerts).where(eq(pricingAlerts.userId, userId));
     }
     return await db.select().from(pricingAlerts);
   }
   async getPricingAlert(id: string): Promise<PricingAlert | undefined> {
+    if (!db) return undefined;
     const [alert] = await db.select().from(pricingAlerts).where(eq(pricingAlerts.id, id));
     return alert;
   }
   async createPricingAlert(alert: InsertPricingAlert): Promise<PricingAlert> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(pricingAlerts).values(alert).returning();
     return created;
   }
   async updatePricingAlert(id: string, data: Partial<PricingAlert>): Promise<PricingAlert | undefined> {
+    if (!db) return undefined;
     const [updated] = await db.update(pricingAlerts).set(data).where(eq(pricingAlerts.id, id)).returning();
     return updated;
   }
   async deletePricingAlert(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(pricingAlerts).where(eq(pricingAlerts.id, id)).returning();
     return result.length > 0;
   }
 
   // Meta Areas
   async getMetaAreas(): Promise<MetaArea[]> {
+    if (!db) return [];
     return await db.select().from(metaAreas).where(eq(metaAreas.archived, false));
   }
   async getMetaArea(id: string): Promise<MetaArea | undefined> {
+    if (!db) return undefined;
     const [area] = await db.select().from(metaAreas).where(eq(metaAreas.id, id));
     return area;
   }
   async getMetaAreaByName(name: string): Promise<MetaArea | undefined> {
+    if (!db) return undefined;
     const [area] = await db.select().from(metaAreas).where(
       and(
-        sql`LOWER(${metaAreas.name}) = LOWER(${name})`,
+        eq(sql`LOWER(${metaAreas.name})`, name.toLowerCase()),
         eq(metaAreas.archived, false)
       )
     );
     return area;
   }
   async createMetaArea(area: InsertMetaArea): Promise<MetaArea> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(metaAreas).values(area).returning();
     return created;
   }
   async updateMetaArea(id: string, data: Partial<MetaArea>): Promise<MetaArea | undefined> {
+    if (!db) return undefined;
     const [updated] = await db.update(metaAreas).set(data).where(eq(metaAreas.id, id)).returning();
     return updated;
   }
   async deleteMetaArea(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(metaAreas).where(eq(metaAreas.id, id)).returning();
     return result.length > 0;
   }
 
   // Metas (Goals)
   async getMetas(filters?: { month?: string; areaId?: string; responsibleId?: string }): Promise<Meta[]> {
+    if (!db) return [];
     const conditions = [];
     if (filters?.month) {
       conditions.push(eq(metas.month, filters.month));
@@ -1281,34 +1422,41 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(metas);
   }
   async getMeta(id: string): Promise<Meta | undefined> {
+    if (!db) return undefined;
     const [meta] = await db.select().from(metas).where(eq(metas.id, id));
     return meta;
   }
   async createMeta(meta: InsertMeta): Promise<Meta> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(metas).values(meta).returning();
     return created;
   }
   async updateMeta(id: string, data: Partial<Meta>): Promise<Meta | undefined> {
+    if (!db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
     const [updated] = await db.update(metas).set(updateData).where(eq(metas.id, id)).returning();
     return updated;
   }
   async deleteMeta(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(metas).where(eq(metas.id, id)).returning();
     return result.length > 0;
   }
 
   // Meta Check-ins
   async getMetaCheckins(metaId: string): Promise<MetaCheckin[]> {
+    if (!db) return [];
     return await db.select().from(metaCheckins).where(eq(metaCheckins.metaId, metaId));
   }
   async createMetaCheckin(checkin: InsertMetaCheckin): Promise<MetaCheckin> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(metaCheckins).values(checkin).returning();
     return created;
   }
 
   // Knowledge Base Documents
   async getKnowledgeDocuments(filters?: { area?: string; tipo?: string; status?: string; search?: string }): Promise<KnowledgeDocument[]> {
+    if (!db) return [];
     const conditions = [];
     if (filters?.area) {
       conditions.push(eq(knowledgeDocuments.area, filters.area));
@@ -1337,28 +1485,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getKnowledgeDocument(id: string): Promise<KnowledgeDocument | undefined> {
+    if (!db) return undefined;
     const [doc] = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, id));
     return doc;
   }
 
   async createKnowledgeDocument(doc: InsertKnowledgeDocument): Promise<KnowledgeDocument> {
-    const { id, ...data } = doc as any;
+    if (!db) throw new Error("Database not connected");
+    const data = { ...doc };
+    if ((data as any).id) delete (data as any).id;
     const [created] = await db.insert(knowledgeDocuments).values(data).returning();
     return created;
   }
 
   async updateKnowledgeDocument(id: string, data: Partial<KnowledgeDocument>): Promise<KnowledgeDocument | undefined> {
+    if (!db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
     const [updated] = await db.update(knowledgeDocuments).set(updateData).where(eq(knowledgeDocuments.id, id)).returning();
     return updated;
   }
 
   async deleteKnowledgeDocument(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(knowledgeDocuments).where(eq(knowledgeDocuments.id, id)).returning();
     return result.length > 0;
   }
 
   async getKnowledgeDocumentStats(): Promise<{ total: number; byTipo: Record<string, number>; byArea: Record<string, number>; byStatus: Record<string, number> }> {
+    if (!db) return { total: 0, byTipo: {}, byArea: {}, byStatus: {} };
     const docs = await this.getKnowledgeDocuments();
     const byTipo: Record<string, number> = {};
     const byArea: Record<string, number> = {};
@@ -1375,30 +1529,36 @@ export class DatabaseStorage implements IStorage {
 
   // Knowledge Document Versions
   async getKnowledgeDocumentVersions(documentId: string): Promise<KnowledgeDocumentVersion[]> {
+    if (!db) return [];
     return await db.select().from(knowledgeDocumentVersions).where(eq(knowledgeDocumentVersions.documentId, documentId)).orderBy(sql`${knowledgeDocumentVersions.createdAt} DESC`);
   }
 
   async createKnowledgeDocumentVersion(version: InsertKnowledgeDocumentVersion): Promise<KnowledgeDocumentVersion> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(knowledgeDocumentVersions).values(version).returning();
     return created;
   }
 
   // Knowledge Audit Logs
   async getKnowledgeAuditLogs(documentId: string): Promise<KnowledgeAuditLog[]> {
+    if (!db) return [];
     return await db.select().from(knowledgeAuditLogs).where(eq(knowledgeAuditLogs.documentId, documentId)).orderBy(sql`${knowledgeAuditLogs.createdAt} DESC`);
   }
 
   async createKnowledgeAuditLog(log: InsertKnowledgeAuditLog): Promise<KnowledgeAuditLog> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(knowledgeAuditLogs).values(log).returning();
     return created;
   }
 
   // Knowledge Favorites
   async getKnowledgeFavorites(userId: string): Promise<KnowledgeFavorite[]> {
+    if (!db) return [];
     return await db.select().from(knowledgeFavorites).where(eq(knowledgeFavorites.userId, userId));
   }
 
   async getKnowledgeFavorite(userId: string, documentId: string): Promise<KnowledgeFavorite | undefined> {
+    if (!db) return undefined;
     const [fav] = await db.select().from(knowledgeFavorites).where(
       and(eq(knowledgeFavorites.userId, userId), eq(knowledgeFavorites.documentId, documentId))
     );
@@ -1406,36 +1566,43 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createKnowledgeFavorite(favorite: InsertKnowledgeFavorite): Promise<KnowledgeFavorite> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(knowledgeFavorites).values(favorite).returning();
     return created;
   }
 
   async deleteKnowledgeFavorite(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(knowledgeFavorites).where(eq(knowledgeFavorites.id, id)).returning();
     return result.length > 0;
   }
 
   // AI Conversations
   async getAiConversations(userId: string): Promise<AiConversation[]> {
+    if (!db) throw new Error("Database not connected");
     return await db.select().from(aiConversations).where(eq(aiConversations.userId, userId)).orderBy(sql`${aiConversations.updatedAt} DESC`);
   }
 
   async getAiConversation(id: string): Promise<AiConversation | undefined> {
+    if (!db) return undefined;
     const [conv] = await db.select().from(aiConversations).where(eq(aiConversations.id, id));
     return conv;
   }
 
   async createAiConversation(conversation: InsertAiConversation): Promise<AiConversation> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(aiConversations).values(conversation).returning();
     return created;
   }
 
   async updateAiConversation(id: string, data: Partial<AiConversation>): Promise<AiConversation | undefined> {
+    if (!db) return undefined;
     const [updated] = await db.update(aiConversations).set({ ...data, updatedAt: new Date() }).where(eq(aiConversations.id, id)).returning();
     return updated;
   }
 
   async deleteAiConversation(id: string): Promise<boolean> {
+    if (!db) return false;
     await db.delete(aiMessages).where(eq(aiMessages.conversationId, id));
     const result = await db.delete(aiConversations).where(eq(aiConversations.id, id)).returning();
     return result.length > 0;
@@ -1443,44 +1610,53 @@ export class DatabaseStorage implements IStorage {
 
   // AI Messages
   async getAiMessages(conversationId: string): Promise<AiMessage[]> {
+    if (!db) return [];
     return await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conversationId)).orderBy(sql`${aiMessages.createdAt} ASC`);
   }
 
   async createAiMessage(message: InsertAiMessage): Promise<AiMessage> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(aiMessages).values(message).returning();
     return created;
   }
   // AI Spaces
   async getAiSpaces(userId: string): Promise<AiSpace[]> {
+    if (!db) throw new Error("Database not connected");
     return await db.select().from(aiSpaces).where(eq(aiSpaces.userId, userId)).orderBy(sql`${aiSpaces.createdAt} DESC`);
   }
 
   async createAiSpace(space: InsertAiSpace): Promise<AiSpace> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(aiSpaces).values(space).returning();
     return created;
   }
 
   async updateAiSpace(id: string, data: Partial<AiSpace>): Promise<AiSpace | undefined> {
+    if (!db) return undefined;
     const [updated] = await db.update(aiSpaces).set(data).where(eq(aiSpaces.id, id)).returning();
     return updated;
   }
 
   async deleteAiSpace(id: string): Promise<boolean> {
+    if (!db) return false;
     await db.delete(aiSpaceConversations).where(eq(aiSpaceConversations.spaceId, id));
     const result = await db.delete(aiSpaces).where(eq(aiSpaces.id, id)).returning();
     return result.length > 0;
   }
 
   async getAiSpaceConversations(spaceId: string): Promise<AiSpaceConversation[]> {
+    if (!db) return [];
     return await db.select().from(aiSpaceConversations).where(eq(aiSpaceConversations.spaceId, spaceId));
   }
 
   async addConversationToSpace(data: InsertAiSpaceConversation): Promise<AiSpaceConversation> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(aiSpaceConversations).values(data).returning();
     return created;
   }
 
   async removeConversationFromSpace(spaceId: string, conversationId: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(aiSpaceConversations).where(
       and(eq(aiSpaceConversations.spaceId, spaceId), eq(aiSpaceConversations.conversationId, conversationId))
     ).returning();
@@ -1489,6 +1665,7 @@ export class DatabaseStorage implements IStorage {
 
   // Flowcharts
   async getFlowcharts(ownerId?: string): Promise<Flowchart[]> {
+    if (!db) throw new Error("Database not connected");
     if (ownerId) {
       return await db.select().from(flowcharts).where(
         and(eq(flowcharts.ownerId, ownerId), eq(flowcharts.isTemplate, false))
@@ -1498,21 +1675,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFlowchart(id: string): Promise<Flowchart | undefined> {
+    if (!db) return undefined;
     const [fc] = await db.select().from(flowcharts).where(eq(flowcharts.id, id));
     return fc;
   }
 
   async createFlowchart(flowchart: InsertFlowchart): Promise<Flowchart> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(flowcharts).values(flowchart).returning();
     return created;
   }
 
   async updateFlowchart(id: string, data: Partial<Flowchart>): Promise<Flowchart | undefined> {
+    if (!db) return undefined;
     const [updated] = await db.update(flowcharts).set({ ...data, updatedAt: new Date() }).where(eq(flowcharts.id, id)).returning();
     return updated;
   }
 
   async deleteFlowchart(id: string): Promise<boolean> {
+    if (!db) return false;
     await db.delete(flowchartComments).where(eq(flowchartComments.flowchartId, id));
     await db.delete(flowchartVersions).where(eq(flowchartVersions.flowchartId, id));
     const result = await db.delete(flowcharts).where(eq(flowcharts.id, id)).returning();
@@ -1521,42 +1702,48 @@ export class DatabaseStorage implements IStorage {
 
   // Flowchart Templates
   async getFlowchartTemplates(): Promise<Flowchart[]> {
+    if (!db) throw new Error("Database not connected");
     return await db.select().from(flowcharts).where(eq(flowcharts.isTemplate, true));
   }
 
   // Flowchart Versions
   async getFlowchartVersions(flowchartId: string): Promise<FlowchartVersion[]> {
+    if (!db) throw new Error("Database not connected");
     return await db.select().from(flowchartVersions).where(eq(flowchartVersions.flowchartId, flowchartId)).orderBy(sql`${flowchartVersions.createdAt} DESC`);
   }
 
   async createFlowchartVersion(version: InsertFlowchartVersion): Promise<FlowchartVersion> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(flowchartVersions).values(version).returning();
     return created;
   }
 
   // Flowchart Comments
   async getFlowchartComments(flowchartId: string): Promise<FlowchartComment[]> {
+    if (!db) throw new Error("Database not connected");
     return await db.select().from(flowchartComments).where(eq(flowchartComments.flowchartId, flowchartId)).orderBy(sql`${flowchartComments.createdAt} DESC`);
   }
 
   async createFlowchartComment(comment: InsertFlowchartComment): Promise<FlowchartComment> {
+    if (!db) throw new Error("Database not connected");
     const [created] = await db.insert(flowchartComments).values(comment).returning();
     return created;
   }
 
   async deleteFlowchartComment(id: string): Promise<boolean> {
+    if (!db) return false;
     const result = await db.delete(flowchartComments).where(eq(flowchartComments.id, id)).returning();
     return result.length > 0;
   }
 
   // Notifications
-  async getNotifications(userId: string): Promise<Notification[]> {
-    if (!db) return [];
-    return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(sql`${notifications.createdAt} DESC`).limit(50);
+  async getNotifications(userId: string, limit: number = 50, offset: number = 0): Promise<Notification[]> {
+    if (!db) throw new Error("Database not connected");
+    return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(sql`${notifications.createdAt} DESC`).limit(limit).offset(offset);
   }
 
   async getUnreadNotificationCount(userId: string): Promise<number> {
-    if (!db) return 0;
+    if (!db) throw new Error("Database not connected");
     const result = await db.select({ count: sql<number>`count(*)` }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
     return Number(result[0]?.count || 0);
   }
@@ -1567,22 +1754,43 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async markNotificationRead(id: string): Promise<Notification | undefined> {
+  async markNotificationRead(id: string, userId: string): Promise<Notification | undefined> {
     if (!db) return undefined;
-    const [updated] = await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id)).returning();
+    const [updated] = await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.id, id), eq(notifications.userId, userId))).returning();
     return updated;
   }
 
   async markAllNotificationsRead(userId: string): Promise<void> {
     if (!db) return;
-    await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    try {
+      await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    } catch (e) {
+      console.error("[storage] Error marking all notifications read:", e);
+    }
+  }
+
+  // Notification Preferences (Mocked as they are missing from schema)
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined> {
+    return { emailNotificationsEnabled: true, pushNotificationsEnabled: true };
+  }
+  async updateNotificationPreferences(userId: string, email?: boolean, push?: boolean): Promise<NotificationPreferences> {
+    return { emailNotificationsEnabled: email ?? true, pushNotificationsEnabled: push ?? true };
+  }
+  async deleteNotification(id: string, userId: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, userId))).returning();
+    return result.length > 0;
+  }
+  async clearNotifications(userId: string): Promise<void> {
+    if (!db) return;
+    await db.delete(notifications).where(eq(notifications.userId, userId));
   }
 
   // Updates / News
   async getUpdates(tenantId?: string, includeUnpublished?: boolean): Promise<Update[]> {
     if (!db) return this.getMockUpdates();
     try {
-      let query = db.select().from(updates);
+      let query = db.select().from(updates).$dynamic();
       const conditions = [];
 
       if (tenantId) {
@@ -1614,12 +1822,15 @@ export class DatabaseStorage implements IStorage {
           title: "Módulo de Novidades e Automação Git (Modo Mock)",
           content: "- Lançamento do novo portal de novidades (Updates).\n- Integração com histórico de commits para geração automática de changelogs.\n- Notificações em tempo real para novos updates publicados.\n\n(Nota: Você está vendo dados mockados porque o banco de dados não está conectado)",
           category: "feature",
+          source: null,
           isPublished: true,
           publishedAt: new Date(),
           createdAt: new Date(),
           updatedAt: new Date(),
+          createdBy: null,
+          commitHash: null,
+          author: "Equipe técnica",
           tenantId: null,
-          deletedAt: null,
         } as Update
       ];
     }
@@ -1630,7 +1841,7 @@ export class DatabaseStorage implements IStorage {
     if (!db) {
       return this.getMockUpdates().find(u => u.id === id);
     }
-    const [update] = await db!.select().from(updates).where(eq(updates.id, id));
+    const [update] = await db.select().from(updates).where(eq(updates.id, id));
     return update;
   }
 
@@ -1643,7 +1854,7 @@ export class DatabaseStorage implements IStorage {
     
     const newUpdate = {
       ...dataToInsert,
-      id: Math.random().toString(36).substr(2, 9),
+      id: (dataToInsert as any).id || Math.random().toString(36).substr(2, 9),
       createdAt: new Date(),
       updatedAt: new Date(),
     } as Update;
@@ -1657,7 +1868,7 @@ export class DatabaseStorage implements IStorage {
     
     try {
       const { id, ...data } = dataToInsert;
-      const [created] = await db!.insert(updates).values(data).returning();
+      const [created] = await db.insert(updates).values(data).returning();
       return created;
     } catch (error) {
       console.warn("[storage] DB insert failed, using memory fallback:", error);
@@ -1686,7 +1897,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     try {
-      const [updated] = await db!.update(updates).set(updateData).where(eq(updates.id, id)).returning();
+      const [updated] = await db.update(updates).set(updateData).where(eq(updates.id, id)).returning();
       return updated;
     } catch (error) {
       console.warn("[storage] DB update failed, using memory fallback:", error);
@@ -1711,14 +1922,14 @@ export class DatabaseStorage implements IStorage {
       return false;
     }
     
-    const result = await db!.delete(updates).where(eq(updates.id, id)).returning();
+    const result = await db.delete(updates).where(eq(updates.id, id)).returning();
     return result.length > 0;
   }
 
   async getLatestUpdates(limit: number = 5, tenantId?: string): Promise<Update[]> {
     if (!db) return this.getMockUpdates().slice(0, limit);
     try {
-      let query = db.select().from(updates).where(eq(updates.isPublished, true));
+      let query = db.select().from(updates).where(eq(updates.isPublished, true)).$dynamic();
 
       if (tenantId) {
         query = query.where(and(eq(updates.tenantId, tenantId), eq(updates.isPublished, true)));
@@ -1732,10 +1943,7 @@ export class DatabaseStorage implements IStorage {
 
   // Prompts Library
   async getPrompts(filters?: { category?: string; search?: string; onlyActive?: boolean }): Promise<PromptLibrary[]> {
-    if (!db) {
-      console.log("[Storage.getPrompts] DB não disponível");
-      return [];
-    }
+    if (!db) throw new Error("Database not connected");
     
     try {
       console.log("[Storage.getPrompts] Iniciando busca com filtros:", filters);
@@ -1770,6 +1978,21 @@ export class DatabaseStorage implements IStorage {
         });
         console.log(`[Storage.getPrompts] Após filtro is_active=true: ${prompts.length}`);
       }
+
+      // Map snake_case to camelCase for consistency
+      prompts = prompts.map(p => ({
+        ...p,
+        isActive: (p as any).is_active ?? (p as any).isActive,
+        usageCount: (p as any).usage_count ?? (p as any).usageCount,
+        lastSyncedAt: (p as any).last_synced_at ?? (p as any).lastSyncedAt,
+        createdAt: (p as any).created_at ?? (p as any).createdAt,
+        updatedAt: (p as any).updated_at ?? (p as any).updatedAt,
+        sourceUrl: (p as any).source_url ?? (p as any).sourceUrl,
+        githubRepo: (p as any).github_repo ?? (p as any).githubRepo,
+        githubPath: (p as any).github_path ?? (p as any).githubPath,
+        isTranslated: (p as any).is_translated ?? (p as any).isTranslated,
+        originalLanguage: (p as any).original_language ?? (p as any).originalLanguage,
+      }));
       
       // Aplicar filtros em memória
       if (filters?.category) {
@@ -1792,7 +2015,7 @@ export class DatabaseStorage implements IStorage {
       return prompts;
     } catch (error) {
       console.error("[Storage.getPrompts] Erro:", error);
-      return [];
+      throw error;
     }
   }
 
@@ -1816,26 +2039,40 @@ export class DatabaseStorage implements IStorage {
 
   async updatePrompt(id: string, data: Partial<PromptLibrary>): Promise<PromptLibrary | undefined> {
     if (!db) return undefined;
-    const [updated] = await db.update(promptsLibrary).set(data).where(eq(promptsLibrary.id, id)).returning();
-    return updated;
+    try {
+      const [updated] = await db.update(promptsLibrary).set(data).where(eq(promptsLibrary.id, id)).returning();
+      return updated;
+    } catch (error) {
+      console.error("[Storage.updatePrompt] Erro:", error);
+      return undefined;
+    }
   }
 
   async deletePrompt(id: string): Promise<boolean> {
     if (!db) return false;
-    const result = await db.delete(promptsLibrary).where(eq(promptsLibrary.id, id)).returning();
-    return result.length > 0;
+    try {
+      const result = await db.delete(promptsLibrary).where(eq(promptsLibrary.id, id)).returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error("[Storage.deletePrompt] Erro:", error);
+      return false;
+    }
   }
 
   async incrementPromptUsage(id: string): Promise<void> {
     if (!db) return;
-    await db
-      .update(promptsLibrary)
-      .set({ usageCount: sql`${promptsLibrary.usageCount} + 1` })
-      .where(eq(promptsLibrary.id, id));
+    try {
+      await db
+        .update(promptsLibrary)
+        .set({ usageCount: sql`${promptsLibrary.usageCount} + 1` })
+        .where(eq(promptsLibrary.id, id));
+    } catch (error) {
+      console.error("[Storage.incrementPromptUsage] Erro:", error);
+    }
   }
 
   async getPromptStats(): Promise<{ total: number; byCategory: Record<string, number> }> {
-    if (!db) return { total: 0, byCategory: {} };
+    if (!db) throw new Error("Database not connected");
     
     const allPrompts = await db.select().from(promptsLibrary).where(eq(promptsLibrary.isActive, true));
     
@@ -1852,37 +2089,65 @@ export class DatabaseStorage implements IStorage {
 
   // Prompt User Favorites
   async getPromptFavorites(userId: string): Promise<PromptUserFavorite[]> {
-    if (!db) return [];
-    return db
+    if (!db) throw new Error("Database not connected");
+    return await db
       .select()
       .from(promptUserFavorites)
       .where(eq(promptUserFavorites.userId, userId));
   }
 
   async getPromptFavorite(userId: string, promptId: string): Promise<PromptUserFavorite | undefined> {
-    if (!db) return undefined;
-    const [favorite] = await db
-      .select()
-      .from(promptUserFavorites)
-      .where(and(
-        eq(promptUserFavorites.userId, userId),
-        eq(promptUserFavorites.promptId, promptId)
-      ));
-    return favorite;
+    if (!db) throw new Error("Database not connected");
+    try {
+      const [favorite] = await db
+        .select()
+        .from(promptUserFavorites)
+        .where(and(
+          eq(promptUserFavorites.userId, userId),
+          eq(promptUserFavorites.promptId, promptId)
+        ));
+      return favorite;
+    } catch (error) {
+      console.error("[Storage.getPromptFavorite] Erro:", error);
+      throw error;
+    }
   }
 
   async createPromptFavorite(favorite: InsertPromptUserFavorite): Promise<PromptUserFavorite> {
     if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(promptUserFavorites).values(favorite).returning();
-    return created;
+    try {
+      const [created] = await db.insert(promptUserFavorites).values(favorite).returning();
+      return created;
+    } catch (error) {
+      console.error("[Storage.createPromptFavorite] Erro:", error);
+      throw error;
+    }
   }
 
   async deletePromptFavorite(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(promptUserFavorites).where(eq(promptUserFavorites.id, id)).returning();
-    return result.length > 0;
+    if (!db) throw new Error("Database not connected");
+    try {
+      const result = await db.delete(promptUserFavorites).where(eq(promptUserFavorites.id, id)).returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error("[Storage.deletePromptFavorite] Erro:", error);
+      throw error;
+    }
   }
 
+  // IMEI.info Stats (Mocked as they are missing from schema)
+  async getImeiInfoStats(): Promise<any[]> { return []; }
+  async getImeiInfoStat(id: string): Promise<any | undefined> { return undefined; }
+  async createImeiInfoStats(stats: any): Promise<any> { return stats; }
+  async updateImeiInfoStat(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
+  async deleteImeiInfoStat(id: string): Promise<boolean> { return false; }
+
+  // IMEI.info Alerts (Mocked as they are missing from schema)
+  async getImeiInfoAlerts(): Promise<any[]> { return []; }
+  async getImeiInfoAlert(id: string): Promise<any | undefined> { return undefined; }
+  async createImeiInfoAlert(alert: any): Promise<any> { return alert; }
+  async updateImeiInfoAlert(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
+  async deleteImeiInfoAlert(id: string): Promise<boolean> { return false; }
   // ============== GIT ANALYTICS - REPOSITORIES ==============
   
   async getGitRepositories(tenantId?: string): Promise<GitRepository[]> {
