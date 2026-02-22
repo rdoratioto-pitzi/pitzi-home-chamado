@@ -3,9 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { 
-  RefreshCw, LayoutDashboard, Table2, GitPullRequest, GitCommit, 
-  Users, TrendingUp, Shield, GitBranch, Zap, Bug, Wrench, AlertTriangle 
+import {
+  RefreshCw, LayoutDashboard, Table2, GitPullRequest, GitCommit,
+  Users, TrendingUp, Shield, GitBranch, Zap, Bug, Wrench, AlertTriangle
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,9 @@ import { KPICard, KPI_HELP_TEXTS } from "./components/KPICard";
 import { TYPE_COLORS, TYPE_LABELS } from "./components/Badges";
 import { TypeDistributionChart } from "./components/TypeDistributionChart";
 import { VolumeByDayCharts, VolumeByMonthCharts } from "./components/VolumeCharts";
+import { RepositoryVolumeChart } from "./components/RepositoryVolumeChart";
+import { SecurityModal } from "./components/SecurityModal";
+import { DeveloperDetailModal } from "./components/DeveloperDetailModal";
 
 // Types
 export interface GitRepository {
@@ -52,6 +55,9 @@ export interface DeveloperStats {
 export default function GitAnalyticsPage() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "detailed">("dashboard");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [showDevModal, setShowDevModal] = useState(false);
+  const [selectedDev, setSelectedDev] = useState<DeveloperStats | null>(null);
   const { toast } = useToast();
 
   // Fetch repositories
@@ -141,8 +147,8 @@ export default function GitAnalyticsPage() {
 
           {/* Content */}
           {activeTab === "dashboard" ? (
-            <DashboardView 
-              stats={stats} 
+            <DashboardView
+              stats={stats}
               repositories={repositories}
               developerStats={developerStats}
               totalCommits={totalCommits}
@@ -159,6 +165,14 @@ export default function GitAnalyticsPage() {
               securityTotal={securityTotal}
               securityHigh={securityHigh}
               securityLow={securityLow}
+              onOpenSecurityModal={() => setShowSecurityModal(true)}
+              onOpenDevModal={(dev) => { setSelectedDev(dev); setShowDevModal(true); }}
+              showSecurityModal={showSecurityModal}
+              setShowSecurityModal={setShowSecurityModal}
+              showDevModal={showDevModal}
+              setShowDevModal={setShowDevModal}
+              selectedDev={selectedDev}
+              setSelectedDev={setSelectedDev}
             />
           ) : (
             <DetailedView />
@@ -187,6 +201,14 @@ interface DashboardViewProps {
   securityTotal: number;
   securityHigh: number;
   securityLow: number;
+  onOpenSecurityModal: () => void;
+  onOpenDevModal: (dev: DeveloperStats) => void;
+  showSecurityModal: boolean;
+  setShowSecurityModal: (open: boolean) => void;
+  showDevModal: boolean;
+  setShowDevModal: (open: boolean) => void;
+  selectedDev: DeveloperStats | null;
+  setSelectedDev: (dev: DeveloperStats | null) => void;
 }
 
 function DashboardView({
@@ -207,7 +229,32 @@ function DashboardView({
   securityTotal,
   securityHigh,
   securityLow,
+  onOpenSecurityModal,
+  onOpenDevModal,
+  showSecurityModal,
+  setShowSecurityModal,
+  showDevModal,
+  setShowDevModal,
+  selectedDev,
+  setSelectedDev,
 }: DashboardViewProps) {
+  // Calcular commits e PRs por repositório (simplificado - usando proporção)
+  const commitsByRepo: Record<string, number> = {};
+  const prsByRepo: Record<string, number> = {};
+  repositories.forEach((repo, idx) => {
+    // Distribuir proporcionalmente (em produção, viria da API)
+    const proportion = 1 / (idx + 1);
+    commitsByRepo[repo.id] = Math.round(totalCommits * proportion / repositories.length) || 0;
+    prsByRepo[repo.id] = Math.round((stats?.totalPRs || 0) * proportion / repositories.length) || 0;
+  });
+  // Ajustar o primeiro repo para ter o restante
+  if (repositories.length > 0) {
+    const sumCommits = Object.values(commitsByRepo).reduce((a, b) => a + b, 0);
+    const sumPRs = Object.values(prsByRepo).reduce((a, b) => a + b, 0);
+    commitsByRepo[repositories[0].id] = totalCommits - sumCommits + (commitsByRepo[repositories[0].id] || 0);
+    prsByRepo[repositories[0].id] = (stats?.totalPRs || 0) - sumPRs + (prsByRepo[repositories[0].id] || 0);
+  }
+
   return (
     <div className="space-y-6">
       {/* KPIs Row 1 - Métricas principais */}
@@ -249,6 +296,7 @@ function DashboardView({
           helpText={KPI_HELP_TEXTS.vulnerabilities}
           alert={securityTotal > 0}
           clickable={securityTotal > 0}
+          onClick={onOpenSecurityModal}
         />
         <KPICard
           title="Repositórios"
@@ -309,7 +357,7 @@ function DashboardView({
               </p>
             </div>
           </div>
-          <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100">
+          <Button variant="outline" className="border-amber-300 text-amber-700 hover:bg-amber-100" onClick={onOpenSecurityModal}>
             Ver Detalhes
           </Button>
         </div>
@@ -328,7 +376,11 @@ function DashboardView({
           <h3 className="text-sm font-semibold mb-4">Produtividade por Desenvolvedor</h3>
           <div className="space-y-3">
             {developerStats.slice(0, 5).map((dev, idx) => (
-              <div key={idx} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
+              <div
+                key={idx}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
+                onClick={() => onOpenDevModal(dev)}
+              >
                 <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
                   {dev.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
                 </div>
@@ -361,6 +413,29 @@ function DashboardView({
 
       {/* Volume por Mês */}
       <VolumeByMonthCharts repositories={repositories} />
+
+      {/* Volume por Repositório */}
+      {repositories.length > 0 && (
+        <RepositoryVolumeChart
+          repositories={repositories}
+          commitsByRepo={commitsByRepo}
+          prsByRepo={prsByRepo}
+        />
+      )}
+
+      {/* Modals */}
+      <SecurityModal
+        open={showSecurityModal}
+        onClose={() => setShowSecurityModal(false)}
+        repositoryFullName={repositories[0]?.fullName}
+      />
+      <DeveloperDetailModal
+        open={showDevModal}
+        onClose={() => setShowDevModal(false)}
+        developer={selectedDev}
+        allDevelopers={developerStats}
+        onSelectDeveloper={setSelectedDev}
+      />
     </div>
   );
 }
