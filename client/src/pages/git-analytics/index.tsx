@@ -17,6 +17,8 @@ import { VolumeByDayCharts, VolumeByMonthCharts } from "./components/VolumeChart
 import { RepositoryVolumeChart } from "./components/RepositoryVolumeChart";
 import { SecurityModal } from "./components/SecurityModal";
 import { DeveloperDetailModal } from "./components/DeveloperDetailModal";
+import { CommitsTable } from "./components/CommitsTable";
+import { PullRequestsTable } from "./components/PullRequestsTable";
 
 // Types
 export interface GitRepository {
@@ -237,7 +239,11 @@ export default function GitAnalyticsPage() {
               selectedDevName={selectedDevName}
             />
           ) : (
-            <DetailedView />
+            <DetailedView
+              repositories={repositories}
+              selectedRepoId={selectedRepoId}
+              selectedDevName={selectedDevName}
+            />
           )}
         </div>
       </div>
@@ -510,10 +516,74 @@ function DashboardView({
   );
 }
 
-function DetailedView() {
+function DetailedView({
+  repositories,
+  selectedRepoId,
+  selectedDevName
+}: {
+  repositories: GitRepository[];
+  selectedRepoId: string;
+  selectedDevName: string;
+}) {
+  const [activeTab, setActiveTab] = useState<"commits" | "prs" | "security">("commits");
+
   return (
-    <div className="text-center py-8 text-muted-foreground">
-      Visão detalhada será implementada nos próximos passos...
+    <div className="space-y-4">
+      {/* Tabs */}
+      <div className="flex items-center gap-1 border-b">
+        <button
+          onClick={() => setActiveTab("commits")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "commits"
+              ? "border-blue-500 text-blue-600"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Commits
+        </button>
+        <button
+          onClick={() => setActiveTab("prs")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "prs"
+              ? "border-blue-500 text-blue-600"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Pull Requests
+        </button>
+        <button
+          onClick={() => setActiveTab("security")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "security"
+              ? "border-blue-500 text-blue-600"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Segurança
+        </button>
+      </div>
+
+      {/* Conteúdo */}
+      {activeTab === "commits" && (
+        <CommitsTable
+          repositories={repositories}
+          selectedRepoId={selectedRepoId}
+          selectedDevName={selectedDevName}
+        />
+      )}
+      {activeTab === "prs" && (
+        <PullRequestsTable
+          repositories={repositories}
+          selectedRepoId={selectedRepoId}
+          selectedDevName={selectedDevName}
+        />
+      )}
+      {activeTab === "security" && (
+        <div className="text-center py-12 text-muted-foreground">
+          <p>Use o botão "Ver Detalhes" no card de Vulnerabilidades do Dashboard</p>
+          <p className="text-sm mt-2">ou clique no KPI de Vulnerabilidades para ver os alertas de segurança.</p>
+        </div>
+      )}
     </div>
   );
 }
