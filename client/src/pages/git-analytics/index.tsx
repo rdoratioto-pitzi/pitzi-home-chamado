@@ -70,10 +70,11 @@ export default function GitAnalyticsPage() {
 
   // Fetch stats
   const { data: stats, refetch: refetchStats } = useQuery<GitAnalyticsStats>({
-    queryKey: ["/api/git-analytics/stats", selectedRepoId],
+    queryKey: ["/api/git-analytics/stats", selectedRepoId, selectedDevName],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedRepoId !== "all") params.set("repositoryId", selectedRepoId);
+      if (selectedDevName !== "all") params.set("authorName", selectedDevName);
       const res = await fetch(`/api/git-analytics/stats?${params}`);
       return res.json();
     },
@@ -81,10 +82,11 @@ export default function GitAnalyticsPage() {
 
   // Fetch developer stats
   const { data: developerStats = [] } = useQuery<DeveloperStats[]>({
-    queryKey: ["/api/git-analytics/developer-stats", selectedRepoId],
+    queryKey: ["/api/git-analytics/developer-stats", selectedRepoId, selectedDevName],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedRepoId !== "all") params.set("repositoryId", selectedRepoId);
+      if (selectedDevName !== "all") params.set("authorName", selectedDevName);
       const res = await fetch(`/api/git-analytics/developer-stats?${params}`);
       return res.json();
     },
