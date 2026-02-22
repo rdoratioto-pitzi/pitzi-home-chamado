@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   RefreshCw, LayoutDashboard, Table2, GitPullRequest, GitCommit,
   Users, TrendingUp, Shield, GitBranch, Zap, Bug, Wrench, AlertTriangle
@@ -527,6 +528,16 @@ function DetailedView({
 }) {
   const [activeTab, setActiveTab] = useState<"commits" | "prs" | "security">("commits");
 
+  // Fetch security alerts
+  const { data: securityAlerts = [] } = useQuery<any[]>({
+    queryKey: ["/api/git-analytics/security-alerts"],
+    queryFn: async () => {
+      const res = await fetch(`/api/git-analytics/security-alerts`);
+      return res.json();
+    },
+    enabled: activeTab === "security",
+  });
+
   return (
     <div className="space-y-4">
       {/* Tabs */}
@@ -559,7 +570,7 @@ function DetailedView({
               : "border-transparent text-muted-foreground hover:text-foreground"
           }`}
         >
-          Segurança
+          Segurança ({securityAlerts.length})
         </button>
       </div>
 
@@ -579,11 +590,94 @@ function DetailedView({
         />
       )}
       {activeTab === "security" && (
-        <div className="text-center py-12 text-muted-foreground">
-          <p>Use o botão "Ver Detalhes" no card de Vulnerabilidades do Dashboard</p>
-          <p className="text-sm mt-2">ou clique no KPI de Vulnerabilidades para ver os alertas de segurança.</p>
-        </div>
+        <SecurityAlertsTable alerts={securityAlerts} repositories={repositories} />
       )}
+    </div>
+  );
+}
+
+// Componente inline para tabela de segurança
+function SecurityAlertsTable({ alerts, repositories }: { alerts: any[]; repositories: GitRepository[] }) {
+  if (alerts.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Shield className="h-12 w-12 mx-auto mb-4 text-emerald-500 opacity-50" />
+        <p className="text-muted-foreground">Nenhuma vulnerabilidade detectada</p>
+        <p className="text-sm text-muted-foreground mt-1">Seus repositórios estão seguros!</p>
+      </div>
+    );
+  }
+
+  const getRepoName = (repoId: string) => {
+    return repositories.find(r => r.id === repoId)?.name || "—";
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case "critical": return "bg-red-600 text-white";
+      case "high": return "bg-orange-500 text-white";
+      case "medium": return "bg-amber-500 text-white";
+      case "low": return "bg-blue-500 text-white";
+      default: return "bg-slate-500 text-white";
+    }
+  };
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="w-[80px]">#</TableHead>
+            <TableHead className="w-[100px]">Severidade</TableHead>
+            <TableHead>Título</TableHead>
+            <TableHead className="w-[120px]">Pacote</TableHead>
+            <TableHead className="w-[120px]">Repositório</TableHead>
+            <TableHead className="w-[100px]">Status</TableHead>
+            <TableHead className="w-[120px]">Patch</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {alerts.map((alert) => (
+            <TableRow key={alert.id}>
+              <TableCell className="font-mono text-xs">
+                #{alert.githubAlertNumber}
+              </TableCell>
+              <TableCell>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase ${getSeverityColor(alert.severity)}`}>
+                  {alert.severity}
+                </span>
+              </TableCell>
+              <TableCell className="max-w-[300px]">
+                <div className="truncate font-medium" title={alert.title}>
+                  {alert.title}
+                </div>
+              </TableCell>
+              <TableCell className="text-sm">
+                <span className="font-mono">{alert.packageName}</span>
+              </TableCell>
+              <TableCell className="text-sm text-muted-foreground">
+                {getRepoName(alert.repositoryId)}
+              </TableCell>
+              <TableCell>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                  alert.status === "open"
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                    : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                }`}>
+                  {alert.status === "open" ? "Aberto" : "Corrigido"}
+                </span>
+              </TableCell>
+              <TableCell className="text-xs">
+                {alert.patchedVersion ? (
+                  <span className="text-emerald-600">✓ {alert.patchedVersion}</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
