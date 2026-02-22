@@ -34,6 +34,7 @@ import {
   Workflow,
   ClipboardList,
   Sparkles,
+  GitBranch,
 } from "lucide-react";
 import {
   Sidebar,
@@ -534,12 +535,12 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={location === "/updates"}
-                  className={`h-11 px-3 transition-all duration-200 rounded-lg ${location === "/updates" ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                  isActive={location === "/git-analytics"}
+                  className={`h-11 px-3 transition-all duration-200 rounded-lg ${location === "/git-analytics" ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
                 >
-                  <Link href="/updates" data-testid="link-updates">
-                    <Sparkles className={`h-[20px] w-[20px] ${location === "/updates" ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-[14px]">Updates</span>
+                  <Link href="/git-analytics" data-testid="link-git-analytics">
+                    <GitBranch className={`h-[20px] w-[20px] ${location === "/git-analytics" ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-[14px]">Git Analytics</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
