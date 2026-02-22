@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { getCurrentUser } from "@/lib/permissions";
@@ -11,9 +11,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle } from "lucide-react";
+import { DataTable } from "@/components/data-table";
+import { cn } from "@/lib/utils";
+import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle, GripVertical, Star, Table, Tag } from "lucide-react";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { User as UserType } from "@shared/schema";
 import { RichTextarea } from "@/components/rich-textarea";
+import DOMPurify from "dompurify";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +34,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,7 +79,8 @@ export default function ReunioesPage() {
   const [editingArea, setEditingArea] = useState<TaskArea | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState<"table" | "grid" | "list">("table");
+  const [showTagsSidebar, setShowTagsSidebar] = useState(true);
 
   const currentUser = getCurrentUser();
   const currentUserId = currentUser?.id || "";
@@ -149,30 +161,138 @@ export default function ReunioesPage() {
   const { data: allMeetings = [] } = useQuery<Task[]>({
     queryKey: ["/api/tasks", "meetings", "all"],
     queryFn: async () => {
-      const res = await fetch("/api/tasks");
+      // Filtrar apenas reuniões (type=meeting_note)
+      const res = await fetch("/api/tasks?type=meeting_note");
       if (!res.ok) throw new Error("Failed to fetch meetings");
       return res.json();
     },
     refetchInterval: 5000, // Poll every 5 seconds for shared meetings
   });
 
-  const { data: allTasks = [], isLoading: tasksLoading } = useQuery<Task[]>({
-    queryKey: ["/api/tasks", selectedAreaId],
+  const { data: meetings = [], isLoading: tasksLoading } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", selectedAreaId, "meetings"],
     queryFn: async () => {
-      const url = selectedAreaId 
-        ? `/api/tasks?tagId=${selectedAreaId}` 
-        : "/api/tasks";
+      // Filtrar apenas reuniões (type=meeting_note)
+      const url = selectedAreaId
+        ? `/api/tasks?tagId=${selectedAreaId}&type=meeting_note`
+        : "/api/tasks?type=meeting_note";
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch tasks");
+      if (!res.ok) throw new Error("Failed to fetch meetings");
       return res.json();
     },
     refetchInterval: 5000, // Poll every 5 seconds for shared meetings
   });
 
-  // Filter only meetings (type === "meeting_note")
-  const meetings = useMemo(() => {
-    return allTasks;
-  }, [allTasks]);
+  // Definição das colunas da tabela de reuniões
+  // Colunas removidas: Responsável, Status, Local
+  const meetingTableColumns = useMemo(() => [
+    {
+      key: 'title',
+      label: 'Nome da Reunião',
+      render: (value: string) => (
+        <div className="font-medium">
+          {value}
+        </div>
+      )
+    },
+    {
+      key: 'meetingData',
+      label: 'Data',
+      className: 'w-[120px]',
+      render: (value: any, row: Task) => {
+        const meetingData = row.meetingData as any;
+        const date = meetingData?.date || row.dueDate;
+        return date ? new Date(date).toLocaleDateString('pt-BR') : '-';
+      }
+    },
+    {
+      key: 'meetingData',
+      label: 'Horário',
+      className: 'w-[100px]',
+      render: (value: any, row: Task) => {
+        const meetingData = row.meetingData as any;
+        return meetingData?.time || '-';
+      }
+    },
+    {
+      key: 'assigneeIds',
+      label: 'Participantes',
+      className: 'w-[150px]',
+      render: (value: string[], row: Task) => {
+        // Parse meetingData to get participants
+        const meetingData = row.meetingData ? JSON.parse(row.meetingData as string) : {};
+        const participantIds = meetingData?.participants || [];
+        const externalParticipants = meetingData?.externalParticipants || [];
+        
+        if (participantIds.length === 0 && externalParticipants.length === 0) return '-';
+        
+        // Get names of internal participants
+        const participantNames = participantIds
+          .map((id: string) => {
+            const user = users?.find(u => u.id === id);
+            return user?.name;
+          })
+          .filter(Boolean);
+        
+        // Combine with external participants
+        const allParticipants = [...participantNames, ...externalParticipants];
+        
+        if (allParticipants.length === 0) return '-';
+        if (allParticipants.length === 1) return allParticipants[0];
+        
+        return (
+          <Popover>
+            <PopoverTrigger className="text-primary hover:underline cursor-pointer text-sm">
+              +{allParticipants.length} pessoas
+            </PopoverTrigger>
+            <PopoverContent className="w-64">
+              <div className="text-sm font-medium mb-2">Participantes</div>
+              <ul className="text-sm space-y-1">
+                {allParticipants.map((name: string, i: number) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-primary" />
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
+        );
+      }
+    },
+    {
+      key: 'tagId',
+      label: 'Tag',
+      className: 'w-[120px]',
+      render: (value: string) => {
+        const area = areas?.find(a => a.id === value);
+        return area ? (
+          <Badge
+            variant="secondary"
+            className="gap-1"
+          >
+            <div
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: area.color || "#00A137" }}
+            />
+            {area.name}
+          </Badge>
+        ) : '-';
+      }
+    },
+    {
+      key: 'recurrence',
+      label: 'Recorrência',
+      className: 'w-[120px]',
+      render: (value: any, row: Task) => {
+        if (row.isRecurring) {
+          const recurrenceType = row.recurrenceType === 'weekly' ? 'Semanal' : 'Diária';
+          return `🔄 ${recurrenceType}`;
+        }
+        return '-';
+      }
+    }
+  ], [users, areas]);
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
@@ -214,6 +334,162 @@ export default function ReunioesPage() {
       toast({ title: "Tag excluída com sucesso!" });
     },
   });
+
+  // Mutation para definir tag como padrão
+  const setDefaultTagMutation = useMutation({
+    mutationFn: async ({ id, isDefault }: { id: string; isDefault: boolean }) => {
+      if (isDefault) {
+        return apiRequest("DELETE", `/api/task-tags/${id}/set-default`);
+      } else {
+        return apiRequest("POST", `/api/task-tags/${id}/set-default`, { scope: "meetings" });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "meetings"] });
+      toast({ title: "Tag padrão atualizada!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar tag padrão", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Mutation para reordenar tags
+  const reorderTagsMutation = useMutation({
+    mutationFn: async (tagIds: string[]) => {
+      return apiRequest("POST", "/api/task-tags/reorder", { tagIds, scope: "meetings" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-tags", "meetings"] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao reordenar tags", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Query para buscar tag padrão
+  const { data: defaultTag } = useQuery<TaskArea | null>({
+    queryKey: ["/api/task-tags/default", "meetings"],
+    queryFn: async () => {
+      const res = await fetch("/api/task-tags/default?scope=meetings");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  // Sensors para drag and drop do dnd-kit
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  // Handler para drag end das tags
+  const handleTagDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const oldIndex = areas.findIndex(t => t.id === active.id);
+      const newIndex = areas.findIndex(t => t.id === over.id);
+      
+      const newOrder = arrayMove(areas, oldIndex, newIndex);
+      reorderTagsMutation.mutate(newOrder.map(t => t.id));
+    }
+  };
+
+  // Componente para tag ordenável
+  function SortableTag({ area, areaMeetingCount }: { area: TaskArea; areaMeetingCount: number }) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: area.id });
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`group flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+          selectedAreaId === area.id
+            ? "bg-primary/10 text-primary"
+            : "hover:bg-muted"
+        }`}
+        onClick={() => setSelectedAreaId(area.id)}
+        data-testid={`button-area-${area.id}`}
+      >
+        <button
+          className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-muted rounded"
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-3 w-3 text-muted-foreground" />
+        </button>
+        <div
+          className="h-3 w-3 rounded-full flex-shrink-0"
+          style={{ backgroundColor: area.color || "#00A137" }}
+        />
+        {area.visibility === "shared" ? (
+          <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        ) : (
+          <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        )}
+        <span className="flex-1 truncate">{area.name}</span>
+        {area.isDefault && (
+          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400 flex-shrink-0" />
+        )}
+        <Badge variant="secondary" className="text-xs flex-shrink-0">
+          {areaMeetingCount}
+        </Badge>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded flex-shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              data-testid={`button-area-menu-${area.id}`}
+            >
+              <MoreHorizontal className="h-3 w-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                setDefaultTagMutation.mutate({
+                  id: area.id,
+                  isDefault: area.isDefault || false
+                });
+              }}
+            >
+              <Star className={`h-4 w-4 mr-2 ${area.isDefault ? "fill-yellow-400 text-yellow-400" : ""}`} />
+              {area.isDefault ? "Remover como Padrão" : "Definir como Padrão"}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleOpenAreaDialog(area)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => deleteAreaMutation.mutate(area.id)}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
+  }
 
   const createMeetingMutation = useMutation({
     mutationFn: async (data: typeof newMeeting) => {
@@ -386,7 +662,7 @@ export default function ReunioesPage() {
       type: "meeting_note",
       status: "todo",
       priority: "medium",
-      areaId: selectedAreaId || (areas[0]?.id || ""),
+      areaId: selectedAreaId || (defaultTag?.id || (areas[0]?.id || "")),
       createdBy: currentUserId,
       assigneeId: "",
       assigneeIds: [],
@@ -500,7 +776,7 @@ export default function ReunioesPage() {
   const handleOpenMeetingDialog = () => {
     setNewMeeting({
       ...newMeeting,
-      areaId: selectedAreaId || (areas[0]?.id || ""),
+      areaId: selectedAreaId || (defaultTag?.id || (areas[0]?.id || "")),
     });
     setShowMeetingDialog(true);
   };
@@ -613,107 +889,99 @@ export default function ReunioesPage() {
 
   return (
     <div className="flex h-full">
-      {/* Sidebar - Areas */}
-      <div className="w-56 border-r border-border bg-muted/30 flex flex-col">
-        <div className="p-3 border-b border-border flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Tags</span>
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            className="h-6 w-6"
-            onClick={() => handleOpenAreaDialog()}
-            data-testid="button-add-area"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          <button
-            className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 mb-1 ${
-              !selectedAreaId ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
-            }`}
-            onClick={() => setSelectedAreaId(null)}
-            data-testid="button-all-meetings"
-          >
-            <Folder className="h-4 w-4" />
-            Todas as Reuniões
-            <Badge variant="secondary" className="ml-auto text-xs">
-              {meetings.length}
-            </Badge>
-          </button>
-          {areas.map((area) => {
-            const areaCount = allMeetings.filter(m => m.tagId === area.id).length;
-            return (
-              <div
-                key={area.id}
-                className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 mb-1 group cursor-pointer ${
-                  selectedAreaId === area.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
-                }`}
-                onClick={() => setSelectedAreaId(area.id)}
-                data-testid={`button-area-${area.id}`}
+      {/* Sidebar - Areas (condicional) */}
+      {showTagsSidebar && (
+        <div className="w-56 border-r border-border bg-muted/30 flex flex-col">
+          <div className="p-3 border-b border-border flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">Tags</span>
+            <div className="flex items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() => handleOpenAreaDialog()}
+                data-testid="button-add-area"
               >
-                <div 
-                  className="h-3 w-3 rounded-full flex-shrink-0" 
-                  style={{ backgroundColor: area.color || "#00A137" }}
-                />
-                {area.visibility === "public" ? (
-                  <Globe className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                ) : area.visibility === "shared" ? (
-                  <Users className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                ) : (
-                  <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                )}
-                <span className="truncate flex-1">{area.name}</span>
-                <Badge variant="secondary" className="text-xs">
-                  {areaCount}
-                </Badge>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={(e) => {
-                      e.stopPropagation();
-                      handleOpenAreaDialog(area);
-                    }}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      className="text-destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteAreaMutation.mutate(area.id);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-6 w-6"
+                onClick={() => setShowTagsSidebar(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            <button
+              className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 mb-1 ${
+                !selectedAreaId ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted"
+              }`}
+              onClick={() => setSelectedAreaId(null)}
+              data-testid="button-all-meetings"
+            >
+              <Folder className="h-4 w-4" />
+              Todas as Reuniões
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {meetings.length}
+              </Badge>
+            </button>
+            {areas.length > 0 ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleTagDragEnd}
+              >
+                <SortableContext
+                  items={areas.map(t => t.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {areas.map((area) => {
+                    const areaCount = allMeetings.filter(m => m.tagId === area.id).length;
+                    return (
+                      <SortableTag
+                        key={area.id}
+                        area={area}
+                        areaMeetingCount={areaCount}
+                      />
+                    );
+                  })}
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <div className="px-3 py-2 text-sm text-muted-foreground">
+                Nenhuma tag criada
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <PageHeader 
+        <PageHeader
           title={selectedArea ? selectedArea.name : "Todas as Reuniões"}
           description={selectedArea?.description || "Gerencie suas reuniões e anotações"}
           actions={
-            <Button onClick={handleOpenMeetingDialog} data-testid="button-new-meeting">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Reunião
-            </Button>
+            <div className="flex items-center gap-2">
+              {!showTagsSidebar && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowTagsSidebar(true)}
+                  className="flex items-center gap-2"
+                >
+                  <Tag className="h-4 w-4" />
+                  <span>Tags</span>
+                </Button>
+              )}
+              <Button onClick={handleOpenMeetingDialog} data-testid="button-new-meeting">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Reunião
+              </Button>
+            </div>
           }
         />
 
@@ -754,19 +1022,30 @@ export default function ReunioesPage() {
           <div className="flex items-center gap-1 ml-auto">
             <Button 
               size="icon" 
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              onClick={() => setViewMode("grid")}
-              data-testid="button-view-grid"
+              variant={viewMode === "table" ? "secondary" : "ghost"}
+              onClick={() => setViewMode("table")}
+              data-testid="button-view-table"
+              title="Visualização em Tabela"
             >
-              <LayoutGrid className="h-4 w-4" />
+              <Table className="h-4 w-4" />
             </Button>
             <Button 
               size="icon" 
               variant={viewMode === "list" ? "secondary" : "ghost"}
               onClick={() => setViewMode("list")}
               data-testid="button-view-list"
+              title="Visualização em Lista"
             >
               <List className="h-4 w-4" />
+            </Button>
+            <Button 
+              size="icon" 
+              variant={viewMode === "grid" ? "secondary" : "ghost"}
+              onClick={() => setViewMode("grid")}
+              data-testid="button-view-grid"
+              title="Visualização em Cards"
+            >
+              <LayoutGrid className="h-4 w-4" />
             </Button>
             <Button 
               size="icon" 
@@ -808,6 +1087,15 @@ export default function ReunioesPage() {
                 </Button>
               )}
             </div>
+          ) : viewMode === "table" ? (
+            <DataTable
+              columns={meetingTableColumns}
+              data={filteredMeetings}
+              onRowClick={(meeting) => navigate(`/reunioes/${meeting.id}`)}
+              showCheckbox={false}
+              isLoading={tasksLoading}
+              emptyMessage="Nenhuma reunião encontrada."
+            />
           ) : (
             <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-2"}>
               {filteredMeetings.map((meeting) => {
@@ -1688,9 +1976,10 @@ export default function ReunioesPage() {
                   </h1>
                   
                   {meeting.description && (
-                    <p className="text-xl text-muted-foreground whitespace-pre-wrap">
-                      {meeting.description}
-                    </p>
+                    <div
+                      className="text-xl text-muted-foreground"
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(meeting.description) }}
+                    />
                   )}
                   
                   <div className="flex items-center justify-center gap-4 py-4">

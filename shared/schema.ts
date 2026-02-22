@@ -377,6 +377,8 @@ export const taskTags = pgTable("task_tags", {
   scope: text("scope").notNull().default("tasks"),
   color: text("color").default("#00A137"),
   icon: text("icon").default("folder"),
+  isDefault: boolean("is_default").default(false),
+  displayOrder: integer("display_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1142,3 +1144,126 @@ export const promptsLibraryWithTranslation = pgTable('prompts_library', {
   translatedContent: text('translated_content'),
   translatedAt: timestamp('translated_at'),
 });
+// ============== GIT ANALYTICS ==============
+
+// Repositórios GitHub conectados
+export const gitRepositories = pgTable("git_repositories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  githubId: integer("github_id").notNull(),
+  name: text("name").notNull(),                    // ex: "Renov.Home"
+  fullName: text("full_name").notNull(),           // ex: "Renov-BD/Renov.Home"
+  owner: text("owner").notNull(),                  // ex: "Renov-BD"
+  defaultBranch: text("default_branch").default("main"),
+  isActive: boolean("is_active").default(true),
+  syncEnabled: boolean("sync_enabled").default(true),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertGitRepositorySchema = createInsertSchema(gitRepositories).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertGitRepository = z.infer<typeof insertGitRepositorySchema>;
+export type GitRepository = typeof gitRepositories.$inferSelect;
+
+// Commits sincronizados do GitHub
+export const gitCommits = pgTable("git_commits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  repositoryId: varchar("repository_id").notNull(),
+  sha: text("sha").notNull().unique(),
+  message: text("message").notNull(),
+  fullMessage: text("full_message"),               // Mensagem completa com body
+  authorName: text("author_name").notNull(),
+  authorEmail: text("author_email"),
+  authorAvatarUrl: text("author_avatar_url"),
+  commitType: text("commit_type").default("improvement"), // feature, bugfix, improvement, docs, refactor, security
+  branch: text("branch"),
+  prNumber: integer("pr_number"),                  // PR associado, se houver
+  filesChanged: integer("files_changed").default(0),
+  additions: integer("additions").default(0),
+  deletions: integer("deletions").default(0),
+  committedAt: timestamp("committed_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGitCommitSchema = createInsertSchema(gitCommits).omit({ id: true, createdAt: true });
+export type InsertGitCommit = z.infer<typeof insertGitCommitSchema>;
+export type GitCommit = typeof gitCommits.$inferSelect;
+
+// Pull Requests sincronizados do GitHub
+export const gitPullRequests = pgTable("git_pull_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  repositoryId: varchar("repository_id").notNull(),
+  githubPrNumber: integer("github_pr_number").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  authorName: text("author_name").notNull(),
+  authorAvatarUrl: text("author_avatar_url"),
+  status: text("status").default("open"),          // open, merged, closed
+  prType: text("pr_type").default("improvement"),  // feature, bugfix, improvement, docs, refactor, security
+  sourceBranch: text("source_branch"),
+  targetBranch: text("target_branch"),
+  commitsCount: integer("commits_count").default(0),
+  additions: integer("additions").default(0),
+  deletions: integer("deletions").default(0),
+  reviewers: text("reviewers"),                    // JSON array
+  labels: text("labels"),                          // JSON array
+  createdAt: timestamp("created_at"),
+  mergedAt: timestamp("merged_at"),
+  closedAt: timestamp("closed_at"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertGitPullRequestSchema = createInsertSchema(gitPullRequests).omit({ id: true, updatedAt: true });
+export type InsertGitPullRequest = z.infer<typeof insertGitPullRequestSchema>;
+export type GitPullRequest = typeof gitPullRequests.$inferSelect;
+
+// Alertas de segurança (Dependabot)
+export const gitSecurityAlerts = pgTable("git_security_alerts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  repositoryId: varchar("repository_id").notNull(),
+  githubAlertNumber: integer("github_alert_number").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  severity: text("severity").notNull(),            // critical, high, medium, low
+  packageName: text("package_name").notNull(),
+  packageEcosystem: text("package_ecosystem"),     // npm, pip, etc
+  vulnerableVersion: text("vulnerable_version"),
+  patchedVersion: text("patched_version"),
+  status: text("status").default("open"),          // open, dismissed, fixed
+  isDirectDependency: boolean("is_direct_dependency").default(false),
+  cveId: text("cve_id"),
+  ghsaId: text("ghsa_id"),
+  createdAt: timestamp("created_at"),
+  dismissedAt: timestamp("dismissed_at"),
+  fixedAt: timestamp("fixed_at"),
+});
+
+export const insertGitSecurityAlertSchema = createInsertSchema(gitSecurityAlerts).omit({ id: true });
+export type InsertGitSecurityAlert = z.infer<typeof insertGitSecurityAlertSchema>;
+export type GitSecurityAlert = typeof gitSecurityAlerts.$inferSelect;
+
+// Branches
+export const gitBranches = pgTable("git_branches", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: varchar("tenant_id"),
+  repositoryId: varchar("repository_id").notNull(),
+  name: text("name").notNull(),
+  sha: text("sha").notNull(),
+  isDefault: boolean("is_default").default(false),
+  isProtected: boolean("is_protected").default(false),
+  aheadBy: integer("ahead_by").default(0),
+  behindBy: integer("behind_by").default(0),
+  hasOpenPR: boolean("has_open_pr").default(false),
+  lastCommitAt: timestamp("last_commit_at"),
+  lastCommitAuthor: text("last_commit_author"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertGitBranchSchema = createInsertSchema(gitBranches);
+export type InsertGitBranch = z.infer<typeof insertGitBranchSchema>;
+export type GitBranch = typeof gitBranches.$inferSelect;
