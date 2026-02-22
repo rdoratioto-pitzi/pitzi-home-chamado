@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Workflow,
   Sparkles,
+  GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
@@ -131,13 +132,12 @@ const modules: ModuleCard[] = [
     permissionKey: "conhecimento",
   },
   {
-    title: "Updates",
-    description: "Novidades e atualizações do sistema",
-    icon: Sparkles,
-    href: "/updates",
-    color: "text-pink-600 dark:text-pink-400",
-    bgColor: "bg-pink-100 dark:bg-pink-900/30",
-    permissionKey: "updates",
+    title: "Git Analytics",
+    description: "Governança de código e produtividade",
+    icon: GitBranch,
+    href: "/git-analytics",
+    color: "text-indigo-600 dark:text-indigo-400",
+    bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
   },
 ];
 
