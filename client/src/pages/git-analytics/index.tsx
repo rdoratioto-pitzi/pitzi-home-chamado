@@ -122,6 +122,17 @@ export default function GitAnalyticsPage() {
     },
   });
 
+  // Fetch pending branches
+  const { data: pendingBranches = [] } = useQuery<any[]>({
+    queryKey: ["/api/git-analytics/pending-branches", selectedRepoId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedRepoId !== "all") params.set("repositoryId", selectedRepoId);
+      const res = await fetch(`/api/git-analytics/pending-branches?${params}`);
+      return res.json();
+    },
+  });
+
   // Funções auxiliares para período
   const getMonthName = (month: number) => {
     const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -287,6 +298,7 @@ export default function GitAnalyticsPage() {
               securityTotal={securityTotal}
               securityHigh={securityHigh}
               securityLow={securityLow}
+              pendingBranches={pendingBranches}
               onOpenSecurityModal={() => setShowSecurityModal(true)}
               onOpenDevModal={(dev) => { setSelectedDev(dev); setShowDevModal(true); }}
               showSecurityModal={showSecurityModal}
@@ -329,6 +341,7 @@ interface DashboardViewProps {
   securityTotal: number;
   securityHigh: number;
   securityLow: number;
+  pendingBranches: any[];
   onOpenSecurityModal: () => void;
   onOpenDevModal: (dev: DeveloperStats) => void;
   showSecurityModal: boolean;
@@ -359,6 +372,7 @@ function DashboardView({
   securityTotal,
   securityHigh,
   securityLow,
+  pendingBranches,
   onOpenSecurityModal,
   onOpenDevModal,
   showSecurityModal,
@@ -523,6 +537,33 @@ function DashboardView({
               onClick={() => window.open(`https://github.com/${repositories[0]?.fullName}/pulls`, "_blank")}
             >
               Ver no GitHub
+            </Button>
+          </div>
+        )}
+
+        {/* Branches Pendentes Alert Banner */}
+        {pendingBranches.length > 0 && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/50 rounded-lg">
+                <GitBranch className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="font-medium text-blue-800 dark:text-blue-200">
+                  {pendingBranches.length} branch{pendingBranches.length > 1 ? "es" : ""} aguardando revisão
+                </p>
+                <p className="text-sm text-blue-600 dark:text-blue-400">
+                  {pendingBranches.slice(0, 3).map((b: any) => b.name).join(", ")}
+                  {pendingBranches.length > 3 && ` e mais ${pendingBranches.length - 3}`}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              className="border-blue-300 text-blue-700 hover:bg-blue-100"
+              onClick={() => window.open(`https://github.com/${repositories[0]?.fullName}/branches`, "_blank")}
+            >
+              Ver Branches
             </Button>
           </div>
         )}
