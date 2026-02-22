@@ -70,12 +70,24 @@ export default function GitAnalyticsPage() {
 
   // Fetch stats
   const { data: stats, refetch: refetchStats } = useQuery<GitAnalyticsStats>({
-    queryKey: ["/api/git-analytics/stats"],
+    queryKey: ["/api/git-analytics/stats", selectedRepoId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedRepoId !== "all") params.set("repositoryId", selectedRepoId);
+      const res = await fetch(`/api/git-analytics/stats?${params}`);
+      return res.json();
+    },
   });
 
   // Fetch developer stats
   const { data: developerStats = [] } = useQuery<DeveloperStats[]>({
-    queryKey: ["/api/git-analytics/developer-stats"],
+    queryKey: ["/api/git-analytics/developer-stats", selectedRepoId],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedRepoId !== "all") params.set("repositoryId", selectedRepoId);
+      const res = await fetch(`/api/git-analytics/developer-stats?${params}`);
+      return res.json();
+    },
   });
 
   // Sync handler
