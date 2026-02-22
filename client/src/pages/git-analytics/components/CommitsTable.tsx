@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, ExternalLink, Search } from "lucide-react";
 import { TypeBadge } from "./Badges";
+import { ExportButton } from "./ExportButton";
 import { GitRepository } from "../index";
 
 interface GitCommit {
@@ -109,6 +110,19 @@ export function CommitsTable({ repositories, selectedRepoId, selectedDevName }: 
         <div className="text-sm text-muted-foreground">
           {total} commits
         </div>
+        <ExportButton
+          data={filteredCommits}
+          filename={`commits-${new Date().toISOString().split('T')[0]}`}
+          columns={[
+            { key: "sha", label: "Hash" },
+            { key: "commitType", label: "Tipo" },
+            { key: "message", label: "Mensagem" },
+            { key: "authorName", label: "Autor" },
+            { key: "additions", label: "Adições" },
+            { key: "deletions", label: "Deleções" },
+            { key: "committedAt", label: "Data" },
+          ]}
+        />
       </div>
 
       {/* Tabela */}

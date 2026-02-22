@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, ExternalLink, Search, GitMerge, GitPullRequest, XCircle } from "lucide-react";
 import { TypeBadge, StatusBadge } from "./Badges";
+import { ExportButton } from "./ExportButton";
 import { GitRepository } from "../index";
 
 interface GitPullRequest {
@@ -131,6 +132,24 @@ export function PullRequestsTable({ repositories, selectedRepoId, selectedDevNam
         <div className="text-sm text-muted-foreground">
           {total} pull requests
         </div>
+        <ExportButton
+          data={filteredPRs}
+          filename={`pull-requests-${new Date().toISOString().split('T')[0]}`}
+          columns={[
+            { key: "githubPrNumber", label: "Número" },
+            { key: "status", label: "Status" },
+            { key: "prType", label: "Tipo" },
+            { key: "title", label: "Título" },
+            { key: "authorName", label: "Autor" },
+            { key: "sourceBranch", label: "Branch Origem" },
+            { key: "targetBranch", label: "Branch Destino" },
+            { key: "commitsCount", label: "Commits" },
+            { key: "additions", label: "Adições" },
+            { key: "deletions", label: "Deleções" },
+            { key: "createdAt", label: "Criado em" },
+            { key: "mergedAt", label: "Merged em" },
+          ]}
+        />
       </div>
 
       {/* Tabela */}
