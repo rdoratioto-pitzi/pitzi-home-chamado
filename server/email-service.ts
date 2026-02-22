@@ -149,6 +149,77 @@ export async function sendPasswordResetEmail(
   }
 }
 
+export async function sendWelcomeEmail(
+  user: User,
+  initialPassword: string
+): Promise<{ success: boolean; error?: string }> {
+  // Check SMTP configuration
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    const errorMessage = "SMTP not configured - missing SMTP_USER or SMTP_PASS environment variables";
+    console.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+
+  // Validate transporter configuration
+  try {
+    await transporter.verify();
+  } catch (verifyError) {
+    const errorMessage = `SMTP transporter verification failed: ${verifyError instanceof Error ? verifyError.message : String(verifyError)}`;
+    console.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>${emailStyles}</head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Bem-vindo ao Renov Home</h1>
+        </div>
+        <div class="content">
+          <p>Olá <strong>${user.name}</strong>,</p>
+          <p>Você foi cadastrado na plataforma interna de gestão da Renov.</p>
+          <p>Abaixo estão suas informações de acesso:</p>
+          
+          <div class="ticket-info">
+            <p style="margin: 0;"><strong>Link:</strong> <a href="https://home.renovsmart.com.br/" style="color: #00A137;">home.renovsmart.com.br</a></p>
+            <p style="margin: 5px 0 0 0;"><strong>E-mail:</strong> ${user.email}</p>
+            <p style="margin: 5px 0 0 0;"><strong>Senha inicial:</strong> ${initialPassword}</p>
+          </div>
+          
+          <p>Recomendamos que você altere sua senha após o primeiro acesso.</p>
+          
+          <a href="${BASE_URL}/login" class="btn">Acessar o Sistema</a>
+          
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+          <p style="font-size: 12px; color: #777;">Este é um e-mail automático, por favor não responda.</p>
+        </div>
+        <div class="footer">
+          <p>Renov Home - Sistema de Gestão Interna</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"Renov Home" <${process.env.SMTP_USER}>`,
+      to: user.email,
+      subject: "Bem-vindo ao Renov Home - Acesso ao Sistema",
+      html,
+    });
+    console.log(`Welcome email sent to ${user.email}`);
+    return { success: true };
+  } catch (error) {
+    const errorMessage = `Failed to send welcome email to ${user.email}: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
 export async function sendTicketCreatedEmail(
   ticket: Ticket,
   requester: User,
