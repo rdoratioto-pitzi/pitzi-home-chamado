@@ -5233,6 +5233,18 @@ export async function registerRoutes(
     }
   });
 
+  // Pending Branches (branches com commits à frente sem PR aberto)
+  app.get("/api/git-analytics/pending-branches", async (req, res) => {
+    try {
+      const { repositoryId } = req.query;
+      const branches = await storage.getPendingBranches(repositoryId as string);
+      res.json(branches);
+    } catch (error: any) {
+      console.error("Get pending branches error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Stats (agregações para dashboard)
   app.get("/api/git-analytics/stats", async (req, res) => {
     try {
