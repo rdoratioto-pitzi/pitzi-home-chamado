@@ -92,6 +92,15 @@ export default function GitAnalyticsPage() {
     },
   });
 
+  // Lista completa de desenvolvedores para o dropdown (sem filtro)
+  const { data: allDevelopers = [] } = useQuery<DeveloperStats[]>({
+    queryKey: ["/api/git-analytics/developer-stats", "all-for-dropdown"],
+    queryFn: async () => {
+      const res = await fetch(`/api/git-analytics/developer-stats`);
+      return res.json();
+    },
+  });
+
   // Sync handler
   const handleSync = async () => {
     setIsSyncing(true);
@@ -175,7 +184,7 @@ export default function GitAnalyticsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os devs</SelectItem>
-                    {developerStats.map((dev) => (
+                    {allDevelopers.map((dev) => (
                       <SelectItem key={dev.name} value={dev.name}>
                         {dev.name}
                       </SelectItem>
