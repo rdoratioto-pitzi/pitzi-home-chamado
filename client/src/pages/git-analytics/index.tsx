@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   RefreshCw, LayoutDashboard, Table2, GitPullRequest, GitCommit,
   Users, TrendingUp, Shield, GitBranch, Zap, Bug, Wrench, AlertTriangle
@@ -54,6 +55,8 @@ export interface DeveloperStats {
 
 export default function GitAnalyticsPage() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "detailed">("dashboard");
+  const [selectedRepoId, setSelectedRepoId] = useState<string>("all");
+  const [selectedDevName, setSelectedDevName] = useState<string>("all");
   const [isSyncing, setIsSyncing] = useState(false);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
   const [showDevModal, setShowDevModal] = useState(false);
@@ -119,30 +122,64 @@ export default function GitAnalyticsPage() {
 
       <div className="flex-1 overflow-auto">
         <div className="p-6 space-y-6">
-          {/* Header com tabs e botão sync */}
-          <div className="flex items-center justify-between">
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "dashboard" | "detailed")}>
-              <TabsList>
-                <TabsTrigger value="dashboard" className="flex items-center gap-2">
-                  <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
-                </TabsTrigger>
-                <TabsTrigger value="detailed" className="flex items-center gap-2">
-                  <Table2 className="h-4 w-4" />
-                  Detalhado
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+          {/* Header com tabs, filtros e botão sync */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "dashboard" | "detailed")}>
+                <TabsList>
+                  <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                  </TabsTrigger>
+                  <TabsTrigger value="detailed" className="flex items-center gap-2">
+                    <Table2 className="h-4 w-4" />
+                    Detalhado
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
 
-            <Button
-              variant="outline"
-              onClick={handleSync}
-              disabled={isSyncing}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-              {isSyncing ? "Sincronizando..." : "Sincronizar"}
-            </Button>
+              <div className="flex items-center gap-3">
+                {/* Filtro de Repositório */}
+                <Select value={selectedRepoId} onValueChange={setSelectedRepoId}>
+                  <SelectTrigger className="w-[180px] h-9">
+                    <SelectValue placeholder="Repositório" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os repositórios</SelectItem>
+                    {repositories.map((repo) => (
+                      <SelectItem key={repo.id} value={repo.id}>
+                        {repo.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Filtro de Desenvolvedor */}
+                <Select value={selectedDevName} onValueChange={setSelectedDevName}>
+                  <SelectTrigger className="w-[180px] h-9">
+                    <SelectValue placeholder="Desenvolvedor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os devs</SelectItem>
+                    {developerStats.map((dev) => (
+                      <SelectItem key={dev.name} value={dev.name}>
+                        {dev.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="outline"
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+                  {isSyncing ? "Sincronizando..." : "Sincronizar"}
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Content */}
