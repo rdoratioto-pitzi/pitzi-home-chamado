@@ -179,6 +179,80 @@ async function syncSecurityAlerts(repositoryId: string, fullName: string): Promi
   }
 }
 
+// Sincroniza branches de um repositório
+async function syncBranches(repositoryId: string, fullName: string): Promise<number> {
+  console.log(`[GitSync] Syncing branches for ${fullName}...`);
+  
+  const branchesData = await githubFetch(`/repos/${fullName}/branches?per_page=100`);
+  
+  if (!Array.isArray(branchesData)) {
+    console.log("[GitSync] No branches found or error fetching branches");
+    return 0;
+  }
+
+  // Buscar PRs abertos para verificar quais branches têm PR
+  const openPRs = await githubFetch(`/repos/${fullName}/pulls?state=open&per_page=100`);
+  const branchesWithPR = new Set(openPRs.map((pr: any) => pr.head.ref));
+
+  // Buscar branch default
+  const repoInfo = await githubFetch(`/repos/${fullName}`);
+  const defaultBranch = repoInfo.default_branch || "main";
+
+  let synced = 0;
+
+  for (const branch of branchesData) {
+    try {
+      // Comparar com a branch default para saber ahead/behind
+      let aheadBy = 0;
+      let behindBy = 0;
+      
+      if (branch.name !== defaultBranch) {
+        try {
+          const comparison = await githubFetch(`/repos/${fullName}/compare/${defaultBranch}...${branch.name}`);
+          aheadBy = comparison.ahead_by || 0;
+          behindBy = comparison.behind_by || 0;
+        } catch (e) {
+          // Ignora erro de comparação
+        }
+      }
+
+      // Buscar último commit da branch
+      let lastCommitAt = null;
+      let lastCommitAuthor = null;
+      try {
+        const commits = await githubFetch(`/repos/${fullName}/commits?sha=${branch.name}&per_page=1`);
+        if (commits.length > 0) {
+          lastCommitAt = new Date(commits[0].commit.author?.date);
+          lastCommitAuthor = commits[0].commit.author?.name || commits[0].author?.login;
+        }
+      } catch (e) {
+        // Ignora erro
+      }
+
+      await storage.upsertGitBranch({
+        tenantId: null,
+        repositoryId,
+        name: branch.name,
+        sha: branch.commit.sha,
+        isDefault: branch.name === defaultBranch,
+        isProtected: branch.protected || false,
+        aheadBy,
+        behindBy,
+        hasOpenPR: branchesWithPR.has(branch.name),
+        lastCommitAt,
+        lastCommitAuthor,
+      });
+
+      synced++;
+    } catch (error) {
+      console.error(`[GitSync] Error syncing branch ${branch.name}:`, error);
+    }
+  }
+
+  console.log(`[GitSync] Synced ${synced} branches`);
+  return synced;
+}
+
 // Sincroniza um repositório específico
 export async function syncRepository(repositoryId: string): Promise<void> {
   const repo = await storage.getGitRepository(repositoryId);
@@ -199,6 +273,7 @@ export async function syncRepository(repositoryId: string): Promise<void> {
     syncCommits(repositoryId, repo.fullName, since),
     syncPullRequests(repositoryId, repo.fullName),
     syncSecurityAlerts(repositoryId, repo.fullName),
+    syncBranches(repositoryId, repo.fullName),
   ]);
   
   await storage.updateGitRepository(repositoryId, {
