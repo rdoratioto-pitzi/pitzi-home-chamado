@@ -22,6 +22,7 @@ interface SecurityAlert {
   cveId: string | null;
   ghsaId: string | null;
   createdAt: string;
+  repositoryName?: string;
 }
 
 interface SecurityModalProps {
@@ -29,9 +30,10 @@ interface SecurityModalProps {
   onClose: () => void;
   repositoryName?: string;
   repositoryFullName?: string;
+  repositories?: { id: string; name: string; fullName: string }[];
 }
 
-export function SecurityModal({ open, onClose, repositoryName, repositoryFullName }: SecurityModalProps) {
+export function SecurityModal({ open, onClose, repositoryName, repositoryFullName, repositories }: SecurityModalProps) {
   const [severityFilter, setSeverityFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("open");
 
@@ -50,6 +52,12 @@ export function SecurityModal({ open, onClose, repositoryName, repositoryFullNam
     if (severityFilter !== "all" && alert.severity !== severityFilter) return false;
     return true;
   });
+
+  // Mapear nome do repositório para cada alerta
+  const alertsWithRepoName = filteredAlerts.map(alert => ({
+    ...alert,
+    repositoryName: repositories?.find(r => r.id === alert.repositoryId)?.name || "Desconhecido",
+  }));
 
   const openCount = alerts.filter((a) => a.status === "open").length;
   const fixedCount = alerts.filter((a) => a.status === "fixed").length;
@@ -127,7 +135,7 @@ export function SecurityModal({ open, onClose, repositoryName, repositoryFullNam
             </div>
           ) : (
             <div className="divide-y">
-              {filteredAlerts.map((alert) => (
+              {alertsWithRepoName.map((alert) => (
                 <div
                   key={alert.id}
                   className="px-4 py-4 hover:bg-muted/50 transition-colors"
@@ -151,7 +159,8 @@ export function SecurityModal({ open, onClose, repositoryName, repositoryFullNam
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        #{alert.githubAlertNumber} opened {getDaysAgo(alert.createdAt)} days ago •{" "}
+                        <span className="font-medium text-blue-500">{alert.repositoryName}</span>
+                        {" • "}#{alert.githubAlertNumber} opened {getDaysAgo(alert.createdAt)} days ago •{" "}
                         <span className="font-medium">{alert.packageName}</span> ({alert.packageEcosystem})
                         {alert.vulnerableVersion && ` • ${alert.vulnerableVersion}`}
                       </p>
