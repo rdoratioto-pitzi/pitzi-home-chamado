@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1264,3 +1264,87 @@ export const gitBranches = pgTable("git_branches", {
 export const insertGitBranchSchema = createInsertSchema(gitBranches);
 export type InsertGitBranch = z.infer<typeof insertGitBranchSchema>;
 export type GitBranch = typeof gitBranches.$inferSelect;
+
+// =====================================================
+// AI Dev System V2
+// =====================================================
+
+// Modelos AI disponíveis
+export const aiModels = pgTable("ai_models", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  nome: text("nome").notNull().unique(),
+  provider: text("provider").notNull(),
+  modelId: text("model_id").notNull(),
+  custoInputPorMm: decimal("custo_input_por_mm", { precision: 10, scale: 4 }),
+  custoOutputPorMm: decimal("custo_output_por_mm", { precision: 10, scale: 4 }),
+  config: jsonb("config").$type<{
+    temperature?: number;
+    max_tokens?: number;
+    [key: string]: any;
+  }>().default({}),
+  ativo: boolean("ativo").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAiModelSchema = createInsertSchema(aiModels);
+export type InsertAiModel = z.infer<typeof insertAiModelSchema>;
+export type AiModel = typeof aiModels.$inferSelect;
+
+// Plans executados
+export const aiPlans = pgTable("ai_plans", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  titulo: text("titulo").notNull(),
+  requisito: text("requisito").notNull(),
+  arquivoOrigem: text("arquivo_origem").notNull(),
+  prompts: jsonb("prompts").$type<Array<{
+    ordem: number;
+    titulo: string;
+    prompt: string;
+  }>>().notNull().default([]),
+  modeloId: varchar("modelo_id").references(() => aiModels.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("pending"),
+  arquivosModificados: text("arquivos_modificados").array().default([]),
+  custoTotal: decimal("custo_total", { precision: 10, scale: 4 }).default("0"),
+  tempoTotalSegundos: integer("tempo_total_segundos").default(0),
+  errosEncontrados: jsonb("erros_encontrados").$type<Array<{
+    fase: string;
+    erro: string;
+    tentativa: number;
+  }>>().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertAiPlanSchema = createInsertSchema(aiPlans);
+export type InsertAiPlan = z.infer<typeof insertAiPlanSchema>;
+export type AiPlan = typeof aiPlans.$inferSelect;
+
+// Execução de cada prompt
+export const aiPromptExecutions = pgTable("ai_prompt_executions", {
+  id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  planId: varchar("plan_id").references(() => aiPlans.id, { onDelete: "cascade" }).notNull(),
+  ordem: integer("ordem").notNull(),
+  titulo: text("titulo").notNull(),
+  prompt: text("prompt").notNull(),
+  status: text("status").notNull().default("pending"),
+  tentativas: integer("tentativas").default(0),
+  codigoGerado: text("codigo_gerado"),
+  arquivosCriados: text("arquivos_criados").array().default([]),
+  errosEncontrados: jsonb("erros_encontrados").$type<Array<{
+    mensagem: string;
+    stack?: string;
+    tentativa: number;
+  }>>().default([]),
+  tokensInput: integer("tokens_input").default(0),
+  tokensOutput: integer("tokens_output").default(0),
+  custo: decimal("custo", { precision: 10, scale: 4 }).default("0"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+});
+
+export const insertAiPromptExecutionSchema = createInsertSchema(aiPromptExecutions);
+export type InsertAiPromptExecution = z.infer<typeof insertAiPromptExecutionSchema>;
+export type AiPromptExecution = typeof aiPromptExecutions.$inferSelect;
