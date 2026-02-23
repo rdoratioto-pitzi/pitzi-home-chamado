@@ -434,6 +434,25 @@ export default function GestaoMetasPage() {
     const user = getUserById(meta.responsibleId);
     const progress = getProgress(meta);
 
+    // Buscar check-ins da meta
+    const { data: checkins = [] } = useQuery<any[]>({
+      queryKey: ["/api/metas", meta.id, "checkins"],
+      queryFn: async () => {
+        const res = await fetch(`/api/metas/${meta.id}/checkins`);
+        return res.json();
+      },
+    });
+
+    const formatValue = (value: number) => {
+      if (meta.measurementType === "monetary") {
+        return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+      }
+      if (meta.measurementType === "percentage") {
+        return `${value}%`;
+      }
+      return `${value} ${meta.unit || ""}`;
+    };
+
     return (
       <Card key={meta.id} className="hover-elevate" data-testid={`card-meta-${meta.id}`}>
         <CardContent className="p-4">
@@ -486,6 +505,59 @@ export default function GestaoMetasPage() {
               {progress.toFixed(0)}%
             </div>
           </div>
+
+          {/* Histórico de Check-ins - completo */}
+          {checkins && checkins.length > 0 && (
+            <div className="mt-4 pt-3 border-t border-border/40">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Histórico de Check-ins ({checkins.length})
+                </span>
+              </div>
+              <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+                {checkins
+                  .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                  .map((checkin: any) => (
+                    <div
+                      key={checkin.id}
+                      className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-muted/30"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium">
+                          {(checkin.user?.name || 'U').charAt(0).toUpperCase()}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{checkin.user?.name || 'Usuário'}</span>
+                          <span className="text-muted-foreground text-[10px]">
+                            {new Date(checkin.createdAt).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono font-medium text-primary">
+                          {meta.measurementType === 'monetary'
+                            ? `R$ ${Number(checkin.newValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                            : meta.measurementType === 'percentage'
+                            ? `${checkin.newValue}%`
+                            : `${checkin.newValue} ${meta.unit || ''}`
+                          }
+                        </span>
+                        {checkin.comment && (
+                          <p className="text-[10px] text-muted-foreground truncate max-w-[120px]" title={checkin.comment}>
+                            {checkin.comment}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t">
             <Button
