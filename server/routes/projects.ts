@@ -391,9 +391,11 @@ export function registerProjectRoutes(router: Router) {
 
   router.post("/api/cards/:id/comments", requireAuth, async (req, res) => {
     try {
+      const { userId } = getSessionUser(req);
       const validated = insertKanbanCommentSchema.parse({
         ...req.body,
         cardId: getId(req),
+        userId: userId,
       });
       const comment = await storage.createKanbanComment(validated);
 
