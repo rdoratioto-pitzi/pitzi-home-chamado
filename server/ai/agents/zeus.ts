@@ -91,6 +91,12 @@ export class ZeusAgent {
           const coderResult = await hefestoAgent.execute({
             prompt: prompt.prompt,
             modelId: modelo.modelId,
+            modelo: {
+              id: modelo.id,
+              modelId: modelo.modelId,
+              custoInputPorMm: modelo.custoInputPorMm || '0',
+              custoOutputPorMm: modelo.custoOutputPorMm || '0',
+            },
           });
           
           const codigo = coderResult.content;
@@ -112,16 +118,19 @@ export class ZeusAgent {
             .set({
               status: 'completed',
               codigoGerado: codigo,
+              arquivosCriados: coderResult.arquivosCriados,
               tokensInput: coderResult.tokensInput,
               tokensOutput: coderResult.tokensOutput,
+              custo: coderResult.custo.toString(),
               completedAt: new Date(),
             })
             .where(eq(aiPromptExecutions.id, execution.id));
           
-          // Calcular custo
-          const custoInput = (coderResult.tokensInput / 1_000_000) * parseFloat(modelo.custoInputPorMm || '0');
-          const custoOutput = (coderResult.tokensOutput / 1_000_000) * parseFloat(modelo.custoOutputPorMm || '0');
-          custoTotal += custoInput + custoOutput;
+          // Adicionar arquivos modificados
+          arquivosModificados.push(...coderResult.arquivosCriados);
+          
+          // Calcular custo (agora vem do Hefesto)
+          custoTotal += coderResult.custo;
           
           console.log(`✅ [Zeus] PROMPT ${prompt.ordem} concluído`);
           
