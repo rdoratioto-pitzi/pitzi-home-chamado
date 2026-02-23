@@ -24,6 +24,7 @@ import type { Ticket, TicketComment, TicketCommentWithUser, User, Setting } from
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   Dialog,
   DialogContent,
@@ -233,7 +234,10 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ content: comment.trim() }),
+        body: JSON.stringify({ 
+          content: comment.trim(),
+          attachments: commentImages.length > 0 ? JSON.stringify(commentImages) : null
+        }),
       });
 
       if (!response.ok) {
@@ -382,12 +386,13 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             </div>
             
             {isEditingDescription ? (
-              <div className="space-y-2 mb-4">
-                <Textarea
+              <div className="space-y-4 mb-4">
+                <RichTextarea
                   value={editedDescription}
-                  onChange={(e) => setEditedDescription(e.target.value)}
-                  maxLength={5000}
-                  rows={6}
+                  onChange={setEditedDescription}
+                  images={editedAttachments}
+                  onImagesChange={setEditedAttachments}
+                  placeholder="Edite a descrição do chamado..."
                 />
                 <div className="flex gap-2 justify-end">
                   <Button 
@@ -794,14 +799,14 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
           </div>
         </div>
 
-        <div className="border-t pt-4 space-y-2">
-          <Textarea
+        <div className="border-t pt-4 space-y-4">
+          <RichTextarea
             placeholder="Adicione um comentário..."
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={3}
-            className="resize-none"
-            data-testid="input-comment"
+            onChange={setComment}
+            images={commentImages}
+            onImagesChange={setCommentImages}
+            className="min-h-[100px]"
           />
           <Button
             onClick={handleSubmitComment}

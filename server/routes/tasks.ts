@@ -27,7 +27,6 @@ type SessionUser = {
   isAdmin: boolean;
 };
 
-
 export function registerTaskRoutes(router: Router) {
   const getId = (req: Request) => req.params.id as string;
 
@@ -766,7 +765,8 @@ export function registerTaskRoutes(router: Router) {
 
   router.post("/api/tasks/:id/comments", requireAuth, async (req, res) => {
     try {
-      const data = { ...req.body, taskId: getId(req) };
+      const { userId } = getSessionUser(req);
+      const data = { ...req.body, taskId: getId(req), authorId: userId };
       const validated = insertTaskCommentSchema.parse(data);
       const comment = await storage.createTaskComment(validated);
 

@@ -69,10 +69,12 @@ import {
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
   flowcharts, flowchartVersions, flowchartComments,
   aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates,
-  promptsLibrary, promptUserFavorites
+  promptsLibrary, promptUserFavorites,
+  // Git Analytics
+  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches
  } from "@shared/schema";
  import { db } from "./db";
- import { eq, and, or, sql, asc, type SQL } from "drizzle-orm";
+ import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
  
  export type NotificationPreferences = {
   emailNotificationsEnabled: boolean;
@@ -199,7 +201,7 @@ import {
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
   getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string }): Promise<Task[]>;
-  getTasksWithConditions(conditions: SQL): Promise<Task[]>;
+  getTasksWithConditions(conditions: SQL | undefined): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<boolean>;
@@ -635,6 +637,7 @@ export class DatabaseStorage implements IStorage {
 
   // Ticket Comments
   async getTicketComments(ticketId: string): Promise<TicketCommentWithUser[]> {
+    if (!db) return [];
     return await db
       .select({
         id: ticketComments.id,
@@ -1015,7 +1018,7 @@ export class DatabaseStorage implements IStorage {
     }
     return await baseQuery;
   }
-  async getTasksWithConditions(conditions: SQL): Promise<Task[]> {
+  async getTasksWithConditions(conditions: SQL | undefined): Promise<Task[]> {
     if (!db) return [];
     return await db.select().from(tasks).where(conditions);
   }
@@ -2827,6 +2830,7 @@ export class DatabaseStorage implements IStorage {
   }[]> {
     if (!db) return [];
     try {
+      const database = db;
       const conditions = [];
       
       if (filters?.repositoryId) {
@@ -2842,7 +2846,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(eq(gitCommits.authorName, filters.authorName));
       }
       
-      let query = db.select({
+      let query = database.select({
         name: gitCommits.authorName,
         email: gitCommits.authorEmail,
         avatarUrl: gitCommits.authorAvatarUrl,
@@ -2864,7 +2868,7 @@ export class DatabaseStorage implements IStorage {
           prConditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
         }
         
-        const [prStats] = await db.select({
+        const [prStats] = await database.select({
           total: sql<number>`count(*)`,
           merged: sql<number>`count(*) FILTER (WHERE ${gitPullRequests.status} = 'merged')`
         }).from(gitPullRequests).where(and(...prConditions));
