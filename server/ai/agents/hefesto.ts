@@ -33,61 +33,68 @@ export class HefestoAgent {
     
     console.log('🔨 [Hefesto] Iniciando implementação...');
     
+    // Extrair caminho do arquivo do prompt
+    const arquivoAlvo = this.extrairArquivoAlvo(params.prompt);
+    
+    let conteudoOriginal = '';
+    if (arquivoAlvo && existsSync(arquivoAlvo)) {
+      console.log(`📖 [Hefesto] Lendo arquivo original: ${arquivoAlvo}`);
+      conteudoOriginal = readFileSync(arquivoAlvo, 'utf-8');
+    }
+    
+    // Construir prompt otimizado
+    const promptOtimizado = this.construirPromptOtimizado(params.prompt, conteudoOriginal);
+    
     // Chamar OpenRouter
+    const startTime = Date.now();
     const result = await openRouterService.chat({
       model: params.modelId,
       messages: [
         { 
           role: 'system', 
-          content: `Você é Hefesto, forjador de código. 
+          content: `Você é Hefesto, forjador de código.
 
-INSTRUÇÕES CRÍTICAS:
-1. Leia o arquivo COMPLETO antes de modificar
-2. Gere o arquivo COMPLETO modificado
-3. Use o formato:
-//ARQUIVO: caminho/do/arquivo.ts
-[código completo do arquivo aqui]
+REGRAS ESTRITAS:
+1. Retorne APENAS código TypeScript/JavaScript válido
+2. NÃO use markdown com \`\`\`
+3. NÃO adicione explicações antes ou depois
+4. NÃO adicione comentários explicativos em português
+5. Se modificar arquivo existente, retorne arquivo COMPLETO
+6. Use formato: //ARQUIVO: caminho/arquivo.ts seguido do código
 
-4. NÃO adicione explicações após o código
-5. NÃO use markdown com \`\`\`
-6. Apenas código TypeScript/JavaScript válido
-7. Mantenha TODA a estrutura original, apenas faça a mudança solicitada
-
-Siga CLAUDE.md: shadcn/ui, Wouter, TanStack Query, Drizzle ORM.` 
+Tecnologias permitidas: shadcn/ui, Wouter, TanStack Query, Drizzle ORM
+Proibido: Material-UI, React Router, Prisma, Redux` 
         },
-        { role: 'user', content: params.prompt }
+        { role: 'user', content: promptOtimizado }
       ],
+      temperature: 0,
+      maxTokens: 4000, // Limitar tokens para evitar excesso
     });
     
-    console.log('✅ [Hefesto] Código gerado!');
+    const tempoDecorrido = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`⏱️  [Hefesto] Resposta em ${tempoDecorrido}s`);
+    console.log(`📊 [Hefesto] Tokens: ${result.tokensInput} in / ${result.tokensOutput} out`);
     
     const codigoGerado = result.content;
     const arquivosCriados: string[] = [];
     
-    // Extrair e salvar arquivos do código gerado
+    // Extrair e salvar arquivos
     const arquivos = this.extrairArquivos(codigoGerado);
     
-    for (const arquivo of arquivos) {
-      try {
-        console.log(`📝 [Hefesto] Salvando: ${arquivo.caminho}`);
-        
-        // Limpar código antes de salvar
+    if (arquivos.length === 0) {
+      console.log('⚠️  [Hefesto] Nenhum arquivo com //ARQUIVO: encontrado');
+      console.log('💡 [Hefesto] Tentando salvar no arquivo alvo...');
+      
+      if (arquivoAlvo) {
+        const codigoLimpo = this.limparCodigo(codigoGerado);
+        this.salvarArquivo(arquivoAlvo, codigoLimpo);
+        arquivosCriados.push(arquivoAlvo);
+      }
+    } else {
+      for (const arquivo of arquivos) {
         const codigoLimpo = this.limparCodigo(arquivo.conteudo);
-        
-        // Criar diretório se não existir
-        const dir = dirname(arquivo.caminho);
-        if (!existsSync(dir)) {
-          mkdirSync(dir, { recursive: true });
-        }
-        
-        // Salvar arquivo
-        writeFileSync(arquivo.caminho, codigoLimpo, 'utf-8');
+        this.salvarArquivo(arquivo.caminho, codigoLimpo);
         arquivosCriados.push(arquivo.caminho);
-        
-        console.log(`✅ [Hefesto] Salvo: ${arquivo.caminho}`);
-        
-      } catch (error: any) {
-        console.error(`❌ [Hefesto] Erro ao salvar ${arquivo.caminho}:`, error.message);
       }
     }
     
@@ -114,10 +121,43 @@ Siga CLAUDE.md: shadcn/ui, Wouter, TanStack Query, Drizzle ORM.`
     };
   }
   
-  /**
-   * Limpa código gerado pelo LLM
-   * Remove explicações, markdown, texto extra
-   */
+  private extrairArquivoAlvo(prompt: string): string | null {
+    // Procurar por "Arquivo:" ou "arquivo:" no prompt
+    const match = prompt.match(/(?:Arquivo|arquivo):\s*([^\n]+)/i);
+    if (match) {
+      return match[1].trim();
+    }
+    return null;
+  }
+  
+  private construirPromptOtimizado(promptOriginal: string, conteudoArquivo: string): string {
+    let prompt = promptOriginal;
+    
+    if (conteudoArquivo) {
+      prompt = `ARQUIVO ATUAL:\n${conteudoArquivo}\n\nINSTRUÇÕES:\n${promptOriginal}\n\nRETORNE O ARQUIVO COMPLETO MODIFICADO.`;
+    }
+    
+    return prompt;
+  }
+  
+  private salvarArquivo(caminho: string, conteudo: string): void {
+    try {
+      console.log(`📝 [Hefesto] Salvando: ${caminho}`);
+      
+      const dir = dirname(caminho);
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+      }
+      
+      writeFileSync(caminho, conteudo, 'utf-8');
+      console.log(`✅ [Hefesto] Salvo: ${caminho} (${conteudo.split('\n').length} linhas)`);
+      
+    } catch (error: any) {
+      console.error(`❌ [Hefesto] Erro ao salvar ${caminho}:`, error.message);
+      throw error;
+    }
+  }
+  
   private limparCodigo(codigo: string): string {
     let limpo = codigo;
     
@@ -125,33 +165,23 @@ Siga CLAUDE.md: shadcn/ui, Wouter, TanStack Query, Drizzle ORM.`
     limpo = limpo.replace(/```[a-z]*\n?/g, '').replace(/```$/g, '');
     
     // Remover explicações em português/inglês após o código
-    // Procura por linhas que começam com texto descritivo
     const linhas = limpo.split('\n');
     const codigoLimpo: string[] = [];
-    let dentroExplicacao = false;
     
     for (const linha of linhas) {
-      // Se linha começa com texto não-código (português/inglês)
-      if (/^(Neste|Este|This|The|Note|Observ|Explicação)/i.test(linha.trim())) {
-        dentroExplicacao = true;
-        continue;
+      // Parar se encontrar explicação textual
+      if (/^(Neste|Este|This|The|Note|Observ|Explicação|Como você pode|Agora|Para)/i.test(linha.trim())) {
+        break;
       }
-      
-      if (!dentroExplicacao) {
-        codigoLimpo.push(linha);
-      }
+      codigoLimpo.push(linha);
     }
     
     return codigoLimpo.join('\n').trim();
   }
   
-  /**
-   * Extrai arquivos do código gerado
-   */
   private extrairArquivos(codigo: string): Array<{ caminho: string; conteudo: string }> {
     const arquivos: Array<{ caminho: string; conteudo: string }> = [];
     
-    // Padrão: //ARQUIVO: caminho/do/arquivo.ts
     const regex = /\/\/\s*ARQUIVO:\s*([^\n]+)\n([\s\S]*?)(?=\/\/\s*ARQUIVO:|$)/gi;
     
     let match;
@@ -160,10 +190,6 @@ Siga CLAUDE.md: shadcn/ui, Wouter, TanStack Query, Drizzle ORM.`
       const conteudo = match[2].trim();
       
       arquivos.push({ caminho, conteudo });
-    }
-    
-    if (arquivos.length === 0) {
-      console.log('⚠️  [Hefesto] Nenhum arquivo com //ARQUIVO: encontrado');
     }
     
     return arquivos;

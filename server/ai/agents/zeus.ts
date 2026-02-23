@@ -182,7 +182,7 @@ export class ZeusAgent {
         .set({
           status: erros.length === 0 ? 'completed' : 'failed',
           completedAt: new Date(),
-          custoTotal: custoTotal.toString(),
+          custoTotal: custoTotal.toFixed(4),
           tempoTotalSegundos: tempoTotal,
           arquivosModificados,
           errosEncontrados: erros.map(e => ({ erro: e, fase: 'execution' })),
