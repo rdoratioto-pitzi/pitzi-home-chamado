@@ -147,6 +147,11 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
 
   const { data: comments = [] } = useQuery<TicketCommentWithUser[]>({
     queryKey: ["/api/tickets", ticket?.id, "comments"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tickets/${ticket?.id}/comments`);
+      if (!res.ok) throw new Error("Failed to fetch comments");
+      return res.json();
+    },
     enabled: !!ticket?.id,
   });
 
