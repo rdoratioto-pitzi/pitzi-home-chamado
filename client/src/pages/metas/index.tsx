@@ -787,12 +787,12 @@ export default function MetasVisaoGeralPage() {
       </Dialog>
 
       <Dialog open={isCheckinDialogOpen} onOpenChange={setIsCheckinDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Check-in de Progresso</DialogTitle>
           </DialogHeader>
           {checkinMeta && (
-            <div className="space-y-6 py-4">
+            <div className="flex-1 overflow-y-auto space-y-6 py-4">
               <div className="p-4 bg-muted/30 rounded-lg" data-testid="card-checkin-info">
                 <h4 className="font-bold text-sm mb-1" data-testid="text-checkin-meta-title">{checkinMeta.title}</h4>
                 <p className="text-xs text-muted-foreground" data-testid="text-checkin-area">
@@ -900,11 +900,11 @@ export default function MetasVisaoGeralPage() {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0 border-t pt-4">
             <Button variant="outline" onClick={() => setIsCheckinDialogOpen(false)} data-testid="button-cancel-checkin">
               Cancelar
             </Button>
-            <Button 
+            <Button
               onClick={handleCheckin}
               disabled={createCheckinMutation.isPending}
               data-testid="button-submit-checkin"
