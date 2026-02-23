@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import 'dotenv/config';
 import { Command } from 'commander';
 import { zeusAgent } from '../server/ai/agents/zeus';
 import { db } from '../server/db';
