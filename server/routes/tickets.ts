@@ -16,6 +16,8 @@ import {
 } from "../email-service";
 
 export function registerTicketRoutes(router: Router) {
+  const getId = (req: any) => req.params.id as string;
+
   router.get("/api/tickets", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
@@ -36,7 +38,7 @@ export function registerTicketRoutes(router: Router) {
   router.get("/api/tickets/:id", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
-      const ticket = await storage.getTicket(req.params.id);
+      const ticket = await storage.getTicket(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
       if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
         return res.status(404).json({ error: "Ticket not found" });
@@ -103,7 +105,7 @@ export function registerTicketRoutes(router: Router) {
   router.patch("/api/tickets/:id", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
-      const oldTicket = await storage.getTicket(req.params.id);
+      const oldTicket = await storage.getTicket(getId(req));
       if (!oldTicket) return res.status(404).json({ error: "Ticket not found" });
       if (!isAdmin && oldTicket.requesterId !== userId && oldTicket.assigneeId !== userId) {
         return res.status(403).json({ error: "Access denied" });
@@ -135,7 +137,7 @@ export function registerTicketRoutes(router: Router) {
         updateData.descriptionLastEditedAt = new Date(updateData.descriptionLastEditedAt);
       }
 
-      const ticket = await storage.updateTicket(req.params.id, updateData);
+      const ticket = await storage.updateTicket(getId(req), updateData);
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
 
       if (req.body.status && req.body.status !== oldTicket.status) {
@@ -182,12 +184,12 @@ export function registerTicketRoutes(router: Router) {
 
   router.delete("/api/tickets/:id", requireAuth, async (req, res) => {
     const { userId, isAdmin } = getSessionUser(req);
-    const ticket = await storage.getTicket(req.params.id);
+    const ticket = await storage.getTicket(getId(req));
     if (!ticket) return res.status(404).json({ error: "Ticket not found" });
     if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
       return res.status(403).json({ error: "Access denied" });
     }
-    const deleted = await storage.deleteTicket(req.params.id);
+    const deleted = await storage.deleteTicket(getId(req));
     if (!deleted) return res.status(404).json({ error: "Ticket not found" });
     res.status(204).send();
   });
@@ -195,13 +197,13 @@ export function registerTicketRoutes(router: Router) {
   router.get("/api/tickets/:id/comments", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
-      const ticket = await storage.getTicket(req.params.id);
+      const ticket = await storage.getTicket(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
       if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
 
-      const comments = await storage.getTicketComments(req.params.id);
+      const comments = await storage.getTicketComments(getId(req));
       res.json(comments);
     } catch (error: any) {
       const status = error.status || 500;
@@ -212,7 +214,7 @@ export function registerTicketRoutes(router: Router) {
   router.post("/api/tickets/:id/comments", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
-      const ticket = await storage.getTicket(req.params.id);
+      const ticket = await storage.getTicket(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
 
       if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
@@ -221,7 +223,8 @@ export function registerTicketRoutes(router: Router) {
 
       const validated = insertTicketCommentSchema.parse({
         ...req.body,
-        ticketId: req.params.id,
+        ticketId: getId(req),
+        userId: userId,
       });
       const comment = await storage.createTicketComment(validated);
 
@@ -308,7 +311,7 @@ export function registerTicketRoutes(router: Router) {
   });
 
   router.get("/api/ticket-responsaveis/:id", requireAuth, async (req, res) => {
-    const responsavel = await storage.getTicketResponsavel(req.params.id);
+    const responsavel = await storage.getTicketResponsavel(getId(req));
     if (!responsavel) return res.status(404).json({ error: "Responsavel not found" });
     res.json(responsavel);
   });
@@ -330,7 +333,7 @@ export function registerTicketRoutes(router: Router) {
     try {
       const partialSchema = insertTicketResponsavelSchema.partial();
       const validated = partialSchema.parse(req.body);
-      const responsavel = await storage.updateTicketResponsavel(req.params.id, validated);
+      const responsavel = await storage.updateTicketResponsavel(getId(req), validated);
       if (!responsavel) return res.status(404).json({ error: "Responsavel not found" });
       res.json(responsavel);
     } catch (error) {
@@ -342,7 +345,7 @@ export function registerTicketRoutes(router: Router) {
   });
 
   router.delete("/api/ticket-responsaveis/:id", requireAdmin, async (req, res) => {
-    const deleted = await storage.deleteTicketResponsavel(req.params.id);
+    const deleted = await storage.deleteTicketResponsavel(getId(req));
     if (!deleted) return res.status(404).json({ error: "Responsavel not found" });
     res.status(204).send();
   });

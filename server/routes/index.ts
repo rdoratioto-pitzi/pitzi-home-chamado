@@ -16,6 +16,7 @@ import { registerIntegrationRoutes } from "./integrations";
 import { registerLabelRoutes } from "./labels";
 import { registerPricingRoutes } from "./pricing";
 import { registerUpdateRoutes } from "./updates";
+import { registerGitAnalyticsRoutes } from "./git-analytics";
 
 export function registerModularRoutes(app: Router) {
   const router = Router();
@@ -37,6 +38,7 @@ export function registerModularRoutes(app: Router) {
   registerLabelRoutes(router);
   registerPricingRoutes(router);
   registerUpdateRoutes(router);
+  registerGitAnalyticsRoutes(router);
   
   app.use(router);
 }

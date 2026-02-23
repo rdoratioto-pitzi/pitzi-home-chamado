@@ -1097,6 +1097,9 @@ export const promptsLibrary = pgTable("prompts_library", {
   // Timestamps
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  // Tradução
+  translatedContent: text('translated_content'),
+  translatedAt: timestamp('translated_at'),
 });
 
 export const insertPromptLibrarySchema = createInsertSchema(promptsLibrary).omit({ 
@@ -1138,12 +1141,6 @@ export const PROMPT_CATEGORIES = [
 
 export type PromptCategory = typeof PROMPT_CATEGORIES[number]["id"];
 
-// Campos de tradução para prompts_library
-export const promptsLibraryWithTranslation = pgTable('prompts_library', {
-  // Campos existentes permanecem inalterados
-  translatedContent: text('translated_content'),
-  translatedAt: timestamp('translated_at'),
-});
 // ============== GIT ANALYTICS ==============
 
 // Repositórios GitHub conectados

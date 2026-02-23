@@ -49,6 +49,7 @@ null
 
 # Agentes - Logs e credenciais
 agents/.env
+agents/.env.example
 agents/node_modules/
 agents/dist/
 agents/logs/*.log

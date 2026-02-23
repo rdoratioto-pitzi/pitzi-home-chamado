@@ -65,10 +65,10 @@ export function KPICard({
     >
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-muted-foreground font-medium inline-flex items-center">
+          <div className="text-xs text-muted-foreground font-medium inline-flex items-center">
             {title}
             {helpText && <HelpTooltip text={helpText} />}
-          </p>
+          </div>
           <p className="text-2xl font-bold mt-1">{value}</p>
           {subtitle && <p className="text-xs text-muted-foreground mt-1 truncate">{subtitle}</p>}
         </div>
