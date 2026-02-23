@@ -735,9 +735,11 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                           {c.createdAt ? format(new Date(c.createdAt), "dd/MM/yyyy HH:mm") : "-"}
                         </span>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                        {c.content}
-                      </p>
+                      <div
+                        className="text-sm text-muted-foreground mt-1 break-words overflow-hidden prose prose-sm dark:prose-invert max-w-none"
+                        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                        dangerouslySetInnerHTML={{ __html: c.content || '' }}
+                      />
                       {c.attachments && (
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           {(() => {

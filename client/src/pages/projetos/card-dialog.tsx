@@ -32,7 +32,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { User, KanbanCard, KanbanComment } from "@shared/schema";
+import type { User, KanbanCard, KanbanComment, KanbanCommentWithUser } from "@shared/schema";
 import { useEffect, useState, useRef } from "react";
 import { useUpload } from "@/hooks/use-upload";
 
@@ -145,7 +145,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   const subtasks = allProjectCards.filter(c => c.parentCardId === cardId);
   const parentOptions = allProjectCards.filter(c => !c.parentCardId && c.id !== cardId);
 
-  const { data: comments = [] } = useQuery<KanbanComment[]>({
+  const { data: comments = [] } = useQuery<KanbanCommentWithUser[]>({
     queryKey: ["/api/cards", cardId, "comments"],
     queryFn: async () => {
       const res = await fetch(`/api/cards/${cardId}/comments`);
@@ -273,7 +273,6 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
     mutationFn: async (content: string) => {
       return apiRequest("POST", `/api/cards/${cardId}/comments`, {
         content,
-        userId: "admin",
       });
     },
     onSuccess: () => {
@@ -439,7 +438,6 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                         {[...comments].sort((a, b) => 
                           new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
                         ).map((comment) => {
-                          const user = users.find(u => u.id === comment.userId);
                           return (
                             <div key={comment.id} className="bg-muted/30 p-3 rounded-lg text-sm border-l-2 border-primary/50">
                               <div className="flex items-center justify-between mb-2">
@@ -447,7 +445,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                                   <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
                                     <UserIcon className="h-3 w-3 text-primary" />
                                   </div>
-                                  <span className="font-semibold text-sm">{user?.name || "Usuário"}</span>
+                                  <span className="font-semibold text-sm">{comment.author?.name || "Usuário"}</span>
                                 </div>
                                 <span className="text-[10px] text-muted-foreground">
                                   {new Date(comment.createdAt!).toLocaleString("pt-BR", {
