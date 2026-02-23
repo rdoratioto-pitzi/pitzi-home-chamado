@@ -79,6 +79,119 @@ const measurementUnits: Record<string, string> = {
   binary: "",
 };
 
+// Componente separado para evitar erro de hooks no map
+function MetaCard({
+  meta,
+  users,
+  onCheckin,
+  area
+}: {
+  meta: any;
+  users: User[];
+  onCheckin: (meta: any) => void;
+  area: any;
+}) {
+  const { data: checkins = [] } = useQuery<any[]>({
+    queryKey: ["/api/metas", meta.id, "checkins"],
+    queryFn: async () => {
+      const res = await fetch(`/api/metas/${meta.id}/checkins`);
+      return res.json();
+    },
+  });
+
+  const getUserById = (id: string) => users.find(u => u.id === id);
+  const user = getUserById(meta.responsibleId);
+  
+  const current = parseFloat(meta.currentValue || "0");
+  const target = parseFloat(meta.targetValue || "100");
+  const progress = target > 0 ? Math.min(100, (current / target) * 100) : 0;
+
+  const formatValue = (value: string | number) => {
+    const num = Number(value);
+    if (meta.measurementType === 'monetary') {
+      return `R$ ${num.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    }
+    if (meta.measurementType === 'percentage') {
+      return `${num}%`;
+    }
+    return `${num} ${meta.unit || ''}`;
+  };
+
+  return (
+    <Card
+      className="p-4 shadow-none border-border/40 bg-background hover-elevate cursor-pointer"
+      onClick={() => onCheckin(meta)}
+    >
+      {/* Título + Badges */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-[14px] font-bold text-foreground leading-snug">{meta.title}</p>
+          <Badge variant="secondary" className="text-[9px] uppercase font-bold">
+            {measurementLabels[meta.measurementType] || meta.measurementType}
+          </Badge>
+          <Badge variant="outline" className={`text-[9px] uppercase font-bold ${statusColors[meta.status]}`}>
+            <CalendarClock className="h-3 w-3 mr-1" />
+            {statusLabels[meta.status]}
+          </Badge>
+        </div>
+        <div className="text-[20px] font-bold" style={{ color: area?.color }}>{Math.round(progress)}%</div>
+      </div>
+
+      {/* Barra de progresso + Valor */}
+      <div className="flex items-center gap-4 mb-2">
+        <div className="flex-1 bg-muted rounded-full h-1.5">
+          <div
+            className="h-full rounded-full transition-all"
+            style={{ width: `${progress}%`, backgroundColor: area?.color }}
+          />
+        </div>
+        <span className="text-[11px] font-bold text-muted-foreground whitespace-nowrap">
+          {meta.measurementType === "binary"
+            ? (current > 0 ? "1 / 1" : "0 / 1")
+            : `${formatValue(current)} / ${formatValue(target)} ${meta.unit || (meta.measurementType === "monetary" ? "" : measurementUnits[meta.measurementType])}`
+          }
+        </span>
+      </div>
+
+      {/* Responsável + Data + Botão */}
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
+            {user?.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || 'U'}
+          </div>
+          <span>{user?.name || 'Usuário'}</span>
+          <span>•</span>
+          <span>{meta.updatedAt ? format(parseISO(meta.updatedAt.toString()), "dd 'de' MMM yyyy", { locale: ptBR }) : format(parseISO(`${meta.month}-01`), "MMM yyyy", { locale: ptBR })}</span>
+        </div>
+        <Button variant="ghost" size="sm" className="text-[10px] h-7" onClick={(e) => { e.stopPropagation(); onCheckin(meta); }}>
+          <RefreshCw className="h-3 w-3 mr-1" />
+          Check-in
+        </Button>
+      </div>
+
+      {/* Histórico de Check-ins */}
+      {checkins.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-border/30 space-y-1">
+          {checkins
+            .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .map((c: any) => {
+              const cUser = getUserById(c.userId);
+              return (
+                <div key={c.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{cUser?.name?.split(' ')[0] || 'Usuário'}</span>
+                  <span>•</span>
+                  <span>{new Date(c.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
+                  <span>•</span>
+                  <span className="font-mono text-primary">{formatValue(c.newValue)}</span>
+                </div>
+              );
+            })}
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function getCurrentUser() {
   try {
     const userStr = sessionStorage.getItem("user");
@@ -547,100 +660,15 @@ export default function MetasVisaoGeralPage() {
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 gap-3">
-                            {areaMetas.map((meta) => {
-                              const progress = getProgress(meta);
-                              const user = getUserById(meta.responsibleId);
-                              const current = parseFloat(meta.currentValue || "0");
-                              const target = parseFloat(meta.targetValue || "100");
-
-                              return (
-                                <Card 
-                                  key={meta.id} 
-                                  className="p-4 shadow-none border-border/40 bg-background hover-elevate cursor-pointer" 
-                                  data-testid={`card-meta-${meta.id}`}
-                                  onClick={() => openCheckin(meta)}
-                                >
-                                  <div className="flex items-start gap-4">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap mb-2">
-                                        <p className="text-[14px] font-bold text-foreground leading-snug" data-testid={`text-meta-title-${meta.id}`}>{meta.title}</p>
-                                        <Badge variant="secondary" className="text-[9px] uppercase font-bold" data-testid={`badge-meta-type-${meta.id}`}>
-                                          {measurementLabels[meta.measurementType] || meta.measurementType}
-                                        </Badge>
-                                        <Badge 
-                                          variant="outline" 
-                                          className={`text-[9px] uppercase font-bold ${statusColors[meta.status]}`}
-                                          data-testid={`badge-meta-status-${meta.id}`}
-                                        >
-                                          <CalendarClock className="h-3 w-3 mr-1" />
-                                          {statusLabels[meta.status]}
-                                        </Badge>
-                                      </div>
-                                      
-                                      <div className="flex items-center gap-4 mb-2">
-                                        <div className="flex-1 bg-muted rounded-full h-1.5" data-testid={`progress-meta-${meta.id}`}>
-                                          <div 
-                                            className="h-full rounded-full transition-all"
-                                            style={{ 
-                                              width: `${progress}%`,
-                                              backgroundColor: area.color
-                                            }}
-                                          />
-                                        </div>
-                                        <span className="text-[11px] font-bold text-muted-foreground whitespace-nowrap" data-testid={`text-meta-value-${meta.id}`}>
-                                          {meta.measurementType === "binary" 
-                                            ? (current > 0 ? "1 / 1" : "0 / 1")
-                                            : `${formatValue(current, meta.measurementType)} / ${formatValue(target, meta.measurementType)} ${meta.unit || (meta.measurementType === "monetary" ? "" : measurementUnits[meta.measurementType])}`
-                                          }
-                                        </span>
-                                      </div>
-
-                                      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-                                        {user && (
-                                          <div className="flex items-center gap-1" data-testid={`text-meta-responsible-${meta.id}`}>
-                                            <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
-                                              {user.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                                            </div>
-                                            <span>{user.name}</span>
-                                          </div>
-                                        )}
-                                        <div className="flex items-center gap-1" data-testid={`text-meta-updated-${meta.id}`}>
-                                          <Clock className="h-3 w-3" />
-                                          <span>
-                                            {meta.updatedAt ? format(parseISO(meta.updatedAt.toString()), "dd 'de' MMM yyyy", { locale: ptBR }) : format(parseISO(`${meta.month}-01`), "MMM yyyy", { locale: ptBR })}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="flex flex-col items-center gap-2">
-                                      <div 
-                                        className="h-12 w-12 shrink-0 rounded-full border-2 flex items-center justify-center"
-                                        style={{ borderColor: `${area.color}40` }}
-                                        data-testid={`circle-progress-${meta.id}`}
-                                      >
-                                        <span className="text-[13px] font-bold" style={{ color: area.color }}>
-                                          {progress.toFixed(0)}%
-                                        </span>
-                                      </div>
-                                      <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="text-[10px]"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          openCheckin(meta);
-                                        }}
-                                        data-testid={`button-checkin-${meta.id}`}
-                                      >
-                                        <RefreshCw className="h-3 w-3 mr-1" />
-                                        Check-in
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </Card>
-                              );
-                            })}
+                            {areaMetas.map((meta) => (
+                              <MetaCard
+                                key={meta.id}
+                                meta={meta}
+                                users={users}
+                                onCheckin={openCheckin}
+                                area={area}
+                              />
+                            ))}
                           </div>
                         )}
                       </div>
