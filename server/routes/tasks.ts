@@ -399,13 +399,12 @@ export function registerTaskRoutes(router: Router) {
       ),
     ];
 
-    // 3. Tarefas shared em áreas acessíveis
+    // 3. TODAS as tarefas em áreas acessíveis (tags compartilhadas onde o usuário é membro)
+    // IMPORTANTE: Se o usuário tem acesso a uma tag, ele deve ver TODAS as reuniões/tarefas
+    // dessa tag, independente da visibilidade da tarefa (private, shared ou public)
     if (accessibleAreaIds.length > 0) {
       securityConditions.push(
-        and(
-          eq(tasks.visibility, 'shared'),
-          or(...accessibleAreaIds.map(areaId => eq(tasks.tagId, areaId)))
-        )
+        or(...accessibleAreaIds.map(areaId => eq(tasks.tagId, areaId)))
       );
     }
 
@@ -417,7 +416,7 @@ export function registerTaskRoutes(router: Router) {
     const userTasks = await storage.getTasksWithConditions(and(...(conditions || []))) as Task[];
 
     // Filtrar por multi-assignee em memória (não é possível fazer no SQL diretamente)
-    // Apenas tarefas não-privadas onde o usuário está na lista de assigneeIds
+    // Inclui tarefas onde o usuário está na lista de assigneeIds E tem acesso à tag
     const multiAssigneeTasks = await storage.getTasksWithConditions(
       and(
         sql`${tasks.assigneeIds} IS NOT NULL`,
@@ -430,8 +429,15 @@ export function registerTaskRoutes(router: Router) {
 
     const filteredMultiAssignee = multiAssigneeTasks.filter((t: Task) => {
       if (!t.assigneeIds) return false;
-      // Não incluir tarefas privadas de outros usuários
-      if (t.visibility === 'private' && t.createdBy !== userId) return false;
+      // Não incluir tarefas privadas de outros usuários, EXCETO se o usuário tem acesso à tag
+      if (t.visibility === 'private' && t.createdBy !== userId) {
+        // Verificar se o usuário tem acesso à tag da tarefa
+        if (t.tagId && accessibleAreaIds.includes(t.tagId)) {
+          // Usuário tem acesso à tag, pode ver a tarefa
+        } else {
+          return false;
+        }
+      }
       try {
         const ids = typeof t.assigneeIds === 'string' ? JSON.parse(t.assigneeIds) : t.assigneeIds;
         return Array.isArray(ids) && ids.includes(userId);
@@ -474,8 +480,15 @@ export function registerTaskRoutes(router: Router) {
       return res.json(task);
     }
 
-    // Se for privada e não for o criador, negar acesso (mesmo para admin)
+    // Se for privada e não for o criador, verificar se tem acesso à tag
     if (task.visibility === 'private') {
+      // Verificar se o usuário tem acesso à tag da tarefa
+      if (task.tagId) {
+        const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
+        if (accessibleAreaIds.includes(task.tagId)) {
+          return res.json(task); // Usuário é membro da tag, pode ver a tarefa
+        }
+      }
       return res.status(403).json({ error: "Access denied - private task" });
     }
 
