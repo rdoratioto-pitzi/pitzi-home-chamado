@@ -977,12 +977,12 @@ export default function GestaoMetasPage() {
       </Dialog>
 
       <Dialog open={isCheckinDialogOpen} onOpenChange={setIsCheckinDialogOpen}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Registrar Check-in</DialogTitle>
           </DialogHeader>
           {checkinMeta && (
-            <div className="space-y-4">
+            <div className="flex-1 overflow-y-auto space-y-4">
               <div className="p-3 bg-muted rounded-lg">
                 <p className="font-medium text-sm">{checkinMeta.title}</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -1009,12 +1009,12 @@ export default function GestaoMetasPage() {
               </div>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-shrink-0 border-t pt-4">
             <Button variant="outline" onClick={() => setIsCheckinDialogOpen(false)}>
               Cancelar
             </Button>
-            <Button 
-              onClick={handleCheckin} 
+            <Button
+              onClick={handleCheckin}
               disabled={createCheckinMutation.isPending}
               data-testid="button-save-checkin"
             >
