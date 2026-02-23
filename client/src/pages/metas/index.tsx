@@ -243,6 +243,9 @@ export default function MetasVisaoGeralPage() {
     queryKey: ["/api/users"],
   });
 
+  // Filtrar apenas usuários ativos para o campo responsável
+  const activeUsers = users.filter((user) => user.status === "active");
+
   const { data: checkins = [], isLoading: checkinsLoading } = useQuery<MetaCheckin[]>({
     queryKey: ["/api/metas", checkinMeta?.id, "checkins"],
     queryFn: async () => {
@@ -735,7 +738,7 @@ export default function MetasVisaoGeralPage() {
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map(user => (
+                    {activeUsers.map((user) => (
                       <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                     ))}
                   </SelectContent>
