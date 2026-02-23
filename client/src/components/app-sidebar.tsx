@@ -84,12 +84,6 @@ const allMenuItems = [
     module: "chamados" as keyof ModulePermissions,
   },
   {
-    title: "Projetos",
-    url: "/projetos",
-    icon: FolderKanban,
-    module: "projetos" as keyof ModulePermissions,
-  },
-  {
     title: "Tarefas",
     url: "/tarefas",
     icon: CheckSquare,
@@ -100,6 +94,12 @@ const allMenuItems = [
     url: "/reunioes",
     icon: Video,
     module: "tarefas" as keyof ModulePermissions,
+  },
+  {
+    title: "Projetos",
+    url: "/projetos",
+    icon: FolderKanban,
+    module: "projetos" as keyof ModulePermissions,
   },
   {
     title: "Fluxogramas",
