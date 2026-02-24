@@ -301,7 +301,7 @@ export function RichTextarea({
 
   return (
     <div className="space-y-2">
-      <div 
+      <div
         ref={containerRef}
         className={cn(
           "relative border rounded-md transition-all",
@@ -310,23 +310,25 @@ export function RichTextarea({
         )}
         onBlur={handleBlur}
       >
-        <ReactQuill
-          ref={quillRef}
-          theme="snow"
-          value={value || ''}
-          onChange={handleQuillChange}
-          onFocus={handleQuillFocus}
-          onBlur={handleQuillBlur}
-          readOnly={disabled || isUploading}
-          placeholder={placeholder}
-          modules={modules}
-          formats={formats}
-          className={cn(
-            "quill-editor border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
-            externalClassName
-          )}
-          data-testid={dataTestId}
-        />
+        <div className="[&_.ql-editor]:text-foreground [&_.ql-editor]:dark:text-gray-100 [&_.ql-toolbar]:dark:border-gray-700 [&_.ql-toolbar]:dark:bg-gray-900/50 [&_.ql-container]:dark:border-gray-700 [&_.ql-editor.ql-blank]:dark:text-gray-400">
+          <ReactQuill
+            ref={quillRef}
+            theme="snow"
+            value={value || ''}
+            onChange={handleQuillChange}
+            onFocus={handleQuillFocus}
+            onBlur={handleQuillBlur}
+            readOnly={disabled || isUploading}
+            placeholder={placeholder}
+            modules={modules}
+            formats={formats}
+            className={cn(
+              "quill-editor border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
+              externalClassName
+            )}
+            data-testid={dataTestId}
+          />
+        </div>
         <input
           ref={fileInputRef}
           type="file"
