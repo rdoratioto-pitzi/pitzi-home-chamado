@@ -1,3 +1,6 @@
+/**
+* AppSidebar - Menu lateral principal do Renov Home
+*/
 import { Link, useLocation } from "wouter";
 import { useState, useMemo, useEffect } from "react";
 import {
@@ -525,11 +528,11 @@ export function AppSidebar() {
                         {apisSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
-                            <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubItem key=subItem.url>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                  <span class="text-[13.5px]">{subItem.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
