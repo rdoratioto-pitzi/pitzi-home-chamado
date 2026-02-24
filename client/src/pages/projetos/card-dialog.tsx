@@ -72,6 +72,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState("");
+  const [commentImages, setCommentImages] = useState<string[]>([]);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
 
@@ -85,8 +86,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
     u.name.toLowerCase().includes(mentionFilter.toLowerCase())
   );
 
-  const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleCommentChange = (value: string) => {
     setNewComment(value);
     
     const lastAtPos = value.lastIndexOf("@");
@@ -402,10 +402,13 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                       {!readOnly && (
                         <div className="space-y-2">
                           <div className="flex gap-2 relative">
-                            <Input 
-                              placeholder="Adicionar um comentário... Use @ para mencionar" 
+                            <RichTextarea
+                              placeholder="Adicionar um comentário... Use @ para mencionar"
                               value={newComment}
                               onChange={handleCommentChange}
+                              images={commentImages}
+                              onImagesChange={setCommentImages}
+                              className="min-h-[80px]"
                             />
                             {showMentions && filteredUsers.length > 0 && (
                               <div className="absolute bottom-full left-0 w-64 bg-popover border rounded-md shadow-md z-50 mb-1 max-h-48 overflow-y-auto">
@@ -423,11 +426,13 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                                 ))}
                               </div>
                             )}
-                            <Button 
-                              type="button" 
-                              size="sm" 
+                          </div>
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              size="sm"
                               onClick={() => commentMutation.mutate(newComment)}
-                              disabled={!newComment || commentMutation.isPending}
+                              disabled={!newComment.trim() || commentMutation.isPending}
                             >
                               Enviar
                             </Button>
@@ -457,7 +462,11 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                                   })}
                                 </span>
                               </div>
-                              <p className="text-sm text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
+                              <div
+                                className="text-sm text-foreground/90 break-words overflow-hidden prose prose-sm dark:prose-invert max-w-none"
+                                style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                                dangerouslySetInnerHTML={{ __html: comment.content || '' }}
+                              />
                             </div>
                           );
                         })}
