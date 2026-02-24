@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RichTextarea } from "@/components/rich-textarea";
+import { RichContent } from "@/components/rich-content";
 import { DataTable } from "@/components/data-table";
 import { cn } from "@/lib/utils";
 import DOMPurify from "dompurify";
@@ -1395,10 +1396,9 @@ export default function TarefasPage() {
                                         </Badge>
                                       </div>
                                       {task.description && (
-                                        <div
-                                          className="text-sm text-muted-foreground line-clamp-1 mb-2 break-words"
-                                          style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(task.description) }}
+                                        <RichContent
+                                          content={DOMPurify.sanitize(task.description)}
+                                          className="text-sm text-muted-foreground line-clamp-1 mb-2"
                                         />
                                       )}
                                       <div className="flex items-center gap-2 flex-wrap">

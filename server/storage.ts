@@ -4,6 +4,7 @@ import {
   type TicketResponsavel, type InsertTicketResponsavel,
   type TicketComment, type InsertTicketComment,
   type TicketCommentWithUser,
+  type KanbanCommentWithUser,
   type Project, type InsertProject,
   type KanbanColumn, type InsertKanbanColumn,
   type KanbanCard, type InsertKanbanCard,
@@ -136,7 +137,7 @@ import {
   deleteKanbanCard(id: string): Promise<boolean>;
 
   // Kanban Comments
-  getKanbanComments(cardId: string): Promise<KanbanComment[]>;
+  getKanbanComments(cardId: string): Promise<KanbanCommentWithUser[]>;
   createKanbanComment(comment: InsertKanbanComment): Promise<KanbanComment>;
 
   // Objectives
@@ -765,9 +766,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Kanban Comments
-  async getKanbanComments(cardId: string): Promise<KanbanComment[]> {
+  async getKanbanComments(cardId: string): Promise<KanbanCommentWithUser[]> {
     if (!db) return [];
-    return await db.select().from(kanbanComments).where(eq(kanbanComments.cardId, cardId));
+    return await db
+      .select({
+        id: kanbanComments.id,
+        tenantId: kanbanComments.tenantId,
+        cardId: kanbanComments.cardId,
+        userId: kanbanComments.userId,
+        content: kanbanComments.content,
+        createdAt: kanbanComments.createdAt,
+        author: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(kanbanComments)
+      .innerJoin(users, eq(kanbanComments.userId, users.id))
+      .where(eq(kanbanComments.cardId, cardId))
+      .orderBy(desc(kanbanComments.createdAt));
   }
   async createKanbanComment(insertComment: InsertKanbanComment): Promise<KanbanComment> {
     if (!db) throw new Error("Database not connected");

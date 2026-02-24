@@ -304,7 +304,7 @@ export default function ChamadosPage() {
   const [slaFilter, setSlaFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [periodFilter, setPeriodFilter] = useState<"month" | "year" | "total">("month");
+  const [periodFilter, setPeriodFilter] = useState<"month" | "year" | "total">("year");
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid">("list");
 
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
@@ -385,7 +385,7 @@ export default function ChamadosPage() {
         ticket.code?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
       const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
-      const matchesType = typeFilter === "all" || typeFilter === "Tipo" || (ticket.type || "").toLowerCase() === typeFilter.toLowerCase();
+      const matchesType = typeFilter === "all" || (ticket.type || "").toLowerCase() === typeFilter.toLowerCase();
       const matchesAssignee = assigneeFilter === "all" || ticket.assigneeId === assigneeFilter;
 
       let matchesSla = true;

@@ -123,6 +123,196 @@ function getCurrentUser() {
   return null;
 }
 
+// Componente separado para renderizar card de meta (solve hooks issue)
+function MetaCardGestao({
+  meta,
+  users,
+  areas,
+  onEdit,
+  onDelete,
+  onCheckin,
+}: {
+  meta: Meta;
+  users: User[];
+  areas: MetaArea[];
+  onEdit: (meta: Meta) => void;
+  onDelete: (meta: Meta) => void;
+  onCheckin: (meta: Meta) => void;
+}) {
+  const area = areas.find((a) => a.id === meta.areaId);
+  const user = users.find((u) => u.id === meta.responsibleId);
+
+  const getProgress = (m: Meta): number => {
+    const current = parseFloat(m.currentValue || "0");
+    const target = parseFloat(m.targetValue || "100");
+    if (target === 0) return 0;
+    if (m.measurementType === "binary") {
+      return current > 0 ? 100 : 0;
+    }
+    return Math.min(100, Math.max(0, (current / target) * 100));
+  };
+
+  const progress = getProgress(meta);
+
+  // Buscar check-ins da meta - agora no nível do componente (CORRETO)
+  const { data: checkins = [] } = useQuery<any[]>({
+    queryKey: ["/api/metas", meta.id, "checkins"],
+    queryFn: async () => {
+      const res = await fetch(`/api/metas/${meta.id}/checkins`);
+      return res.json();
+    },
+  });
+
+  const formatValue = (value: number) => {
+    if (meta.measurementType === "monetary") {
+      return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+    }
+    if (meta.measurementType === "percentage") {
+      return `${value}%`;
+    }
+    return `${value} ${meta.unit || ""}`;
+  };
+
+  return (
+    <Card key={meta.id} className="hover-elevate" data-testid={`card-meta-${meta.id}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex-1 min-w-0">
+            <h4 className="font-medium text-sm truncate" data-testid={`text-meta-title-${meta.id}`}>
+              {meta.title}
+            </h4>
+            {area && (
+              <Badge
+                variant="outline"
+                className="mt-1 text-xs"
+                style={{ borderColor: area.color, color: area.color }}
+                data-testid={`badge-area-${meta.id}`}
+              >
+                {area.name}
+              </Badge>
+            )}
+          </div>
+          <Badge className={statusColors[meta.status]} data-testid={`badge-status-${meta.id}`}>
+            {statusLabels[meta.status]}
+          </Badge>
+        </div>
+
+        <div className="flex items-center gap-2 mb-3">
+          {user && (
+            <div className="flex items-center gap-1.5">
+              <Avatar className="h-5 w-5">
+                <AvatarFallback className="text-[10px]">
+                  {user.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-xs text-muted-foreground">{user.name}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Progresso</span>
+            <span className="font-medium">
+              {meta.measurementType === "binary"
+                ? (parseFloat(meta.currentValue || "0") > 0 ? "Sim" : "Não")
+                : `${meta.currentValue || 0} / ${meta.targetValue} ${meta.unit || measurementUnits[meta.measurementType]}`
+              }
+            </span>
+          </div>
+          <Progress value={progress} className="h-2" data-testid={`progress-meta-${meta.id}`} />
+          <div className="text-right text-xs font-medium text-muted-foreground">
+            {progress.toFixed(0)}%
+          </div>
+        </div>
+
+        {/* Histórico de Check-ins - completo */}
+        {checkins && checkins.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-border/40">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Histórico de Check-ins ({checkins.length})
+              </span>
+            </div>
+            <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
+              {checkins
+                .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                .map((checkin: any) => (
+                  <div
+                    key={checkin.id}
+                    className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-muted/30"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium">
+                        {(checkin.user?.name || 'U').charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{checkin.user?.name || 'Usuário'}</span>
+                        <span className="text-muted-foreground text-[10px]">
+                          {new Date(checkin.createdAt).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-mono font-medium text-primary">
+                        {meta.measurementType === 'monetary'
+                          ? `R$ ${Number(checkin.newValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                          : meta.measurementType === 'percentage'
+                          ? `${checkin.newValue}%`
+                          : `${checkin.newValue} ${meta.unit || ''}`
+                        }
+                      </span>
+                      {checkin.comment && (
+                        <p className="text-[10px] text-muted-foreground truncate max-w-[120px]" title={checkin.comment}>
+                          {checkin.comment}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            onClick={() => onCheckin(meta)}
+            data-testid={`button-checkin-${meta.id}`}
+          >
+            <BarChart3 className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8"
+            onClick={() => onEdit(meta)}
+            data-testid={`button-edit-${meta.id}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-destructive"
+            onClick={() => onDelete(meta)}
+            data-testid={`button-delete-${meta.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function GestaoMetasPage() {
   const { toast } = useToast();
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
@@ -196,6 +386,9 @@ export default function GestaoMetasPage() {
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
+
+  // Filtrar apenas usuários ativos para o campo responsável
+  const activeUsers = users.filter((user) => user.status === "active");
 
   const createMetaMutation = useMutation({
     mutationFn: async (data: any) => apiRequest("POST", "/api/metas", data),
@@ -429,173 +622,6 @@ export default function GestaoMetasPage() {
     return { total, completed, inProgress, overdue };
   }, [metas]);
 
-  const renderMetaCard = (meta: Meta) => {
-    const area = getAreaById(meta.areaId);
-    const user = getUserById(meta.responsibleId);
-    const progress = getProgress(meta);
-
-    // Buscar check-ins da meta
-    const { data: checkins = [] } = useQuery<any[]>({
-      queryKey: ["/api/metas", meta.id, "checkins"],
-      queryFn: async () => {
-        const res = await fetch(`/api/metas/${meta.id}/checkins`);
-        return res.json();
-      },
-    });
-
-    const formatValue = (value: number) => {
-      if (meta.measurementType === "monetary") {
-        return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-      }
-      if (meta.measurementType === "percentage") {
-        return `${value}%`;
-      }
-      return `${value} ${meta.unit || ""}`;
-    };
-
-    return (
-      <Card key={meta.id} className="hover-elevate" data-testid={`card-meta-${meta.id}`}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-sm truncate" data-testid={`text-meta-title-${meta.id}`}>
-                {meta.title}
-              </h4>
-              {area && (
-                <Badge 
-                  variant="outline" 
-                  className="mt-1 text-xs"
-                  style={{ borderColor: area.color, color: area.color }}
-                  data-testid={`badge-area-${meta.id}`}
-                >
-                  {area.name}
-                </Badge>
-              )}
-            </div>
-            <Badge className={statusColors[meta.status]} data-testid={`badge-status-${meta.id}`}>
-              {statusLabels[meta.status]}
-            </Badge>
-          </div>
-
-          <div className="flex items-center gap-2 mb-3">
-            {user && (
-              <div className="flex items-center gap-1.5">
-                <Avatar className="h-5 w-5">
-                  <AvatarFallback className="text-[10px]">
-                    {user.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="text-xs text-muted-foreground">{user.name}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Progresso</span>
-              <span className="font-medium">
-                {meta.measurementType === "binary" 
-                  ? (parseFloat(meta.currentValue || "0") > 0 ? "Sim" : "Não")
-                  : `${meta.currentValue || 0} / ${meta.targetValue} ${meta.unit || measurementUnits[meta.measurementType]}`
-                }
-              </span>
-            </div>
-            <Progress value={progress} className="h-2" data-testid={`progress-meta-${meta.id}`} />
-            <div className="text-right text-xs font-medium text-muted-foreground">
-              {progress.toFixed(0)}%
-            </div>
-          </div>
-
-          {/* Histórico de Check-ins - completo */}
-          {checkins && checkins.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-border/40">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Histórico de Check-ins ({checkins.length})
-                </span>
-              </div>
-              <div className="space-y-2 max-h-32 overflow-y-auto pr-2">
-                {checkins
-                  .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-                  .map((checkin: any) => (
-                    <div
-                      key={checkin.id}
-                      className="flex items-center justify-between text-xs py-1.5 px-2 rounded bg-muted/30"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium">
-                          {(checkin.user?.name || 'U').charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{checkin.user?.name || 'Usuário'}</span>
-                          <span className="text-muted-foreground text-[10px]">
-                            {new Date(checkin.createdAt).toLocaleDateString('pt-BR', {
-                              day: '2-digit',
-                              month: 'short',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-mono font-medium text-primary">
-                          {meta.measurementType === 'monetary'
-                            ? `R$ ${Number(checkin.newValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-                            : meta.measurementType === 'percentage'
-                            ? `${checkin.newValue}%`
-                            : `${checkin.newValue} ${meta.unit || ''}`
-                          }
-                        </span>
-                        {checkin.comment && (
-                          <p className="text-[10px] text-muted-foreground truncate max-w-[120px]" title={checkin.comment}>
-                            {checkin.comment}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-1 mt-3 pt-3 border-t">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={() => openCheckin(meta)}
-              data-testid={`button-checkin-${meta.id}`}
-            >
-              <BarChart3 className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={() => openEditMeta(meta)}
-              data-testid={`button-edit-${meta.id}`}
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-destructive"
-              onClick={() => {
-                setDeletingMeta(meta);
-                setIsDeleteDialogOpen(true);
-              }}
-              data-testid={`button-delete-${meta.id}`}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
@@ -744,7 +770,20 @@ export default function GestaoMetasPage() {
                       </AccordionTrigger>
                       <AccordionContent className="pb-4">
                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                          {areaMetas.map(renderMetaCard)}
+                          {areaMetas.map((meta) => (
+                            <MetaCardGestao
+                              key={meta.id}
+                              meta={meta}
+                              users={users}
+                              areas={areas}
+                              onEdit={openEditMeta}
+                              onDelete={(m) => {
+                                setDeletingMeta(m);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                              onCheckin={openCheckin}
+                            />
+                          ))}
                         </div>
                       </AccordionContent>
                     </AccordionItem>
@@ -771,7 +810,20 @@ export default function GestaoMetasPage() {
               </Card>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredMetas.map(renderMetaCard)}
+                {filteredMetas.map((meta) => (
+                  <MetaCardGestao
+                    key={meta.id}
+                    meta={meta}
+                    users={users}
+                    areas={areas}
+                    onEdit={openEditMeta}
+                    onDelete={(m) => {
+                      setDeletingMeta(m);
+                      setIsDeleteDialogOpen(true);
+                    }}
+                    onCheckin={openCheckin}
+                  />
+                ))}
               </div>
             )}
           </TabsContent>
@@ -902,7 +954,7 @@ export default function GestaoMetasPage() {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {users.map(user => (
+                    {activeUsers.map((user) => (
                       <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                     ))}
                   </SelectContent>
