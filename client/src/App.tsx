@@ -1,3 +1,4 @@
+// Renov Home - Sistema de Gestão Operacional
 import { useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
@@ -341,5 +342,3 @@ function App() {
 }
 
 export default App;
-// teste workflow
-// teste workflow
