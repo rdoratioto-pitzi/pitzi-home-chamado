@@ -77,15 +77,15 @@ export class ArgosAgent {
     // REMOVIDO: validação de tamanho mínimo (causa falsos positivos)
     
     // Verificar parênteses/chaves balanceadas
-    const openBraces = (code.match(/{/g) || []).length;
-    const closeBraces = (code.match(/}/g) || []).length;
+    const openBraces = ((code || "").match(/{/g) || []).length;
+    const closeBraces = ((code || "").match(/}/g) || []).length;
     
     if (openBraces !== closeBraces) {
       errors.push(`Chaves desbalanceadas: ${openBraces} aberturas, ${closeBraces} fechamentos`);
     }
     
-    const openParens = (code.match(/\(/g) || []).length;
-    const closeParens = (code.match(/\)/g) || []).length;
+    const openParens = ((code || "").match(/\(/g) || []).length;
+    const closeParens = ((code || "").match(/\)/g) || []).length;
     
     if (openParens !== closeParens) {
       errors.push(`Parênteses desbalanceados: ${openParens} aberturas, ${closeParens} fechamentos`);
@@ -97,6 +97,11 @@ export class ArgosAgent {
   private checkProjectPatterns(code: string): { errors: string[]; warnings: string[] } {
     const errors: string[] = [];
     const warnings: string[] = [];
+    
+    // Validar código
+    if (!code || typeof code !== 'string') {
+      return { errors: [], warnings: [] };
+    }
     
     // Bibliotecas proibidas (do CLAUDE.md)
     const forbidden = [
@@ -131,16 +136,16 @@ export class ArgosAgent {
     const linesOfCode = lines.length;
     
     // Complexidade ciclomática simplificada
-    const ifCount = (code.match(/\bif\s*\(/g) || []).length;
-    const forCount = (code.match(/\bfor\s*\(/g) || []).length;
-    const whileCount = (code.match(/\bwhile\s*\(/g) || []).length;
-    const switchCount = (code.match(/\bswitch\s*\(/g) || []).length;
-    const ternaryCount = (code.match(/\?[^:]+:/g) || []).length;
+    const ifCount = ((code || "").match(/\bif\s*\(/g) || []).length;
+    const forCount = ((code || "").match(/\bfor\s*\(/g) || []).length;
+    const whileCount = ((code || "").match(/\bwhile\s*\(/g) || []).length;
+    const switchCount = ((code || "").match(/\bswitch\s*\(/g) || []).length;
+    const ternaryCount = ((code || "").match(/\?[^:]+:/g) || []).length;
     
     const complexity = 1 + ifCount + forCount + whileCount + switchCount + ternaryCount;
     
     // Contar imports
-    const imports = (code.match(/^import\s+/gm) || []).length;
+    const imports = ((code || "").match(/^import\s+/gm) || []).length;
     
     return {
       linesOfCode,

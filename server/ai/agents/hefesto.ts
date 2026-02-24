@@ -28,18 +28,56 @@ interface ModelConfig {
 export class HefestoAgent {
   
   private readonly MAX_TENTATIVAS = 3;
+  private readonly DIFF_THRESHOLD = 200; // Linhas
   
-  /**
-   * Executa prompt com ReAct Loop completo
-   * THINK → ACT → OBSERVE → REFINE (até 3x)
-   */
   async execute(params: {
     prompt: string;
     modelId: string;
     modelo?: ModelConfig;
   }): Promise<CoderResult> {
     
-    console.log('🔨 [Hefesto] Iniciando implementação com ReAct Loop...');
+    console.log('🔨 [Hefesto] Iniciando implementação com estratégia híbrida...');
+    
+    const arquivoAlvo = this.extrairArquivoAlvo(params.prompt);
+    
+    // Decidir estratégia
+    const estrategia = await this.decidirEstrategia(arquivoAlvo, params.prompt);
+    console.log(`📋 [Hefesto] Estratégia escolhida: ${estrategia}`);
+    
+    if (estrategia === 'DIFF') {
+      return await this.executarComDiff(params, arquivoAlvo!);
+    } else {
+      return await this.executarCompleto(params, arquivoAlvo);
+    }
+  }
+  
+  private async decidirEstrategia(arquivoAlvo: string | null, prompt: string): Promise<'DIFF' | 'COMPLETO'> {
+    // Se arquivo não existe, sempre gerar completo
+    if (!arquivoAlvo || !existsSync(arquivoAlvo)) {
+      return 'COMPLETO';
+    }
+    
+    // Ler arquivo e contar linhas
+    const conteudo = readFileSync(arquivoAlvo, 'utf-8');
+    const linhas = conteudo.split('\n').length;
+    
+    // Se arquivo pequeno, gerar completo
+    if (linhas < this.DIFF_THRESHOLD) {
+      return 'COMPLETO';
+    }
+    
+    // Se prompt menciona "criar" ou "adicionar", pode precisar de completo
+    if (prompt.toLowerCase().includes('criar arquivo') || prompt.toLowerCase().includes('novo arquivo')) {
+      return 'COMPLETO';
+    }
+    
+    // Arquivo grande + modificação = DIFF
+    console.log(`📊 [Hefesto] Arquivo tem ${linhas} linhas (>${this.DIFF_THRESHOLD}) → usando DIFF`);
+    return 'DIFF';
+  }
+  
+  private async executarComDiff(params: any, arquivoAlvo: string): Promise<CoderResult> {
+    console.log('✂️  [Hefesto] Modo DIFF ativado');
     
     let tentativa = 0;
     let ultimoErro = '';
@@ -52,9 +90,94 @@ export class HefestoAgent {
       console.log(`\n🔄 [Hefesto] Tentativa ${tentativa}/${this.MAX_TENTATIVAS}`);
       
       try {
-        // FASE 1: THINK (Raciocinar)
-        console.log('🧠 [Hefesto] THINK - Planejando implementação...');
-        const arquivoAlvo = this.extrairArquivoAlvo(params.prompt);
+        const conteudoOriginal = readFileSync(arquivoAlvo, 'utf-8');
+        
+        // Prompt para modo DIFF
+        const promptDiff = this.construirPromptDiff(params.prompt, conteudoOriginal, ultimoErro);
+        
+        const startTime = Date.now();
+        const result = await openRouterService.chat({
+          model: params.modelId,
+          messages: [
+            { role: 'system', content: this.getSystemPromptDiff() },
+            { role: 'user', content: promptDiff }
+          ],
+          temperature: 0,
+          maxTokens: 40000,
+        });
+        
+        const tempoDecorrido = ((Date.now() - startTime) / 1000).toFixed(1);
+        console.log(`⏱️  [Hefesto] Resposta em ${tempoDecorrido}s`);
+        console.log(`📊 [Hefesto] Tokens: ${result.tokensInput} in / ${result.tokensOutput} out`);
+        console.log(`📝 [Hefesto] Resposta LLM (${result.content?.length || 0} chars):`, result.content?.substring(0, 200));
+        
+        tokensInputTotal += result.tokensInput;
+        tokensOutputTotal += result.tokensOutput;
+        
+        // Aplicar diff no arquivo
+        const novoConteudo = this.aplicarDiff(conteudoOriginal, result.content);
+        
+        // Validar
+        const validacao = await this.validarCodigo(novoConteudo, arquivoAlvo);
+        
+        if (!validacao.valido) {
+          ultimoErro = validacao.erros.join('; ');
+          erros.push(`Tentativa ${tentativa}: ${ultimoErro}`);
+          console.log(`❌ [Hefesto] Validação falhou: ${ultimoErro}`);
+          
+          if (tentativa < this.MAX_TENTATIVAS) {
+            continue;
+          } else {
+            throw new Error(`Falha após ${this.MAX_TENTATIVAS} tentativas: ${ultimoErro}`);
+          }
+        }
+        
+        // Salvar
+        writeFileSync(arquivoAlvo, novoConteudo, 'utf-8');
+        console.log(`✅ [Hefesto] Arquivo atualizado via DIFF`);
+        
+        const custo = this.calcularCusto(tokensInputTotal, tokensOutputTotal, params.modelo);
+        
+        return {
+          success: true,
+          codigoGerado: novoConteudo,
+          arquivosCriados: [arquivoAlvo],
+          tokensInput: tokensInputTotal,
+          tokensOutput: tokensOutputTotal,
+          custo,
+          tentativas: tentativa,
+          erros,
+        };
+        
+      } catch (error: any) {
+        console.error('❌ [Hefesto] Erro detalhado:', error);
+        console.error('Stack:', error.stack);
+        ultimoErro = error.message;
+        erros.push(`Tentativa ${tentativa}: ${error.message}`);
+        
+        if (tentativa >= this.MAX_TENTATIVAS) {
+          throw error;
+        }
+      }
+    }
+    
+    throw new Error('Loop excedido');
+  }
+  
+  private async executarCompleto(params: any, arquivoAlvo: string | null): Promise<CoderResult> {
+    console.log('📄 [Hefesto] Modo COMPLETO ativado');
+    
+    let tentativa = 0;
+    let ultimoErro = '';
+    const erros: string[] = [];
+    let tokensInputTotal = 0;
+    let tokensOutputTotal = 0;
+    
+    while (tentativa < this.MAX_TENTATIVAS) {
+      tentativa++;
+      console.log(`\n🔄 [Hefesto] Tentativa ${tentativa}/${this.MAX_TENTATIVAS}`);
+      
+      try {
         let conteudoOriginal = '';
         
         if (arquivoAlvo && existsSync(arquivoAlvo)) {
@@ -62,24 +185,17 @@ export class HefestoAgent {
           conteudoOriginal = readFileSync(arquivoAlvo, 'utf-8');
         }
         
-        // FASE 2: ACT (Implementar)
-        console.log('⚡ [Hefesto] ACT - Gerando código...');
-        const promptOtimizado = this.construirPromptOtimizado(
-          params.prompt, 
-          conteudoOriginal, 
-          ultimoErro,
-          tentativa
-        );
+        const promptOtimizado = this.construirPromptCompleto(params.prompt, conteudoOriginal, ultimoErro, tentativa);
         
         const startTime = Date.now();
         const result = await openRouterService.chat({
           model: params.modelId,
           messages: [
-            { role: 'system', content: this.getSystemPrompt() },
+            { role: 'system', content: this.getSystemPromptCompleto() },
             { role: 'user', content: promptOtimizado }
           ],
           temperature: 0,
-          maxTokens: 8192,
+          maxTokens: 40000,
         });
         
         const tempoDecorrido = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -87,9 +203,6 @@ export class HefestoAgent {
         
         tokensInputTotal += result.tokensInput;
         tokensOutputTotal += result.tokensOutput;
-        
-        // FASE 3: OBSERVE (Validar)
-        console.log('👁️  [Hefesto] OBSERVE - Validando código gerado...');
         
         const codigoLimpo = this.limparCodigo(result.content);
         const validacao = await this.validarCodigo(codigoLimpo, arquivoAlvo);
@@ -100,22 +213,16 @@ export class HefestoAgent {
           console.log(`❌ [Hefesto] Validação falhou: ${ultimoErro}`);
           
           if (tentativa < this.MAX_TENTATIVAS) {
-            console.log('🔄 [Hefesto] REFINE - Tentando corrigir...');
             continue;
           } else {
             throw new Error(`Falha após ${this.MAX_TENTATIVAS} tentativas: ${ultimoErro}`);
           }
         }
         
-        // SUCESSO! Salvar arquivos
-        console.log('✅ [Hefesto] Validação aprovada! Salvando...');
         const arquivosCriados = await this.salvarArquivos(codigoLimpo, arquivoAlvo);
-        
-        // Calcular custo
         const custo = this.calcularCusto(tokensInputTotal, tokensOutputTotal, params.modelo);
         
         console.log(`💰 [Hefesto] Custo total: $${custo.toFixed(4)}`);
-        console.log(`📁 [Hefesto] ${arquivosCriados.length} arquivo(s) salvos`);
         console.log(`✅ [Hefesto] Sucesso na tentativa ${tentativa}!`);
         
         return {
@@ -130,215 +237,200 @@ export class HefestoAgent {
         };
         
       } catch (error: any) {
+        console.error('❌ [Hefesto] Erro detalhado:', error);
+        console.error('Stack:', error.stack);
         ultimoErro = error.message;
         erros.push(`Tentativa ${tentativa}: ${error.message}`);
-        console.error(`❌ [Hefesto] Erro: ${error.message}`);
         
         if (tentativa >= this.MAX_TENTATIVAS) {
-          throw new Error(`Falha após ${this.MAX_TENTATIVAS} tentativas. Último erro: ${ultimoErro}`);
+          throw error;
         }
       }
     }
     
-    throw new Error('Loop de tentativas excedido');
+    throw new Error('Loop excedido');
   }
   
-  private getSystemPrompt(): string {
-    return `Você é Hefesto, forjador de código TypeScript/JavaScript de alta qualidade.
+  private getSystemPromptDiff(): string {
+    return `Você é Hefesto em MODO DIFF.
+
+TAREFA: Retornar APENAS as mudanças necessárias no formato:
+
+LINHA N: código modificado
+
+EXEMPLOS:
+LINHA 42: title: "Chat IA Renov",
+LINHA 85: import { ChatBot } from "./chat";
+LINHA 150-153: [DELETAR]
+LINHA 154: // Nova funcionalidade
+
+REGRAS:
+- Retorne APENAS linhas que precisam mudar
+- Use LINHA N: para substituições
+- Use LINHA N-M: [DELETAR] para remover blocos
+- NÃO retorne o arquivo completo
+- NÃO use markdown
+- Seja PRECISO no número da linha`;
+  }
+  
+  private getSystemPromptCompleto(): string {
+    return `Você é Hefesto em MODO COMPLETO.
 
 REGRAS ABSOLUTAS:
 1. Retorne APENAS código válido
 2. NÃO use markdown com \`\`\`
-3. NÃO adicione explicações em português/inglês
-4. Se modificar arquivo existente, retorne arquivo COMPLETO
-5. Use formato: //ARQUIVO: caminho/arquivo.ts seguido do código
+3. NÃO adicione explicações
+4. Use formato: //ARQUIVO: caminho seguido do código
+5. Se modificar arquivo existente, retorne COMPLETO
 
-TECNOLOGIAS OBRIGATÓRIAS:
-✅ shadcn/ui (componentes)
-✅ Wouter (rotas)
-✅ TanStack Query (state)
-✅ Drizzle ORM (banco)
-✅ Zod (validação)
+TECNOLOGIAS:
+✅ shadcn/ui, Wouter, TanStack Query, Drizzle ORM, Zod
+❌ Material-UI, React Router, Prisma, Redux
 
-PROIBIDO:
-❌ Material-UI, Ant Design, Chakra UI
-❌ React Router
-❌ Prisma, TypeORM
-❌ Redux, MobX, Zustand
-
-FORMATO DE IMPORTS (EXEMPLOS):
-✅ import { Button } from "@/components/ui/button";
-✅ import { useQuery } from "@tanstack/react-query";
-✅ import { Link } from "wouter";
-✅ import { db } from "@/lib/db";
-✅ import { z } from "zod";
-
-VALIDAÇÕES QUE SERÃO FEITAS:
-- Sintaxe TypeScript válida
-- Chaves/parênteses balanceados
-- Imports corretos
-- Sem bibliotecas proibidas
-
-Se modificar arquivo, retorne TUDO (imports, funções, exports).`;
+IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
   }
   
-  private construirPromptOtimizado(
-    promptOriginal: string, 
-    conteudoArquivo: string,
-    ultimoErro: string,
-    tentativa: number
-  ): string {
+  private construirPromptDiff(promptOriginal: string, conteudoArquivo: string, ultimoErro: string): string {
     let prompt = '';
     
-    // Se é retry, mencionar erro
-    if (tentativa > 1 && ultimoErro) {
-      prompt += `TENTATIVA ${tentativa}: A tentativa anterior falhou com erro:\n"${ultimoErro}"\n\nCORRIJA o erro e tente novamente.\n\n`;
+    if (ultimoErro) {
+      prompt += `ERRO ANTERIOR: ${ultimoErro}\n\nCORRIJA e tente novamente.\n\n`;
     }
     
-    // Se tem arquivo original
-    if (conteudoArquivo) {
-      prompt += `ARQUIVO ATUAL (${conteudoArquivo.split('\n').length} linhas):\n\`\`\`typescript\n${conteudoArquivo}\n\`\`\`\n\n`;
-    }
+    // Mostrar arquivo com números de linha
+    const linhasNumeradas = conteudoArquivo.split('\n')
+      .map((linha, i) => `${i + 1}: ${linha}`)
+      .join('\n');
     
-    // Prompt original
+    prompt += `ARQUIVO ATUAL:\n${linhasNumeradas}\n\n`;
     prompt += `TAREFA:\n${promptOriginal}\n\n`;
-    
-    // Instruções de formato
-    prompt += `FORMATO DE RESPOSTA:\n//ARQUIVO: caminho/completo/arquivo.ts\n[código completo aqui]\n\nRETORNE APENAS CÓDIGO, SEM EXPLICAÇÕES.`;
+    prompt += `RETORNE: Apenas as linhas que precisam mudar no formato LINHA N: código`;
     
     return prompt;
   }
   
+  private construirPromptCompleto(promptOriginal: string, conteudoArquivo: string, ultimoErro: string, tentativa: number): string {
+    let prompt = '';
+    
+    if (tentativa > 1 && ultimoErro) {
+      prompt += `TENTATIVA ${tentativa}: Erro anterior: "${ultimoErro}"\nCORRIJA e tente novamente.\n\n`;
+    }
+    
+    if (conteudoArquivo) {
+      prompt += `ARQUIVO ATUAL:\n\`\`\`typescript\n${conteudoArquivo}\n\`\`\`\n\n`;
+    }
+    
+    prompt += `TAREFA:\n${promptOriginal}\n\nFORMATO:\n//ARQUIVO: caminho\n[código completo]`;
+    
+    return prompt;
+  }
+  
+  private aplicarDiff(conteudoOriginal: string, diff: string): string {
+    const linhas = conteudoOriginal.split('\n');
+    
+    console.log(`📝 [Hefesto] Aplicando DIFF... (${diff.length} chars)`);
+    
+    // Limpar diff de markdown e espaços
+    const diffLimpo = diff.replace(/```[a-z]*\n?/gi, '').replace(/```$/g, '').trim();
+    
+    if (!diffLimpo) {
+      console.log('⚠️  [Hefesto] DIFF vazio, retornando original');
+      return conteudoOriginal;
+    }
+    
+    // Parsear diff
+    const mudancas = diffLimpo.split('\n').filter(l => l.trim());
+    
+    console.log(`📋 [Hefesto] ${mudancas.length} mudanças encontradas`);
+    
+    for (const mudanca of mudancas) {
+      // LINHA N: código
+      const matchLinha = mudanca.match(/^LINHA\s+(\d+):\s*(.*)$/i);
+      if (matchLinha && matchLinha.length >= 3) {
+        const numeroLinha = parseInt(matchLinha[1]) - 1; // 0-indexed
+        const novoConteudo = matchLinha[2];
+        
+        if (numeroLinha >= 0 && numeroLinha < linhas.length) {
+          linhas[numeroLinha] = novoConteudo;
+          console.log(`✏️  [Hefesto] Linha ${numeroLinha + 1} modificada`);
+        } else {
+          console.log(`⚠️  [Hefesto] Linha ${numeroLinha + 1} fora do range`);
+        }
+        continue;
+      }
+      
+      // LINHA N-M: [DELETAR]
+      const matchDelete = mudanca.match(/^LINHA\s+(\d+)-(\d+):\s*\[DELETAR\]$/i);
+      if (matchDelete && matchDelete.length >= 3) {
+        const inicio = parseInt(matchDelete[1]) - 1;
+        const fim = parseInt(matchDelete[2]) - 1;
+        
+        if (inicio >= 0 && fim < linhas.length && inicio <= fim) {
+          linhas.splice(inicio, fim - inicio + 1);
+          console.log(`🗑️  [Hefesto] Linhas ${inicio + 1}-${fim + 1} deletadas`);
+        }
+      }
+    }
+    
+    return linhas.join('\n');
+  }
+  
+  // [Continua com métodos auxiliares...]
   private async validarCodigo(codigo: string, arquivoAlvo: string | null): Promise<{ valido: boolean; erros: string[] }> {
     const erros: string[] = [];
     
-    // 1. Verificar se não está vazio
     if (!codigo || codigo.trim().length < 10) {
-      erros.push('Código vazio ou muito curto');
+      erros.push('Código vazio');
       return { valido: false, erros };
     }
     
-    // 2. Verificar chaves balanceadas
     const openBraces = (codigo.match(/{/g) || []).length;
     const closeBraces = (codigo.match(/}/g) || []).length;
     if (openBraces !== closeBraces) {
-      erros.push(`Chaves desbalanceadas: ${openBraces} aberturas vs ${closeBraces} fechamentos`);
+      erros.push(`Chaves desbalanceadas: ${openBraces} vs ${closeBraces}`);
     }
     
-    // 3. Verificar parênteses balanceados
-    const openParens = (codigo.match(/\(/g) || []).length;
-    const closeParens = (codigo.match(/\)/g) || []).length;
-    if (openParens !== closeParens) {
-      erros.push(`Parênteses desbalanceados: ${openParens} aberturas vs ${closeParens} fechamentos`);
-    }
-    
-    // 4. Verificar bibliotecas proibidas
-    const proibidas = ['@mui/material', 'antd', '@chakra-ui', 'react-router-dom', 'prisma'];
+    const proibidas = ['@mui/material', 'react-router-dom'];
     proibidas.forEach(lib => {
-      if (codigo.includes(lib)) {
-        erros.push(`Biblioteca proibida detectada: ${lib}`);
-      }
+      if (codigo.includes(lib)) erros.push(`Biblioteca proibida: ${lib}`);
     });
     
-    // 5. Verificar se tem imports válidos (para arquivos TypeScript)
-    if (codigo.includes('import') && !codigo.includes('from')) {
-      erros.push('Imports mal formatados');
-    }
-    
-    // 6. Verificar se tem código real (não só comentários)
-    const semComentarios = codigo.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-    if (semComentarios.trim().length < 20) {
-      erros.push('Código contém apenas comentários');
-    }
-    
-    // 7. Syntax check com TypeScript (se possível)
-    if (arquivoAlvo && arquivoAlvo.endsWith('.ts') || arquivoAlvo?.endsWith('.tsx')) {
-      try {
-        // Salvar temporariamente e testar compilação
-        const tempFile = '/tmp/hefesto-test.ts';
-        writeFileSync(tempFile, codigo, 'utf-8');
-        
-        const { stderr } = await execAsync(`npx tsc --noEmit ${tempFile}`, {
-          timeout: 5000,
-        });
-        
-        if (stderr && stderr.includes('error TS')) {
-          const errorLines = stderr.split('\n').filter(l => l.includes('error TS'));
-          if (errorLines.length > 0) {
-            erros.push(`Erro TypeScript: ${errorLines[0].substring(0, 100)}`);
-          }
-        }
-      } catch (error) {
-        // Ignorar timeout ou outros erros de compilação por ora
-      }
-    }
-    
-    return {
-      valido: erros.length === 0,
-      erros,
-    };
+    return { valido: erros.length === 0, erros };
   }
   
   private async salvarArquivos(codigo: string, arquivoAlvo: string | null): Promise<string[]> {
-    const arquivosCriados: string[] = [];
-    
-    // Extrair arquivos do padrão //ARQUIVO:
     const arquivos = this.extrairArquivos(codigo);
+    const salvos: string[] = [];
     
     if (arquivos.length > 0) {
-      // Salvar arquivos marcados
-      for (const arquivo of arquivos) {
-        this.salvarArquivo(arquivo.caminho, arquivo.conteudo);
-        arquivosCriados.push(arquivo.caminho);
+      for (const arq of arquivos) {
+        this.salvarArquivo(arq.caminho, arq.conteudo);
+        salvos.push(arq.caminho);
       }
     } else if (arquivoAlvo) {
-      // Fallback: salvar no arquivo alvo
-      console.log('⚠️  [Hefesto] Nenhum //ARQUIVO: encontrado, salvando em arquivo alvo');
       this.salvarArquivo(arquivoAlvo, codigo);
-      arquivosCriados.push(arquivoAlvo);
-    } else {
-      throw new Error('Nenhum arquivo para salvar encontrado');
+      salvos.push(arquivoAlvo);
     }
     
-    return arquivosCriados;
+    return salvos;
   }
   
   private salvarArquivo(caminho: string, conteudo: string): void {
-    console.log(`📝 [Hefesto] Salvando: ${caminho}`);
-    
     const dir = dirname(caminho);
-    if (!existsSync(dir)) {
-      mkdirSync(dir, { recursive: true });
-    }
-    
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(caminho, conteudo, 'utf-8');
-    const linhas = conteudo.split('\n').length;
-    console.log(`✅ [Hefesto] Salvo: ${caminho} (${linhas} linhas)`);
+    console.log(`✅ [Hefesto] Salvo: ${caminho} (${conteudo.split('\n').length} linhas)`);
   }
   
   private limparCodigo(codigo: string): string {
-    let limpo = codigo;
-    
-    // Remover blocos markdown
-    limpo = limpo.replace(/```[a-z]*\n?/gi, '').replace(/```$/g, '');
-    
-    // Remover explicações textuais
-    const linhas = limpo.split('\n');
-    const codigoLimpo: string[] = [];
-    
-    for (const linha of linhas) {
-      // Parar se encontrar explicação em português/inglês
-      if (/^(Neste|Este|This|The|Note|Observ|Como você|Agora|Para|Explicação)/i.test(linha.trim())) {
-        break;
-      }
-      codigoLimpo.push(linha);
-    }
-    
-    return codigoLimpo.join('\n').trim();
+    return codigo
+      .replace(/```[a-z]*\n?/gi, '')
+      .replace(/```$/g, '')
+      .trim();
   }
   
   private extrairArquivoAlvo(prompt: string): string | null {
-    const match = prompt.match(/(?:Arquivo|arquivo|File|file):\s*([^\n]+)/i);
+    const match = prompt.match(/(?:Arquivo|arquivo):\s*([^\n]+)/i);
     return match ? match[1].trim() : null;
   }
   
@@ -348,10 +440,7 @@ Se modificar arquivo, retorne TUDO (imports, funções, exports).`;
     
     let match;
     while ((match = regex.exec(codigo)) !== null) {
-      arquivos.push({
-        caminho: match[1].trim(),
-        conteudo: match[2].trim(),
-      });
+      arquivos.push({ caminho: match[1].trim(), conteudo: match[2].trim() });
     }
     
     return arquivos;
@@ -359,11 +448,9 @@ Se modificar arquivo, retorne TUDO (imports, funções, exports).`;
   
   private calcularCusto(tokensInput: number, tokensOutput: number, modelo?: ModelConfig): number {
     if (!modelo) return 0;
-    
-    const custoInput = (tokensInput / 1_000_000) * parseFloat(modelo.custoInputPorMm || '0');
-    const custoOutput = (tokensOutput / 1_000_000) * parseFloat(modelo.custoOutputPorMm || '0');
-    
-    return custoInput + custoOutput;
+    const custoIn = (tokensInput / 1_000_000) * parseFloat(modelo.custoInputPorMm || '0');
+    const custoOut = (tokensOutput / 1_000_000) * parseFloat(modelo.custoOutputPorMm || '0');
+    return custoIn + custoOut;
   }
 }
 

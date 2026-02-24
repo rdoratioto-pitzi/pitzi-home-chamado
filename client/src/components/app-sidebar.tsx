@@ -72,7 +72,7 @@ const allMenuItems = [
     module: null,
   },
   {
-    title: "Macgyver IA",
+title: "Chat IA Renov",
     url: "/macgyver-ia",
     icon: Bot,
     module: null,
