@@ -1,4 +1,5 @@
-import { Table, TableHeader, TableBody, TableRow, TableCell, Button } from "@/components/ui/table";
+import { Table, TableHeader, TableBody, TableRow, TableCell } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Folder, FileText, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
@@ -126,4 +127,4 @@ const FileBrowser: React.FC<FileBrowserProps> = ({ files, breadcrumbs }) => {
     );
 };
 
-export default FileBrowser;
+export { FileBrowser };
