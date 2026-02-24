@@ -495,7 +495,21 @@ export default function KanbanPage() {
                   <KanbanColumnComponent
                     key={column.id}
                     column={column}
-                    columnCards={filteredCards.filter(c => c.columnId === column.id).sort((a, b) => a.order - b.order)}
+                    columnCards={filteredCards.filter(c => c.columnId === column.id).sort((a, b) => {
+                      // Sort by priority first: muito_urgente > urgente > normal
+                      const priorityOrder: Record<string, number> = {
+                        "muito_urgente": 0,
+                        "urgente": 1,
+                        "normal": 2
+                      };
+                      const priorityA = priorityOrder[a.priority] ?? 3;
+                      const priorityB = priorityOrder[b.priority] ?? 3;
+                      if (priorityA !== priorityB) {
+                        return priorityA - priorityB;
+                      }
+                      // Then sort by order
+                      return a.order - b.order;
+                    })}
                     users={users}
                     project={project}
                     priorityColors={priorityColors}
