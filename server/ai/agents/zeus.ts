@@ -99,7 +99,7 @@ export class ZeusAgent {
             },
           });
           
-          const codigo = coderResult.content;
+          const codigo = coderResult.codigoGerado;
           
           // ARGOS: Validar código em paralelo
           console.log('👁️  [Zeus] → Chamando Argos...');
