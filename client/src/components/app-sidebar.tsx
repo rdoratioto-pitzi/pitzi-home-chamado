@@ -144,7 +144,7 @@ const pricingSubItems = [
 ];
 
 const conhecimentoSubItems = [
-  { title: "Visão Geral", url: "/conhecimento", icon: LayoutDashboard },
+{ title: "Biblioteca", url: "/conhecimento", icon: LayoutDashboard },
   { title: "Meus Favoritos", url: "/conhecimento/favoritos", icon: Star },
   { title: "Prompts", url: "/conhecimento/prompts", icon: Sparkles },
 ];
