@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { RichTextarea } from "@/components/rich-textarea";
+import { RichContent } from "@/components/rich-content";
 import {
   Dialog,
   DialogContent,
@@ -135,12 +136,27 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Função para extrair imagens base64 do HTML
+  const extractImagesFromHtml = (html: string): string[] => {
+    if (!html) return [];
+    const imgRegex = /<img[^>]+src="(data:image\/[^"]+)"/g;
+    const images: string[] = [];
+    let match;
+    while ((match = imgRegex.exec(html)) !== null) {
+      images.push(match[1]);
+    }
+    return images;
+  };
+
   useEffect(() => {
     if (ticket) {
       console.log('[TicketDetailSheet] Carregando ticket:', ticket.id);
       setComment("");
       setEditedDescription(ticket.description || '');
-      setEditedAttachments(ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : []);
+      // Extrair imagens do HTML da descrição + anexos existentes
+      const htmlImages = extractImagesFromHtml(ticket.description || '');
+      const attachmentImages = ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : [];
+      setEditedAttachments([...htmlImages, ...attachmentImages]);
       setIsEditingDescription(false);
     }
   }, [ticket?.id]);
@@ -424,10 +440,9 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
               </div>
             ) : (
               <>
-                <div
-                  className="text-sm text-muted-foreground prose prose-sm max-w-none break-words overflow-hidden mb-1"
-                  style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                  dangerouslySetInnerHTML={{ __html: ticket.description || '' }}
+                <RichContent
+                  content={ticket.description || ''}
+                  className="text-sm text-muted-foreground mb-1"
                 />
                 {ticket.descriptionLastEditedAt && (
                   <p className="text-[10px] text-muted-foreground mb-4 italic">
@@ -740,11 +755,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                           {c.createdAt ? format(new Date(c.createdAt), "dd/MM/yyyy HH:mm") : "-"}
                         </span>
                       </div>
-                      <div
-                        className="text-sm text-muted-foreground mt-1 break-words overflow-hidden prose prose-sm dark:prose-invert max-w-none"
-                        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                        dangerouslySetInnerHTML={{ __html: c.content || '' }}
-                      />
+                      <RichContent content={c.content || ''} className="text-sm text-muted-foreground mt-1" />
                       {c.attachments && (
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           {(() => {

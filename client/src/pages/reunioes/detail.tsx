@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RichTextarea } from "@/components/rich-textarea";
+import { RichContent } from "@/components/rich-content";
 import {
   ArrowLeft,
   Calendar,
@@ -577,11 +578,7 @@ export default function MeetingDetailPage() {
                 ) : (
                   <div className="mt-1 space-y-4">
                     {editedMeetingData.agenda ? (
-                      <div 
-                        className="prose prose-sm max-w-none break-words overflow-hidden"
-                        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                        dangerouslySetInnerHTML={{ __html: editedMeetingData.agenda }}
-                      />
+                      <RichContent content={editedMeetingData.agenda} />
                     ) : (
                       <span className="text-muted-foreground">Nenhuma pauta definida</span>
                     )}
@@ -732,11 +729,7 @@ export default function MeetingDetailPage() {
                                 {new Date(comment.createdAt || "").toLocaleString("pt-BR")}
                               </span>
                             </div>
-                            <div
-                              className="text-sm text-muted-foreground mt-1 break-words overflow-hidden prose prose-sm dark:prose-invert max-w-none"
-                              style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                              dangerouslySetInnerHTML={{ __html: comment.content || '' }}
-                            />
+                            <RichContent content={comment.content || ''} className="text-sm text-muted-foreground mt-1" />
                             {(comment as any).attachments && (
                               <div className="grid grid-cols-2 gap-2 mt-2">
                                 {(() => {
@@ -842,10 +835,7 @@ export default function MeetingDetailPage() {
                                     {new Date(reply.createdAt || "").toLocaleString("pt-BR")}
                                   </span>
                                 </div>
-                                <div
-                                  className="text-sm whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none"
-                                  dangerouslySetInnerHTML={{ __html: reply.content || '' }}
-                                />
+                                <RichContent content={reply.content || ''} className="text-sm" />
                               </div>
                             </div>
                           );
