@@ -99,11 +99,14 @@ export class ZeusAgent {
             },
           });
           
-          const codigo = coderResult.content;
+          const codigo = coderResult.codigoGerado;
           
           // ARGOS: Validar código em paralelo
           console.log('👁️  [Zeus] → Chamando Argos...');
-          const monitorResult = await argosAgent.validate(codigo);
+          const monitorResult = await argosAgent.validate({
+            codigo: coderResult.codigoGerado,
+            prompt: prompt.prompt,
+          });
           
           if (!monitorResult.valid) {
             throw new Error(`Validação falhou: ${monitorResult.errors.join(', ')}`);
