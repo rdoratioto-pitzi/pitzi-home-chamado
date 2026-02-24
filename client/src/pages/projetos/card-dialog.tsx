@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RichTextarea } from "@/components/rich-textarea";
+import { RichContent } from "@/components/rich-content";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -75,6 +76,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   const [commentImages, setCommentImages] = useState<string[]>([]);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
+  const [objectivesImages, setObjectivesImages] = useState<string[]>([]);
+  const [developmentImages, setDevelopmentImages] = useState<string[]>([]);
 
 
   const { data: users = [] } = useQuery<User[]>({
@@ -173,6 +176,18 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
 
   const [selectedParentId, setSelectedParentId] = useState<string | null>(parentCardId || null);
 
+  // Função para extrair imagens base64 do HTML
+  const extractImagesFromHtml = (html: string): string[] => {
+    if (!html) return [];
+    const imgRegex = /<img[^>]+src="(data:image\/[^"]+)"/g;
+    const images: string[] = [];
+    let match;
+    while ((match = imgRegex.exec(html)) !== null) {
+      images.push(match[1]);
+    }
+    return images;
+  };
+
   // Consolidado em um único useEffect com dependência apenas [cardId] para evitar loops
   useEffect(() => {
     if (open) {
@@ -189,6 +204,11 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
           endDate: cardData.endDate ? new Date(cardData.endDate).toISOString().split('T')[0] : "",
           tag: cardData.tags?.[0] || "",
         });
+        
+        // Extrair imagens dos campos HTML
+        setObjectivesImages(extractImagesFromHtml(cardData.objectives ? String(cardData.objectives) : ""));
+        setDevelopmentImages(extractImagesFromHtml(cardData.development ? String(cardData.development) : ""));
+        
         if (cardData.attachments && cardData.attachments.length > 0) {
           setAttachments(cardData.attachments.map((path: string) => ({
             name: path.split("/").pop() || "Arquivo",
@@ -219,6 +239,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
           tag: "",
         });
         setAttachments([]);
+        setObjectivesImages([]);
+        setDevelopmentImages([]);
         setSelectedParentId(parentCardId || null);
       }
     }
@@ -365,6 +387,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                             data-testid="input-card-objectives"
                             value={field.value || ''}
                             onChange={(val) => field.onChange(val)}
+                            images={objectivesImages}
+                            onImagesChange={setObjectivesImages}
                           />
                         </FormControl>
                         <FormMessage />
@@ -386,6 +410,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                             data-testid="input-card-development"
                             value={field.value || ''}
                             onChange={(val) => field.onChange(val)}
+                            images={developmentImages}
+                            onImagesChange={setDevelopmentImages}
                           />
                         </FormControl>
                         <FormMessage />
@@ -462,11 +488,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                                   })}
                                 </span>
                               </div>
-                              <div
-                                className="text-sm text-foreground/90 break-words overflow-hidden prose prose-sm dark:prose-invert max-w-none"
-                                style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                                dangerouslySetInnerHTML={{ __html: comment.content || '' }}
-                              />
+                              <RichContent content={comment.content || ''} />
                             </div>
                           );
                         })}

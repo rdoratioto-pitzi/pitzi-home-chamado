@@ -287,3 +287,30 @@
   border-radius: 6px;
   overflow-x: auto;
 }
+
+/* Estilos para imagens no editor Quill */
+.ql-snow .ql-editor img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 8px 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ql-snow .ql-editor img.ql-video {
+  width: 100%;
+  height: auto;
+}
+
+/* Garantir que imagens em conteúdo renderizado também sejam clicáveis */
+.prose img,
+.prose-sm img,
+.content-view img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 8px 0;
+  border-radius: 4px;
+  cursor: pointer;
+}

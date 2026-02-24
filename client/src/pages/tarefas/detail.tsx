@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { RichTextarea } from "@/components/rich-textarea";
+import { RichContent } from "@/components/rich-content";
 import {
   ArrowLeft,
   Calendar,
@@ -525,10 +526,9 @@ export default function TaskDetailPage() {
             ) : (
               <div>
                 {task.description ? (
-                  <div 
-                    className="text-muted-foreground prose prose-sm max-w-none break-words overflow-hidden"
-                    style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-                    dangerouslySetInnerHTML={{ __html: task.description }}
+                  <RichContent
+                    content={task.description}
+                    className="text-muted-foreground"
                   />
                 ) : (
                   <p className="text-muted-foreground">Nenhuma descrição</p>
