@@ -18,6 +18,7 @@ import { registerPricingRoutes } from "./pricing";
 import { registerUpdateRoutes } from "./updates";
 import { registerGitAnalyticsRoutes } from "./git-analytics";
 import { registerMetaRoutes } from "./metas";
+import { registerFlowchartRoutes } from "./flowcharts";
 
 export function registerModularRoutes(app: Router) {
   const router = Router();
@@ -41,6 +42,7 @@ export function registerModularRoutes(app: Router) {
   registerUpdateRoutes(router);
   registerGitAnalyticsRoutes(router);
   registerMetaRoutes(router);
+  registerFlowchartRoutes(router);
   
   app.use(router);
 }

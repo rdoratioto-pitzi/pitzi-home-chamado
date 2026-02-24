@@ -55,6 +55,7 @@ export type ModulePermissions = {
   apis: boolean;
   configuracoes: boolean;
   updates: boolean;
+  estoques: boolean;
 };
 
 // ============== TICKETS (Chamados) ==============
@@ -235,6 +236,11 @@ export const kanbanComments = pgTable("kanban_comments", {
 export const insertKanbanCommentSchema = createInsertSchema(kanbanComments).omit({ id: true, createdAt: true });
 export type InsertKanbanComment = z.infer<typeof insertKanbanCommentSchema>;
 export type KanbanComment = typeof kanbanComments.$inferSelect;
+
+// Kanban Comment with User data for JOIN queries
+export type KanbanCommentWithUser = typeof kanbanComments.$inferSelect & {
+  author: { id: string; name: string; email: string };
+};
 
 // ============== OKRs ==============
 export const objectives = pgTable("objectives", {

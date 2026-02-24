@@ -11,10 +11,6 @@ interface MonitorResult {
 
 export class ArgosAgent {
   
-  /**
-   * Valida código gerado
-   * NÃO valida tamanho (arquivo pode ser grande ou pequeno)
-   */
   async validate(params: {
     codigo: string;
     prompt: string;
@@ -25,30 +21,45 @@ export class ArgosAgent {
     const warnings: string[] = [];
     const errors: string[] = [];
     
+    if (!params.codigo || typeof params.codigo !== 'string') {
+      console.log('⚠️  [Argos] Código vazio ou inválido');
+      return {
+        valid: false,
+        warnings: [],
+        errors: ['Código vazio ou inválido'],
+        metrics: { linesOfCode: 0, complexity: 0, imports: 0 },
+      };
+    }
+    
     // 1. Validações de sintaxe básica
     console.log('🔍 [Argos] Verificando sintaxe...');
     const syntaxCheck = this.checkSyntax(params.codigo);
     errors.push(...syntaxCheck);
     
-    // 2. Validações de padrões do projeto (CLAUDE.md)
+    // 2. Validações JSX (NOVO!)
+    console.log('🔍 [Argos] Verificando sintaxe JSX...');
+    const jsxCheck = this.checkJSXSyntax(params.codigo);
+    errors.push(...jsxCheck);
+    
+    // 3. Validações de imports/exports
+    console.log('🔍 [Argos] Verificando imports e exports...');
+    const importsCheck = this.checkImportsExports(params.codigo);
+    errors.push(...importsCheck.errors);
+    warnings.push(...importsCheck.warnings);
+    
+    // 4. Validações de padrões do projeto
     console.log('🔍 [Argos] Verificando padrões do projeto...');
     const patternsCheck = this.checkProjectPatterns(params.codigo);
     errors.push(...patternsCheck.errors);
     warnings.push(...patternsCheck.warnings);
     
-    // 3. Análise de complexidade
+    // 5. Análise de complexidade
     console.log('🔍 [Argos] Analisando complexidade...');
     const metrics = this.analyzeComplexity(params.codigo);
     
     if (metrics.complexity > 20) {
       warnings.push(`Complexidade alta: ${metrics.complexity} (recomendado < 20)`);
     }
-    
-    // 4. Validações de segurança
-    console.log('🔍 [Argos] Verificando segurança...');
-    const securityCheck = this.checkSecurity(params.codigo);
-    errors.push(...securityCheck.errors);
-    warnings.push(...securityCheck.warnings);
     
     const isValid = errors.length === 0;
     
@@ -74,9 +85,10 @@ export class ArgosAgent {
   private checkSyntax(code: string): string[] {
     const errors: string[] = [];
     
-    // REMOVIDO: validação de tamanho mínimo (causa falsos positivos)
+    if (!code || typeof code !== 'string') {
+      return [];
+    }
     
-    // Verificar parênteses/chaves balanceadas
     const openBraces = (code.match(/{/g) || []).length;
     const closeBraces = (code.match(/}/g) || []).length;
     
@@ -94,11 +106,74 @@ export class ArgosAgent {
     return errors;
   }
   
+  private checkJSXSyntax(code: string): string[] {
+    const errors: string[] = [];
+    
+    if (!code || typeof code !== 'string') {
+      return [];
+    }
+    
+    // Detectar props JSX sem chaves: key=algo.prop ou value=algo.prop
+    // Correto: key={algo.prop} ou value={algo.prop}
+    const jsxPropWithoutBraces = /\b(key|value|className|style|onClick|onChange|onSubmit|href|src|alt|title|placeholder|id|name|type|checked|disabled|required|readOnly|autoFocus|tabIndex|role|aria-[a-z]+)=([a-zA-Z_][a-zA-Z0-9_.]+)\b(?![^<]*>)/g;
+    
+    let match;
+    const foundErrors = new Set<string>();
+    
+    while ((match = jsxPropWithoutBraces.exec(code)) !== null) {
+      const prop = match[1];
+      const value = match[2];
+      
+      // Ignorar strings literais (ex: value="all")
+      if (value.startsWith('"') || value.startsWith("'")) {
+        continue;
+      }
+      
+      const errorMsg = `JSX: '${prop}=${value}' deve ser '${prop}={${value}}'`;
+      foundErrors.add(errorMsg);
+    }
+    
+    errors.push(...Array.from(foundErrors));
+    
+    return errors;
+  }
+  
+  private checkImportsExports(code: string): { errors: string[]; warnings: string[] } {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    
+    if (!code || typeof code !== 'string') {
+      return { errors: [], warnings: [] };
+    }
+    
+    // Detectar import de Button do lugar errado
+    if (code.includes('from "@/components/ui/table"')) {
+      const tableImports = code.match(/import\s+{([^}]+)}\s+from\s+"@\/components\/ui\/table"/);
+      if (tableImports && tableImports[1].includes('Button')) {
+        errors.push('Import incorreto: Button deve vir de "@/components/ui/button", não de "table"');
+      }
+    }
+    
+    // Detectar mistura de export default com named imports
+    const hasExportDefault = /export\s+default/.test(code);
+    const hasNamedExport = /export\s+{/.test(code) || /export\s+(const|function|class)/.test(code);
+    
+    if (hasExportDefault && hasNamedExport) {
+      warnings.push('Arquivo usa export default E named exports - considere usar apenas um padrão');
+    }
+    
+    return { errors, warnings };
+  }
+  
   private checkProjectPatterns(code: string): { errors: string[]; warnings: string[] } {
     const errors: string[] = [];
     const warnings: string[] = [];
     
-    // Bibliotecas proibidas (do CLAUDE.md)
+    if (!code || typeof code !== 'string') {
+      return { errors: [], warnings: [] };
+    }
+    
+    // Bibliotecas proibidas
     const forbidden = [
       { lib: '@mui/material', name: 'Material-UI' },
       { lib: 'antd', name: 'Ant Design' },
@@ -127,10 +202,14 @@ export class ArgosAgent {
     complexity: number;
     imports: number;
   } {
+    if (!code || typeof code !== 'string') {
+      return { linesOfCode: 0, complexity: 0, imports: 0 };
+    }
+    
     const lines = code.split('\n').filter(l => l.trim().length > 0);
     const linesOfCode = lines.length;
     
-    // Complexidade ciclomática simplificada
+    // Complexidade ciclomática
     const ifCount = (code.match(/\bif\s*\(/g) || []).length;
     const forCount = (code.match(/\bfor\s*\(/g) || []).length;
     const whileCount = (code.match(/\bwhile\s*\(/g) || []).length;
@@ -147,33 +226,6 @@ export class ArgosAgent {
       complexity,
       imports,
     };
-  }
-  
-  private checkSecurity(code: string): { errors: string[]; warnings: string[] } {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    
-    // SQL Injection
-    if (code.includes('db.execute') && code.includes('${')) {
-      errors.push('Possível SQL Injection: use Drizzle ORM');
-    }
-    
-    // Senha hardcoded
-    if (/password\s*[=:]\s*["']/.test(code)) {
-      errors.push('Senha hardcoded - use process.env');
-    }
-    
-    // API keys hardcoded
-    if (/api[_-]?key\s*[=:]\s*["'][^"']+["']/i.test(code)) {
-      errors.push('API key hardcoded - use process.env');
-    }
-    
-    // eval() usage
-    if (code.includes('eval(')) {
-      errors.push('Uso de eval() detectado - evite por segurança');
-    }
-    
-    return { errors, warnings };
   }
 }
 

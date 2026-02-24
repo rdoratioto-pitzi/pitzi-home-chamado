@@ -6,7 +6,7 @@ import { requireAdmin, requireAuth } from "../middleware/auth";
 import { sendPasswordResetEmail, sendWelcomeEmail } from "../email-service";
 
 export function registerUserRoutes(router: Router) {
-  router.get("/api/users", requireAdmin, async (req, res) => {
+  router.get("/api/users", requireAuth, async (req, res) => {
     const users = await storage.getUsers();
     const safeUsers = users.map(({ password, ...user }) => user);
     res.json(safeUsers);

@@ -1,3 +1,4 @@
+// Renov Home - Sistema de Gestão Operacional
 import { useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
@@ -54,6 +55,7 @@ import FluxogramasPage from "@/pages/fluxogramas/index";
 import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 import UpdatesPage from "@/pages/updates/index";
 import GitAnalyticsPage from "@/pages/git-analytics/index";
+import EstoquesPage from "@/pages/estoques/index";
 
 function Router() {
   return (
@@ -279,6 +281,11 @@ function Router() {
           <GitAnalyticsPage />
         </ProtectedRoute>
       </Route>
+      <Route path="/estoques">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesPage />
+        </ProtectedRoute>
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );
@@ -341,5 +348,3 @@ function App() {
 }
 
 export default App;
-// teste workflow
-// teste workflow
