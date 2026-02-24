@@ -16,6 +16,7 @@ interface CoderResult {
   custo: number;
   tentativas: number;
   erros: string[];
+  modoUsado: 'DIFF' | 'COMPLETO';
 }
 
 interface ModelConfig {
@@ -28,7 +29,7 @@ interface ModelConfig {
 export class HefestoAgent {
   
   private readonly MAX_TENTATIVAS = 3;
-  private readonly DIFF_THRESHOLD = 200; // Linhas
+  private readonly DIFF_THRESHOLD = 200;
   
   async execute(params: {
     prompt: string;
@@ -39,39 +40,56 @@ export class HefestoAgent {
     console.log('🔨 [Hefesto] Iniciando implementação com estratégia híbrida...');
     
     const arquivoAlvo = this.extrairArquivoAlvo(params.prompt);
-    
-    // Decidir estratégia
     const estrategia = await this.decidirEstrategia(arquivoAlvo, params.prompt);
+    
     console.log(`📋 [Hefesto] Estratégia escolhida: ${estrategia}`);
     
-    if (estrategia === 'DIFF') {
-      return await this.executarComDiff(params, arquivoAlvo!);
-    } else {
-      return await this.executarCompleto(params, arquivoAlvo);
+    try {
+      if (estrategia === 'DIFF') {
+        return await this.executarComDiff(params, arquivoAlvo!);
+      } else {
+        return await this.executarCompleto(params, arquivoAlvo);
+      }
+    } catch (error: any) {
+      // FALLBACK: Se DIFF falhou, tentar COMPLETO
+      if (estrategia === 'DIFF' && error.message.includes('Falha após')) {
+        console.log('');
+        console.log('🔄 [Hefesto] FALLBACK ATIVADO!');
+        console.log('⚠️  [Hefesto] Modo DIFF falhou após 3 tentativas');
+        console.log('🔄 [Hefesto] Tentando modo COMPLETO como alternativa...');
+        console.log('');
+        
+        try {
+          const result = await this.executarCompleto(params, arquivoAlvo);
+          return {
+            ...result,
+            erros: [...result.erros, 'DIFF falhou, usado COMPLETO como fallback'],
+          };
+        } catch (fallbackError: any) {
+          throw new Error(`DIFF e COMPLETO falharam. DIFF: ${error.message}, COMPLETO: ${fallbackError.message}`);
+        }
+      }
+      
+      throw error;
     }
   }
   
   private async decidirEstrategia(arquivoAlvo: string | null, prompt: string): Promise<'DIFF' | 'COMPLETO'> {
-    // Se arquivo não existe, sempre gerar completo
     if (!arquivoAlvo || !existsSync(arquivoAlvo)) {
       return 'COMPLETO';
     }
     
-    // Ler arquivo e contar linhas
     const conteudo = readFileSync(arquivoAlvo, 'utf-8');
     const linhas = conteudo.split('\n').length;
     
-    // Se arquivo pequeno, gerar completo
     if (linhas < this.DIFF_THRESHOLD) {
       return 'COMPLETO';
     }
     
-    // Se prompt menciona "criar" ou "adicionar", pode precisar de completo
     if (prompt.toLowerCase().includes('criar arquivo') || prompt.toLowerCase().includes('novo arquivo')) {
       return 'COMPLETO';
     }
     
-    // Arquivo grande + modificação = DIFF
     console.log(`📊 [Hefesto] Arquivo tem ${linhas} linhas (>${this.DIFF_THRESHOLD}) → usando DIFF`);
     return 'DIFF';
   }
@@ -91,8 +109,6 @@ export class HefestoAgent {
       
       try {
         const conteudoOriginal = readFileSync(arquivoAlvo, 'utf-8');
-        
-        // Prompt para modo DIFF
         const promptDiff = this.construirPromptDiff(params.prompt, conteudoOriginal, ultimoErro);
         
         const startTime = Date.now();
@@ -108,16 +124,11 @@ export class HefestoAgent {
         
         const tempoDecorrido = ((Date.now() - startTime) / 1000).toFixed(1);
         console.log(`⏱️  [Hefesto] Resposta em ${tempoDecorrido}s`);
-        console.log(`📊 [Hefesto] Tokens: ${result.tokensInput} in / ${result.tokensOutput} out`);
-        console.log(`📝 [Hefesto] Resposta LLM (${result.content?.length || 0} chars):`, result.content?.substring(0, 200));
         
         tokensInputTotal += result.tokensInput;
         tokensOutputTotal += result.tokensOutput;
         
-        // Aplicar diff no arquivo
         const novoConteudo = this.aplicarDiff(conteudoOriginal, result.content);
-        
-        // Validar
         const validacao = await this.validarCodigo(novoConteudo, arquivoAlvo);
         
         if (!validacao.valido) {
@@ -132,7 +143,6 @@ export class HefestoAgent {
           }
         }
         
-        // Salvar
         writeFileSync(arquivoAlvo, novoConteudo, 'utf-8');
         console.log(`✅ [Hefesto] Arquivo atualizado via DIFF`);
         
@@ -147,16 +157,15 @@ export class HefestoAgent {
           custo,
           tentativas: tentativa,
           erros,
+          modoUsado: 'DIFF',
         };
         
       } catch (error: any) {
-        console.error('❌ [Hefesto] Erro detalhado:', error);
-        console.error('Stack:', error.stack);
         ultimoErro = error.message;
         erros.push(`Tentativa ${tentativa}: ${error.message}`);
         
         if (tentativa >= this.MAX_TENTATIVAS) {
-          throw error;
+          throw new Error(`Falha após ${this.MAX_TENTATIVAS} tentativas: ${ultimoErro}`);
         }
       }
     }
@@ -234,11 +243,10 @@ export class HefestoAgent {
           custo,
           tentativas: tentativa,
           erros,
+          modoUsado: 'COMPLETO',
         };
         
       } catch (error: any) {
-        console.error('❌ [Hefesto] Erro detalhado:', error);
-        console.error('Stack:', error.stack);
         ultimoErro = error.message;
         erros.push(`Tentativa ${tentativa}: ${error.message}`);
         
@@ -297,7 +305,6 @@ IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
       prompt += `ERRO ANTERIOR: ${ultimoErro}\n\nCORRIJA e tente novamente.\n\n`;
     }
     
-    // Mostrar arquivo com números de linha
     const linhasNumeradas = conteudoArquivo.split('\n')
       .map((linha, i) => `${i + 1}: ${linha}`)
       .join('\n');
@@ -330,7 +337,6 @@ IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
     
     console.log(`📝 [Hefesto] Aplicando DIFF... (${diff.length} chars)`);
     
-    // Limpar diff de markdown e espaços
     const diffLimpo = diff.replace(/```[a-z]*\n?/gi, '').replace(/```$/g, '').trim();
     
     if (!diffLimpo) {
@@ -338,16 +344,13 @@ IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
       return conteudoOriginal;
     }
     
-    // Parsear diff
     const mudancas = diffLimpo.split('\n').filter(l => l.trim());
-    
     console.log(`📋 [Hefesto] ${mudancas.length} mudanças encontradas`);
     
     for (const mudanca of mudancas) {
-      // LINHA N: código
       const matchLinha = mudanca.match(/^LINHA\s+(\d+):\s*(.*)$/i);
       if (matchLinha && matchLinha.length >= 3) {
-        const numeroLinha = parseInt(matchLinha[1]) - 1; // 0-indexed
+        const numeroLinha = parseInt(matchLinha[1]) - 1;
         const novoConteudo = matchLinha[2];
         
         if (numeroLinha >= 0 && numeroLinha < linhas.length) {
@@ -359,7 +362,6 @@ IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
         continue;
       }
       
-      // LINHA N-M: [DELETAR]
       const matchDelete = mudanca.match(/^LINHA\s+(\d+)-(\d+):\s*\[DELETAR\]$/i);
       if (matchDelete && matchDelete.length >= 3) {
         const inicio = parseInt(matchDelete[1]) - 1;
@@ -375,7 +377,6 @@ IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
     return linhas.join('\n');
   }
   
-  // [Continua com métodos auxiliares...]
   private async validarCodigo(codigo: string, arquivoAlvo: string | null): Promise<{ valido: boolean; erros: string[] }> {
     const erros: string[] = [];
     
