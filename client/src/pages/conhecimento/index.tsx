@@ -65,7 +65,7 @@ export default function ConhecimentoPage() {
   return (
     <div className="flex-1 overflow-auto p-6 space-y-6" data-testid="page-conhecimento">
       <PageHeader
-        title="Base de Conhecimento"
+        title="Biblioteca"
         description="Acesse políticas, procedimentos, templates e documentos internos da organização."
       />
 
@@ -165,7 +165,7 @@ export default function ConhecimentoPage() {
             path: `/conhecimento/${doc.id}`,
           }))}
           breadcrumbs={[
-            { name: 'Base de Conhecimento', path: '/conhecimento' }
+            { name: 'Biblioteca', path: '/conhecimento' }
           ]}
         />
       </div>
