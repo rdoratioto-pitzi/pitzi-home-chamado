@@ -64,12 +64,12 @@ setupSession(app);
 // Testar acessando: GET /api/test-email-url/CHA-0054
 app.get("/api/test-email-url/:code", (req, res) => {
   const { code } = req.params;
-  const baseUrl = process.env.APP_URL 
+  const baseUrl = process.env.APP_URL
     || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null)
     || "https://home.renovsmart.com.br";
   const ticketUrl = `${baseUrl}/chamados?id=${code}`;
   
-  res.json({ 
+  res.json({
     code,
     url: ticketUrl,
     env: {
