@@ -100,8 +100,30 @@ export function RichTextarea({
         [{ 'list': 'ordered' }, { 'list': 'bullet' }],  // Ordem correta: ordered (1.) primeiro, bullet (•) depois
         ['blockquote'],
         ['link'],
+        ['image'],
         ['clean']
       ],
+      handlers: {
+        image: function(this: any) {
+          const input = document.createElement('input');
+          input.setAttribute('type', 'file');
+          input.setAttribute('accept', 'image/*');
+          input.click();
+          input.onchange = async () => {
+            if (input.files && input.files[0]) {
+              const file = input.files[0];
+              const reader = new FileReader();
+              reader.onload = () => {
+                const quill = this.quill;
+                const range = quill.getSelection(true);
+                quill.insertEmbed(range.index, 'image', reader.result as string);
+                quill.setSelection(range.index + 1);
+              };
+              reader.readAsDataURL(file);
+            }
+          };
+        }
+      }
     },
     keyboard: {
       bindings: {
@@ -143,6 +165,7 @@ export function RichTextarea({
     'bold', 'italic', 'strike', 'code',
     'list', 'blockquote',
     'link',
+    'image',
     'indent',
   ];
 
@@ -228,37 +251,47 @@ export function RichTextarea({
 
   const handleQuillPaste = useCallback(async (e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
-    const files: File[] = [];
+    const imageFiles: File[] = [];
     
     for (let i = 0; i < items.length; i++) {
-      const file = items[i].getAsFile();
-      if (file) files.push(file);
-    }
-
-    if (files.length === 0) return;
-
-    e.preventDefault(); // Prevent Quill's default paste behavior for files
-
-    setIsUploading(true);
-    const uploadedUrls: string[] = [];
-
-    for (const file of files) {
-      const url = await uploadFile(file);
-      if (url) {
-        uploadedUrls.push(url);
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
       }
     }
 
-    if (uploadedUrls.length > 0 && onImagesChange) {
-      onImagesChange([...images, ...uploadedUrls]);
-      toast({
-        title: "Arquivo colado",
-        description: `${uploadedUrls.length} arquivo(s) adicionado(s) via area de transferencia.`,}
-      );
+    if (imageFiles.length === 0) return;
+
+    e.preventDefault(); // Prevent Quill's default paste behavior for images
+
+    setIsUploading(true);
+
+    // Get Quill editor instance
+    const quill = quillRef.current?.getEditor();
+    if (!quill) {
+      setIsUploading(false);
+      return;
+    }
+
+    const range = quill.getSelection(true);
+
+    for (const file of imageFiles) {
+      const url = await uploadFile(file);
+      if (url) {
+        // Insert image directly into the editor
+        quill.insertEmbed(range.index, 'image', url);
+        // Move cursor after image
+        quill.setSelection(range.index + 1);
+        toast({
+          title: "Imagem colada",
+          description: "A imagem foi inserida no editor.",
+        });
+      }
     }
 
     setIsUploading(false);
-  }, [images, onImagesChange, uploadFile, toast]);
+  }, [uploadFile, toast]);
 
   const handleBlur = useCallback((e: React.FocusEvent) => {
     if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
@@ -268,7 +301,7 @@ export function RichTextarea({
 
   return (
     <div className="space-y-2">
-      <div 
+      <div
         ref={containerRef}
         className={cn(
           "relative border rounded-md transition-all",
@@ -277,23 +310,25 @@ export function RichTextarea({
         )}
         onBlur={handleBlur}
       >
-        <ReactQuill
-          ref={quillRef}
-          theme="snow"
-          value={value || ''}
-          onChange={handleQuillChange}
-          onFocus={handleQuillFocus}
-          onBlur={handleQuillBlur}
-          readOnly={disabled || isUploading}
-          placeholder={placeholder}
-          modules={modules}
-          formats={formats}
-          className={cn(
-            "quill-editor border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
-            externalClassName
-          )}
-          data-testid={dataTestId}
-        />
+        <div className="[&_.ql-editor]:text-foreground [&_.ql-editor]:dark:text-gray-100 [&_.ql-toolbar]:dark:border-gray-700 [&_.ql-toolbar]:dark:bg-gray-900/50 [&_.ql-container]:dark:border-gray-700 [&_.ql-editor.ql-blank]:dark:text-gray-400">
+          <ReactQuill
+            ref={quillRef}
+            theme="snow"
+            value={value || ''}
+            onChange={handleQuillChange}
+            onFocus={handleQuillFocus}
+            onBlur={handleQuillBlur}
+            readOnly={disabled || isUploading}
+            placeholder={placeholder}
+            modules={modules}
+            formats={formats}
+            className={cn(
+              "quill-editor border-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none",
+              externalClassName
+            )}
+            data-testid={dataTestId}
+          />
+        </div>
         <input
           ref={fileInputRef}
           type="file"

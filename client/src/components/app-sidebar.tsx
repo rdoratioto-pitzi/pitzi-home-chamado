@@ -35,6 +35,7 @@ import {
   ClipboardList,
   Sparkles,
   GitBranch,
+  Warehouse,
 } from "lucide-react";
 import {
   Sidebar,
@@ -72,7 +73,7 @@ const allMenuItems = [
     module: null,
   },
   {
-    title: "Macgyver IA",
+title: "Chat IA Renov",
     url: "/macgyver-ia",
     icon: Bot,
     module: null,
@@ -106,6 +107,12 @@ const allMenuItems = [
     url: "/fluxogramas",
     icon: Workflow,
     module: "fluxogramas" as keyof ModulePermissions,
+  },
+  {
+    title: "Estoques",
+    url: "/estoques",
+    icon: Warehouse,
+    module: "estoques" as keyof ModulePermissions,
   },
 ];
 
@@ -144,7 +151,7 @@ const pricingSubItems = [
 ];
 
 const conhecimentoSubItems = [
-  { title: "Visão Geral", url: "/conhecimento", icon: LayoutDashboard },
+{ title: "Biblioteca", url: "/conhecimento", icon: LayoutDashboard },
   { title: "Meus Favoritos", url: "/conhecimento/favoritos", icon: Star },
   { title: "Prompts", url: "/conhecimento/prompts", icon: Sparkles },
 ];
@@ -226,6 +233,7 @@ export function AppSidebar() {
           conhecimento: true,
           apis: true,
           configuracoes: true,
+          estoques: true,
         };
       }
       if (currentUser?.modulePermissions) {
@@ -247,6 +255,7 @@ export function AppSidebar() {
       conhecimento: false,
       apis: false,
       configuracoes: false,
+      estoques: false,
     };
   }, [currentUser]);
 
