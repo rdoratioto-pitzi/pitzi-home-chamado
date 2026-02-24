@@ -314,3 +314,111 @@
   border-radius: 4px;
   cursor: pointer;
 }
+
+/* ============================================
+   ESTILOS DARK MODE PARA QUILL EDITOR
+   ============================================ */
+
+/* Editor texto no modo escuro */
+.dark .ql-editor {
+  color: #f3f4f6;
+}
+
+/* Todos os elementos de texto dentro do editor */
+.dark .ql-editor p,
+.dark .ql-editor li,
+.dark .ql-editor h1,
+.dark .ql-editor h2,
+.dark .ql-editor h3,
+.dark .ql-editor h4,
+.dark .ql-editor h5,
+.dark .ql-editor h6,
+.dark .ql-editor span,
+.dark .ql-editor div {
+  color: #f3f4f6;
+}
+
+/* Placeholder no modo escuro */
+.dark .ql-editor.ql-blank::before {
+  color: #9ca3af;
+}
+
+/* Blockquote no modo escuro */
+.dark .ql-editor blockquote {
+  border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
+/* Código no modo escuro */
+.dark .ql-editor code,
+.dark .ql-editor pre {
+  background-color: #1f2937;
+  color: #e5e7eb;
+}
+
+/* Link no modo escuro */
+.dark .ql-editor a {
+  color: #60a5fa;
+}
+
+/* Listas no modo escuro */
+.dark .ql-editor ul,
+.dark .ql-editor ol {
+  color: #f3f4f6;
+}
+
+/* Tooltip do Quill no modo escuro */
+.dark .ql-snow .ql-tooltip {
+  background-color: #1f2937;
+  border-color: #374151;
+  color: #f3f4f6;
+}
+
+.dark .ql-snow .ql-tooltip input[type="text"] {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
+
+/* Toolbar no modo escuro */
+.dark .ql-snow .ql-stroke {
+  stroke: #9ca3af;
+}
+
+.dark .ql-snow .ql-fill {
+  fill: #9ca3af;
+}
+
+.dark .ql-snow .ql-picker {
+  color: #9ca3af;
+}
+
+.dark .ql-snow .ql-picker-options {
+  background-color: #1f2937;
+  border-color: #374151;
+}
+
+.dark .ql-snow .ql-picker-label:hover,
+.dark .ql-snow .ql-picker-item:hover {
+  color: #f3f4f6;
+}
+
+.dark .ql-snow .ql-picker-item.ql-selected {
+  color: #60a5fa;
+}
+
+/* Botões da toolbar no modo escuro */
+.dark .ql-snow .ql-button:hover .ql-stroke,
+.dark .ql-snow button:hover .ql-stroke {
+  stroke: #f3f4f6;
+}
+
+.dark .ql-snow .ql-button.ql-active .ql-stroke,
+.dark .ql-snow button.ql-active .ql-stroke {
+  stroke: #60a5fa;
+}
+
+/* Container do editor no modo escuro */
+.dark .ql-snow .ql-editor {
+  background-color: transparent;
+}

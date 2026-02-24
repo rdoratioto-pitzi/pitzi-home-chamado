@@ -662,8 +662,8 @@ export default function TaskDetailPage() {
                   ) : (
                     <div>
                       {editedMeetingData.agenda ? (
-                        <div 
-                          className="mt-1 prose prose-sm max-w-none break-words overflow-hidden"
+                        <div
+                          className="mt-1 prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden"
                           style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                           dangerouslySetInnerHTML={{ __html: editedMeetingData.agenda }}
                         />
