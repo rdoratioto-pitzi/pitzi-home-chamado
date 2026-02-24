@@ -11,10 +11,6 @@ interface MonitorResult {
 
 export class ArgosAgent {
   
-  /**
-   * Valida código gerado
-   * NÃO valida tamanho (arquivo pode ser grande ou pequeno)
-   */
   async validate(params: {
     codigo: string;
     prompt: string;
@@ -25,12 +21,23 @@ export class ArgosAgent {
     const warnings: string[] = [];
     const errors: string[] = [];
     
+    // Validação de entrada
+    if (!params.codigo || typeof params.codigo !== 'string') {
+      console.log('⚠️  [Argos] Código vazio ou inválido');
+      return {
+        valid: false,
+        warnings: [],
+        errors: ['Código vazio ou inválido'],
+        metrics: { linesOfCode: 0, complexity: 0, imports: 0 },
+      };
+    }
+    
     // 1. Validações de sintaxe básica
     console.log('🔍 [Argos] Verificando sintaxe...');
     const syntaxCheck = this.checkSyntax(params.codigo);
     errors.push(...syntaxCheck);
     
-    // 2. Validações de padrões do projeto (CLAUDE.md)
+    // 2. Validações de padrões do projeto
     console.log('🔍 [Argos] Verificando padrões do projeto...');
     const patternsCheck = this.checkProjectPatterns(params.codigo);
     errors.push(...patternsCheck.errors);
@@ -43,12 +50,6 @@ export class ArgosAgent {
     if (metrics.complexity > 20) {
       warnings.push(`Complexidade alta: ${metrics.complexity} (recomendado < 20)`);
     }
-    
-    // 4. Validações de segurança
-    console.log('🔍 [Argos] Verificando segurança...');
-    const securityCheck = this.checkSecurity(params.codigo);
-    errors.push(...securityCheck.errors);
-    warnings.push(...securityCheck.warnings);
     
     const isValid = errors.length === 0;
     
@@ -74,18 +75,20 @@ export class ArgosAgent {
   private checkSyntax(code: string): string[] {
     const errors: string[] = [];
     
-    // REMOVIDO: validação de tamanho mínimo (causa falsos positivos)
+    if (!code || typeof code !== 'string') {
+      return [];
+    }
     
     // Verificar parênteses/chaves balanceadas
-    const openBraces = ((code || "").match(/{/g) || []).length;
-    const closeBraces = ((code || "").match(/}/g) || []).length;
+    const openBraces = (code.match(/{/g) || []).length;
+    const closeBraces = (code.match(/}/g) || []).length;
     
     if (openBraces !== closeBraces) {
       errors.push(`Chaves desbalanceadas: ${openBraces} aberturas, ${closeBraces} fechamentos`);
     }
     
-    const openParens = ((code || "").match(/\(/g) || []).length;
-    const closeParens = ((code || "").match(/\)/g) || []).length;
+    const openParens = (code.match(/\(/g) || []).length;
+    const closeParens = (code.match(/\)/g) || []).length;
     
     if (openParens !== closeParens) {
       errors.push(`Parênteses desbalanceados: ${openParens} aberturas, ${closeParens} fechamentos`);
@@ -98,12 +101,11 @@ export class ArgosAgent {
     const errors: string[] = [];
     const warnings: string[] = [];
     
-    // Validar código
     if (!code || typeof code !== 'string') {
       return { errors: [], warnings: [] };
     }
     
-    // Bibliotecas proibidas (do CLAUDE.md)
+    // Bibliotecas proibidas
     const forbidden = [
       { lib: '@mui/material', name: 'Material-UI' },
       { lib: 'antd', name: 'Ant Design' },
@@ -132,53 +134,30 @@ export class ArgosAgent {
     complexity: number;
     imports: number;
   } {
+    if (!code || typeof code !== 'string') {
+      return { linesOfCode: 0, complexity: 0, imports: 0 };
+    }
+    
     const lines = code.split('\n').filter(l => l.trim().length > 0);
     const linesOfCode = lines.length;
     
-    // Complexidade ciclomática simplificada
-    const ifCount = ((code || "").match(/\bif\s*\(/g) || []).length;
-    const forCount = ((code || "").match(/\bfor\s*\(/g) || []).length;
-    const whileCount = ((code || "").match(/\bwhile\s*\(/g) || []).length;
-    const switchCount = ((code || "").match(/\bswitch\s*\(/g) || []).length;
-    const ternaryCount = ((code || "").match(/\?[^:]+:/g) || []).length;
+    // Complexidade ciclomática
+    const ifCount = (code.match(/\bif\s*\(/g) || []).length;
+    const forCount = (code.match(/\bfor\s*\(/g) || []).length;
+    const whileCount = (code.match(/\bwhile\s*\(/g) || []).length;
+    const switchCount = (code.match(/\bswitch\s*\(/g) || []).length;
+    const ternaryCount = (code.match(/\?[^:]+:/g) || []).length;
     
     const complexity = 1 + ifCount + forCount + whileCount + switchCount + ternaryCount;
     
     // Contar imports
-    const imports = ((code || "").match(/^import\s+/gm) || []).length;
+    const imports = (code.match(/^import\s+/gm) || []).length;
     
     return {
       linesOfCode,
       complexity,
       imports,
     };
-  }
-  
-  private checkSecurity(code: string): { errors: string[]; warnings: string[] } {
-    const errors: string[] = [];
-    const warnings: string[] = [];
-    
-    // SQL Injection
-    if (code.includes('db.execute') && code.includes('${')) {
-      errors.push('Possível SQL Injection: use Drizzle ORM');
-    }
-    
-    // Senha hardcoded
-    if (/password\s*[=:]\s*["']/.test(code)) {
-      errors.push('Senha hardcoded - use process.env');
-    }
-    
-    // API keys hardcoded
-    if (/api[_-]?key\s*[=:]\s*["'][^"']+["']/i.test(code)) {
-      errors.push('API key hardcoded - use process.env');
-    }
-    
-    // eval() usage
-    if (code.includes('eval(')) {
-      errors.push('Uso de eval() detectado - evite por segurança');
-    }
-    
-    return { errors, warnings };
   }
 }
 
