@@ -55,6 +55,7 @@ import FluxogramasPage from "@/pages/fluxogramas/index";
 import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 import UpdatesPage from "@/pages/updates/index";
 import GitAnalyticsPage from "@/pages/git-analytics/index";
+import EstoquesPage from "@/pages/estoques/index";
 
 function Router() {
   return (
@@ -278,6 +279,11 @@ function Router() {
       <Route path="/git-analytics">
         <ProtectedRoute>
           <GitAnalyticsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesPage />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />

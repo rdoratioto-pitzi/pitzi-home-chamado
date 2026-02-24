@@ -55,6 +55,7 @@ export type ModulePermissions = {
   apis: boolean;
   configuracoes: boolean;
   updates: boolean;
+  estoques: boolean;
 };
 
 // ============== TICKETS (Chamados) ==============

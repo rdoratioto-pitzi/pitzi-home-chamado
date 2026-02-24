@@ -35,6 +35,7 @@ import {
   ClipboardList,
   Sparkles,
   GitBranch,
+  Warehouse,
 } from "lucide-react";
 import {
   Sidebar,
@@ -106,6 +107,12 @@ title: "Chat IA Renov",
     url: "/fluxogramas",
     icon: Workflow,
     module: "fluxogramas" as keyof ModulePermissions,
+  },
+  {
+    title: "Estoques",
+    url: "/estoques",
+    icon: Warehouse,
+    module: "estoques" as keyof ModulePermissions,
   },
 ];
 
@@ -226,6 +233,7 @@ export function AppSidebar() {
           conhecimento: true,
           apis: true,
           configuracoes: true,
+          estoques: true,
         };
       }
       if (currentUser?.modulePermissions) {
@@ -247,6 +255,7 @@ export function AppSidebar() {
       conhecimento: false,
       apis: false,
       configuracoes: false,
+      estoques: false,
     };
   }, [currentUser]);
 
