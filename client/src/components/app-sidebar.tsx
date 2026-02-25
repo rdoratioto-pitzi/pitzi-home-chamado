@@ -76,7 +76,7 @@ const allMenuItems = [
     module: null,
   },
   {
-    title: "Macgyver IA",
+title: "Chat IA Renov",
     url: "/macgyver-ia",
     icon: Bot,
     module: null,
@@ -154,7 +154,7 @@ const pricingSubItems = [
 ];
 
 const conhecimentoSubItems = [
-  { title: "Visão Geral", url: "/conhecimento", icon: LayoutDashboard },
+{ title: "Biblioteca", url: "/conhecimento", icon: LayoutDashboard },
   { title: "Meus Favoritos", url: "/conhecimento/favoritos", icon: Star },
   { title: "Prompts", url: "/conhecimento/prompts", icon: Sparkles },
 ];

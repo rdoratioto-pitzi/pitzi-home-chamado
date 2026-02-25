@@ -1373,9 +1373,9 @@ export default function MacgyverIA() {
                 <div className="flex flex-col items-center text-center space-y-3">
                   <MacGyverIcon size={56} />
                   <div className="space-y-1.5">
-                    <h1 className="text-2xl font-bold tracking-tight" data-testid="text-welcome-heading">
-                      Macgyver IA Renov
-                    </h1>
+<h1 className="text-2xl font-bold tracking-tight" data-testid="text-welcome-heading">  
+Chat IA Renov  
+</h1>
                     <p className="text-muted-foreground text-sm max-w-md mx-auto">
                       Seu assistente estrategico com IA. Analise dados, gere relatorios e obtenha insights em tempo real.
                     </p>

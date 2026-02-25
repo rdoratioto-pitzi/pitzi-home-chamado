@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RichTextarea } from "@/components/rich-textarea";
+import { RichContent } from "@/components/rich-content";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,7 +33,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { User, KanbanCard, KanbanComment } from "@shared/schema";
+import type { User, KanbanCard, KanbanComment, KanbanCommentWithUser } from "@shared/schema";
 import { useEffect, useState, useRef } from "react";
 import { useUpload } from "@/hooks/use-upload";
 
@@ -72,8 +73,11 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState("");
+  const [commentImages, setCommentImages] = useState<string[]>([]);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState("");
+  const [objectivesImages, setObjectivesImages] = useState<string[]>([]);
+  const [developmentImages, setDevelopmentImages] = useState<string[]>([]);
 
 
   const { data: users = [] } = useQuery<User[]>({
@@ -85,8 +89,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
     u.name.toLowerCase().includes(mentionFilter.toLowerCase())
   );
 
-  const handleCommentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleCommentChange = (value: string) => {
     setNewComment(value);
     
     const lastAtPos = value.lastIndexOf("@");
@@ -145,7 +148,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   const subtasks = allProjectCards.filter(c => c.parentCardId === cardId);
   const parentOptions = allProjectCards.filter(c => !c.parentCardId && c.id !== cardId);
 
-  const { data: comments = [] } = useQuery<KanbanComment[]>({
+  const { data: comments = [] } = useQuery<KanbanCommentWithUser[]>({
     queryKey: ["/api/cards", cardId, "comments"],
     queryFn: async () => {
       const res = await fetch(`/api/cards/${cardId}/comments`);
@@ -173,6 +176,18 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
 
   const [selectedParentId, setSelectedParentId] = useState<string | null>(parentCardId || null);
 
+  // Função para extrair imagens base64 do HTML
+  const extractImagesFromHtml = (html: string): string[] => {
+    if (!html) return [];
+    const imgRegex = /<img[^>]+src="(data:image\/[^"]+)"/g;
+    const images: string[] = [];
+    let match;
+    while ((match = imgRegex.exec(html)) !== null) {
+      images.push(match[1]);
+    }
+    return images;
+  };
+
   // Consolidado em um único useEffect com dependência apenas [cardId] para evitar loops
   useEffect(() => {
     if (open) {
@@ -189,6 +204,11 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
           endDate: cardData.endDate ? new Date(cardData.endDate).toISOString().split('T')[0] : "",
           tag: cardData.tags?.[0] || "",
         });
+        
+        // Extrair imagens dos campos HTML
+        setObjectivesImages(extractImagesFromHtml(cardData.objectives ? String(cardData.objectives) : ""));
+        setDevelopmentImages(extractImagesFromHtml(cardData.development ? String(cardData.development) : ""));
+        
         if (cardData.attachments && cardData.attachments.length > 0) {
           setAttachments(cardData.attachments.map((path: string) => ({
             name: path.split("/").pop() || "Arquivo",
@@ -219,6 +239,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
           tag: "",
         });
         setAttachments([]);
+        setObjectivesImages([]);
+        setDevelopmentImages([]);
         setSelectedParentId(parentCardId || null);
       }
     }
@@ -273,7 +295,6 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
     mutationFn: async (content: string) => {
       return apiRequest("POST", `/api/cards/${cardId}/comments`, {
         content,
-        userId: "admin",
       });
     },
     onSuccess: () => {
@@ -366,6 +387,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                             data-testid="input-card-objectives"
                             value={field.value || ''}
                             onChange={(val) => field.onChange(val)}
+                            images={objectivesImages}
+                            onImagesChange={setObjectivesImages}
                           />
                         </FormControl>
                         <FormMessage />
@@ -387,6 +410,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                             data-testid="input-card-development"
                             value={field.value || ''}
                             onChange={(val) => field.onChange(val)}
+                            images={developmentImages}
+                            onImagesChange={setDevelopmentImages}
                           />
                         </FormControl>
                         <FormMessage />
@@ -403,10 +428,13 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                       {!readOnly && (
                         <div className="space-y-2">
                           <div className="flex gap-2 relative">
-                            <Input 
-                              placeholder="Adicionar um comentário... Use @ para mencionar" 
+                            <RichTextarea
+                              placeholder="Adicionar um comentário... Use @ para mencionar"
                               value={newComment}
                               onChange={handleCommentChange}
+                              images={commentImages}
+                              onImagesChange={setCommentImages}
+                              className="min-h-[80px]"
                             />
                             {showMentions && filteredUsers.length > 0 && (
                               <div className="absolute bottom-full left-0 w-64 bg-popover border rounded-md shadow-md z-50 mb-1 max-h-48 overflow-y-auto">
@@ -424,11 +452,13 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                                 ))}
                               </div>
                             )}
-                            <Button 
-                              type="button" 
-                              size="sm" 
+                          </div>
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              size="sm"
                               onClick={() => commentMutation.mutate(newComment)}
-                              disabled={!newComment || commentMutation.isPending}
+                              disabled={!newComment.trim() || commentMutation.isPending}
                             >
                               Enviar
                             </Button>
@@ -439,7 +469,6 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                         {[...comments].sort((a, b) => 
                           new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
                         ).map((comment) => {
-                          const user = users.find(u => u.id === comment.userId);
                           return (
                             <div key={comment.id} className="bg-muted/30 p-3 rounded-lg text-sm border-l-2 border-primary/50">
                               <div className="flex items-center justify-between mb-2">
@@ -447,7 +476,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                                   <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
                                     <UserIcon className="h-3 w-3 text-primary" />
                                   </div>
-                                  <span className="font-semibold text-sm">{user?.name || "Usuário"}</span>
+                                  <span className="font-semibold text-sm">{comment.author?.name || "Usuário"}</span>
                                 </div>
                                 <span className="text-[10px] text-muted-foreground">
                                   {new Date(comment.createdAt!).toLocaleString("pt-BR", {
@@ -459,7 +488,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                                   })}
                                 </span>
                               </div>
-                              <p className="text-sm text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
+                              <RichContent content={comment.content || ''} />
                             </div>
                           );
                         })}

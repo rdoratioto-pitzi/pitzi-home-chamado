@@ -3,6 +3,10 @@ import { openRouterService } from '../services/openrouter.service';
 import { writeFileSync, existsSync, readFileSync } from 'fs';
 import { dirname } from 'path';
 import { mkdirSync } from 'fs';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 interface CoderResult {
   success: boolean;

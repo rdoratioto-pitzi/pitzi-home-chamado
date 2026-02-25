@@ -237,6 +237,11 @@ export const insertKanbanCommentSchema = createInsertSchema(kanbanComments).omit
 export type InsertKanbanComment = z.infer<typeof insertKanbanCommentSchema>;
 export type KanbanComment = typeof kanbanComments.$inferSelect;
 
+// Kanban Comment with User data for JOIN queries
+export type KanbanCommentWithUser = typeof kanbanComments.$inferSelect & {
+  author: { id: string; name: string; email: string };
+};
+
 // ============== OKRs ==============
 export const objectives = pgTable("objectives", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

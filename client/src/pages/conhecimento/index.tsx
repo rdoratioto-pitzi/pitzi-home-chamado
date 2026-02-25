@@ -1,144 +1,71 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { FileBrowser } from "@/components/conhecimento/file-browser";
 import { 
   Search, 
-  Plus, 
-  FileText, 
-  Star, 
-  StarOff,
-  Filter,
-  ChevronRight,
+  Plus,
+  FileText,
   BookOpen,
   FileCheck,
-  ClipboardList,
-  GitBranch,
+  Workflow,
   Users,
-  FileSpreadsheet,
+  ClipboardList,
   HelpCircle,
-  Lock,
-  Globe,
-  Clock,
-  Eye
 } from "lucide-react";
-import type { KnowledgeDocument } from "@shared/schema";
-import { getCurrentUser } from "@/lib/permissions";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-
-const AREAS = [
-  { value: "LAB", label: "Laboratório" },
-  { value: "RH", label: "Recursos Humanos" },
-  { value: "COM", label: "Comercial" },
-  { value: "FIN", label: "Financeiro" },
-  { value: "MKT", label: "Marketing" },
-  { value: "OPS", label: "Operações" },
-  { value: "TI", label: "Tecnologia" },
-];
 
 const TIPOS = [
-  { value: "politica", label: "Políticas Internas", icon: FileCheck, color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-  { value: "pop", label: "POPs", icon: ClipboardList, color: "bg-green-500/10 text-green-600 dark:text-green-400" },
-  { value: "fluxograma", label: "Fluxogramas", icon: GitBranch, color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
-  { value: "mapa_cargo", label: "Mapas de Cargo", icon: Users, color: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
-  { value: "template", label: "Templates", icon: FileSpreadsheet, color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400" },
-  { value: "checklist", label: "Checklists", icon: ClipboardList, color: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" },
-  { value: "faq", label: "FAQs", icon: HelpCircle, color: "bg-pink-500/10 text-pink-600 dark:text-pink-400" },
+  { value: 'politica', label: 'Políticas Internas', icon: FileText, color: 'bg-blue-500' },
+  { value: 'pop', label: 'POPs', icon: FileCheck, color: 'bg-green-500' },
+  { value: 'fluxograma', label: 'Fluxogramas', icon: Workflow, color: 'bg-purple-500' },
+  { value: 'mapa-cargo', label: 'Mapas de Cargo', icon: Users, color: 'bg-orange-500' },
+  { value: 'template', label: 'Templates', icon: BookOpen, color: 'bg-cyan-500' },
+  { value: 'checklist', label: 'Checklists', icon: ClipboardList, color: 'bg-yellow-500' },
+  { value: 'faq', label: 'FAQs', icon: HelpCircle, color: 'bg-pink-500' },
 ];
 
+const AREAS = ['TI', 'RH', 'Comercial', 'Financeiro', 'Marketing', 'Operações'];
+
 const STATUS_OPTIONS = [
-  { value: "rascunho", label: "Rascunho", color: "bg-gray-500/10 text-gray-600" },
-  { value: "em_analise", label: "Em Análise", color: "bg-yellow-500/10 text-yellow-600" },
-  { value: "aprovado", label: "Aprovado", color: "bg-green-500/10 text-green-600" },
-  { value: "arquivado", label: "Arquivado", color: "bg-red-500/10 text-red-600" },
+  { value: 'draft', label: 'Rascunho' },
+  { value: 'review', label: 'Em Revisão' },
+  { value: 'published', label: 'Publicado' },
+  { value: 'archived', label: 'Arquivado' },
 ];
 
 export default function ConhecimentoPage() {
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const user = getCurrentUser();
-  
   const [searchTerm, setSearchTerm] = useState("");
-  const [areaFilter, setAreaFilter] = useState<string>("all");
-  const [tipoFilter, setTipoFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [areaFilter, setAreaFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: documents, isLoading } = useQuery<KnowledgeDocument[]>({
-    queryKey: ["/api/conhecimento"],
+  const { data: documents = [], isLoading } = useQuery({
+    queryKey: ['/api/knowledge/documents'],
   });
-
-  const { data: stats } = useQuery<{ total: number; byTipo: Record<string, number>; byArea: Record<string, number>; byStatus: Record<string, number> }>({
-    queryKey: ["/api/conhecimento/stats"],
-  });
-
-  const { data: favorites } = useQuery<{ documentId: string }[]>({
-    queryKey: ["/api/conhecimento/favoritos", user?.id],
-    enabled: !!user?.id,
-  });
-
-  const favoriteMutation = useMutation({
-    mutationFn: async ({ documentId, action }: { documentId: string; action: "add" | "remove" }) => {
-      if (action === "add") {
-        return apiRequest("POST", `/api/conhecimento/${documentId}/favoritar`, { userId: user?.id });
-      } else {
-        return apiRequest("DELETE", `/api/conhecimento/${documentId}/favoritar/${user?.id}`);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/conhecimento/favoritos", user?.id] });
-      toast({ title: "Sucesso", description: "Favorito atualizado!" });
-    },
-  });
-
-  const favoriteIds = useMemo(() => new Set(favorites?.map(f => f.documentId) || []), [favorites]);
 
   const filteredDocuments = useMemo(() => {
-    if (!documents) return [];
-    
-    return documents.filter(doc => {
+    return documents.filter((doc: any) => {
       const matchesSearch = !searchTerm || 
-        doc.nomeArquivo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (doc.tags && doc.tags.toLowerCase().includes(searchTerm.toLowerCase()));
+        doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.description?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesArea = areaFilter === "all" || doc.area === areaFilter;
-      const matchesTipo = tipoFilter === "all" || doc.tipo === tipoFilter;
+      const matchesType = typeFilter === "all" || doc.type === typeFilter;
       const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
-      
-      return matchesSearch && matchesArea && matchesTipo && matchesStatus;
+
+      return matchesSearch && matchesArea && matchesType && matchesStatus;
     });
-  }, [documents, searchTerm, areaFilter, tipoFilter, statusFilter]);
-
-  const getStatusBadge = (status: string) => {
-    const option = STATUS_OPTIONS.find(s => s.value === status);
-    return option ? (
-      <Badge variant="secondary" className={option.color}>
-        {option.label}
-      </Badge>
-    ) : null;
-  };
-
-  const getTipoInfo = (tipo: string) => {
-    return TIPOS.find(t => t.value === tipo);
-  };
-
-  const getAreaLabel = (area: string) => {
-    return AREAS.find(a => a.value === area)?.label || area;
-  };
+  }, [documents, searchTerm, areaFilter, typeFilter, statusFilter]);
 
   return (
     <div className="flex-1 overflow-auto p-6 space-y-6" data-testid="page-conhecimento">
       <PageHeader
-        title="Base de Conhecimento"
+        title="Biblioteca"
         description="Acesse políticas, procedimentos, templates e documentos internos da organização."
       />
 
@@ -162,13 +89,13 @@ export default function ConhecimentoPage() {
             <SelectContent>
               <SelectItem value="all">Todas as Áreas</SelectItem>
               {AREAS.map(area => (
-                <SelectItem key={area.value} value={area.value}>{area.label}</SelectItem>
+                <SelectItem key={area} value={area}>{area}</SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <Select value={tipoFilter} onValueChange={setTipoFilter}>
-            <SelectTrigger className="w-[160px]" data-testid="select-tipo">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[160px]" data-testid="select-type">
               <SelectValue placeholder="Filtrar por Tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -191,130 +118,57 @@ export default function ConhecimentoPage() {
             </SelectContent>
           </Select>
 
-          <Button onClick={() => setLocation("/conhecimento/novo")} data-testid="button-novo-documento">
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Documento
+          <Button asChild>
+            <Link href="/conhecimento/novo">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Documento
+            </Link>
           </Button>
         </div>
       </div>
 
+      {/* Cards de Estatísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {TIPOS.map(tipo => {
-          const Icon = tipo.icon;
-          const count = stats?.byTipo[tipo.value] || 0;
+        {TIPOS.map((tipo) => {
+          const count = filteredDocuments.filter((doc: any) => doc.type === tipo.value).length;
           return (
-            <Card 
-              key={tipo.value}
-              className={`cursor-pointer hover-elevate transition-all ${tipoFilter === tipo.value ? 'ring-2 ring-primary' : ''}`}
-              onClick={() => setTipoFilter(tipoFilter === tipo.value ? "all" : tipo.value)}
-              data-testid={`card-tipo-${tipo.value}`}
-            >
-              <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                <div className={`p-3 rounded-lg ${tipo.color}`}>
-                  <Icon className="h-5 w-5" />
+            <Card key={tipo.value} className="hover:shadow-md transition-shadow">
+              <CardHeader className="p-4 pb-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${tipo.color}`}>
+                  <tipo.icon className="h-4 w-4 text-white" />
                 </div>
-                <span className="text-sm font-medium">{tipo.label}</span>
-                <span className="text-2xl font-bold">{count}</span>
+                <CardTitle className="text-sm font-medium">{tipo.label}</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="text-2xl font-bold">{count}</div>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4 pb-4">
-          <div>
-            <CardTitle className="text-lg">Documentos</CardTitle>
-            <CardDescription>{filteredDocuments.length} documento(s) encontrado(s)</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="space-y-2 p-4">
-              {[1, 2, 3, 4, 5].map(i => (
-                <Skeleton key={i} className="h-16 w-full" />
-              ))}
-            </div>
-          ) : filteredDocuments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <BookOpen className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Nenhum documento encontrado</p>
-              <Button variant="outline" className="mt-4" onClick={() => setLocation("/conhecimento/novo")}>
-                <Plus className="h-4 w-4 mr-2" />
-                Criar primeiro documento
-              </Button>
-            </div>
-          ) : (
-            <div className="divide-y">
-              {filteredDocuments.map(doc => {
-                const tipoInfo = getTipoInfo(doc.tipo);
-                const TipoIcon = tipoInfo?.icon || FileText;
-                const isFavorite = favoriteIds.has(doc.id);
-                
-                return (
-                  <div 
-                    key={doc.id}
-                    className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors cursor-pointer group"
-                    onClick={() => setLocation(`/conhecimento/${doc.id}`)}
-                    data-testid={`document-row-${doc.id}`}
-                  >
-                    <div className={`p-2 rounded-lg shrink-0 ${tipoInfo?.color || 'bg-gray-500/10'}`}>
-                      <TipoIcon className="h-5 w-5" />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium truncate">{doc.nomeArquivo}</span>
-                        {doc.visibilidade === "departamento" || doc.visibilidade === "funcoes" ? (
-                          <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                        ) : (
-                          <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                        <Badge variant="outline" className="text-xs">{getAreaLabel(doc.area)}</Badge>
-                        <span className="text-xs">•</span>
-                        <span className="text-xs">{doc.versao}</span>
-                        <span className="text-xs">•</span>
-                        <span className="text-xs flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {doc.createdAt && format(new Date(doc.createdAt), "dd MMM yyyy", { locale: ptBR })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {getStatusBadge(doc.status)}
-                      
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          favoriteMutation.mutate({ 
-                            documentId: doc.id, 
-                            action: isFavorite ? "remove" : "add" 
-                          });
-                        }}
-                        data-testid={`button-favorite-${doc.id}`}
-                      >
-                        {isFavorite ? (
-                          <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                        ) : (
-                          <StarOff className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                      
-                      <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Lista de Documentos - Estilo GitHub */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Documentos</h2>
+          <span className="text-sm text-muted-foreground">
+            {filteredDocuments.length} documento(s) encontrado(s)
+          </span>
+        </div>
+        
+        <FileBrowser
+          files={filteredDocuments.map((doc: any) => ({
+            type: 'file' as const,
+            name: doc.title,
+            description: doc.description || 'Sem descrição',
+            updatedAt: new Date(doc.updatedAt),
+            path: `/conhecimento/${doc.id}`,
+          }))}
+          breadcrumbs={[
+            { name: 'Biblioteca', path: '/conhecimento' }
+          ]}
+        />
+      </div>
     </div>
   );
 }
