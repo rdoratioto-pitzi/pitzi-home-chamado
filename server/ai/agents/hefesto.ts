@@ -1,3 +1,4 @@
+import { applyPatch, createPatch, parsePatch } from 'diff';
 import { openRouterService } from '../services/openrouter.service';
 import { writeFileSync, existsSync, readFileSync } from 'fs';
 import { dirname } from 'path';
@@ -16,7 +17,7 @@ interface CoderResult {
   custo: number;
   tentativas: number;
   erros: string[];
-  modoUsado: 'DIFF' | 'COMPLETO';
+  modoUsado: 'PATCH' | 'COMPLETO';
 }
 
 interface ModelConfig {
@@ -29,7 +30,7 @@ interface ModelConfig {
 export class HefestoAgent {
   
   private readonly MAX_TENTATIVAS = 3;
-  private readonly DIFF_THRESHOLD = 200;
+  private readonly PATCH_THRESHOLD = 200; // linhas
   
   async execute(params: {
     prompt: string;
@@ -37,44 +38,41 @@ export class HefestoAgent {
     modelo?: ModelConfig;
   }): Promise<CoderResult> {
     
-    console.log('🔨 [Hefesto] Iniciando implementação com estratégia híbrida...');
+    console.log('🔨 [Hefesto V8] Iniciando com Git Diff nativo...');
     
     const arquivoAlvo = this.extrairArquivoAlvo(params.prompt);
     const estrategia = await this.decidirEstrategia(arquivoAlvo, params.prompt);
     
-    console.log(`📋 [Hefesto] Estratégia escolhida: ${estrategia}`);
+    console.log(`📋 [Hefesto] Estratégia: ${estrategia}`);
     
     try {
-      if (estrategia === 'DIFF') {
-        return await this.executarComDiff(params, arquivoAlvo!);
+      if (estrategia === 'PATCH') {
+        return await this.executarComPatch(params, arquivoAlvo!);
       } else {
         return await this.executarCompleto(params, arquivoAlvo);
       }
     } catch (error: any) {
-      // FALLBACK: Se DIFF falhou, tentar COMPLETO
-      if (estrategia === 'DIFF' && error.message.includes('Falha após')) {
-        console.log('');
+      // FALLBACK: Se PATCH falhou, tentar COMPLETO
+      if (estrategia === 'PATCH' && error.message.includes('Falha após')) {
         console.log('🔄 [Hefesto] FALLBACK ATIVADO!');
-        console.log('⚠️  [Hefesto] Modo DIFF falhou após 3 tentativas');
-        console.log('🔄 [Hefesto] Tentando modo COMPLETO como alternativa...');
-        console.log('');
+        console.log('⚠️  [Hefesto] Modo PATCH falhou');
+        console.log('🔄 [Hefesto] Tentando modo COMPLETO...');
         
         try {
           const result = await this.executarCompleto(params, arquivoAlvo);
           return {
             ...result,
-            erros: [...result.erros, 'DIFF falhou, usado COMPLETO como fallback'],
+            erros: [...result.erros, 'PATCH falhou, usado COMPLETO como fallback'],
           };
         } catch (fallbackError: any) {
-          throw new Error(`DIFF e COMPLETO falharam. DIFF: ${error.message}, COMPLETO: ${fallbackError.message}`);
+          throw new Error(`PATCH e COMPLETO falharam. PATCH: ${error.message}, COMPLETO: ${fallbackError.message}`);
         }
       }
-      
       throw error;
     }
   }
   
-  private async decidirEstrategia(arquivoAlvo: string | null, prompt: string): Promise<'DIFF' | 'COMPLETO'> {
+  private async decidirEstrategia(arquivoAlvo: string | null, prompt: string): Promise<'PATCH' | 'COMPLETO'> {
     if (!arquivoAlvo || !existsSync(arquivoAlvo)) {
       return 'COMPLETO';
     }
@@ -82,7 +80,7 @@ export class HefestoAgent {
     const conteudo = readFileSync(arquivoAlvo, 'utf-8');
     const linhas = conteudo.split('\n').length;
     
-    if (linhas < this.DIFF_THRESHOLD) {
+    if (linhas < this.PATCH_THRESHOLD) {
       return 'COMPLETO';
     }
     
@@ -90,15 +88,14 @@ export class HefestoAgent {
       return 'COMPLETO';
     }
     
-    console.log(`📊 [Hefesto] Arquivo tem ${linhas} linhas (>${this.DIFF_THRESHOLD}) → usando DIFF`);
-    return 'DIFF';
+    console.log(`📊 [Hefesto] Arquivo tem ${linhas} linhas → usando PATCH`);
+    return 'PATCH';
   }
   
-  private async executarComDiff(params: any, arquivoAlvo: string): Promise<CoderResult> {
-    console.log('✂️  [Hefesto] Modo DIFF ativado');
+  private async executarComPatch(params: any, arquivoAlvo: string): Promise<CoderResult> {
+    console.log('✂️  [Hefesto] Modo PATCH (Git Diff Nativo)');
     
     let tentativa = 0;
-    let ultimoErro = '';
     const erros: string[] = [];
     let tokensInputTotal = 0;
     let tokensOutputTotal = 0;
@@ -109,42 +106,46 @@ export class HefestoAgent {
       
       try {
         const conteudoOriginal = readFileSync(arquivoAlvo, 'utf-8');
-        const promptDiff = this.construirPromptDiff(params.prompt, conteudoOriginal, ultimoErro);
         
-        const startTime = Date.now();
         const result = await openRouterService.chat({
           model: params.modelId,
           messages: [
-            { role: 'system', content: this.getSystemPromptDiff() },
-            { role: 'user', content: promptDiff }
+            { role: 'system', content: this.getSystemPromptPatch() },
+            { role: 'user', content: this.construirPromptPatch(params.prompt, conteudoOriginal, arquivoAlvo) }
           ],
           temperature: 0,
           maxTokens: 40000,
         });
         
-        const tempoDecorrido = ((Date.now() - startTime) / 1000).toFixed(1);
-        console.log(`⏱️  [Hefesto] Resposta em ${tempoDecorrido}s`);
-        
         tokensInputTotal += result.tokensInput;
         tokensOutputTotal += result.tokensOutput;
         
-        const novoConteudo = this.aplicarDiff(conteudoOriginal, result.content);
+        console.log(`📊 [Hefesto] Tokens: ${result.tokensInput} in / ${result.tokensOutput} out`);
+        
+        // Aplicar patch usando biblioteca 'diff'
+        const patchTexto = this.limparPatch(result.content);
+        console.log(`📝 [Hefesto] Patch recebido (${patchTexto.length} chars)`);
+        
+        const novoConteudo = applyPatch(conteudoOriginal, patchTexto);
+        
+        if (!novoConteudo || novoConteudo === conteudoOriginal) {
+          erros.push(`Tentativa ${tentativa}: Patch não aplicou (formato inválido)`);
+          console.log('❌ [Hefesto] Patch não aplicou');
+          continue;
+        }
+        
+        // Validar
         const validacao = await this.validarCodigo(novoConteudo, arquivoAlvo);
         
         if (!validacao.valido) {
-          ultimoErro = validacao.erros.join('; ');
-          erros.push(`Tentativa ${tentativa}: ${ultimoErro}`);
-          console.log(`❌ [Hefesto] Validação falhou: ${ultimoErro}`);
-          
-          if (tentativa < this.MAX_TENTATIVAS) {
-            continue;
-          } else {
-            throw new Error(`Falha após ${this.MAX_TENTATIVAS} tentativas: ${ultimoErro}`);
-          }
+          erros.push(`Tentativa ${tentativa}: ${validacao.erros.join('; ')}`);
+          console.log(`❌ [Hefesto] Validação falhou: ${validacao.erros[0]}`);
+          continue;
         }
         
+        // Salvar
         writeFileSync(arquivoAlvo, novoConteudo, 'utf-8');
-        console.log(`✅ [Hefesto] Arquivo atualizado via DIFF`);
+        console.log(`✅ [Hefesto] Patch aplicado com sucesso!`);
         
         const custo = this.calcularCusto(tokensInputTotal, tokensOutputTotal, params.modelo);
         
@@ -157,24 +158,20 @@ export class HefestoAgent {
           custo,
           tentativas: tentativa,
           erros,
-          modoUsado: 'DIFF',
+          modoUsado: 'PATCH',
         };
         
       } catch (error: any) {
-        ultimoErro = error.message;
         erros.push(`Tentativa ${tentativa}: ${error.message}`);
-        
-        if (tentativa >= this.MAX_TENTATIVAS) {
-          throw new Error(`Falha após ${this.MAX_TENTATIVAS} tentativas: ${ultimoErro}`);
-        }
+        console.log(`❌ [Hefesto] Erro: ${error.message}`);
       }
     }
     
-    throw new Error('Loop excedido');
+    throw new Error(`Falha após ${this.MAX_TENTATIVAS} tentativas: ${erros[erros.length - 1]}`);
   }
   
   private async executarCompleto(params: any, arquivoAlvo: string | null): Promise<CoderResult> {
-    console.log('📄 [Hefesto] Modo COMPLETO ativado');
+    console.log('📄 [Hefesto] Modo COMPLETO');
     
     let tentativa = 0;
     let ultimoErro = '';
@@ -219,20 +216,15 @@ export class HefestoAgent {
         if (!validacao.valido) {
           ultimoErro = validacao.erros.join('; ');
           erros.push(`Tentativa ${tentativa}: ${ultimoErro}`);
-          console.log(`❌ [Hefesto] Validação falhou: ${ultimoErro}`);
-          
-          if (tentativa < this.MAX_TENTATIVAS) {
-            continue;
-          } else {
-            throw new Error(`Falha após ${this.MAX_TENTATIVAS} tentativas: ${ultimoErro}`);
-          }
+          console.log(`❌ [Hefesto] Validação falhou: ${validacao.erros[0]}`);
+          continue;
         }
         
         const arquivosCriados = await this.salvarArquivos(codigoLimpo, arquivoAlvo);
         const custo = this.calcularCusto(tokensInputTotal, tokensOutputTotal, params.modelo);
         
-        console.log(`💰 [Hefesto] Custo total: $${custo.toFixed(4)}`);
-        console.log(`✅ [Hefesto] Sucesso na tentativa ${tentativa}!`);
+        console.log(`💰 [Hefesto] Custo: $${custo.toFixed(4)}`);
+        console.log(`✅ [Hefesto] Sucesso!`);
         
         return {
           success: true,
@@ -249,78 +241,70 @@ export class HefestoAgent {
       } catch (error: any) {
         ultimoErro = error.message;
         erros.push(`Tentativa ${tentativa}: ${error.message}`);
-        
-        if (tentativa >= this.MAX_TENTATIVAS) {
-          throw error;
-        }
       }
     }
     
-    throw new Error('Loop excedido');
+    throw new Error(`Falha após ${this.MAX_TENTATIVAS} tentativas: ${ultimoErro}`);
   }
   
-  private getSystemPromptDiff(): string {
-    return `Você é Hefesto em MODO DIFF.
+  private getSystemPromptPatch(): string {
+    return `Você é Hefesto. Retorne APENAS o unified diff patch.
 
-TAREFA: Retornar APENAS as mudanças necessárias no formato:
-
-LINHA N: código modificado
-
-EXEMPLOS:
-LINHA 42: title: "Chat IA Renov",
-LINHA 85: import { ChatBot } from "./chat";
-LINHA 150-153: [DELETAR]
-LINHA 154: // Nova funcionalidade
+EXEMPLO EXATO:
+--- a/file.tsx
++++ b/file.tsx
+@@ -5,4 +5,7 @@
+ import { useState } from "react";
+ 
++/**
++ * Component description
++ */
+ export function MyComponent() {
+   return <div>Hello</div>;
 
 REGRAS:
-- Retorne APENAS linhas que precisam mudar
-- Use LINHA N: para substituições
-- Use LINHA N-M: [DELETAR] para remover blocos
-- NÃO retorne o arquivo completo
-- NÃO use markdown
-- Seja PRECISO no número da linha`;
+1. Primeira linha: --- a/caminho
+2. Segunda linha: +++ b/caminho
+3. @@ -linha,qtd +linha,qtd @@
+4. Linhas de contexto SEM prefixo
+5. Linhas removidas com -
+6. Linhas adicionadas com +
+7. NÃO use \`\`\`diff
+8. NÃO explique
+9. APENAS o patch`;
   }
   
   private getSystemPromptCompleto(): string {
     return `Você é Hefesto em MODO COMPLETO.
 
-REGRAS ABSOLUTAS:
+REGRAS:
 1. Retorne APENAS código válido
-2. NÃO use markdown com \`\`\`
-3. NÃO adicione explicações
-4. Use formato: //ARQUIVO: caminho seguido do código
-5. Se modificar arquivo existente, retorne COMPLETO
+2. NÃO use markdown
+3. Use formato: //ARQUIVO: caminho seguido do código
+4. Se modificar arquivo existente, retorne COMPLETO
 
-TECNOLOGIAS:
-✅ shadcn/ui, Wouter, TanStack Query, Drizzle ORM, Zod
-❌ Material-UI, React Router, Prisma, Redux
-
-IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
+Stack: shadcn/ui, Wouter, TanStack Query, Drizzle ORM
+Proibido: Material-UI, React Router, Prisma, Redux`;
   }
   
-  private construirPromptDiff(promptOriginal: string, conteudoArquivo: string, ultimoErro: string): string {
-    let prompt = '';
-    
-    if (ultimoErro) {
-      prompt += `ERRO ANTERIOR: ${ultimoErro}\n\nCORRIJA e tente novamente.\n\n`;
-    }
-    
-    const linhasNumeradas = conteudoArquivo.split('\n')
-      .map((linha, i) => `${i + 1}: ${linha}`)
-      .join('\n');
-    
-    prompt += `ARQUIVO ATUAL:\n${linhasNumeradas}\n\n`;
-    prompt += `TAREFA:\n${promptOriginal}\n\n`;
-    prompt += `RETORNE: Apenas as linhas que precisam mudar no formato LINHA N: código`;
-    
-    return prompt;
+  private construirPromptPatch(promptOriginal: string, conteudoArquivo: string, arquivoAlvo: string): string {
+    return `Arquivo: ${arquivoAlvo}
+
+Conteúdo atual (${conteudoArquivo.split('\n').length} linhas):
+\`\`\`typescript
+${conteudoArquivo}
+\`\`\`
+
+Tarefa: ${promptOriginal}
+
+Retorne unified diff patch para aplicar as mudanças.`;
   }
   
   private construirPromptCompleto(promptOriginal: string, conteudoArquivo: string, ultimoErro: string, tentativa: number): string {
     let prompt = '';
     
     if (tentativa > 1 && ultimoErro) {
-      prompt += `TENTATIVA ${tentativa}: Erro anterior: "${ultimoErro}"\nCORRIJA e tente novamente.\n\n`;
+      prompt += `TENTATIVA ${tentativa}: Erro: "${ultimoErro}"\nCORRIJA e tente novamente.\n\n`;
     }
     
     if (conteudoArquivo) {
@@ -332,49 +316,18 @@ IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
     return prompt;
   }
   
-  private aplicarDiff(conteudoOriginal: string, diff: string): string {
-    const linhas = conteudoOriginal.split('\n');
-    
-    console.log(`📝 [Hefesto] Aplicando DIFF... (${diff.length} chars)`);
-    
-    const diffLimpo = diff.replace(/```[a-z]*\n?/gi, '').replace(/```$/g, '').trim();
-    
-    if (!diffLimpo) {
-      console.log('⚠️  [Hefesto] DIFF vazio, retornando original');
-      return conteudoOriginal;
-    }
-    
-    const mudancas = diffLimpo.split('\n').filter(l => l.trim());
-    console.log(`📋 [Hefesto] ${mudancas.length} mudanças encontradas`);
-    
-    for (const mudanca of mudancas) {
-      const matchLinha = mudanca.match(/^LINHA\s+(\d+):\s*(.*)$/i);
-      if (matchLinha && matchLinha.length >= 3) {
-        const numeroLinha = parseInt(matchLinha[1]) - 1;
-        const novoConteudo = matchLinha[2];
-        
-        if (numeroLinha >= 0 && numeroLinha < linhas.length) {
-          linhas[numeroLinha] = novoConteudo;
-          console.log(`✏️  [Hefesto] Linha ${numeroLinha + 1} modificada`);
-        } else {
-          console.log(`⚠️  [Hefesto] Linha ${numeroLinha + 1} fora do range`);
-        }
-        continue;
-      }
-      
-      const matchDelete = mudanca.match(/^LINHA\s+(\d+)-(\d+):\s*\[DELETAR\]$/i);
-      if (matchDelete && matchDelete.length >= 3) {
-        const inicio = parseInt(matchDelete[1]) - 1;
-        const fim = parseInt(matchDelete[2]) - 1;
-        
-        if (inicio >= 0 && fim < linhas.length && inicio <= fim) {
-          linhas.splice(inicio, fim - inicio + 1);
-          console.log(`🗑️  [Hefesto] Linhas ${inicio + 1}-${fim + 1} deletadas`);
-        }
-      }
-    }
-    
-    return linhas.join('\n');
+  private limparPatch(patch: string): string {
+    return patch
+      .replace(/```diff\n?/gi, '')
+      .replace(/```\n?/gi, '')
+      .trim();
+  }
+  
+  private limparCodigo(codigo: string): string {
+    return codigo
+      .replace(/```[a-z]*\n?/gi, '')
+      .replace(/```$/g, '')
+      .trim();
   }
   
   private async validarCodigo(codigo: string, arquivoAlvo: string | null): Promise<{ valido: boolean; erros: string[] }> {
@@ -390,11 +343,6 @@ IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
     if (openBraces !== closeBraces) {
       erros.push(`Chaves desbalanceadas: ${openBraces} vs ${closeBraces}`);
     }
-    
-    const proibidas = ['@mui/material', 'react-router-dom'];
-    proibidas.forEach(lib => {
-      if (codigo.includes(lib)) erros.push(`Biblioteca proibida: ${lib}`);
-    });
     
     return { valido: erros.length === 0, erros };
   }
@@ -420,14 +368,8 @@ IMPORTANTE: Cuide da sintaxe! Chaves JSX: href={value} não href=value`;
     const dir = dirname(caminho);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(caminho, conteudo, 'utf-8');
-    console.log(`✅ [Hefesto] Salvo: ${caminho} (${conteudo.split('\n').length} linhas)`);
-  }
-  
-  private limparCodigo(codigo: string): string {
-    return codigo
-      .replace(/```[a-z]*\n?/gi, '')
-      .replace(/```$/g, '')
-      .trim();
+    const linhas = conteudo.split('\n').length;
+    console.log(`✅ [Hefesto] Salvo: ${caminho} (${linhas} linhas)`);
   }
   
   private extrairArquivoAlvo(prompt: string): string | null {
