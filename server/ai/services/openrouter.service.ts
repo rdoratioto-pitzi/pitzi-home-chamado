@@ -10,12 +10,9 @@ interface OpenRouterResponse {
     };
   }>;
   usage?: {
-    prompt_tokens?: number;
-    completion_tokens?: number;
-  };
-  error?: {
-    message: string;
-    code: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
   };
 }
 
@@ -43,63 +40,61 @@ class OpenRouterService {
     }
   }
 
-  async chat(params: ChatParams): Promise<ChatResult> {
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://renovsmart.com.br',
-        'X-Title': 'Renov AI Dev System',
-      },
-      body: JSON.stringify({
-        model: params.model,
-        messages: params.messages,
-        temperature: params.temperature ?? 0,
-        max_tokens: params.maxTokens ?? 40000,
-      }),
-    });
+  async chat(params: {
+    model: string;
+    messages: OpenRouterMessage[];
+    temperature?: number;
+    maxTokens?: number;
+  }): Promise<{
+    content: string;
+    tokensInput: number;
+    tokensOutput: number;
+  }> {
+    try {
+      console.log('📡 [OpenRouter] Request:', params.model);
+      
+      const response = await fetch(`${this.baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+          'HTTP-Referer': 'https://renovsmart.com.br',
+          'X-Title': 'Renov AI Dev System',
+        },
+        body: JSON.stringify({
+          model: params.model,
+          messages: params.messages,
+          temperature: params.temperature ?? 0,
+          max_tokens: params.maxTokens ?? 40000,
+        }),
+      });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('❌ [OpenRouter] Erro HTTP:', response.status, error);
-      throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
-    }
+      console.log('📡 [OpenRouter] Status:', response.status);
 
-    const data = await response.json() as OpenRouterResponse;
-    
-    // Debug: ver resposta
-    console.log('📡 [OpenRouter] Status:', response.status);
-    console.log('📊 [OpenRouter] Resposta (primeiros 300 chars):', JSON.stringify(data).substring(0, 300));
-    
-    // Verificar erro na resposta
-    if (data.error) {
-      console.error('❌ [OpenRouter] Erro na resposta:', data.error);
-      throw new Error(`OpenRouter error: ${data.error.message}`);
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('❌ [OpenRouter] Error:', error);
+        throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
+      }
+
+      const data = await response.json() as OpenRouterResponse;
+      
+      console.log('📊 [OpenRouter] Choices:', data.choices?.length || 0);
+      
+      if (!data.choices || data.choices.length === 0) {
+        console.error('❌ [OpenRouter] Response:', JSON.stringify(data).substring(0, 500));
+        throw new Error('OpenRouter retornou resposta vazia');
+      }
+
+      return {
+        content: data.choices[0]?.message?.content || '',
+        tokensInput: data.usage?.prompt_tokens || 0,
+        tokensOutput: data.usage?.completion_tokens || 0,
+      };
+    } catch (error: any) {
+      console.error('❌ [OpenRouter] Exception:', error.message);
+      throw error;
     }
-    
-    // Validar formato
-    if (!data.choices || data.choices.length === 0) {
-      console.error('❌ [OpenRouter] Resposta sem choices:', JSON.stringify(data));
-      throw new Error('OpenRouter retornou resposta sem choices');
-    }
-    
-    if (!data.choices[0].message) {
-      console.error('❌ [OpenRouter] Choice sem message:', JSON.stringify(data.choices[0]));
-      throw new Error('OpenRouter retornou choice sem message');
-    }
-    
-    const content = data.choices[0].message.content || '';
-    const tokensInput = data.usage?.prompt_tokens || 0;
-    const tokensOutput = data.usage?.completion_tokens || 0;
-    
-    console.log(`✅ [OpenRouter] Sucesso: ${tokensInput} in / ${tokensOutput} out`);
-    
-    return {
-      content,
-      tokensInput,
-      tokensOutput,
-    };
   }
 
   async testConnection(model: string = 'minimax/minimax-01'): Promise<boolean> {
