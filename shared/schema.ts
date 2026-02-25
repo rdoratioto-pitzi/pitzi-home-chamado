@@ -1300,7 +1300,7 @@ export type AiModel = typeof aiModels.$inferSelect;
 // Plans executados
 export const aiPlans = pgTable("ai_plans", {
   id: varchar("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
   titulo: text("titulo").notNull(),
   requisito: text("requisito").notNull(),
   arquivoOrigem: text("arquivo_origem").notNull(),
