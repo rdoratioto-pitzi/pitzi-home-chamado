@@ -206,6 +206,20 @@ export function registerProjectRoutes(router: Router) {
       }
     }
     const cards = await storage.getKanbanCards(getId(req));
+    
+    // Sort cards by priority: muito_urgente > urgente > normal
+    const priorityOrder: Record<string, number> = {
+      "muito_urgente": 0,
+      "urgente": 1,
+      "normal": 2
+    };
+    
+    cards.sort((a, b) => {
+      const priorityA = priorityOrder[a.priority] ?? 3;
+      const priorityB = priorityOrder[b.priority] ?? 3;
+      return priorityA - priorityB;
+    });
+    
     res.json(cards);
   });
 
@@ -391,9 +405,11 @@ export function registerProjectRoutes(router: Router) {
 
   router.post("/api/cards/:id/comments", requireAuth, async (req, res) => {
     try {
+      const { userId } = getSessionUser(req);
       const validated = insertKanbanCommentSchema.parse({
         ...req.body,
         cardId: getId(req),
+        userId: userId,
       });
       const comment = await storage.createKanbanComment(validated);
 

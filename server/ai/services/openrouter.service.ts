@@ -1,18 +1,13 @@
-import fetch from 'node-fetch';
-
 interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
 interface OpenRouterResponse {
-  id: string;
-  choices: Array<{
-    message: {
-      role: string;
-      content: string;
+  choices?: Array<{
+    message?: {
+      content?: string;
     };
-    finish_reason: string;
   }>;
   usage?: {
     prompt_tokens: number;
@@ -21,9 +16,22 @@ interface OpenRouterResponse {
   };
 }
 
-export class OpenRouterService {
-  private apiKey: string;
-  private baseUrl = 'https://openrouter.ai/api/v1';
+interface ChatParams {
+  model: string;
+  messages: OpenRouterMessage[];
+  temperature?: number;
+  maxTokens?: number;
+}
+
+interface ChatResult {
+  content: string;
+  tokensInput: number;
+  tokensOutput: number;
+}
+
+class OpenRouterService {
+  private readonly apiKey: string;
+  private readonly baseUrl = 'https://openrouter.ai/api/v1';
 
   constructor() {
     this.apiKey = process.env.OPENROUTER_API_KEY || '';
@@ -98,7 +106,7 @@ export class OpenRouterService {
       });
       return true;
     } catch (error) {
-      console.error('OpenRouter test failed:', error);
+      console.error('OpenRouter connection test failed:', error);
       return false;
     }
   }

@@ -19,6 +19,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } 
 import { CSS } from '@dnd-kit/utilities';
 import type { User as UserType } from "@shared/schema";
 import { RichTextarea } from "@/components/rich-textarea";
+import { RichContent } from "@/components/rich-content";
 import DOMPurify from "dompurify";
 import {
   Dialog,
@@ -1976,9 +1977,9 @@ export default function ReunioesPage() {
                   </h1>
                   
                   {meeting.description && (
-                    <div
+                    <RichContent
+                      content={DOMPurify.sanitize(meeting.description)}
                       className="text-xl text-muted-foreground"
-                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(meeting.description) }}
                     />
                   )}
                   
@@ -2011,10 +2012,7 @@ export default function ReunioesPage() {
                   {meetingData.agenda && (
                     <div className="text-left mt-8 p-6 bg-muted rounded-lg">
                       <h3 className="text-xl font-semibold mb-4">📋 Pauta da Reunião</h3>
-                      <div 
-                        className="prose prose-sm max-w-none"
-                        dangerouslySetInnerHTML={{ __html: meetingData.agenda }}
-                      />
+                      <RichContent content={meetingData.agenda} />
                     </div>
                   )}
                   

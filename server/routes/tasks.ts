@@ -929,7 +929,26 @@ export function registerTaskRoutes(router: Router) {
 
   // ============== AREA TASKS (convenient endpoint) ==============
   router.get("/api/task-tags/:id/tasks", requireAuth, async (req, res) => {
-    const tasks = await storage.getTasks({ tagId: getId(req) });
+    const { userId } = getSessionUser(req);
+    const tagId = getId(req);
+
+    // Buscar a tag primeiro
+    const tag = await storage.getTaskTag(tagId);
+
+    if (!tag) {
+      return res.status(404).json({ error: "Tag não encontrada" });
+    }
+
+    // Verificar se usuário tem acesso à tag usando a mesma lógica de getTaskTags
+    const userAreas = await getUserAccessibleAreaIds(userId);
+    const hasAccess = userAreas.includes(tagId);
+
+    if (!hasAccess) {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    // Se tem acesso, buscar TODAS as reuniões da tag (não filtrar por createdBy)
+    const tasks = await storage.getTasks({ tagId });
     res.json(tasks);
   });
 }

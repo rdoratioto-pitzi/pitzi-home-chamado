@@ -1,0 +1,90 @@
+import fetch from 'node-fetch';
+
+interface OpenRouterMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+interface OpenRouterResponse {
+  id: string;
+  choices: Array<{
+    message: {
+      role: string;
+      content: string;
+    };
+    finish_reason: string;
+  }>;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export class OpenRouterService {
+  private apiKey: string;
+  private baseUrl = 'https://openrouter.ai/api/v1';
+
+  constructor() {
+    this.apiKey = process.env.OPENROUTER_API_KEY || '';
+    if (!this.apiKey) {
+      console.warn('⚠️  OPENROUTER_API_KEY não configurada');
+    }
+  }
+
+  async chat(params: {
+    model: string;
+    messages: OpenRouterMessage[];
+    temperature?: number;
+    maxTokens?: number;
+  }): Promise<{
+    content: string;
+    tokensInput: number;
+    tokensOutput: number;
+  }> {
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+        'HTTP-Referer': 'https://renov.home',
+        'X-Title': 'Renov AI Dev System',
+      },
+      body: JSON.stringify({
+        model: params.model,
+        messages: params.messages,
+        temperature: params.temperature ?? 0,
+        max_tokens: params.maxTokens ?? 8192,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json() as OpenRouterResponse;
+
+    return {
+      content: data.choices[0]?.message?.content || '',
+      tokensInput: data.usage.prompt_tokens,
+      tokensOutput: data.usage.completion_tokens,
+    };
+  }
+
+  async testConnection(model: string = 'minimax/minimax-01'): Promise<boolean> {
+    try {
+      await this.chat({
+        model,
+        messages: [{ role: 'user', content: 'test' }],
+        maxTokens: 10,
+      });
+      return true;
+    } catch (error) {
+      console.error('OpenRouter test failed:', error);
+      return false;
+    }
+  }
+}
+
+export const openRouterService = new OpenRouterService();

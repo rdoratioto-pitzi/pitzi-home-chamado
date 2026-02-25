@@ -38,12 +38,10 @@ import {
   Target,
   CheckCircle2,
   TrendingUp,
-  Plus,
   ChevronLeft,
   ChevronRight,
   RefreshCw,
   Clock,
-  BarChart3,
   Building2,
   CalendarClock,
   Loader2,
@@ -206,21 +204,8 @@ export default function MetasVisaoGeralPage() {
   const currentMonthLabel = format(parseISO(`${selectedMonth}-01`), "MMMM yyyy", { locale: ptBR });
   const currentUser = getCurrentUser();
 
-  const [isMetaDialogOpen, setIsMetaDialogOpen] = useState(false);
   const [isCheckinDialogOpen, setIsCheckinDialogOpen] = useState(false);
-  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [checkinMeta, setCheckinMeta] = useState<Meta | null>(null);
-
-  const [metaForm, setMetaForm] = useState({
-    title: "",
-    description: "",
-    areaId: "",
-    responsibleId: "",
-    measurementType: "percentage",
-    targetValue: "",
-    unit: "",
-    month: selectedMonth,
-  });
 
   const [checkinForm, setCheckinForm] = useState({
     newValue: "",
@@ -242,6 +227,9 @@ export default function MetasVisaoGeralPage() {
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
+
+  // Filtrar apenas usuários ativos para o campo responsável
+  const activeUsers = users.filter((user) => user.status === "active");
 
   const { data: checkins = [], isLoading: checkinsLoading } = useQuery<MetaCheckin[]>({
     queryKey: ["/api/metas", checkinMeta?.id, "checkins"],
@@ -278,19 +266,6 @@ export default function MetasVisaoGeralPage() {
     setSelectedMonth(format(next, "yyyy-MM"));
   };
 
-  const createMetaMutation = useMutation({
-    mutationFn: async (data: any) => apiRequest("POST", "/api/metas", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/metas"] });
-      toast({ title: "Meta criada com sucesso!" });
-      setIsMetaDialogOpen(false);
-      resetMetaForm();
-    },
-    onError: (error: any) => {
-      toast({ title: "Erro ao criar meta", description: error.message, variant: "destructive" });
-    },
-  });
-
   const createCheckinMutation = useMutation({
     mutationFn: async ({ metaId, data }: { metaId: string; data: any }) =>
       apiRequest("POST", `/api/metas/${metaId}/checkins`, data),
@@ -306,37 +281,10 @@ export default function MetasVisaoGeralPage() {
     },
   });
 
-  const resetMetaForm = () => {
-    setMetaForm({
-      title: "",
-      description: "",
-      areaId: selectedAreaId || "",
-      responsibleId: "",
-      measurementType: "percentage",
-      targetValue: "",
-      unit: "",
-      month: selectedMonth,
-    });
-  };
-
-  const openNewMetaDialog = (areaId: string) => {
-    setSelectedAreaId(areaId);
-    setMetaForm(prev => ({ ...prev, areaId, month: selectedMonth }));
-    setIsMetaDialogOpen(true);
-  };
-
   const openCheckin = (meta: Meta) => {
     setCheckinMeta(meta);
     setCheckinForm({ newValue: meta.currentValue || "0", comment: "" });
     setIsCheckinDialogOpen(true);
-  };
-
-  const handleSaveMeta = () => {
-    const data = {
-      ...metaForm,
-      targetValue: parseFloat(metaForm.targetValue) || 0,
-    };
-    createMetaMutation.mutate(data);
   };
 
   const handleCheckin = () => {
@@ -436,12 +384,6 @@ export default function MetasVisaoGeralPage() {
       <PageHeader
         title="Metas"
         breadcrumbs={[{ label: "Metas" }]}
-        actions={
-          <Button onClick={() => setIsMetaDialogOpen(true)} data-testid="button-nova-meta">
-            <Plus className="h-4 w-4 mr-2" />
-            Nova Meta
-          </Button>
-        }
       />
 
       <main className="flex-1 p-6 space-y-6">
@@ -636,20 +578,10 @@ export default function MetasVisaoGeralPage() {
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="px-6 pb-6 pt-2 space-y-4 border-t border-border/40 bg-muted/5">
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="mb-2">
                           <h4 className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest">
                             Metas ({areaMetas.length})
                           </h4>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="text-primary font-bold"
-                            onClick={() => openNewMetaDialog(area.id)}
-                            data-testid={`button-add-meta-${area.id}`}
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1.5" />
-                            Nova Meta
-                          </Button>
                         </div>
                         
                         {areaMetas.length === 0 ? (
@@ -680,139 +612,6 @@ export default function MetasVisaoGeralPage() {
           </Accordion>
         )}
       </main>
-
-      <Dialog open={isMetaDialogOpen} onOpenChange={setIsMetaDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Nova Meta</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Título *</Label>
-              <Input
-                value={metaForm.title}
-                onChange={e => setMetaForm(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Ex: Aumentar vendas em 20%"
-                data-testid="input-meta-title"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Descrição</Label>
-              <RichTextarea
-                value={metaForm.description}
-                onChange={(val: string) => setMetaForm(prev => ({ ...prev, description: val }))}
-                placeholder="Descreva a meta..."
-                data-testid="input-meta-description"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Área de Negócio *</Label>
-                <Select
-                  value={metaForm.areaId}
-                  onValueChange={val => setMetaForm(prev => ({ ...prev, areaId: val }))}
-                >
-                  <SelectTrigger data-testid="select-meta-area">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {activeAreas.map(area => (
-                      <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Responsável *</Label>
-                <Select
-                  value={metaForm.responsibleId}
-                  onValueChange={val => setMetaForm(prev => ({ ...prev, responsibleId: val }))}
-                >
-                  <SelectTrigger data-testid="select-meta-responsible">
-                    <SelectValue placeholder="Selecione..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map(user => (
-                      <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Tipo de Medição *</Label>
-                <Select
-                  value={metaForm.measurementType}
-                  onValueChange={val => setMetaForm(prev => ({ ...prev, measurementType: val }))}
-                >
-                  <SelectTrigger data-testid="select-meta-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="percentage">Percentual (%)</SelectItem>
-                    <SelectItem value="absolute">Quantidade</SelectItem>
-                    <SelectItem value="monetary">Monetário (R$)</SelectItem>
-                    <SelectItem value="binary">Sim/Não</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {metaForm.measurementType !== "binary" && (
-                <div className="space-y-2">
-                  <Label>Valor Alvo *</Label>
-                  <Input
-                    type={metaForm.measurementType === "monetary" ? "text" : "number"}
-                    step="any"
-                    value={metaForm.measurementType === "monetary" 
-                      ? (metaForm.targetValue ? formatCurrencyInput((parseFloat(metaForm.targetValue) * 100).toFixed(0)) : "") 
-                      : metaForm.targetValue
-                    }
-                    onChange={e => {
-                      const val = e.target.value;
-                      if (metaForm.measurementType === "monetary") {
-                        setMetaForm(prev => ({ ...prev, targetValue: parseCurrencyValue(val) }));
-                      } else {
-                        setMetaForm(prev => ({ ...prev, targetValue: val }));
-                      }
-                    }}
-                    placeholder={metaForm.measurementType === "monetary" ? "R$ 0,00" : (metaForm.measurementType === "percentage" ? "100" : "0")}
-                    data-testid="input-meta-target"
-                  />
-                </div>
-              )}
-            </div>
-
-            {metaForm.measurementType === "absolute" && (
-              <div className="space-y-2">
-                <Label>Unidade</Label>
-                <Input
-                  value={metaForm.unit}
-                  onChange={e => setMetaForm(prev => ({ ...prev, unit: e.target.value }))}
-                  placeholder="Ex: Pontos, Unidades, Itens..."
-                  data-testid="input-meta-unit"
-                />
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMetaDialogOpen(false)} data-testid="button-cancel-meta">
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleSaveMeta}
-              disabled={!metaForm.title || !metaForm.areaId || !metaForm.responsibleId || createMetaMutation.isPending}
-              data-testid="button-save-meta"
-            >
-              {createMetaMutation.isPending ? "Salvando..." : "Criar Meta"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={isCheckinDialogOpen} onOpenChange={setIsCheckinDialogOpen}>
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] flex flex-col">
