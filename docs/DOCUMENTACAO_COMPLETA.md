@@ -133,6 +133,9 @@ Renov.Home/
 │       │   ├── 📁 macgyver-ia/
 │       │   ├── 📁 configuracoes/
 │       │   ├── 📁 apis/
+│       │   ├── 📁 estoques/     # Novo módulo
+│       │   ├── 📁 git-analytics/ # Novo módulo
+│       │   ├── 📁 updates/       # Novo módulo
 │       │   ├── home.tsx
 │       │   ├── login.tsx
 │       │   └── not-found.tsx
@@ -142,14 +145,43 @@ Renov.Home/
 │       └── main.tsx
 │
 ├── 📁 server/                    # Backend Express
+│   ├── 📁 ai/                   # Agentes e serviços de IA
+│   │   ├── 📁 agents/           # Agentes especializados (Argos, Atena, Hefesto, Hermes, Zeus)
+│   │   └── 📁 services/         # Serviços de IA (email, parsing, OpenRouter)
 │   ├── 📁 jobs/                 # Jobs agendados (cron)
 │   │   ├── prompts-sync.job.ts
 │   │   └── recurrence.job.ts
+│   ├── 📁 lib/                  # Bibliotecas internas (ex: tradução)
+│   ├── 📁 middleware/           # Middlewares de autenticação, validação
 │   ├── 📁 replit_integrations/  # Integrações Replit
 │   │   └── 📁 object_storage/
+│   ├── 📁 routes/               # Rotas da API organizadas por módulo
+│   │   ├── ai.ts
+│   │   ├── auth.ts
+│   │   ├── cep.ts
+│   │   ├── flowcharts.ts
+│   │   ├── git-analytics.ts
+│   │   ├── integrations.ts
+│   │   ├── knowledge.ts
+│   │   ├── labels.ts
+│   │   ├── metas.ts
+│   │   ├── notifications.ts
+│   │   ├── okrs.ts
+│   │   ├── pricing.ts
+│   │   ├── projects.ts
+│   │   ├── settings.ts
+│   │   ├── shipments.ts
+│   │   ├── slas.ts
+│   │   ├── tasks.ts
+│   │   ├── tickets.ts
+│   │   ├── updates.ts
+│   │   └── users.ts
 │   ├── 📁 services/             # Serviços de negócio
 │   │   ├── prompts-sync.service.ts
-│   │   └── translate-prompts.service.ts
+│   │   ├── translate-prompts.service.ts
+│   │   └── github-sync.ts
+│   ├── 📁 types/                # Definições de tipos TypeScript
+│   ├── ai-tools.ts              # Ferramentas de IA
 │   ├── auth.ts                  # Configuração de autenticação
 │   ├── correios-service.ts      # Integração Correios
 │   ├── db.ts                    # Configuração do banco
@@ -157,7 +189,7 @@ Renov.Home/
 │   ├── external-data.ts         # Dados externos para IA
 │   ├── index.ts                 # Entry point do servidor
 │   ├── openrouter.ts            # Integração OpenRouter AI
-│   ├── routes.ts                # Definição de rotas API
+│   ├── routes.ts                # Definição de rotas API (legado)
 │   ├── seed.ts                  # Dados iniciais
 │   ├── static.ts                # Servir arquivos estáticos
 │   ├── storage.ts               # Interface de storage
@@ -169,7 +201,11 @@ Renov.Home/
 ├── 📁 migrations/                # Migrações do banco
 ├── 📁 docs/                      # Documentação
 ├── 📁 attached_assets/           # Assets anexados
-├── 📁 scripts/                   # Scripts utilitários
+├── 📁 agents/                    # Agentes de CLI (Atlas, Giter, Neo, Turing, Ada)
+├── 📁 cli/                       # CLI para desenvolvimento (renov-dev)
+├── 📁 plans/                     # Planos de trabalho e documentação de planejamento
+├── 📁 scripts/                   # Scripts utilitários (migrações, parsing, etc.)
+├── 📁 "Comandos github"/         # Comandos GitHub para automação
 ├── package.json
 ├── drizzle.config.ts
 ├── vite.config.ts
@@ -197,6 +233,14 @@ Renov.Home/
 | Recharts | 2.15.2 | Gráficos |
 | Framer Motion | 11.18.2 | Animações |
 | date-fns | 3.6.0 | Manipulação de datas |
+| @xyflow/react | 12.10.0 | Editor de fluxogramas |
+| @dnd-kit/* | 6.3.1+ | Drag-and-drop para Kanban |
+| quill | 2.0.3 | Editor de rich text |
+| react-quill-new | 3.8.3 | Wrapper React para Quill |
+| @uppy/* | 5.2.0 | Upload de arquivos |
+| bwip-js | 4.8.0 | Geração de códigos de barras |
+| jspdf | 4.0.0 | Geração de PDFs |
+| html2canvas | 1.4.1 | Captura de tela para PDF |
 
 ### Backend
 
@@ -210,6 +254,13 @@ Renov.Home/
 | Nodemailer | 7.0.13 | Envio de emails |
 | node-cron | 4.2.1 | Jobs agendados |
 | xml2js | 0.6.2 | Parsing XML (Correios) |
+| connect-pg-simple | 10.0.0 | Armazenamento de sessão no PostgreSQL |
+| memorystore | 1.6.7 | Cache de sessão em memória |
+| ws | 8.18.0 | WebSockets para comunicação em tempo real |
+| xlsx | @e965/xlsx@0.20.3 | Manipulação de planilhas Excel |
+| js-yaml | 4.1.1 | Parsing de YAML |
+| google-auth-library | 10.5.0 | Autenticação Google OAuth |
+| @google-cloud/storage | 7.18.0 | Integração com Google Cloud Storage |
 
 ### Integrações Externas
 
@@ -219,6 +270,9 @@ Renov.Home/
 | RS Logística | REST | Gestão logística |
 | RenovSmart | REST | Dados de pricing |
 | OpenRouter | REST | LLM/IA |
+| GitHub API | REST | Sincronização de prompts |
+| Google Cloud Storage | REST | Armazenamento de arquivos |
+| Replit Object Storage | REST | Armazenamento de objetos (Replit) |
 
 ---
 
@@ -735,6 +789,79 @@ erDiagram
 
 ---
 
+### 14. 📈 Git Analytics
+
+**Descrição**: Dashboard de análise de commits e pull requests dos repositórios GitHub da empresa.
+
+**Funcionalidades**:
+- Visualização de KPIs: total de commits, PRs, desenvolvedores ativos
+- Gráficos de volume por tipo (feat, fix, chore, etc.)
+- Detalhamento por desenvolvedor com modal de detalhes
+- Tabelas de commits e pull requests com filtros
+- Análise de segurança (alertas por severidade)
+- Sincronização automática com GitHub API
+- Exportação de dados para Excel
+
+**Arquivos principais**:
+- `client/src/pages/git-analytics/index.tsx`
+- `server/routes/git-analytics.ts`
+- `server/services/github-sync.ts`
+
+---
+
+### 15. 📦 Estoques
+
+**Descrição**: Controle simplificado de inventário e gestão de estoques.
+
+**Funcionalidades**:
+- Listagem de itens em estoque
+- Controle de quantidades e localização
+- Movimentações de entrada e saída
+- Alertas de baixo estoque
+- Relatórios de inventário
+
+**Arquivos principais**:
+- `client/src/pages/estoques/index.tsx`
+
+---
+
+### 16. 📰 Updates
+
+**Descrição**: Feed de atualizações e notícias internas da empresa.
+
+**Funcionalidades**:
+- Publicação de updates por administradores
+- Categorização por tipo (anúncio, evento, manutenção)
+- Sistema de likes e comentários
+- Notificações para novos updates
+- Histórico de updates
+
+**Arquivos principais**:
+- `client/src/pages/updates/index.tsx`
+- `server/routes/updates.ts`
+
+---
+
+### 17. 🔌 APIs
+
+**Descrição**: Módulo de integração com APIs externas, oferecendo dashboards e ferramentas de gestão.
+
+**Funcionalidades**:
+- Dashboard de APIs (Correios, RS Logística, RenovSmart)
+- Simulação de logística reversa
+- Relatórios de pedidos
+- Administração de logística
+- Monitoramento de status das integrações
+
+**Arquivos principais**:
+- `client/src/pages/apis/index.tsx`
+- `client/src/pages/apis/correios-reversa.tsx`
+- `client/src/pages/apis/api-rs-logistica.tsx`
+- `client/src/pages/apis/api-adm-logistica.tsx`
+- `client/src/pages/apis/api-relatorio-pedidos.tsx`
+
+---
+
 ## 🔐 Autenticação e Autorização
 
 ### Fluxo de Autenticação
@@ -1044,6 +1171,78 @@ POST   /api/knowledge/:id/approve
 POST   /api/knowledge/:id/reject
 ```
 
+#### Git Analytics
+```
+GET    /api/git-analytics/stats
+GET    /api/git-analytics/repositories
+GET    /api/git-analytics/commits
+GET    /api/git-analytics/pull-requests
+GET    /api/git-analytics/developers
+POST   /api/git-analytics/sync
+```
+
+#### Updates
+```
+GET    /api/updates
+POST   /api/updates
+GET    /api/updates/:id
+PUT    /api/updates/:id
+DELETE /api/updates/:id
+POST   /api/updates/:id/like
+POST   /api/updates/:id/comments
+GET    /api/updates/:id/comments
+```
+
+#### Estoques
+```
+GET    /api/estoques
+POST   /api/estoques
+GET    /api/estoques/:id
+PUT    /api/estoques/:id
+DELETE /api/estoques/:id
+POST   /api/estoques/:id/movimentacoes
+GET    /api/estoques/:id/movimentacoes
+```
+
+#### Shipments (Envios)
+```
+GET    /api/shipments
+POST   /api/shipments
+GET    /api/shipments/:id
+PUT    /api/shipments/:id
+DELETE /api/shipments/:id
+POST   /api/shipments/:id/tracking
+```
+
+#### Labels (Etiquetas)
+```
+GET    /api/labels
+POST   /api/labels
+GET    /api/labels/:id
+PUT    /api/labels/:id
+DELETE /api/labels/:id
+```
+
+#### SLAs (Service Level Agreements)
+```
+GET    /api/slas
+POST   /api/slas
+GET    /api/slas/:id
+PUT    /api/slas/:id
+DELETE /api/slas/:id
+```
+
+#### CEP (Consulta de CEP)
+```
+GET    /api/cep/:cep
+```
+
+#### Integrações
+```
+GET    /api/integrations/status
+POST   /api/integrations/test
+```
+
 ---
 
 ## ⚙️ Configuração e Deploy
@@ -1079,6 +1278,20 @@ RS_LOGISTICA_API_KEY=
 
 # RenovSmart
 RENOVSMART_API_KEY=
+
+# GitHub (para sincronização de commits e prompts)
+GITHUB_TOKEN=ghp_seu_token_aqui
+
+# Google Cloud Storage (opcional, para upload de arquivos)
+GOOGLE_CLOUD_STORAGE_BUCKET=
+GOOGLE_CLOUD_STORAGE_KEY_FILE_PATH=
+
+# Replit Object Storage (se deploy no Replit)
+REPLIT_OBJECT_STORAGE_BUCKET=
+REPLIT_OBJECT_STORAGE_ENDPOINT=
+
+# Porta do servidor (opcional)
+PORT=5050
 ```
 
 ### Scripts NPM
@@ -1200,6 +1413,6 @@ Para dúvidas ou problemas:
 
 ---
 
-**Documentação gerada em**: 17 de Fevereiro de 2026
+**Documentação gerada em**: 26 de Fevereiro de 2026
 **Versão da aplicação**: 1.0.0
-**Última atualização**: 17/02/2026
+**Última atualização**: 26/02/2026
