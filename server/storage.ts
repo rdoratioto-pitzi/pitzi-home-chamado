@@ -2305,10 +2305,16 @@ export class DatabaseStorage implements IStorage {
     if (!db || data.length === 0) return 0;
     try {
       const result = await db.insert(gitCommits).values(data).onConflictDoNothing().returning();
+      console.log(`[storage] createGitCommitsBatch: inserted ${result.length} commits`);
       return result.length;
-    } catch (error) {
+    } catch (error: any) {
       console.error("[storage] createGitCommitsBatch error:", error);
-      return 0;
+      console.error("[storage] Error details:", {
+        message: error?.message,
+        code: error?.code,
+        detail: error?.detail
+      });
+      throw error; // Propagar para o caller diagnosticar
     }
   }
 
