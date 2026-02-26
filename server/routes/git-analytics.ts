@@ -352,4 +352,44 @@ export function registerGitAnalyticsRoutes(router: Router) {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Sync status - endpoint de diagnóstico
+  router.get("/api/git-analytics/sync-status", requireAuth, async (req, res) => {
+    try {
+      const hasToken = !!process.env.GITHUB_TOKEN;
+      const repositories = await storage.getGitRepositories();
+      
+      // Contagem de registros por tabela
+      const activeRepos = repositories.filter(r => r.isActive && r.syncEnabled);
+      
+      // Buscar último repositório sincronizado
+      let lastSyncRepo = null;
+      let lastSyncTime = null;
+      
+      for (const repo of repositories) {
+        if (repo.lastSyncAt) {
+          const syncTime = new Date(repo.lastSyncAt).getTime();
+          if (!lastSyncTime || syncTime > lastSyncTime) {
+            lastSyncTime = syncTime;
+            lastSyncRepo = repo;
+          }
+        }
+      }
+      
+      res.json({
+        hasGitHubToken: hasToken,
+        tokenPreview: hasToken ? `${process.env.GITHUB_TOKEN?.substring(0, 8)}...` : null,
+        totalRepositories: repositories.length,
+        activeRepositories: activeRepos.length,
+        lastSync: lastSyncRepo ? {
+          repository: lastSyncRepo.fullName,
+          lastSyncAt: lastSyncRepo.lastSyncAt,
+        } : null,
+        environment: process.env.NODE_ENV || 'development',
+      });
+    } catch (error: any) {
+      console.error("Get sync status error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 }
