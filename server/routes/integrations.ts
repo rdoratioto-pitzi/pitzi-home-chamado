@@ -4,6 +4,7 @@ import { storage } from "../storage";
 import { z } from "zod";
 
 export function registerIntegrationRoutes(router: Router) {
+  console.log("Registering Integration Routes...");
   const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
   const RS_API_TOKEN = "Renov123";
 
@@ -64,6 +65,88 @@ export function registerIntegrationRoutes(router: Router) {
       }
       console.error("Error receiving logistica reversa event:", error);
       res.status(400).json({ error: "Failed to process event" });
+    }
+  });
+
+  // ============== AVALIAÇÕES IA INTEGRATION ==============
+
+  // Helper method for AI Evaluation API calls
+  const fetchAiEvaluation = async (endpoint: string, query: any) => {
+    const params = new URLSearchParams();
+    Object.keys(query).forEach(key => {
+      if (query[key]) params.append(key, query[key] as string);
+    });
+    
+    // Assume external API follows similar structure: /avaliacoes-ia/{endpoint}
+    // If RS_API_BASE_URL ends with /api, we append /avaliacoes-ia/{endpoint}
+    // Result: https://dash.renovsmart.com.br/api/avaliacoes-ia/resumo
+    const url = `${RS_API_BASE_URL}/avaliacoes-ia/${endpoint}`;
+    const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
+    
+    const response = await fetch(fullUrl, {
+      method: "GET",
+      headers: { 
+        "Authorization": `Bearer ${RS_API_TOKEN}`, 
+        "Content-Type": "application/json" 
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Não autenticado na API externa via backend");
+      }
+      const text = await response.text();
+      try {
+        const json = JSON.parse(text);
+        throw new Error(json.message || json.error || `API error: ${response.status}`);
+      } catch (e) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+    }
+    return response.json();
+  };
+
+  // 1. Resumo de Assertividade
+  router.get("/api/avaliacoes-ia/resumo", async (req, res) => {
+    try {
+      const data = await fetchAiEvaluation("resumo", req.query);
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Evaluation resumo error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar resumo" });
+    }
+  });
+
+  // 2. Evolução Temporal
+  router.get("/api/avaliacoes-ia/evolucao", async (req, res) => {
+    try {
+      const data = await fetchAiEvaluation("evolucao", req.query);
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Evaluation evolucao error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar evolução" });
+    }
+  });
+
+  // 3. Acurácia por Dispositivo
+  router.get("/api/avaliacoes-ia/dispositivos", async (req, res) => {
+    try {
+      const data = await fetchAiEvaluation("dispositivos", req.query);
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Evaluation dispositivos error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar dispositivos" });
+    }
+  });
+
+  // 4. Detalhamento de Avaliações
+  router.get("/api/avaliacoes-ia/detalhes", async (req, res) => {
+    try {
+      const data = await fetchAiEvaluation("detalhes", req.query);
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Evaluation detalhes error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar detalhes" });
     }
   });
 }
