@@ -13,12 +13,23 @@ export class OmieService {
    */
   async getConfig(): Promise<OmieConfig | null> {
     try {
+      console.log('[OMIE Service] Loading config from database...');
       const result = await pool?.query(
         'SELECT * FROM omie_config WHERE is_active = true LIMIT 1'
       );
-      return result?.rows[0] || null;
-    } catch (error) {
-      console.error('[OmieService] Erro ao buscar config:', error);
+      
+      if (!result?.rows[0]) {
+        console.error('[OMIE Service] No config found in database');
+        return null;
+      }
+      
+      console.log('[OMIE Service] Config loaded successfully');
+      console.log('[OMIE Service] App key present:', !!result.rows[0].app_key);
+      console.log('[OMIE Service] App secret present:', !!result.rows[0].app_secret);
+      
+      return result.rows[0];
+    } catch (error: any) {
+      console.error('[OMIE Service] Error loading config:', error.message);
       return null;
     }
   }
@@ -27,18 +38,47 @@ export class OmieService {
    * Atualiza as credenciais do Omie
    */
   async updateConfig(app_key: string, app_secret: string): Promise<void> {
-    await pool?.query(
-      'UPDATE omie_config SET app_key = $1, app_secret = $2, updated_at = NOW() WHERE id = 1',
-      [app_key, app_secret]
-    );
+    console.log('[OMIE Service] Updating config...');
+    console.log('[OMIE Service] New app_key:', app_key.substring(0, 5) + '...');
+    console.log('[OMIE Service] App secret length:', app_secret.length);
+    
+    // Verificar se já existe configuração
+    const existingConfig = await pool?.query('SELECT id FROM omie_config LIMIT 1');
+    
+    if (existingConfig?.rows && existingConfig.rows.length > 0) {
+      console.log('[OMIE Service] Updating existing config, id:', existingConfig.rows[0].id);
+      await pool?.query(
+        'UPDATE omie_config SET app_key = $1, app_secret = $2, is_active = true, updated_at = NOW() WHERE id = $3',
+        [app_key, app_secret, existingConfig.rows[0].id]
+      );
+    } else {
+      console.log('[OMIE Service] No existing config, inserting new...');
+      await pool?.query(
+        'INSERT INTO omie_config (app_key, app_secret, is_active) VALUES ($1, $2, $3)',
+        [app_key, app_secret, true]
+      );
+    }
+    
+    console.log('[OMIE Service] Config updated successfully');
   }
   
   /**
    * Faz uma chamada à API do Omie
    */
   async callApi(endpoint: string, call: string, params: any[] = []): Promise<any> {
+    console.log('[OMIE Service] =======================================');
+    console.log('[OMIE Service] Starting API call...');
+    console.log('[OMIE Service] Endpoint:', endpoint);
+    console.log('[OMIE Service] Call:', call);
+    console.log('[OMIE Service] Params:', JSON.stringify(params, null, 2));
+    
     const config = await this.getConfig();
-    if (!config) throw new Error('Omie config not found');
+    if (!config) {
+      console.error('[OMIE Service] Config not found - cannot make API call');
+      throw new Error('Omie config not found. Please configure API credentials first.');
+    }
+    
+    console.log('[OMIE Service] Config loaded, app_key:', config.app_key.substring(0, 5) + '...');
     
     const requestBody: OmieRequest = {
       call,
@@ -47,16 +87,89 @@ export class OmieService {
       param: params
     };
     
+    const fullUrl = `${this.baseUrl}${endpoint}`;
+    
+    console.log('[OMIE Service] Full URL:', fullUrl);
+    console.log('[OMIE Service] Request body:', JSON.stringify({
+      call: requestBody.call,
+      app_key: requestBody.app_key?.substring(0, 5) + '...',
+      app_secret: '***',
+      param: requestBody.param
+    }, null, 2));
+    
     try {
-      const response = await axios.post(`${this.baseUrl}${endpoint}`, requestBody, {
+      console.log('[OMIE Service] Sending request to Omie API...');
+      const startTime = Date.now();
+      
+      const response = await axios.post(fullUrl, requestBody, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 30000
+        timeout: 30000,
+        validateStatus: (status) => status < 500
       });
       
+      const duration = Date.now() - startTime;
+      
+      console.log('[OMIE Service] Response received:');
+      console.log('- Status:', response.status);
+      console.log('- Duration:', duration, 'ms');
+      console.log('- Data type:', typeof response.data);
+      console.log('- Data keys:', Object.keys(response.data || {}));
+      
+      // Check for SOAP fault
+      if (response.data?.faultstring) {
+        console.error('[OMIE Service] API returned fault:');
+        console.error('- Faultstring:', response.data.faultstring);
+        console.error('- Faultcode:', response.data.faultcode);
+        throw new Error(response.data.faultstring);
+      }
+      
+      // Check for other error formats
+      if (response.data?.error) {
+        console.error('[OMIE Service] API returned error:');
+        console.error('- Error:', JSON.stringify(response.data.error));
+        throw new Error(response.data.error.message || JSON.stringify(response.data.error));
+      }
+      
+      // Check for status error
+      if (response.data?.status === 'error') {
+        console.error('[OMIE Service] API returned error status:');
+        console.error('- Message:', response.data.message);
+        throw new Error(response.data.message || 'API returned error status');
+      }
+      
+      console.log('[OMIE Service] API call successful');
       return response.data;
+      
     } catch (error: any) {
-      console.error('[OmieService] Erro na chamada API:', error.response?.data || error.message);
-      throw new Error(error.response?.data?.faultstring || error.message);
+      console.error('[OMIE Service] =======================================');
+      console.error('[OMIE Service] API call FAILED:');
+      console.error('- Error message:', error.message);
+      
+      if (error.response) {
+        console.error('- Response status:', error.response.status);
+        console.error('- Response statusText:', error.response.statusText);
+        console.error('- Response data:', JSON.stringify(error.response.data, null, 2));
+      } else if (error.request) {
+        console.error('- No response received (request made)');
+        console.error('- Request details:', error.request);
+      }
+      
+      console.error('- Stack:', error.stack);
+      
+      // Extract meaningful error message
+      let errorMessage = error.message;
+      
+      if (error.response?.data?.faultstring) {
+        errorMessage = error.response.data.faultstring;
+      } else if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error.response?.status === 404) {
+        errorMessage = `Endpoint not found: ${endpoint}. Check if the endpoint URL is correct.`;
+      } else if (error.response?.status === 500) {
+        errorMessage = `Server error from Omie API. Check request parameters.`;
+      }
+      
+      throw new Error(errorMessage);
     }
   }
   
@@ -65,15 +178,16 @@ export class OmieService {
    */
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
-      console.log('[OmieService] Testing connection...');
+      console.log('[OMIE Service] =======================================');
+      console.log('[OMIE Service] Testing connection...');
       
       const config = await this.getConfig();
       if (!config) {
-        console.error('[OmieService] Config not found in database');
+        console.error('[OMIE Service] Config not found in database');
         return { success: false, message: 'Configuração não encontrada. Execute a migration.' };
       }
 
-      console.log('[OmieService] Testing connection with app_key:', config.app_key?.substring(0, 5) + '...');
+      console.log('[OMIE Service] Testing connection with app_key:', config.app_key?.substring(0, 5) + '...');
 
       // Usar método ListarClientes com parâmetros mínimos para testar conexão
       // A API Omie requer parâmetros válidos no campo "param"
@@ -87,7 +201,7 @@ export class OmieService {
         }]
       };
 
-      console.log('[OmieService] Request body:', JSON.stringify({
+      console.log('[OMIE Service] Request body:', JSON.stringify({
         call: requestBody.call,
         app_key: requestBody.app_key?.substring(0, 5) + '...',
         app_secret: '***',
@@ -104,27 +218,32 @@ export class OmieService {
         }
       );
 
-      console.log('[OmieService] Response status:', response.status);
-      console.log('[OmieService] Response data:', JSON.stringify(response.data, null, 2));
+      console.log('[OMIE Service] Response status:', response.status);
+      console.log('[OMIE Service] Response data:', JSON.stringify(response.data, null, 2));
 
       // API Omie retorna faultstring em caso de erro SOAP
       if (response.data?.faultstring) {
-        console.error('[OmieService] API returned error:', response.data.faultstring);
+        console.error('[OMIE Service] API returned error:', response.data.faultstring);
         return { success: false, message: response.data.faultstring };
       }
 
       // Se não tem faultstring e recebeu resposta com dados de clientes, a conexão foi bem-sucedida
       if (response.status === 200 && !response.data.faultstring) {
-        console.log('[OmieService] Connection successful');
+        console.log('[OMIE Service] Connection successful!');
         return { success: true, message: 'Conexão estabelecida com sucesso!' };
       }
 
-      console.error('[OmieService] Unexpected response:', response.data);
+      console.error('[OMIE Service] Unexpected response:', response.data);
       return { success: false, message: 'Resposta inesperada da API Omie' };
 
     } catch (error: any) {
-      console.error('[OmieService] Connection test failed:', error.message);
-      console.error('[OmieService] Error details:', error.response?.data);
+      console.error('[OMIE Service] =======================================');
+      console.error('[OMIE Service] Connection test FAILED:');
+      console.error('- Error message:', error.message);
+      
+      if (error.response?.data) {
+        console.error('- Response data:', JSON.stringify(error.response.data, null, 2));
+      }
       
       if (error.response?.data?.faultstring) {
         return { success: false, message: error.response.data.faultstring };
@@ -139,6 +258,8 @@ export class OmieService {
    */
   async logSync(data: Partial<OmieSyncLog>): Promise<void> {
     try {
+      console.log('[OMIE Service] Logging sync:', data.endpoint, '-', data.status);
+      
       await pool?.query(
         `INSERT INTO omie_sync_log (endpoint, category, status, total_records, request_params, response_data, error_message)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
@@ -152,8 +273,10 @@ export class OmieService {
           data.error_message || null
         ]
       );
-    } catch (error) {
-      console.error('[OmieService] Erro ao salvar log:', error);
+      
+      console.log('[OMIE Service] Sync log saved successfully');
+    } catch (error: any) {
+      console.error('[OMIE Service] Error saving log:', error.message);
     }
   }
   
@@ -162,6 +285,8 @@ export class OmieService {
    */
   async getSyncLogs(category?: string, limit: number = 50): Promise<OmieSyncLog[]> {
     try {
+      console.log('[OMIE Service] Fetching sync logs, category:', category, 'limit:', limit);
+      
       let query = 'SELECT * FROM omie_sync_log';
       const params: any[] = [];
       
@@ -174,9 +299,10 @@ export class OmieService {
       params.push(limit);
       
       const result = await pool?.query(query, params);
+      console.log('[OMIE Service] Found', result?.rows?.length || 0, 'log entries');
       return result?.rows || [];
-    } catch (error) {
-      console.error('[OmieService] Erro ao buscar logs:', error);
+    } catch (error: any) {
+      console.error('[OMIE Service] Error fetching logs:', error.message);
       return [];
     }
   }

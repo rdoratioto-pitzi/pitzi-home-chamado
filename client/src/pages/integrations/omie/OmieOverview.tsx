@@ -29,17 +29,41 @@ export default function OmieOverview() {
 
   const loadConfig = async () => {
     try {
-      const { data } = await axios.get('/api/omie/config');
+      console.log('[Frontend] Loading Omie config...');
+      
+      const { data } = await axios.get('/api/omie/config', { 
+        withCredentials: true 
+      });
+      
+      console.log('[Frontend] Config response:', data);
+      
       if (data.success && data.data) {
-        setConfig(data.data);
-        setTempConfig({ app_key: data.data.app_key, app_secret: '' });
+        console.log('[Frontend] Config loaded:', {
+          has_app_key: !!data.data.app_key,
+          app_key_length: data.data.app_key?.length || 0,
+          has_app_secret: !!data.data.app_secret,
+          app_secret_length: data.data.app_secret?.length || 0,
+          is_active: data.data.is_active
+        });
+        
+        setConfig({
+          app_key: data.data.app_key || '',
+          app_secret: data.data.app_secret || '',
+          is_active: data.data.is_active || false
+        });
+        
+        setTempConfig({ 
+          app_key: data.data.app_key || '', 
+          app_secret: '' 
+        });
+      } else {
+        console.error('[Frontend] Invalid response:', data);
+        setConfig({ app_key: '', app_secret: '', is_active: false });
       }
     } catch (error: any) {
-      console.error('Error loading config:', error);
-      // Se não autenticado, mantém os campos vazios mas não mostra erro
-      if (error.response?.status === 401) {
-        console.log('Sessão expirada. Faça login novamente.');
-      }
+      console.error('[Frontend] Error loading config:', error);
+      console.error('[Frontend] Error details:', error.response?.data);
+      setConfig({ app_key: '', app_secret: '', is_active: false });
     } finally {
       setLoading(false);
     }
@@ -58,22 +82,45 @@ export default function OmieOverview() {
   };
 
   const handleSave = async () => {
+    if (!tempConfig.app_key || !tempConfig.app_secret) {
+      setMessage({ type: 'error', text: 'App Key e App Secret são obrigatórios' });
+      return;
+    }
+    
     setSaving(true);
     setMessage(null);
+    
     try {
+      console.log('[Frontend] Saving config...');
+      console.log('[Frontend] App Key length:', tempConfig.app_key.length);
+      console.log('[Frontend] App Secret length:', tempConfig.app_secret.length);
+      
       const { data } = await axios.post('/api/omie/config', {
-        app_key: tempConfig.app_key,
-        app_secret: tempConfig.app_secret
+        app_key: tempConfig.app_key.trim(),
+        app_secret: tempConfig.app_secret.trim()
+      }, { 
+        withCredentials: true 
       });
       
+      console.log('[Frontend] Save response:', data);
+      
       if (data.success) {
-        setConfig({ ...config, app_key: tempConfig.app_key });
+        setMessage({ type: 'success', text: 'Credenciais salvas com sucesso!' });
         setEditMode(false);
-        setMessage({ type: 'success', text: 'Credenciais atualizadas com sucesso!' });
+        
+        // Recarregar config do servidor
         await loadConfig();
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Erro ao salvar' });
       }
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.response?.data?.error || 'Erro ao salvar' });
+      console.error('[Frontend] Save error:', error);
+      console.error('[Frontend] Error response:', error.response?.data);
+      
+      setMessage({ 
+        type: 'error', 
+        text: error.response?.data?.error || error.message || 'Erro ao salvar credenciais' 
+      });
     } finally {
       setSaving(false);
     }
