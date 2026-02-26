@@ -128,4 +128,5 @@ const FileBrowser = ({ files, breadcrumbs }: FileBrowserProps) => {
     );
 };
 
+export { FileBrowser };
 export default FileBrowser;
