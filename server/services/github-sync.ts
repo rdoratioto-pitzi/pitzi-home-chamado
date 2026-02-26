@@ -51,6 +51,71 @@ async function githubFetch(endpoint: string): Promise<any> {
   return response.json();
 }
 
+// Busca detalhes de um commit específico (para obter statistics)
+async function fetchCommitDetails(fullName: string, sha: string): Promise<{ filesChanged: number; additions: number; deletions: number }> {
+  try {
+    const details = await githubFetch(`/repos/${fullName}/commits/${sha}`);
+    // A API retorna 'stats' campo que pode ter { additions, deletions, total }
+    // ou pode vir em 'files' para calcular manualmente
+    const stats = details.stats || {};
+    
+    // Se stats não estiver disponível, calcular a partir dos arquivos
+    if (details.files && Array.isArray(details.files) && (!stats.additions && !stats.deletions)) {
+      let additions = 0;
+      let deletions = 0;
+      for (const file of details.files) {
+        additions += file.additions || 0;
+        deletions += file.deletions || 0;
+      }
+      return {
+        filesChanged: details.files.length,
+        additions,
+        deletions
+      };
+    }
+    
+    return {
+      filesChanged: stats.total || 0,
+      additions: stats.additions || 0,
+      deletions: stats.deletions || 0
+    };
+  } catch (error) {
+    console.error(`[GitSync] Error fetching commit details for ${sha}:`, error);
+    return { filesChanged: 0, additions: 0, deletions: 0 };
+  }
+}
+
+// Busca detalhes de um PR específico (para obter contagem de commits)
+async function fetchPRDetails(fullName: string, prNumber: number): Promise<{ commitsCount: number; additions: number; deletions: number }> {
+  try {
+    // Buscar arquivos do PR para calcular adições e deleções
+    const files = await githubFetch(`/repos/${fullName}/pulls/${prNumber}/files?per_page=100`);
+    
+    // Buscar commits do PR para contar
+    const commits = await githubFetch(`/repos/${fullName}/pulls/${prNumber}/commits?per_page=100`);
+    
+    // Calcular adições e deleções a partir dos arquivos
+    let additions = 0;
+    let deletions = 0;
+    
+    if (Array.isArray(files)) {
+      for (const file of files) {
+        additions += file.additions || 0;
+        deletions += file.deletions || 0;
+      }
+    }
+    
+    return {
+      commitsCount: Array.isArray(commits) ? commits.length : 0,
+      additions,
+      deletions
+    };
+  } catch (error) {
+    console.error(`[GitSync] Error fetching PR details for #${prNumber}:`, error);
+    return { commitsCount: 0, additions: 0, deletions: 0 };
+  }
+}
+
 async function syncCommits(repositoryId: string, fullName: string, since?: Date, until?: Date): Promise<number> {
   console.log(`Syncing commits for ${fullName}...`);
   
@@ -92,23 +157,38 @@ async function syncCommits(repositoryId: string, fullName: string, since?: Date,
 
   console.log(`Total commits fetched: ${allCommits.length}`);
 
-  const commitDataList = allCommits.map((commit: any) => ({
-    tenantId: null,
-    repositoryId,
-    sha: commit.sha,
-    message: commit.commit.message.split("\n")[0].substring(0, 255),
-    fullMessage: commit.commit.message,
-    authorName: commit.commit.author?.name || commit.author?.login || "Unknown",
-    authorEmail: commit.commit.author?.email || null,
-    authorAvatarUrl: commit.author?.avatar_url || null,
-    commitType: detectCommitType(commit.commit.message),
-    branch: null,
-    prNumber: null,
-    filesChanged: 0,
-    additions: 0,
-    deletions: 0,
-    committedAt: new Date(commit.commit.author?.date || new Date()),
-  }));
+  // Buscar detalhes de cada commit para obter statistics (em lotes para não sobrecarregar a API)
+  const commitDataList = [];
+  const batchSize = 10;
+  
+  for (let i = 0; i < allCommits.length; i += batchSize) {
+    const batch = allCommits.slice(i, i + batchSize);
+    const batchWithStats = await Promise.all(
+      batch.map(async (commit: any) => {
+        // Buscar detalhes apenas para commits que ainda não têm dados
+        const stats = await fetchCommitDetails(fullName, commit.sha);
+        return {
+          tenantId: null,
+          repositoryId,
+          sha: commit.sha,
+          message: commit.commit.message.split("\n")[0].substring(0, 255),
+          fullMessage: commit.commit.message,
+          authorName: commit.commit.author?.name || commit.author?.login || "Unknown",
+          authorEmail: commit.commit.author?.email || null,
+          authorAvatarUrl: commit.author?.avatar_url || null,
+          commitType: detectCommitType(commit.commit.message),
+          branch: null,
+          prNumber: null,
+          filesChanged: stats.filesChanged,
+          additions: stats.additions,
+          deletions: stats.deletions,
+          committedAt: new Date(commit.commit.author?.date || new Date()),
+        };
+      })
+    );
+    commitDataList.push(...batchWithStats);
+    console.log(`Processed ${Math.min(i + batchSize, allCommits.length)}/${allCommits.length} commits with stats`);
+  }
 
   const inserted = await storage.createGitCommitsBatch(commitDataList);
   console.log(`Synced ${inserted} new commits`);
@@ -149,6 +229,9 @@ async function syncPullRequests(repositoryId: string, fullName: string): Promise
     for (const pr of allPRs) {
       const status = pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : 'open';
       
+      // Buscar detalhes do PR para obter contagem de commits e linhas
+      const prDetails = await fetchPRDetails(fullName, pr.number);
+      
       await storage.upsertGitPullRequest({
         repositoryId,
         githubPrNumber: pr.number,
@@ -160,9 +243,9 @@ async function syncPullRequests(repositoryId: string, fullName: string): Promise
         prType: detectCommitType(pr.title),
         sourceBranch: pr.head?.ref || '',
         targetBranch: pr.base?.ref || '',
-        commitsCount: pr.commits || 0,
-        additions: pr.additions || 0,
-        deletions: pr.deletions || 0,
+        commitsCount: prDetails.commitsCount,
+        additions: prDetails.additions,
+        deletions: prDetails.deletions,
         reviewers: JSON.stringify(pr.requested_reviewers?.map((r: any) => r.login) || []),
         labels: JSON.stringify(pr.labels?.map((l: any) => l.name) || []),
         createdAt: pr.created_at ? new Date(pr.created_at) : null,
