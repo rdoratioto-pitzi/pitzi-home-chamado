@@ -9,6 +9,10 @@ import { Label } from '@/components/ui/label';
 import { CheckCircle2, XCircle, Key, Server, Database } from 'lucide-react';
 import axios from 'axios';
 
+// Configurar axios global para enviar cookies
+axios.defaults.withCredentials = true;
+axios.defaults.baseURL = '';
+
 export default function OmieOverview() {
   const [config, setConfig] = useState({ app_key: '', app_secret: '', is_active: false });
   const [loading, setLoading] = useState(true);
@@ -27,8 +31,12 @@ export default function OmieOverview() {
       if (data.success) {
         setConfig(prev => ({ ...prev, ...data.data }));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading config:', error);
+      // Se não autenticado, mantém os campos vazios mas não mostra erro
+      if (error.response?.status === 401) {
+        console.log('Sessão expirada. Faça login novamente.');
+      }
     } finally {
       setLoading(false);
     }
@@ -55,16 +63,42 @@ export default function OmieOverview() {
   const handleTest = async () => {
     setTesting(true);
     setMessage(null);
+    setConnectionStatus(null);
+    
     try {
+      console.log('[Frontend] Testing Omie connection...');
+      
       const { data } = await axios.post('/api/omie/test');
+      
+      console.log('[Frontend] Test response:', data);
+      
       setConnectionStatus(data.connected);
+      
+      // Usar a mensagem detalhada do backend quando disponível
+      const messageText = data.message || (data.connected 
+        ? '✓ Conexão estabelecida com sucesso!' 
+        : '✗ Falha na conexão. Verifique as credenciais.');
+      
       setMessage({
         type: data.connected ? 'success' : 'error',
-        text: data.connected ? 'Conexão estabelecida com sucesso!' : 'Falha na conexão. Verifique as credenciais.'
+        text: messageText
       });
+      
     } catch (error: any) {
+      console.error('[Frontend] Test error:', error);
+      
       setConnectionStatus(false);
-      setMessage({ type: 'error', text: error.response?.data?.error || 'Erro ao testar conexão' });
+      
+      // Tentar extrair mensagem de erro do backend
+      const errorMsg = error.response?.data?.message 
+        || error.response?.data?.error 
+        || error.message 
+        || 'Erro ao testar conexão';
+      
+      setMessage({ 
+        type: 'error', 
+        text: '✗ ' + errorMsg
+      });
     } finally {
       setTesting(false);
     }

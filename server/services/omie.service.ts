@@ -63,13 +63,74 @@ export class OmieService {
   /**
    * Testa a conexão com a API Omie
    */
-  async testConnection(): Promise<boolean> {
+  async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
-      await this.callApi('geral/empresas/', 'ConsultarEmpresa', [{}]);
-      return true;
-    } catch (error) {
-      console.error('[OmieService] Teste de conexão falhou:', error);
-      return false;
+      console.log('[OmieService] Testing connection...');
+      
+      const config = await this.getConfig();
+      if (!config) {
+        console.error('[OmieService] Config not found in database');
+        return { success: false, message: 'Configuração não encontrada. Execute a migration.' };
+      }
+
+      console.log('[OmieService] Testing connection with app_key:', config.app_key?.substring(0, 5) + '...');
+
+      // Usar método ListarClientes com parâmetros mínimos para testar conexão
+      // A API Omie requer parâmetros válidos no campo "param"
+      const requestBody = {
+        call: 'ListarClientes',
+        app_key: config.app_key,
+        app_secret: config.app_secret,
+        param: [{
+          pagina: 1,
+          registros_por_pagina: 1
+        }]
+      };
+
+      console.log('[OmieService] Request body:', JSON.stringify({
+        call: requestBody.call,
+        app_key: requestBody.app_key?.substring(0, 5) + '...',
+        app_secret: '***',
+        param: requestBody.param
+      }, null, 2));
+
+      const response = await axios.post(
+        `${this.baseUrl}geral/clientes/`,
+        requestBody,
+        {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 30000,
+          validateStatus: (status) => status < 500
+        }
+      );
+
+      console.log('[OmieService] Response status:', response.status);
+      console.log('[OmieService] Response data:', JSON.stringify(response.data, null, 2));
+
+      // API Omie retorna faultstring em caso de erro SOAP
+      if (response.data?.faultstring) {
+        console.error('[OmieService] API returned error:', response.data.faultstring);
+        return { success: false, message: response.data.faultstring };
+      }
+
+      // Se não tem faultstring e recebeu resposta com dados de clientes, a conexão foi bem-sucedida
+      if (response.status === 200 && !response.data.faultstring) {
+        console.log('[OmieService] Connection successful');
+        return { success: true, message: 'Conexão estabelecida com sucesso!' };
+      }
+
+      console.error('[OmieService] Unexpected response:', response.data);
+      return { success: false, message: 'Resposta inesperada da API Omie' };
+
+    } catch (error: any) {
+      console.error('[OmieService] Connection test failed:', error.message);
+      console.error('[OmieService] Error details:', error.response?.data);
+      
+      if (error.response?.data?.faultstring) {
+        return { success: false, message: error.response.data.faultstring };
+      }
+      
+      return { success: false, message: error.message || 'Erro ao testar conexão' };
     }
   }
   
