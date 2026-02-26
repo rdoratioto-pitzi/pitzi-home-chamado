@@ -47,9 +47,10 @@ interface ProjectDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   project?: Project;
+  onSubmit?: (data: FormData) => Promise<void> | void;
 }
 
-export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProps) {
+export function ProjectDialog({ open, onOpenChange, project, onSubmit: externalOnSubmit }: ProjectDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [memberIds, setMemberIds] = useState<string[]>([]);
@@ -160,8 +161,13 @@ export function ProjectDialog({ open, onOpenChange, project }: ProjectDialogProp
     },
   });
 
-  const onSubmit = (data: FormData) => {
-    mutation.mutate(data);
+  const onSubmit = async (data: FormData) => {
+    if (externalOnSubmit) {
+      await externalOnSubmit(data);
+      onOpenChange(false);
+    } else {
+      mutation.mutate(data);
+    }
   };
 
   return (
