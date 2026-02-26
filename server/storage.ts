@@ -2403,43 +2403,85 @@ export class DatabaseStorage implements IStorage {
   }): Promise<GitPullRequest[]> {
     if (!db) return [];
     try {
-      const conditions = [];
-      
+      // Build WHERE conditions
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
+
       if (filters?.repositoryId) {
-        conditions.push(eq(gitPullRequests.repositoryId, filters.repositoryId));
+        conditions.push(`pr.repository_id = ${paramIndex++}`);
+        params.push(filters.repositoryId);
       }
       if (filters?.authorName) {
-        conditions.push(eq(gitPullRequests.authorName, filters.authorName));
+        conditions.push(`pr.author_name = ${paramIndex++}`);
+        params.push(filters.authorName);
       }
       if (filters?.status) {
-        conditions.push(eq(gitPullRequests.status, filters.status));
+        conditions.push(`pr.status = ${paramIndex++}`);
+        params.push(filters.status);
       }
       if (filters?.prType) {
-        conditions.push(eq(gitPullRequests.prType, filters.prType));
+        conditions.push(`pr.pr_type = ${paramIndex++}`);
+        params.push(filters.prType);
       }
       if (filters?.startDate) {
-        conditions.push(sql`${gitPullRequests.createdAt} >= ${filters.startDate}`);
+        conditions.push(`pr.created_at >= ${paramIndex++}`);
+        params.push(filters.startDate);
       }
       if (filters?.endDate) {
-        conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
+        conditions.push(`pr.created_at <= ${paramIndex++}`);
+        params.push(filters.endDate);
       }
-      
-      let query = db.select().from(gitPullRequests);
-      
-      if (conditions.length > 0) {
-        query = query.where(and(...conditions)) as any;
-      }
-      
-      query = query.orderBy(desc(gitPullRequests.createdAt)) as any;
-      
-      if (filters?.limit) {
-        query = query.limit(filters.limit) as any;
-      }
-      if (filters?.offset) {
-        query = query.offset(filters.offset) as any;
-      }
-      
-      return await query;
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const orderBy = 'ORDER BY pr.created_at DESC';
+      const limitClause = filters?.limit ? `LIMIT ${filters.limit}` : '';
+      const offsetClause = filters?.offset ? `OFFSET ${filters.offset}` : '';
+
+      // Query with JOIN to count commits and calculate lines
+      const query = `
+        SELECT 
+          pr.id,
+          pr.tenant_id,
+          pr.repository_id,
+          pr.github_pr_number as "githubPrNumber",
+          pr.title,
+          pr.description,
+          pr.author_name as "authorName",
+          pr.author_avatar_url as "authorAvatarUrl",
+          pr.status,
+          pr.pr_type as "prType",
+          pr.source_branch as "sourceBranch",
+          pr.target_branch as "targetBranch",
+          COALESCE(commits.commit_count, 0) as "commitsCount",
+          COALESCE(commits.total_additions, 0) as additions,
+          COALESCE(commits.total_deletions, 0) as deletions,
+          pr.reviewers,
+          pr.labels,
+          pr.created_at as "createdAt",
+          pr.merged_at as "mergedAt",
+          pr.closed_at as "closedAt",
+          pr.updated_at as "updatedAt"
+        FROM git_pull_requests pr
+        LEFT JOIN (
+          SELECT 
+            branch,
+            repository_id,
+            COUNT(*) as commit_count,
+            SUM(additions) as total_additions,
+            SUM(deletions) as total_deletions
+          FROM git_commits
+          WHERE branch IS NOT NULL
+          GROUP BY branch, repository_id
+        ) commits ON commits.branch = pr.source_branch AND commits.repository_id = pr.repository_id
+        ${whereClause}
+        ${orderBy}
+        ${limitClause}
+        ${offsetClause}
+      `;
+
+      const result = await db.query(query, params);
+      return result.rows as GitPullRequest[];
     } catch (error) {
       console.error("[storage] getGitPullRequests error:", error);
       return [];
