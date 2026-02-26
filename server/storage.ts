@@ -2301,11 +2301,41 @@ export class DatabaseStorage implements IStorage {
     return commit;
   }
 
+  async updateGitCommit(sha: string, data: Partial<InsertGitCommit>): Promise<GitCommit | undefined> {
+    if (!db) return undefined;
+    try {
+      const [updated] = await db.update(gitCommits)
+        .set(data)
+        .where(eq(gitCommits.sha, sha))
+        .returning();
+      return updated;
+    } catch (error) {
+      console.error("[storage] updateGitCommit error:", error);
+      return undefined;
+    }
+  }
+
   async createGitCommitsBatch(data: InsertGitCommit[]): Promise<number> {
     if (!db || data.length === 0) return 0;
     try {
-      const result = await db.insert(gitCommits).values(data).onConflictDoNothing().returning();
-      console.log(`[storage] createGitCommitsBatch: inserted ${result.length} commits`);
+      // Usar upsert para atualizar commits existentes ou inserir novos
+      const result = await db.insert(gitCommits).values(data).onConflictDoUpdate({
+        target: gitCommits.sha,
+        set: {
+          message: sql`EXCLUDED.message`,
+          fullMessage: sql`EXCLUDED.full_message`,
+          authorName: sql`EXCLUDED.author_name`,
+          authorEmail: sql`EXCLUDED.author_email`,
+          authorAvatarUrl: sql`EXCLUDED.author_avatar_url`,
+          commitType: sql`EXCLUDED.commit_type`,
+          branch: sql`EXCLUDED.branch`,
+          prNumber: sql`EXCLUDED.pr_number`,
+          filesChanged: sql`EXCLUDED.files_changed`,
+          additions: sql`EXCLUDED.additions`,
+          deletions: sql`EXCLUDED.deletions`,
+        }
+      }).returning();
+      console.log(`[storage] createGitCommitsBatch: upserted ${result.length} commits`);
       return result.length;
     } catch (error: any) {
       console.error("[storage] createGitCommitsBatch error:", error);
@@ -2314,7 +2344,7 @@ export class DatabaseStorage implements IStorage {
         code: error?.code,
         detail: error?.detail
       });
-      throw error; // Propagar para o caller diagnosticar
+      throw error;
     }
   }
 
