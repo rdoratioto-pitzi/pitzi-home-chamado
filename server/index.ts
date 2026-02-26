@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { seedDatabase } from "./seed";
 import { setupSession, requireAuth } from "./auth";
 import { startRecurrenceJob } from "./jobs/recurrence.job";
+import { startGitSyncJob } from "./jobs/git-sync.job";
 import { storage } from "./storage";
 
 /**
@@ -217,6 +218,9 @@ export const asyncHandler =
 
         // Iniciar cron job de recorrência
         startRecurrenceJob();
+
+        // Iniciar cron job de sincronização Git Analytics
+        startGitSyncJob();
 
         // Verificar se a tabela de prompts está vazia e executar sincronização inicial
         // Usando importação dinâmica para evitar erros de módulo na inicialização
