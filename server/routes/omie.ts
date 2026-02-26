@@ -48,13 +48,19 @@ export function registerOmieRoutes(router: Router) {
   // POST /api/omie/test - Testar conexão
   router.post("/api/omie/test", async (req, res) => {
     try {
-      const isValid = await omieService.testConnection();
+      console.log('[Omie Routes] Testing connection...');
+      
+      const result = await omieService.testConnection();
+      
+      console.log('[Omie Routes] Test result:', result);
+      
       res.json({ 
         success: true, 
-        connected: isValid,
-        message: isValid ? "Conexão estabelecida com sucesso" : "Falha na conexão"
+        connected: result.success,
+        message: result.message
       });
     } catch (error: any) {
+      console.error('[Omie Routes] Test error:', error.message);
       res.status(500).json({ 
         success: false, 
         connected: false,

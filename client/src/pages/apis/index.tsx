@@ -142,6 +142,13 @@ export default function ApisPage() {
                   APIs Internas
                 </TabsTrigger>
                 <TabsTrigger 
+                  value="externas" 
+                  className="bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none h-12 px-1 text-[13px] font-bold gap-2"
+                >
+                  <Database className="h-4 w-4" />
+                  APIs Externas
+                </TabsTrigger>
+                <TabsTrigger 
                   value="operadores" 
                   className="bg-transparent border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none h-12 px-1 text-[13px] font-bold gap-2"
                 >
@@ -336,7 +343,11 @@ export default function ApisPage() {
                       </div>
                     </CardContent>
                   </Card>
+                </div>
+              </TabsContent>
 
+              <TabsContent value="externas" className="m-0 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card className="border-2 border-border/60 hover:border-primary/30 transition-all cursor-pointer" onClick={() => setLocation('/integrations/omie')}>
                     <CardHeader className="pb-4">
                       <div className="flex items-center gap-4">
