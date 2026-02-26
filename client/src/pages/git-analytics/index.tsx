@@ -584,7 +584,7 @@ function DashboardView({
         <div className="bg-card rounded-xl border p-5">
           <h3 className="text-sm font-semibold mb-4">Produtividade por Desenvolvedor</h3>
           <div className="space-y-3">
-            {filteredDevelopers.slice(0, 5).map((dev, idx) => (
+            {filteredDevelopers.map((dev, idx) => (
               <div
                 key={idx}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
