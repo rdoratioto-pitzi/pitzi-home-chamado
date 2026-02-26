@@ -355,12 +355,15 @@ export default function OmieComprasEstoque() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label>Status</Label>
-              <Select value={ordensFilters.filtrar_por_status} onValueChange={(v) => setOrdensFilters(prev => ({ ...prev, filtrar_por_status: v }))}>
+              <Select 
+                value={ordensFilters.filtrar_por_status || 'ALL'} 
+                onValueChange={(v) => setOrdensFilters(prev => ({ ...prev, filtrar_por_status: v === 'ALL' ? '' : v }))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="ALL">Todos</SelectItem>
                   <SelectItem value="PENDENTE">Pendente</SelectItem>
                   <SelectItem value="ATENDIDO">Atendido</SelectItem>
                   <SelectItem value="CANCELADO">Cancelado</SelectItem>

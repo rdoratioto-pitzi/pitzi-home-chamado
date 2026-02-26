@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, XCircle, Key, Server, Database } from 'lucide-react';
+import { CheckCircle2, XCircle, Key, Server, Database, Edit2, Save, X, Loader2 } from 'lucide-react';
 import axios from 'axios';
 
 // Configurar axios global para enviar cookies
@@ -15,6 +15,8 @@ axios.defaults.baseURL = '';
 
 export default function OmieOverview() {
   const [config, setConfig] = useState({ app_key: '', app_secret: '', is_active: false });
+  const [editMode, setEditMode] = useState(false);
+  const [tempConfig, setTempConfig] = useState({ app_key: '', app_secret: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -28,8 +30,9 @@ export default function OmieOverview() {
   const loadConfig = async () => {
     try {
       const { data } = await axios.get('/api/omie/config');
-      if (data.success) {
-        setConfig(prev => ({ ...prev, ...data.data }));
+      if (data.success && data.data) {
+        setConfig(data.data);
+        setTempConfig({ app_key: data.data.app_key, app_secret: '' });
       }
     } catch (error: any) {
       console.error('Error loading config:', error);
@@ -42,16 +45,32 @@ export default function OmieOverview() {
     }
   };
 
+  const handleEdit = () => {
+    setEditMode(true);
+    setTempConfig({ app_key: config.app_key, app_secret: '' });
+    setMessage(null);
+  };
+
+  const handleCancel = () => {
+    setEditMode(false);
+    setTempConfig({ app_key: config.app_key, app_secret: '' });
+    setMessage(null);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setMessage(null);
     try {
       const { data } = await axios.post('/api/omie/config', {
-        app_key: config.app_key,
-        app_secret: config.app_secret
+        app_key: tempConfig.app_key,
+        app_secret: tempConfig.app_secret
       });
+      
       if (data.success) {
-        setMessage({ type: 'success', text: 'Credenciais salvas com sucesso!' });
+        setConfig({ ...config, app_key: tempConfig.app_key });
+        setEditMode(false);
+        setMessage({ type: 'success', text: 'Credenciais atualizadas com sucesso!' });
+        await loadConfig();
       }
     } catch (error: any) {
       setMessage({ type: 'error', text: error.response?.data?.error || 'Erro ao salvar' });
@@ -142,32 +161,59 @@ export default function OmieOverview() {
                 <Key className="h-5 w-5" />
                 Autenticação
               </CardTitle>
-              <CardDescription>Configurar credenciais de acesso à API Omie</CardDescription>
+              <CardDescription>Credenciais de acesso à API Omie</CardDescription>
             </div>
-            <Badge variant="outline">Bearer Token</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">Bearer Token</Badge>
+              {!editMode && (
+                <Button variant="ghost" size="sm" onClick={handleEdit}>
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Editar
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="app_key">App Key</Label>
-            <Input
-              id="app_key"
-              type="text"
-              placeholder="Digite o App Key"
-              value={config.app_key}
-              onChange={(e) => setConfig(prev => ({ ...prev, app_key: e.target.value }))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="app_secret">App Secret</Label>
-            <Input
-              id="app_secret"
-              type="password"
-              placeholder="Digite o App Secret"
-              value={config.app_secret}
-              onChange={(e) => setConfig(prev => ({ ...prev, app_secret: e.target.value }))}
-            />
-          </div>
+          {editMode ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="app_key">App Key</Label>
+                <Input
+                  id="app_key"
+                  type="text"
+                  placeholder="Digite o App Key"
+                  value={tempConfig.app_key}
+                  onChange={(e) => setTempConfig(prev => ({ ...prev, app_key: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="app_secret">App Secret</Label>
+                <Input
+                  id="app_secret"
+                  type="password"
+                  placeholder="Digite o App Secret"
+                  value={tempConfig.app_secret}
+                  onChange={(e) => setTempConfig(prev => ({ ...prev, app_secret: e.target.value }))}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label>App Key</Label>
+                <div className="bg-muted px-3 py-2 rounded-md text-sm font-mono">
+                  {config.app_key || 'Não configurado'}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>App Secret</Label>
+                <div className="bg-muted px-3 py-2 rounded-md text-sm font-mono">
+                  {config.app_key ? '••••••••••••••••••••' : 'Não configurado'}
+                </div>
+              </div>
+            </>
+          )}
 
           {message && (
             <Alert variant={message.type === 'error' ? 'destructive' : 'default'}>
@@ -177,12 +223,23 @@ export default function OmieOverview() {
           )}
 
           <div className="flex gap-2">
-            <Button onClick={handleSave} disabled={saving || !config.app_key || !config.app_secret}>
-              {saving ? 'Salvando...' : 'Salvar Credenciais'}
-            </Button>
-            <Button variant="outline" onClick={handleTest} disabled={testing || !config.app_key || !config.app_secret}>
-              {testing ? 'Testando...' : 'Testar Conexão'}
-            </Button>
+            {editMode ? (
+              <>
+                <Button onClick={handleSave} disabled={saving || !tempConfig.app_key || !tempConfig.app_secret}>
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? 'Salvando...' : 'Salvar'}
+                </Button>
+                <Button variant="outline" onClick={handleCancel}>
+                  <X className="h-4 w-4 mr-2" />
+                  Cancelar
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" onClick={handleTest} disabled={testing || !config.app_key}>
+                {testing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                {testing ? 'Testando...' : 'Testar Conexão'}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
