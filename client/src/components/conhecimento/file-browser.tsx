@@ -22,7 +22,7 @@ interface FileBrowserProps {
     breadcrumbs: Breadcrumb[];
 }
 
-const FileBrowser: React.FC<FileBrowserProps> = ({ files, breadcrumbs }) => {
+const FileBrowser = ({ files, breadcrumbs }: FileBrowserProps) => {
     const [currentPath, setCurrentPath] = useState("");
     const [, setLocation] = useLocation();
     const [sortConfig, setSortConfig] = useState<{ key: 'name' | 'updatedAt'; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
@@ -30,22 +30,19 @@ const FileBrowser: React.FC<FileBrowserProps> = ({ files, breadcrumbs }) => {
     const sortedFiles = [...files].sort((a, b) => {
         if (a.type === 'folder' && b.type !== 'folder') return -1;
         if (a.type !== 'folder' && b.type === 'folder') return 1;
-        if (a.type === 'folder' && b.type === 'folder') {
-            if (sortConfig.key === 'name') {
-                return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-            }
-            if (sortConfig.key === 'updatedAt') {
-                return sortConfig.direction === 'asc' ? a.updatedAt.getTime() - b.updatedAt.getTime() : b.updatedAt.getTime() - a.updatedAt.getTime();
-            }
+
+        if (sortConfig.key === 'name') {
+            const nameA = a.name ?? '';
+            const nameB = b.name ?? '';
+            return sortConfig.direction === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
         }
-        if (a.type === 'file' && b.type === 'file') {
-            if (sortConfig.key === 'name') {
-                return sortConfig.direction === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name);
-            }
-            if (sortConfig.key === 'updatedAt') {
-                return sortConfig.direction === 'asc' ? a.updatedAt.getTime() - b.updatedAt.getTime() : b.updatedAt.getTime() - a.updatedAt.getTime();
-            }
+
+        if (sortConfig.key === 'updatedAt') {
+            const timeA = a.updatedAt instanceof Date ? a.updatedAt.getTime() : 0;
+            const timeB = b.updatedAt instanceof Date ? b.updatedAt.getTime() : 0;
+            return sortConfig.direction === 'asc' ? timeA - timeB : timeB - timeA;
         }
+
         return 0;
     });
 
@@ -54,7 +51,7 @@ const FileBrowser: React.FC<FileBrowserProps> = ({ files, breadcrumbs }) => {
     };
 
     const requestSort = (key: 'name' | 'updatedAt') => {
-        let direction = 'asc';
+        let direction: 'asc' | 'desc' = 'asc';
         if (sortConfig.key === key && sortConfig.direction === 'asc') {
             direction = 'desc';
         }
@@ -63,7 +60,9 @@ const FileBrowser: React.FC<FileBrowserProps> = ({ files, breadcrumbs }) => {
 
     const getIcon = (key: 'name' | 'updatedAt') => {
         if (sortConfig.key === key) {
-            return sortConfig.direction === 'asc' ? <ChevronRight className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" style={{ transform: 'rotate(180deg)' }} />;
+            return sortConfig.direction === 'asc'
+                ? <ChevronRight className="h-4 w-4" />
+                : <ChevronRight className="h-4 w-4" style={{ transform: 'rotate(180deg)' }} />;
         }
         return null;
     };
@@ -89,10 +88,10 @@ const FileBrowser: React.FC<FileBrowserProps> = ({ files, breadcrumbs }) => {
             <Table>
                 <TableHeader>
                     <TableRow>
-                        <TableCell onClick={() => requestSort('name')}>
+                        <TableCell onClick={() => requestSort('name')} className="cursor-pointer">
                             Nome {getIcon('name')}
                         </TableCell>
-                        <TableCell onClick={() => requestSort('updatedAt')}>
+                        <TableCell onClick={() => requestSort('updatedAt')} className="cursor-pointer">
                             Última Modificação {getIcon('updatedAt')}
                         </TableCell>
                         <TableCell>Descrição</TableCell>
@@ -114,7 +113,9 @@ const FileBrowser: React.FC<FileBrowserProps> = ({ files, breadcrumbs }) => {
                                 {file.name}
                             </TableCell>
                             <TableCell>
-                                {file.updatedAt.toLocaleDateString()}
+                                {file.updatedAt instanceof Date
+                                    ? file.updatedAt.toLocaleDateString()
+                                    : String(file.updatedAt ?? '')}
                             </TableCell>
                             <TableCell>
                                 {file.description || "Nenhuma descrição"}
@@ -127,4 +128,4 @@ const FileBrowser: React.FC<FileBrowserProps> = ({ files, breadcrumbs }) => {
     );
 };
 
-export { FileBrowser };
+export default FileBrowser;
