@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -54,6 +55,7 @@ const correiosIntegrations = [
 ];
 
 export default function ApisPage() {
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("correios");
   const [selectedApi, setSelectedApi] = useState<any>(correiosIntegrations[0]);
   const [trackingCode, setTrackingCode] = useState("");
@@ -330,6 +332,48 @@ export default function ApisPage() {
                         <Button variant="outline" className="w-full gap-2" disabled>
                           <ArrowRight className="h-4 w-4" />
                           Configurar Integração
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-2 border-border/60 hover:border-primary/30 transition-all cursor-pointer" onClick={() => setLocation('/integrations/omie')}>
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center">
+                          <Database className="h-7 w-7 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-[18px] font-bold">API Omie</CardTitle>
+                            <Badge variant="outline" className="text-[10px] bg-green-500/10 text-green-700 border-green-500/30">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Ativo
+                            </Badge>
+                          </div>
+                          <CardDescription className="mt-1.5 text-[13px]">
+                            Integração com ERP Omie para gestão empresarial
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-4 rounded-lg bg-muted/30 border border-border/40">
+                        <div className="flex items-start gap-3">
+                          <Database className="h-5 w-5 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-[13px] font-semibold text-foreground">Dados disponíveis</p>
+                            <p className="text-[12px] text-muted-foreground mt-1">
+                              Compras, estoque, vendas, NF-e, finanças e cadastros gerais do ERP Omie
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-2">
+                        <Button variant="outline" className="w-full gap-2">
+                          <ArrowRight className="h-4 w-4" />
+                          Acessar Integração
                         </Button>
                       </div>
                     </CardContent>

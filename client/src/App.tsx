@@ -56,6 +56,7 @@ import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 import UpdatesPage from "@/pages/updates/index";
 import GitAnalyticsPage from "@/pages/git-analytics/index";
 import EstoquesPage from "@/pages/estoques/index";
+import OmieIntegration from "@/pages/integrations/omie/OmieIntegration";
 
 function Router() {
   return (
@@ -284,6 +285,11 @@ function Router() {
       <Route path="/estoques">
         <ProtectedRoute requiredPermission="estoques">
           <EstoquesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/integrations/omie">
+        <ProtectedRoute>
+          <OmieIntegration />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
