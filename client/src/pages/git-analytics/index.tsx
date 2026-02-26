@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,7 @@ export default function GitAnalyticsPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch repositories
   const { data: repositories = [] } = useQuery<GitRepository[]>({
@@ -165,7 +166,9 @@ export default function GitAnalyticsPage() {
         repositoryId: selectedRepoId !== "all" ? selectedRepoId : undefined,
       });
       
-      await refetchStats();
+      // Invalida TODAS as queries do módulo Git Analytics para atualizar a UI
+      await queryClient.invalidateQueries({ queryKey: ["/api/git-analytics"] });
+      
       toast({ title: "Sincronização concluída!", description: `Dados de ${getMonthName(month)}/${year} atualizados.` });
     } catch (error) {
       toast({ title: "Erro na sincronização", description: String(error), variant: "destructive" });

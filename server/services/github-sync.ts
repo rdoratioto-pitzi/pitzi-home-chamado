@@ -308,7 +308,16 @@ export async function syncRepository(repositoryId: string): Promise<void> {
   
   console.log(`[GitSync] Starting sync for ${repo.fullName}`);
   
-  const since = repo.lastSyncAt || undefined;
+  // Para first-sync (lastSyncAt null), limita a 90 dias para evitar timeout
+  // Isso evita buscar todo o histórico de repositórios grandes
+  let since: Date | undefined;
+  if (repo.lastSyncAt) {
+    since = new Date(repo.lastSyncAt);
+  } else {
+    // First sync: buscar últimos 90 dias apenas
+    since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    console.log(`[GitSync] First sync for ${repo.fullName}, limitando a 90 dias`);
+  }
   
   await Promise.all([
     syncCommits(repositoryId, repo.fullName, since),
