@@ -32,6 +32,7 @@ import ApisPage from "@/pages/apis/index";
 import CorreiosReversaPage from "@/pages/apis/correios-reversa";
 import ApiRsLogisticaPage from "@/pages/apis/api-rs-logistica";
 import ApiAdmLogisticaPage from "@/pages/apis/api-adm-logistica";
+import ApiAvaliacoesIaPage from "@/pages/apis/api-avaliacoes-ia";
 import ApiRelatorioPedidosPage from "@/pages/apis/api-relatorio-pedidos";
 import LoginPage from "@/pages/login";
 import ConfiguracoesPage from "@/pages/configuracoes/index";
@@ -193,6 +194,11 @@ function Router() {
       <Route path="/apis/relatorio-pedidos">
         <ProtectedRoute requiredPermission="apis">
           <ApiRelatorioPedidosPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/apis/avaliacoes-ia">
+        <ProtectedRoute requiredPermission="apis">
+          <ApiAvaliacoesIaPage />
         </ProtectedRoute>
       </Route>
       <Route path="/pricing">
