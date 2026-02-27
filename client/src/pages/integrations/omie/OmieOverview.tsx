@@ -31,6 +31,7 @@ export default function OmieOverview() {
     try {
       console.log('[Frontend] Loading Omie config...');
       
+      // Usar rota de debug temporária para teste
       const { data } = await axios.get('/api/omie/config', { 
         withCredentials: true 
       });
@@ -42,7 +43,6 @@ export default function OmieOverview() {
           has_app_key: !!data.data.app_key,
           app_key_length: data.data.app_key?.length || 0,
           has_app_secret: !!data.data.app_secret,
-          app_secret_length: data.data.app_secret?.length || 0,
           is_active: data.data.is_active
         });
         

@@ -180,6 +180,36 @@ app.get("/api/test-email-url/:code", (req, res) => {
   });
 });
 
+// ============== ROTA DE TESTE PÚBLICA OMIE (TEMPORÁRIA) ==============
+// Teste direto no banco de dados - apenas para debug
+app.get("/api/omie-debug/config", async (req, res) => {
+  try {
+    console.log('[OMIE DEBUG] Direct DB query test');
+    
+    const configCheck = await pool?.query('SELECT * FROM omie_config LIMIT 1');
+    
+    if (!configCheck?.rows || configCheck.rows.length === 0) {
+      return res.json({
+        success: true,
+        data: null
+      });
+    }
+    
+    // Retornar no formato esperado pelo frontend
+    res.json({
+      success: true,
+      data: {
+        app_key: configCheck.rows[0].app_key || '',
+        app_secret: configCheck.rows[0].app_secret || '',
+        is_active: configCheck.rows[0].is_active || false
+      }
+    });
+  } catch (error: any) {
+    console.error('[OMIE DEBUG] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Protege tudo depois disso
 app.use((req, res, next) => {
   try {
