@@ -298,7 +298,7 @@ export default function OmieOverview() {
           <CardDescription>Total de endpoints organizados por categoria</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="text-center p-4 border rounded-lg">
               <div className="text-2xl font-bold text-primary">4</div>
               <div className="text-sm text-muted-foreground">Compras e Estoque</div>
@@ -306,6 +306,10 @@ export default function OmieOverview() {
             <div className="text-center p-4 border rounded-lg">
               <div className="text-2xl font-bold text-primary">3</div>
               <div className="text-sm text-muted-foreground">Vendas e NF-e</div>
+            </div>
+            <div className="text-center p-4 border rounded-lg">
+              <div className="text-2xl font-bold text-primary">1</div>
+              <div className="text-sm text-muted-foreground">Transporte (CT-e)</div>
             </div>
             <div className="text-center p-4 border rounded-lg">
               <div className="text-2xl font-bold text-primary">3</div>
