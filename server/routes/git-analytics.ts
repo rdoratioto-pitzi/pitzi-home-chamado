@@ -221,12 +221,21 @@ export function registerGitAnalyticsRoutes(router: Router) {
               if (statsResponse.ok) {
                 const statsData = await statsResponse.json();
                 
-                // Somar usage desta key
-                // OpenRouter retorna usage em diferentes formatos dependendo do plano
-                const usage = statsData.data?.usage || {};
-                totalTokens += usage.total_tokens || 0;
-                totalRequests += usage.total_requests || 0;
-                totalSpend += usage.total_cost || 0;
+                // OpenRouter retorna usage como objeto com diferentes campos de custo
+                // O campo 'usage' é o custo total em dólares
+                const usage = statsData.data?.usage || 0;
+                const usageDaily = statsData.data?.usage_daily || 0;
+                const usageMonthly = statsData.data?.usage_monthly || 0;
+                
+                // Para exibir em tokens, vamos usar o valor monthly como referência
+                // Como não temos o número exato de tokens, usamos o custo como proxy
+                // Multiplicamos por um fator para obter um número representativo
+                // (assumindo custo médio de $1 por 1M tokens)
+                const estimatedTokens = Math.round(usageMonthly * 1000000);
+                
+                totalTokens += estimatedTokens;
+                totalSpend += usageMonthly;
+                totalRequests += 1; // Contamos como 1 requisição por key
               }
               
             } catch (error) {
@@ -247,10 +256,9 @@ export function registerGitAnalyticsRoutes(router: Router) {
       
       // Ordenar por tokens (maior → menor)
       const sorted = tokenUsage
-        .sort((a, b) => b.totalTokens - a.totalTokens)
-        // Filtrar devs com 0 tokens (não usaram)
-        .filter(dev => dev.totalTokens > 0);
-      
+        .sort((a, b) => b.totalTokens - a.totalTokens);
+        // NÃO filtrar devs com 0 tokens - mostrar todos para debug
+        
       res.json(sorted);
       
     } catch (error: any) {
