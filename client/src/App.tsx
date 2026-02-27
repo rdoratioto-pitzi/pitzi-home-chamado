@@ -28,6 +28,7 @@ import LogisticaReversaPage from "@/pages/logistica/logistica-reversa";
 import SimularFretePage from "@/pages/logistica/simular-frete";
 import ImpressaoEtiquetasPage from "@/pages/logistica/impressao-etiquetas";
 import RomaneiosPage from "@/pages/logistica/romaneios";
+import EficienciaAvaliacoesIaPage from "@/pages/logistica/avaliacoes-ia";
 import ApisPage from "@/pages/apis/index";
 import CorreiosReversaPage from "@/pages/apis/correios-reversa";
 import ApiRsLogisticaPage from "@/pages/apis/api-rs-logistica";
@@ -57,6 +58,7 @@ import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 import UpdatesPage from "@/pages/updates/index";
 import GitAnalyticsPage from "@/pages/git-analytics/index";
 import EstoquesPage from "@/pages/estoques/index";
+import OmieIntegration from "@/pages/integrations/omie/OmieIntegration";
 
 function Router() {
   return (
@@ -169,6 +171,11 @@ function Router() {
       <Route path="/logistica/romaneios">
         <ProtectedRoute requiredPermission="logistica">
           <RomaneiosPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/avaliacoes-ia">
+        <ProtectedRoute requiredPermission="logistica">
+          <EficienciaAvaliacoesIaPage />
         </ProtectedRoute>
       </Route>
       <Route path="/apis">
@@ -290,6 +297,11 @@ function Router() {
       <Route path="/estoques">
         <ProtectedRoute requiredPermission="estoques">
           <EstoquesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/integrations/omie">
+        <ProtectedRoute>
+          <OmieIntegration />
         </ProtectedRoute>
       </Route>
       <Route component={NotFound} />
