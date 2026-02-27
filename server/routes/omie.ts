@@ -2,43 +2,13 @@
  * Rotas para integração com API Omie (ERP)
  */
 import { Router } from "express";
+import { requireAuth } from "../middleware/auth";
 import { omieService } from "../services/omie.service";
 
-// ============== ROTA PÚBLICA DE TESTE (sem autenticação) ==============
-// Esta rota é apenas para teste - NÃO usar em produção!
 export function registerOmieRoutes(router: Router) {
   
-  // Rota de teste pública (sem requireAuth)
-  router.get("/api/omie/public-test", async (req, res) => {
-    try {
-      console.log('[OMIE Routes] PUBLIC TEST: Direct DB query test');
-      
-      const { pool } = require('../db');
-      const result = await pool?.query('SELECT * FROM omie_config LIMIT 1');
-      
-      res.json({
-        success: true,
-        test: 'public-test',
-        has_data: result?.rows?.length > 0,
-        data: result?.rows?.[0] ? {
-          id: result.rows[0].id,
-          app_key: result.rows[0].app_key,
-          has_secret: !!result.rows[0].app_secret,
-          is_active: result.rows[0].is_active
-        } : null
-      });
-    } catch (error: any) {
-      console.error('[OMIE Routes] PUBLIC TEST FAILED:', error.message);
-      res.status(500).json({
-        success: false,
-        test: 'public-test',
-        error: error.message
-      });
-    }
-  });
-
   // GET /api/omie/config - Obter configuração atual
-  router.get("/api/omie/config", async (req, res) => {
+  router.get("/api/omie/config", requireAuth, async (req, res) => {
     try {
       console.log('[OMIE Routes] GET /api/omie/config - Getting config');
       
@@ -49,7 +19,6 @@ export function registerOmieRoutes(router: Router) {
       }
       
       console.log('[OMIE Routes] Config found, app_key:', config.app_key?.substring(0, 5) + '...');
-      console.log('[OMIE Routes] app_secret present:', !!config.app_secret);
       
       res.json({
         success: true,
@@ -66,15 +35,13 @@ export function registerOmieRoutes(router: Router) {
   });
 
   // POST /api/omie/config - Atualizar configuração
-  router.post("/api/omie/config", async (req, res) => {
+  router.post("/api/omie/config", requireAuth, async (req, res) => {
     try {
       console.log('[OMIE Routes] POST /api/omie/config - Updating config');
-      console.log('[OMIE Routes] Request body keys:', Object.keys(req.body));
       
       const { app_key, app_secret } = req.body;
       
       if (!app_key || !app_secret) {
-        console.log('[OMIE Routes] Missing credentials');
         return res.status(400).json({ 
           success: false, 
           error: "app_key and app_secret são obrigatórios" 
@@ -90,13 +57,11 @@ export function registerOmieRoutes(router: Router) {
   });
 
   // POST /api/omie/test - Testar conexão
-  router.post("/api/omie/test", async (req, res) => {
+  router.post("/api/omie/test", requireAuth, async (req, res) => {
     try {
       console.log('[OMIE Routes] POST /api/omie/test - Testing connection');
       
       const result = await omieService.testConnection();
-      
-      console.log('[OMIE Routes] Test result:', result);
       
       res.json({ 
         success: result.success, 
@@ -114,17 +79,14 @@ export function registerOmieRoutes(router: Router) {
   });
 
   // GET /api/omie/logs - Obter logs de sincronização
-  router.get("/api/omie/logs", async (req, res) => {
+  router.get("/api/omie/logs", requireAuth, async (req, res) => {
     try {
-      console.log('[OMIE Routes] GET /api/omie/logs - Fetching logs');
-      
       const { category, limit } = req.query;
       const logs = await omieService.getSyncLogs(
         category as string, 
         limit ? parseInt(limit as string, 10) : 50
       );
       
-      console.log('[OMIE Routes] Found', logs.length, 'logs');
       res.json({ success: true, data: logs });
     } catch (error: any) {
       console.error('[OMIE Routes] Error fetching logs:', error.message);
@@ -133,33 +95,24 @@ export function registerOmieRoutes(router: Router) {
   });
 
   // POST /api/omie/call - Executar chamada direta à API
-  router.post("/api/omie/call", async (req, res) => {
+  router.post("/api/omie/call", requireAuth, async (req, res) => {
     try {
-      console.log('[OMIE Routes] =======================================');
       console.log('[OMIE Routes] POST /api/omie/call - Making API call');
-      console.log('[OMIE Routes] Request body:', JSON.stringify(req.body, null, 2));
       
       const { endpoint, call, params, category } = req.body;
       
       if (!endpoint || !call) {
-        console.log('[OMIE Routes] Missing required fields');
         return res.status(400).json({ 
           success: false, 
           error: "endpoint e call são obrigatórios" 
         });
       }
       
-      console.log('[OMIE Routes] Calling endpoint:', endpoint);
-      console.log('[OMIE Routes] Calling method:', call);
-      
       const startTime = Date.now();
       const data = await omieService.callApi(endpoint, call, params || []);
       const duration = Date.now() - startTime;
       
-      console.log('[OMIE Routes] API call successful');
-      console.log('[OMIE Routes] Duration:', duration, 'ms');
-      console.log('[OMIE Routes] Response type:', typeof data);
-      console.log('[OMIE Routes] Response keys:', Object.keys(data || {}));
+      console.log('[OMIE Routes] API call successful, duration:', duration, 'ms');
       
       // Log de sucesso
       await omieService.logSync({
@@ -173,10 +126,7 @@ export function registerOmieRoutes(router: Router) {
       
       res.json({ success: true, data, duration });
     } catch (error: any) {
-      console.error('[OMIE Routes] =======================================');
-      console.error('[OMIE Routes] API call FAILED:');
-      console.error('[OMIE Routes] Error:', error.message);
-      console.error('[OMIE Routes] Stack:', error.stack);
+      console.error('[OMIE Routes] API call failed:', error.message);
       
       // Log de erro
       await omieService.logSync({
@@ -188,37 +138,6 @@ export function registerOmieRoutes(router: Router) {
       });
       
       res.status(500).json({ success: false, error: error.message });
-    }
-  });
-
-  // GET /api/omie/test-config - Endpoint de teste para verificar conexão direta com DB
-  router.get("/api/omie/test-config", async (req, res) => {
-    try {
-      console.log('[OMIE Routes] TEST: Direct DB query test');
-      
-      const { pool } = require('../db');
-      const result = await pool?.query('SELECT * FROM omie_config LIMIT 1');
-      
-      res.json({
-        success: true,
-        test: 'direct-query',
-        has_data: result?.rows?.length > 0,
-        data: result?.rows?.[0] ? {
-          id: result.rows[0].id,
-          app_key: result.rows[0].app_key,
-          has_secret: !!result.rows[0].app_secret,
-          is_active: result.rows[0].is_active,
-          created_at: result.rows[0].created_at,
-          updated_at: result.rows[0].updated_at
-        } : null
-      });
-    } catch (error: any) {
-      console.error('[OMIE Routes] TEST FAILED:', error.message);
-      res.status(500).json({
-        success: false,
-        test: 'direct-query',
-        error: error.message
-      });
     }
   });
 }
