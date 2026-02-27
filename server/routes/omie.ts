@@ -4,8 +4,39 @@
 import { Router } from "express";
 import { omieService } from "../services/omie.service";
 
+// ============== ROTA PÚBLICA DE TESTE (sem autenticação) ==============
+// Esta rota é apenas para teste - NÃO usar em produção!
 export function registerOmieRoutes(router: Router) {
   
+  // Rota de teste pública (sem requireAuth)
+  router.get("/api/omie/public-test", async (req, res) => {
+    try {
+      console.log('[OMIE Routes] PUBLIC TEST: Direct DB query test');
+      
+      const { pool } = require('../db');
+      const result = await pool?.query('SELECT * FROM omie_config LIMIT 1');
+      
+      res.json({
+        success: true,
+        test: 'public-test',
+        has_data: result?.rows?.length > 0,
+        data: result?.rows?.[0] ? {
+          id: result.rows[0].id,
+          app_key: result.rows[0].app_key,
+          has_secret: !!result.rows[0].app_secret,
+          is_active: result.rows[0].is_active
+        } : null
+      });
+    } catch (error: any) {
+      console.error('[OMIE Routes] PUBLIC TEST FAILED:', error.message);
+      res.status(500).json({
+        success: false,
+        test: 'public-test',
+        error: error.message
+      });
+    }
+  });
+
   // GET /api/omie/config - Obter configuração atual
   router.get("/api/omie/config", async (req, res) => {
     try {
@@ -157,6 +188,37 @@ export function registerOmieRoutes(router: Router) {
       });
       
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/omie/test-config - Endpoint de teste para verificar conexão direta com DB
+  router.get("/api/omie/test-config", async (req, res) => {
+    try {
+      console.log('[OMIE Routes] TEST: Direct DB query test');
+      
+      const { pool } = require('../db');
+      const result = await pool?.query('SELECT * FROM omie_config LIMIT 1');
+      
+      res.json({
+        success: true,
+        test: 'direct-query',
+        has_data: result?.rows?.length > 0,
+        data: result?.rows?.[0] ? {
+          id: result.rows[0].id,
+          app_key: result.rows[0].app_key,
+          has_secret: !!result.rows[0].app_secret,
+          is_active: result.rows[0].is_active,
+          created_at: result.rows[0].created_at,
+          updated_at: result.rows[0].updated_at
+        } : null
+      });
+    } catch (error: any) {
+      console.error('[OMIE Routes] TEST FAILED:', error.message);
+      res.status(500).json({
+        success: false,
+        test: 'direct-query',
+        error: error.message
+      });
     }
   });
 }
