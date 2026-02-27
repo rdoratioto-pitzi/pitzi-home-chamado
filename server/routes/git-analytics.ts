@@ -190,6 +190,75 @@ export function registerGitAnalyticsRoutes(router: Router) {
     }
   });
 
+  // Get developer token usage from OpenRouter
+  router.get("/api/git-analytics/developer-tokens", requireAuth, async (req, res) => {
+    try {
+      // Importar configurações
+      const { 
+        DEVELOPER_KEYS, 
+        getAllDevelopers 
+      } = await import("../config/openrouter-keys");
+      
+      // Buscar usage de cada desenvolvedor
+      const tokenUsage = await Promise.all(
+        getAllDevelopers().map(async (developerName) => {
+          const keys = DEVELOPER_KEYS[developerName];
+          
+          // Somar tokens de todas as keys do desenvolvedor
+          let totalTokens = 0;
+          let totalRequests = 0;
+          let totalSpend = 0;
+          
+          for (const key of keys) {
+            try {
+              // Buscar usage da API OpenRouter para esta key específica
+              const statsResponse = await fetch(`https://openrouter.ai/api/v1/auth/key`, {
+                headers: {
+                  "Authorization": `Bearer ${key.apiKey}`,
+                },
+              });
+              
+              if (statsResponse.ok) {
+                const statsData = await statsResponse.json();
+                
+                // Somar usage desta key
+                // OpenRouter retorna usage em diferentes formatos dependendo do plano
+                const usage = statsData.data?.usage || {};
+                totalTokens += usage.total_tokens || 0;
+                totalRequests += usage.total_requests || 0;
+                totalSpend += usage.total_cost || 0;
+              }
+              
+            } catch (error) {
+              console.error(`Error fetching OpenRouter usage for ${key.keyName}:`, error);
+              // Continuar mesmo se uma key falhar
+            }
+          }
+          
+          return {
+            developerName,
+            totalTokens,
+            totalRequests,
+            totalSpend,
+            keysCount: keys.length,
+          };
+        })
+      );
+      
+      // Ordenar por tokens (maior → menor)
+      const sorted = tokenUsage
+        .sort((a, b) => b.totalTokens - a.totalTokens)
+        // Filtrar devs com 0 tokens (não usaram)
+        .filter(dev => dev.totalTokens > 0);
+      
+      res.json(sorted);
+      
+    } catch (error: any) {
+      console.error("Get developer tokens error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Developer stats
   router.get("/api/git-analytics/developer-stats", requireAuth, async (req, res) => {
     try {
