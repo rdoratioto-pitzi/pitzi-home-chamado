@@ -1,6 +1,7 @@
 import { db } from "./db";
-import { users, taskAreas, flowcharts } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { users, taskAreas, flowcharts, gitRepositories } from "@shared/schema";
+import { eq, and, sql } from "drizzle-orm";
+import https from "https";
 
 const TEMPLATE_DATA = [
   {
@@ -209,9 +210,85 @@ export async function seedDatabase() {
       }
     }
 
+    await seedGitRepositories();
+
     console.log("[seed] Database seeding complete.");
   } catch (error) {
     console.error("[seed] Error during database seeding:", error);
     console.warn("[seed] Continuing server startup without full seeding.");
+  }
+}
+
+async function fetchGitHubOrgRepos(org: string): Promise<any[]> {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) return [];
+
+  return new Promise((resolve) => {
+    const options = {
+      hostname: "api.github.com",
+      path: `/orgs/${org}/repos?per_page=100&type=all`,
+      headers: {
+        Authorization: `token ${token}`,
+        "User-Agent": "Renov-Home-App",
+      },
+    };
+    https.get(options, (res) => {
+      let data = "";
+      res.on("data", (chunk: string) => (data += chunk));
+      res.on("end", () => {
+        try {
+          const repos = JSON.parse(data);
+          resolve(Array.isArray(repos) ? repos : []);
+        } catch {
+          resolve([]);
+        }
+      });
+    }).on("error", () => resolve([]));
+  });
+}
+
+async function seedGitRepositories() {
+  if (!db) return;
+
+  try {
+    const existing = await db.select({ id: gitRepositories.id }).from(gitRepositories);
+    if (existing.length > 0) {
+      console.log(`[seed] Git repositories already configured (${existing.length} repos).`);
+      return;
+    }
+
+    const repos = await fetchGitHubOrgRepos("Renov-BD");
+    if (repos.length === 0) {
+      console.log("[seed] No GitHub repos found for Renov-BD (token missing or no access).");
+      return;
+    }
+
+    for (const repo of repos) {
+      await db.insert(gitRepositories).values({
+        githubId: repo.id,
+        name: repo.name,
+        fullName: repo.full_name,
+        owner: repo.owner.login,
+        defaultBranch: repo.default_branch,
+        isActive: true,
+        syncEnabled: true,
+      });
+      console.log(`[seed] Git repo registered: ${repo.full_name}`);
+    }
+
+    console.log(`[seed] ${repos.length} GitHub repos registered. Initial sync will run via scheduled job.`);
+
+    setTimeout(async () => {
+      try {
+        const { syncAllRepositories } = await import("./services/github-sync");
+        console.log("[seed] Starting initial GitHub sync...");
+        const result = await syncAllRepositories();
+        console.log("[seed] Initial GitHub sync complete:", JSON.stringify(result));
+      } catch (err) {
+        console.error("[seed] Initial GitHub sync error:", err);
+      }
+    }, 5000);
+  } catch (error) {
+    console.error("[seed] Error seeding git repositories:", error);
   }
 }
