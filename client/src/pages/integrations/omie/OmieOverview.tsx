@@ -82,11 +82,23 @@ export default function OmieOverview() {
   };
 
   const handleSave = async () => {
+    // Validações
     if (!tempConfig.app_key || !tempConfig.app_secret) {
       setMessage({ type: 'error', text: 'App Key e App Secret são obrigatórios' });
       return;
     }
-    
+
+    // Validar formato básico (só números)
+    if (!/^\d+$/.test(tempConfig.app_key.trim())) {
+      setMessage({ type: 'error', text: 'App Key deve conter apenas números' });
+      return;
+    }
+
+    if (tempConfig.app_secret.trim().length < 20) {
+      setMessage({ type: 'error', text: 'App Secret parece inválido (muito curto)' });
+      return;
+    }
+
     setSaving(true);
     setMessage(null);
     
