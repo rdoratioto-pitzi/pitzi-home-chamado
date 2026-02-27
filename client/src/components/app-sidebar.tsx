@@ -129,6 +129,7 @@ const logisticaSubItems = [
   { title: "Logística Reversa", url: "/logistica/reversa", icon: RotateCcw },
   { title: "Romaneios", url: "/logistica/romaneios", icon: ClipboardList },
   { title: "Impressão Etiquetas", url: "/logistica/impressao-etiquetas", icon: Printer },
+  { title: "Eficiência Avaliações IA", url: "/logistica/avaliacoes-ia", icon: Bot },
 ];
 
 const apisSubItems = [
