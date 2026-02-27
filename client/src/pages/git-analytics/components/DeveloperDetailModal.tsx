@@ -86,8 +86,8 @@ export function DeveloperDetailModal({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {allDevelopers.map((dev) => (
-                  <SelectItem key={dev.name} value={dev.name}>
+                {allDevelopers.map((dev, index) => (
+                  <SelectItem key={`${dev.name}-${dev.email || index}`} value={dev.name}>
                     {dev.name}
                   </SelectItem>
                 ))}

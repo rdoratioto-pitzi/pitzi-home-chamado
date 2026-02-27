@@ -7,10 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   RefreshCw, LayoutDashboard, Table2, GitPullRequest, GitCommit,
-  Users, TrendingUp, Shield, GitBranch, Zap, Bug, Wrench, AlertTriangle
+  Users, TrendingUp, Shield, GitBranch, Zap, Bug, Wrench, AlertTriangle, PieChart
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useDeveloperTokens, DeveloperTokenUsage } from "@/hooks/use-developer-tokens";
 import { KPICard, KPI_HELP_TEXTS } from "./components/KPICard";
 import { TYPE_COLORS, TYPE_LABELS } from "./components/Badges";
 import { TypeDistributionChart } from "./components/TypeDistributionChart";
@@ -20,6 +21,16 @@ import { SecurityModal } from "./components/SecurityModal";
 import { DeveloperDetailModal } from "./components/DeveloperDetailModal";
 import { CommitsTable } from "./components/CommitsTable";
 import { PullRequestsTable } from "./components/PullRequestsTable";
+
+// Função para formatar tokens (ex: 7.43M, 290K, 47)
+const formatTokens = (value: number): string => {
+  if (value >= 1000000) {
+    return (value / 1000000).toFixed(2) + "M";
+  } else if (value >= 1000) {
+    return (value / 1000).toFixed(0) + "K";
+  }
+  return value.toString();
+};
 
 // Types
 export interface GitRepository {
@@ -260,8 +271,8 @@ export default function GitAnalyticsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os devs</SelectItem>
-                    {allDevelopers.map((dev) => (
-                      <SelectItem key={dev.name} value={dev.name}>
+                    {allDevelopers.map((dev, index) => (
+                      <SelectItem key={`${dev.name}-${dev.email || index}`} value={dev.name}>
                         {dev.name}
                       </SelectItem>
                     ))}
@@ -312,6 +323,7 @@ export default function GitAnalyticsPage() {
               setSelectedDev={setSelectedDev}
               selectedRepoId={selectedRepoId}
               selectedDevName={selectedDevName}
+              selectedPeriod={selectedPeriod}
             />
           ) : (
             <DetailedView
@@ -355,6 +367,85 @@ interface DashboardViewProps {
   setSelectedDev: (dev: DeveloperStats | null) => void;
   selectedRepoId: string;
   selectedDevName: string;
+  selectedPeriod: string;
+}
+
+// Componente para exibir produtividade por tokens (OpenRouter)
+function DeveloperTokensCard({ selectedPeriod }: { selectedPeriod: string }) {
+  // Calcular datas do período selecionado
+  const getPeriodDates = () => {
+    const [year, month] = selectedPeriod.split('-').map(Number);
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
+    return { startDate, endDate };
+  };
+
+  const { startDate, endDate } = getPeriodDates();
+  const { data: tokenData = [], isLoading } = useDeveloperTokens({
+    startDate,
+    endDate,
+  });
+
+  const maxTokens = tokenData.length > 0 ? Math.max(...tokenData.map(t => t.totalTokens)) : 0;
+
+  return (
+    <div className="bg-card rounded-xl border p-5">
+      <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+        <Zap className="h-4 w-4 text-blue-500" />
+        Produtividade por Desenvolvedor (Tokens)
+      </h3>
+      <div className="space-y-3">
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-3 p-2">
+                <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+                  <div className="h-2 w-full bg-muted rounded-full animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : tokenData.length > 0 ? (
+          tokenData
+            .sort((a, b) => b.totalTokens - a.totalTokens)
+            .slice(0, 5)
+            .map((dev, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-xs font-medium text-blue-700 dark:text-blue-400">
+                  {dev.developerName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium truncate">{dev.developerName}</span>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-blue-600 font-medium">{formatTokens(dev.totalTokens)} tokens</span>
+                      {dev.keysCount > 1 && (
+                        <span className="text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded text-xs">
+                          {dev.keysCount} keys
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${maxTokens > 0 ? Math.max((dev.totalTokens / maxTokens) * 100, 2) : 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+        ) : (
+          <p className="text-muted-foreground text-center py-4 text-sm">Nenhum dado de tokens encontrado</p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function DashboardView({
@@ -386,6 +477,7 @@ function DashboardView({
   setSelectedDev,
   selectedRepoId,
   selectedDevName,
+  selectedPeriod,
 }: DashboardViewProps) {
   // Filtrar desenvolvedores pelo filtro global
   const filteredDevelopers = selectedDevName === "all"
@@ -572,49 +664,62 @@ function DashboardView({
         )}
       </div>
 
-      {/* Row: Distribuição por Tipo + Produtividade por Dev */}
+      {/* Row 1: Produtividade por Desenvolvedor (Commits + Tokens) lado a lado */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Produtividade por Desenvolvedor (Commits) */}
+        <div className="bg-card rounded-xl border p-5">
+          <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+            <GitCommit className="h-4 w-4 text-green-600" />
+            Produtividade por Desenvolvedor (Commits)
+          </h3>
+          <div className="space-y-3">
+            {filteredDevelopers.length > 0 ? (
+              filteredDevelopers
+                .sort((a, b) => b.commits - a.commits)
+                .slice(0, 5)
+                .map((dev, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                    onClick={() => onOpenDevModal(dev)}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-xs font-medium text-green-700 dark:text-green-400">
+                      {dev.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-medium truncate">{dev.name}</span>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-green-600 font-medium">{dev.commits} commits</span>
+                          <span className="text-muted-foreground">{dev.prsMerged} merged</span>
+                        </div>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div
+                          className="bg-green-500 h-2 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${filteredDevelopers[0]?.commits ? Math.max((dev.commits / filteredDevelopers[0].commits) * 100, 2) : 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+            ) : (
+              <p className="text-muted-foreground text-center py-4 text-sm">Nenhum dado de commits encontrado</p>
+            )}
+          </div>
+        </div>
+
+        {/* Produtividade por Desenvolvedor (Tokens) */}
+        <DeveloperTokensCard selectedPeriod={selectedPeriod} />
+      </div>
+
+      {/* Row 2: Distribuição por Tipo - largura total */}
+      <div className="w-full">
         <TypeDistributionChart
           commitsByType={stats?.commitsByType || {}}
           totalCommits={totalCommits}
           totalPRs={stats?.totalPRs || 0}
         />
-        
-        {/* Produtividade por Desenvolvedor */}
-        <div className="bg-card rounded-xl border p-5">
-          <h3 className="text-sm font-semibold mb-4">Produtividade por Desenvolvedor</h3>
-          <div className="space-y-3">
-            {filteredDevelopers.map((dev, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer"
-                onClick={() => onOpenDevModal(dev)}
-              >
-                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
-                  {dev.name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium truncate">{dev.name}</span>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-muted-foreground">{dev.commits} commits</span>
-                      <span className="text-emerald-600">{dev.prsMerged} merged</span>
-                    </div>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-1.5">
-                    <div
-                      className="bg-blue-500 h-1.5 rounded-full"
-                      style={{ width: `${developerStats[0]?.commits ? (dev.commits / developerStats[0].commits) * 100 : 0}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-            {developerStats.length === 0 && (
-              <p className="text-muted-foreground text-center py-4 text-sm">Nenhum desenvolvedor encontrado</p>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Volume por Dia */}

@@ -190,6 +190,83 @@ export function registerGitAnalyticsRoutes(router: Router) {
     }
   });
 
+  // Get developer token usage from OpenRouter
+  router.get("/api/git-analytics/developer-tokens", requireAuth, async (req, res) => {
+    try {
+      // Importar configurações
+      const { 
+        DEVELOPER_KEYS, 
+        getAllDevelopers 
+      } = await import("../config/openrouter-keys");
+      
+      // Buscar usage de cada desenvolvedor
+      const tokenUsage = await Promise.all(
+        getAllDevelopers().map(async (developerName) => {
+          const keys = DEVELOPER_KEYS[developerName];
+          
+          // Somar tokens de todas as keys do desenvolvedor
+          let totalTokens = 0;
+          let totalRequests = 0;
+          let totalSpend = 0;
+          
+          for (const key of keys) {
+            try {
+              // Buscar usage da API OpenRouter para esta key específica
+              const statsResponse = await fetch(`https://openrouter.ai/api/v1/auth/key`, {
+                headers: {
+                  "Authorization": `Bearer ${key.apiKey}`,
+                },
+              });
+              
+              if (statsResponse.ok) {
+                const statsData = await statsResponse.json();
+                
+                // OpenRouter retorna usage como objeto com diferentes campos de custo
+                // O campo 'usage' é o custo total em dólares
+                const usage = statsData.data?.usage || 0;
+                const usageDaily = statsData.data?.usage_daily || 0;
+                const usageMonthly = statsData.data?.usage_monthly || 0;
+                
+                // Para exibir em tokens, vamos usar o valor monthly como referência
+                // Como não temos o número exato de tokens, usamos o custo como proxy
+                // Multiplicamos por um fator para obter um número representativo
+                // (assumindo custo médio de $1 por 1M tokens)
+                const estimatedTokens = Math.round(usageMonthly * 1000000);
+                
+                totalTokens += estimatedTokens;
+                totalSpend += usageMonthly;
+                totalRequests += 1; // Contamos como 1 requisição por key
+              }
+              
+            } catch (error) {
+              console.error(`Error fetching OpenRouter usage for ${key.keyName}:`, error);
+              // Continuar mesmo se uma key falhar
+            }
+          }
+          
+          return {
+            developerName,
+            totalTokens,
+            totalRequests,
+            totalSpend,
+            keysCount: keys.length,
+          };
+        })
+      );
+      
+      // Ordenar por tokens (maior → menor)
+      const sorted = tokenUsage
+        .sort((a, b) => b.totalTokens - a.totalTokens);
+        // NÃO filtrar devs com 0 tokens - mostrar todos para debug
+        
+      res.json(sorted);
+      
+    } catch (error: any) {
+      console.error("Get developer tokens error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Developer stats
   router.get("/api/git-analytics/developer-stats", requireAuth, async (req, res) => {
     try {
