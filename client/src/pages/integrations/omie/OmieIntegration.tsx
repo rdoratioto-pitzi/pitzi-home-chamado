@@ -7,6 +7,7 @@ import OmieComprasEstoque from './OmieComprasEstoque';
 import OmieVendas from './OmieVendas';
 import OmieFinancas from './OmieFinancas';
 import OmieGeral from './OmieGeral';
+import OmieTransporte from './OmieTransporte';
 
 export default function OmieIntegration() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -34,10 +35,11 @@ export default function OmieIntegration() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Visão Geral</TabsTrigger>
           <TabsTrigger value="compras">Compras, Estoque e Produção</TabsTrigger>
           <TabsTrigger value="vendas">Vendas e NF-e</TabsTrigger>
+          <TabsTrigger value="transporte">Transporte</TabsTrigger>
           <TabsTrigger value="financas">Finanças</TabsTrigger>
           <TabsTrigger value="geral">Geral</TabsTrigger>
         </TabsList>
@@ -45,6 +47,7 @@ export default function OmieIntegration() {
         <TabsContent value="overview"><OmieOverview /></TabsContent>
         <TabsContent value="compras"><OmieComprasEstoque /></TabsContent>
         <TabsContent value="vendas"><OmieVendas /></TabsContent>
+        <TabsContent value="transporte"><OmieTransporte /></TabsContent>
         <TabsContent value="financas"><OmieFinancas /></TabsContent>
         <TabsContent value="geral"><OmieGeral /></TabsContent>
       </Tabs>
