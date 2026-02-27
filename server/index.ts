@@ -10,6 +10,103 @@ import { storage } from "./storage";
 
 /**
  * --------------------------------------------------
+ * DATABASE CONNECTION TEST
+ * --------------------------------------------------
+ */
+import { pool } from './db';
+
+async function fixOmieConfig() {
+  try {
+    console.log('[Omie Setup] Verificando configuração...');
+    
+    // Verificar se tabela existe
+    const tableCheck = await pool?.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'omie_config'
+      );
+    `);
+    
+    if (!tableCheck?.rows[0].exists) {
+      console.error('[Omie Setup] Tabela omie_config não existe! Execute a migration.');
+      return;
+    }
+    
+    // Verificar se há configuração
+    const configCheck = await pool?.query('SELECT * FROM omie_config LIMIT 1');
+    
+    if (!configCheck?.rows || configCheck.rows.length === 0) {
+      console.log('[Omie Setup] Nenhuma configuração encontrada. Inserindo credenciais...');
+      
+      await pool?.query(`
+        INSERT INTO omie_config (app_key, app_secret, is_active)
+        VALUES ($1, $2, $3)
+      `, ['3512564154099', 'e7036f3b188d5b658319e2f97a62fcca', true]);
+      
+      console.log('[Omie Setup] ✓ Credenciais inseridas com sucesso');
+    } else {
+      console.log('[Omie Setup] ✓ Configuração existente encontrada');
+      console.log('  - App Key:', configCheck.rows[0].app_key?.substring(0, 5) + '...');
+      console.log('  - Ativo:', configCheck.rows[0].is_active);
+      
+      // Atualizar credenciais para garantir que estão corretas
+      await pool?.query(`
+        UPDATE omie_config 
+        SET app_key = $1, app_secret = $2, is_active = $3, updated_at = NOW()
+        WHERE id = $4
+      `, ['3512564154099', 'e7036f3b188d5b658319e2f97a62fcca', true, configCheck.rows[0].id]);
+      
+      console.log('[Omie Setup] ✓ Credenciais atualizadas');
+    }
+    
+    // Verificar tabela de logs
+    const logsTableCheck = await pool?.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'omie_sync_log'
+      );
+    `);
+    
+    if (logsTableCheck?.rows[0].exists) {
+      console.log('[Omie Setup] ✓ Tabela de logs OK');
+    } else {
+      console.error('[Omie Setup] ✗ Tabela omie_sync_log não existe!');
+    }
+    
+  } catch (error: any) {
+    console.error('[Omie Setup] Erro ao verificar configuração:', error.message);
+  }
+}
+
+async function testDatabaseConnection() {
+  try {
+    console.log('[Database] Testing connection...');
+    
+    const timeResult = await pool?.query('SELECT NOW()');
+    console.log('[Database] Connection OK:', timeResult?.rows[0]?.now);
+    
+    // Test if omie_config table exists and has data
+    const configTest = await pool?.query('SELECT * FROM omie_config LIMIT 1');
+    console.log('[Database] Omie config table exists:', configTest?.rows !== undefined);
+    
+    if (configTest?.rows && configTest.rows.length > 0) {
+      console.log('[Database] Omie config app_key:', configTest.rows[0].app_key?.substring(0, 5) + '...');
+      console.log('[Database] Omie config is_active:', configTest.rows[0].is_active);
+    } else {
+      console.log('[Database] WARNING: No omie_config found. Run migration.');
+    }
+    
+    // Test if omie_sync_log table exists
+    const logTest = await pool?.query('SELECT COUNT(*) as count FROM omie_sync_log');
+    console.log('[Database] Omie sync log count:', logTest?.rows[0]?.count);
+    
+  } catch (error: any) {
+    console.error('[Database] Connection test failed:', error.message);
+  }
+}
+
+/**
+ * --------------------------------------------------
  * GLOBAL ERROR CAPTURE (elimina erros silenciosos)
  * --------------------------------------------------
  */
@@ -83,6 +180,36 @@ app.get("/api/test-email-url/:code", (req, res) => {
   });
 });
 
+// ============== ROTA DE TESTE PÚBLICA OMIE (TEMPORÁRIA) ==============
+// Teste direto no banco de dados - apenas para debug
+app.get("/api/omie-debug/config", async (req, res) => {
+  try {
+    console.log('[OMIE DEBUG] Direct DB query test');
+    
+    const configCheck = await pool?.query('SELECT * FROM omie_config LIMIT 1');
+    
+    if (!configCheck?.rows || configCheck.rows.length === 0) {
+      return res.json({
+        success: true,
+        data: null
+      });
+    }
+    
+    // Retornar no formato esperado pelo frontend
+    res.json({
+      success: true,
+      data: {
+        app_key: configCheck.rows[0].app_key || '',
+        app_secret: configCheck.rows[0].app_secret || '',
+        is_active: configCheck.rows[0].is_active || false
+      }
+    });
+  } catch (error: any) {
+    console.error('[OMIE DEBUG] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Protege tudo depois disso
 app.use((req, res, next) => {
   try {
@@ -153,6 +280,12 @@ export const asyncHandler =
  */
 (async () => {
   try {
+    // Test database connection on startup
+    await testDatabaseConnection();
+    
+    // Fix Omie config on startup
+    await fixOmieConfig();
+    
     await seedDatabase();
     await registerRoutes(httpServer, app);
 
