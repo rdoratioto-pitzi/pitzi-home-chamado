@@ -33,6 +33,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { TicketSatisfaction } from "./ticket-satisfaction";
 
 interface TicketDetailSheetProps {
   ticket: Ticket | null;
@@ -818,6 +819,14 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
         </div>
 
         <div className="border-t pt-4 space-y-4">
+          {/* CSAT - Avaliação de Satisfação */}
+          <TicketSatisfaction 
+            ticket={ticket} 
+            onUpdate={(updated) => {
+              queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
+            }}
+          />
+
           <RichTextarea
             placeholder="Adicione um comentário..."
             value={comment}
