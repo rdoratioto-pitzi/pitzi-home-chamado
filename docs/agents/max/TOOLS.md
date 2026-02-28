@@ -178,11 +178,22 @@ Should I proceed? (This will modify package.json and node_modules)
 ## Tool Limitations I'm Aware Of
 
 ### WRITE Tool Issues
+### ✅ WRITE Tool - SOLVED (via create-file.sh)
 
-**Known problems:**
-- Parameter name confusion (`path` vs `file_path`)
-- Truncation on large files
-- Timeout on complex operations
+**Solution implemented:**
+Max uses the `create-file.sh` helper script for reliable file creation.
+
+**How it works:**
+```bash
+# Max executes via bash
+~/.openclaw/workspace/renov/create-file.sh \
+  "/path/to/file.tsx" \
+  "file content here"
+```
+
+**Status:** ✅ Working perfectly (validated 28/02/2026)
+
+**Example:** Successfully created TestButton.tsx with production-ready React code.
 
 **My workarounds:**
 1. Use bash `cat > file` method
