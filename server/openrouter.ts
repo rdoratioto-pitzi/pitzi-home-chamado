@@ -367,7 +367,7 @@ export async function* streamChatCompletion(
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": "https://renov-home.replit.app",
-      "X-Title": "Renov Home AI Assistant"
+      "X-Title": "Matheus Mundstock Macbook M2"
     },
     body: JSON.stringify({
       model,
