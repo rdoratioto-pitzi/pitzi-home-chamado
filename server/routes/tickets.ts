@@ -354,4 +354,54 @@ export function registerTicketRoutes(router: Router) {
     const responsavelId = await storage.findResponsavelForTicket(req.params.categoria, req.params.tipo);
     res.json({ responsavelId });
   });
+
+  // CSAT - Avaliação de satisfação
+  router.patch("/api/tickets/:id/satisfaction", requireAuth, async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      const ticket = await storage.getTicket(getId(req));
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      // Validar que apenas o solicitante pode avaliar
+      if (ticket.requesterId !== userId) {
+        return res.status(403).json({ error: "Apenas o solicitante pode avaliar este chamado" });
+      }
+
+      // Validar que o ticket está closed ou resolved
+      if (ticket.status !== "closed" && ticket.status !== "resolved") {
+        return res.status(400).json({ error: "Apenas chamados fechados ou resolvidos podem ser avaliados" });
+      }
+
+      // Validar se já foi avaliado
+      if (ticket.satisfactionRating !== null && ticket.satisfactionRating !== undefined) {
+        return res.status(400).json({ error: "Este chamado já foi avaliado" });
+      }
+
+      // Validar rating
+      const { rating, comment } = req.body;
+      if (!rating || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
+        return res.status(400).json({ error: "Rating deve ser um número inteiro entre 1 e 5" });
+      }
+
+      // Validar comentário (opcional, até 500 caracteres)
+      if (comment && comment.length > 500) {
+        return res.status(400).json({ error: "Comentário deve ter no máximo 500 caracteres" });
+      }
+
+      // Atualizar avaliação
+      const updatedTicket = await storage.updateTicket(getId(req), {
+        satisfactionRating: rating,
+        satisfactionComment: comment || null,
+        satisfactionCreatedAt: new Date(),
+      });
+
+      res.json(updatedTicket);
+    } catch (error: any) {
+      console.error("Error submitting satisfaction:", error);
+      res.status(500).json({ error: "Failed to submit satisfaction rating" });
+    }
+  });
 }
