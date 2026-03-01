@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "skills": {
+    "token-efficiency-guide": {
+      "source": "openclaw/skills",
+      "sourceType": "github",
+      "sourceUrl": "https://github.com/openclaw/skills.git",
+      "skillPath": "skills/globalcaos/token-efficiency-guide/SKILL.md",
+      "skillFolderHash": "3ea1255c9fd2ee3392cfdedac09b516d13b804da",
+      "installedAt": "2026-03-01T03:14:52.855Z",
+      "updatedAt": "2026-03-01T03:14:52.855Z"
+    }
+  },
+  "dismissed": {}
+}
