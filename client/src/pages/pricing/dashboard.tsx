@@ -34,7 +34,7 @@ import { Link } from "wouter";
 
 const CATEGORIES = [
   { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
-  { id: "f16906d8-f052-4738-a56e-6b57246436f9", name: "Android" },
+  { id: "d686a25d-045d-4b8c-9d7c-35a21d29d31b", name: "Android" },
 ];
 
 interface EligibleDevice {
