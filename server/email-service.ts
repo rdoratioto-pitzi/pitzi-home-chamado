@@ -950,3 +950,70 @@ export async function sendSharedAreaInviteEmail(
     console.error("Failed to send shared area invite email:", error);
   }
 }
+
+/**
+ * Envia email de notificação quando um CSAT é recebido
+ */
+export async function sendCSATReceivedEmail(
+  ticket: Ticket,
+  rating: number,
+  comment: string | null,
+  assignee: User
+): Promise<void> {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log("SMTP not configured, skipping CSAT email notification");
+    return;
+  }
+
+  const ticketUrl = getTicketUrl(ticket.code || ticket.id);
+  const stars = '⭐'.repeat(rating);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      ${emailStyles}
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Avaliação de Chamado Recebida</h1>
+        </div>
+        <div class="content">
+          <p>Olá ${assignee.name},</p>
+          <p>O chamado que você atendeu recebeu uma avaliação de satisfação:</p>
+          
+          <div class="ticket-info">
+            <h3>${ticket.code} - ${ticket.title}</h3>
+            <p><span class="label">Avaliação:</span> ${stars} (${rating}/5)</p>
+            ${comment ? `<p><span class="label">Comentário:</span> "${comment}"</p>` : ''}
+            <p><span class="label">Avaliado em:</span> ${new Date().toLocaleString('pt-BR')}</p>
+          </div>
+          
+          <a href="${ticketUrl}" class="btn">Ver Chamado Completo</a>
+          
+          <p style="margin-top: 20px; font-size: 12px; color: #666;">
+            Link direto: <a href="${ticketUrl}" style="color: #00A137;">${ticketUrl}</a>
+          </p>
+        </div>
+        <div class="footer">
+          <p>Renov Home - Sistema de Gestão Interna</p>
+          <p>Este é um email automático, não responda.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || '"Renov Home" <noreply@renovsmart.com.br>',
+      to: assignee.email,
+      subject: `[${ticket.code}] Avaliação Recebida - ${stars}`,
+      html,
+    });
+    console.log(`✅ [EMAIL CSAT] Enviado para ${assignee.email} - Rating: ${rating}/5`);
+  } catch (error) {
+    console.error("Failed to send CSAT email:", error);
+  }
+}
