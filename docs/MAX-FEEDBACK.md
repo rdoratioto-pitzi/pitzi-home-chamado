@@ -1,164 +1,96 @@
-# FEEDBACK PARA MAX - APRENDIZADOS
+# FEEDBACK PARA MAX - APRENDIZADOS E CORREÇÕES
 
-## 📅 03/03/2026 - Renomear Módulo Biblioteca
+## 1. Como usar este arquivo
+- **Objetivo principal**: Documentar erros cometidos em tasks anteriores, suas consequências e lições aprendidas.
+- **Referência rápida**: Consultar antes de tasks semelhantes (ex: renomeações, edições em massa) para evitar repetições.
+- **Manutenção**: Sempre adicionar novos aprendizados por data. Review semanal durante heartbeats para atualizar MEMORY.md.
+- **Regra de ouro**: NUNCA ignorar este arquivo em operações críticas como renomeações. Checklist é OBRIGATÓRIO.
 
-### ❌ ERRO COMETIDO:
+## 2. Aprendizados por data
 
-**Task:** Renomear "Base de Conhecimento" → "Biblioteca"
+### 03/03/2026
+**Task**: Renomear módulo &quot;Base de Conhecimento&quot; → &quot;Biblioteca&quot;.
 
-**Problema:**
-1. Max renomeou componentes mas **não editou TODAS as referências**
-2. Arquivo `app-sidebar.tsx` **falhou ao editar** (26 chars failed)
-3. Não verificou com `grep` se havia referências residuais
-4. Não testou localmente antes de commitar
+**Erros cometidos**:
+- Edit tool falhou em `app-sidebar.tsx` (26 chars mismatch) mas continuei sem alternativa (read/write/sed).
+- Não executei `grep -r &quot;ConhecimentoPage&quot; client/src/` para verificar **TODAS** referências.
+- Não testei `localhost:5050` antes de declarar &quot;concluído&quot;.
+- Componente exportava `ConhecimentoPage` mas nova página deveria ser `BibliotecaPage` (inconsistência).
+- Faltou atualizar imports em `App.tsx` e variáveis como `setBibliotecaOpen` (erro de digitação: deveria ser `setBibliotecaAberta`?).
 
-**Resultado:**
-- Aplicação não carregou (ConhecimentoPage is not defined)
-- Perda de tempo com debug
-- Matheus teve que corrigir manualmente
+**Consequências**:
+- App quebrou: `Uncaught ReferenceError: ConhecimentoPage is not defined`.
+- `setBibliotecaOpen is not defined` em múltiplos pontos.
+- Matheus corrigiu manualmente ~5 arquivos, perda de ~2 horas de debug.
+- Confiança abalada: &quot;quase ok&quot; não é ok.
 
----
+**Como deveria ter feito**:
+1. **Mapear**: `grep -r &quot;ConhecimentoPage|conhecimento&quot; client/src/ --include=&quot;*.tsx&quot;` **ANTES** de editar.
+2. **SE edit falhar**: Parar imediatamente, usar `read app-sidebar.tsx`, analisar, `write` com correções precisas OU `exec sed -i`.
+3. **Pós-edit**: grep final = ZERO refs residuais.
+4. **Teste full**: `pkill -f vite && pkill -f tsx && npm run dev`, abrir `localhost:5050`, navegar TODAS rotas afetadas, screenshot.
+5. **Só então**: git commit + push.
+6. **Extra**: Usar `git diff` para review humano antes de push.
 
-### ✅ COMO DEVERIA TER FEITO:
+## 3. Checklist para renomeações (OBRIGATÓRIO - marque com x)
+[ ] 1. `grep -r &quot;TERMO_ANTIGO&quot; client/src/` para mapear **TODAS** refs (arquivos, imports, exports, vars).
+[ ] 2. Renomear pastas/arquivos (mv + git mv).
+[ ] 3. Atualizar imports/exports em **cada** arquivo afetado (verificar com grep).
+[ ] 4. Atualizar rotas (App.tsx, router).
+[ ] 5. Atualizar permissões/vars/states (ex: useBibliotecaOpen).
+[ ] 6. `grep -r &quot;TERMO_ANTIGO&quot;` = ZERO resultados residuais.
+[ ] 7. `pkill -f vite && pkill -f tsx`.
+[ ] 8. `npm run dev` e testar **todas** rotas no navegador.
+[ ] 9. Screenshot de funcionamento + testes manuais.
+[ ] 10. `git status && git diff`, review changes.
+[ ] 11. `git commit -m &quot;feat/refactor: renomear X para Y&quot;` + `git push`.
 
-**PASSO A PASSO CORRETO PARA RENOMEAR COMPONENTE:**
-
-1. **PLANEJAR MUDANÇAS:**
+## 4. Comandos úteis para você
 ```bash
-   # Listar TODAS as referências
-   grep -r "ConhecimentoPage" client/src/
-   grep -r "conhecimento" client/src/ | grep -v node_modules
-```
+# Buscar referências (sempre!)
+grep -r &quot;TERMO&quot; client/src/ --include=&quot;*.tsx&quot;
 
-2. **RENOMEAR ARQUIVOS:**
-```bash
-   # Pasta do módulo
-   mv client/src/pages/conhecimento client/src/pages/biblioteca
-   
-   # Componente principal (se existir)
-   mv ConhecimentoPage.tsx BibliotecaPage.tsx
-```
+# Substituir em massa (CUIDADO: backup git antes!)
+find client/src -name &quot;*.tsx&quot; -exec sed -i &quot;s/OLD/NEW/g&quot; {} +
 
-3. **ATUALIZAR IMPORTS (TODOS!):**
-   - App.tsx
-   - routes.tsx
-   - sidebar.tsx
-   - Qualquer arquivo que importe
-
-4. **ATUALIZAR ROTAS:**
-```typescript
-   // DE:
-   path: "/conhecimento/*"
-   // PARA:
-   path: "/biblioteca/*"
-```
-
-5. **ATUALIZAR PERMISSÕES:**
-```typescript
-   // DE:
-   permissions.conhecimento
-   // PARA:
-   permissions.biblioteca
-```
-
-6. **ATUALIZAR VARIÁVEIS:**
-```typescript
-   // DE:
-   const conhecimentoSubItems = ...
-   const conhecimentoOpen = ...
-   // PARA:
-   const bibliotecaSubItems = ...
-   const bibliotecaOpen = ...
-```
-
-7. **VERIFICAR SE NÃO SOBROU NADA:**
-```bash
-   grep -r "conhecimento" client/src/ | grep -v node_modules | grep -v Omie
-   # Resultado deve ser ZERO (exceto preservados como Omie)
-```
-
-8. **MATAR PROCESSOS E TESTAR:**
-```bash
-   pkill -f vite && pkill -f tsx
-   npm run dev
-```
-
-9. **ABRIR NAVEGADOR E VALIDAR:**
-   - http://localhost:5050
-   - Navegar para /biblioteca
-   - Verificar menu
-   - Verificar todas as sub-rotas
-
-10. **SÓ COMMITAR SE 100% FUNCIONAL!**
-
----
-
-### 🎯 LIÇÕES APRENDIDAS:
-
-1. **SEMPRE usar `grep` ANTES de dizer "terminado"**
-2. **SEMPRE testar localmente ANTES de commitar**
-3. **NUNCA assumir que "Edit failed" é aceitável**
-4. **SE edit falhar, usar outro método (sed, manual, etc)**
-5. **Renomear = MUITO MAIS que mudar nome de arquivo**
-6. **Verificar:**
-   - Imports
-   - Exports
-   - Rotas
-   - Permissões
-   - Variáveis
-   - Strings hardcoded
-
----
-
-### 📝 TEMPLATE PARA PRÓXIMAS RENOMEAÇÕES:
-```
-TASK: Renomear [ANTIGO] → [NOVO]
-
-CHECKLIST OBRIGATÓRIO:
-
-[ ] 1. Grep todas refs: grep -r "ANTIGO" client/src/
-[ ] 2. Renomear pastas/arquivos
-[ ] 3. Atualizar imports (TODOS!)
-[ ] 4. Atualizar rotas
-[ ] 5. Atualizar permissões
-[ ] 6. Atualizar variáveis
-[ ] 7. Grep final: deve ser ZERO refs residuais
-[ ] 8. Matar processos
-[ ] 9. npm run dev
-[ ] 10. Testar navegador (TODAS as rotas)
-[ ] 11. Screenshot funcionando
-[ ] 12. Commit + push
-
-SE QUALQUER PASSO FALHAR → PARAR E REPORTAR!
-NÃO commitar até 100% funcional!
-```
-
----
-
-## 🔍 COMANDOS ÚTEIS:
-
-**Buscar referências:**
-```bash
-grep -r "TERMO" client/src/ --include="*.tsx" --include="*.ts"
-```
-
-**Substituir em massa (cuidado!):**
-```bash
-find client/src -name "*.tsx" -exec sed -i 's/ANTIGO/NOVO/g' {} +
-```
-
-**Verificar arquivos modificados:**
-```bash
+# Verificar mudanças
 git status
-git diff client/src/components/app-sidebar.tsx
+git diff arquivo.tsx
+
+# Matar processos dev
+pkill -f vite &amp;&amp; pkill -f tsx
+
+# Teste full
+npm run dev
+# Então abra localhost:5050
+```
+
+**REGRA CRÍTICA**:
+- Edit tool falhou? = **PARE** e use read/write/exec sed.
+- SEMPRE grep após edições.
+- SEMPRE testar local **antes** commit/push.
+- NUNCA assumir &quot;quase ok&quot;. Checklist 100% ou aborta.
+
+## 5. Template para próximas renomeações
+Copie este template para novo aprendizado:
+
+```
+### DATA (YYYY-MM-DD)
+**Task**: [descrição breve]
+
+**Erros cometidos**:
+- [lista bullet]
+
+**Consequências**:
+- [impacto + tempo perdido]
+
+**Como deveria ter feito**:
+1. [passo 1]
+...
+
+**Checklist usado?** [SIM/NAO - link para git commit]
+**Lições para MEMORY.md**: [resumo 1 linha]
 ```
 
 ---
-
-## 💪 PRÓXIMA VEZ: FAZER DIREITO NA PRIMEIRA!
-
-**Lembre-se:**
-- Renomear ≠ apenas mudar nome
-- Grep é seu amigo
-- Testar localmente é OBRIGATÓRIO
-- Edit failed = PROBLEMA, não "quase ok"
+*Última atualização: [data atual]. Consulte antes de qualquer renomeação!*
