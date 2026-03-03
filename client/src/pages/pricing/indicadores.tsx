@@ -35,7 +35,7 @@ import { Link } from "wouter";
 
 const CATEGORIES = [
   { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
-  { id: "f16906d8-f052-4738-a56e-6b57246436f9", name: "Android" },
+  { id: "d686a25d-045d-4b8c-9d7c-35a21d29d31b", name: "Android" },
 ];
 
 interface EligibleDevice {
@@ -64,11 +64,24 @@ export default function IndicadoresPage() {
   const { data: devicesData, isLoading, refetch } = useQuery<EligibleDevicesResponse>({
     queryKey: ["pricing-devices", selectedCategory],
     queryFn: async () => {
-      const response = await fetch(
-        `/api/pricing/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=200`
-      );
-      if (!response.ok) throw new Error("Erro ao carregar dispositivos");
-      return response.json();
+      let allItems: EligibleDevice[] = [];
+      let currentPage = 1;
+      let hasNextPage = true;
+
+      while (hasNextPage) {
+        const response = await fetch(
+          `/api/pricing/eligible-devices?categoryId=${selectedCategory}&pageNumber=${currentPage}&pageSize=200`
+        );
+        if (!response.ok) throw new Error("Erro ao carregar dispositivos");
+        
+        const data = await response.json();
+        allItems = [...allItems, ...data.items];
+
+        hasNextPage = data.hasNextPage;
+        currentPage++;
+      }
+
+      return { items: allItems, currentPage: 1, hasNextPage: false };
     },
     staleTime: 5 * 60 * 1000,
   });
