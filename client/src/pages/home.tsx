@@ -123,13 +123,13 @@ const modules: ModuleCard[] = [
     permissionKey: "pricing",
   },
   {
-    title: "Base de Conhecimento",
+    title: "Biblioteca",
     description: "Documentos e procedimentos internos",
     icon: BookOpen,
-    href: "/conhecimento",
+    href: "/biblioteca",
     color: "text-indigo-600 dark:text-indigo-400",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
-    permissionKey: "conhecimento",
+    permissionKey: "biblioteca",
   },
   {
     title: "Git Analytics",
