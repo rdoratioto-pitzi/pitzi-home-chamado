@@ -230,7 +230,7 @@ export default function DocumentoPage() {
         </Button>
         <div className="flex-1">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
-            <span>Base de Conhecimento</span>
+            <span>Biblioteca</span>
             <span>/</span>
             <span>{getAreaLabel(document.area)}</span>
             <span>/</span>
