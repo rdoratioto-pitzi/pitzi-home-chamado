@@ -76,7 +76,7 @@ const allMenuItems = [
     module: null,
   },
   {
-title: "Chat IA Renov",
+title: "Chat IA",
     url: "/macgyver-ia",
     icon: Bot,
     module: null,

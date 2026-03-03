@@ -85,6 +85,10 @@ export const tickets = pgTable("tickets", {
   // Audit log for description edits
   descriptionLastEditedBy: varchar("description_last_edited_by"),
   descriptionLastEditedAt: timestamp("description_last_edited_at"),
+  // CSAT - Satisfação do solicitante
+  satisfactionRating: integer("satisfaction_rating"), // 1-5
+  satisfactionComment: text("satisfaction_comment"),
+  satisfactionCreatedAt: timestamp("satisfaction_created_at"),
 });
 
 export const insertTicketSchema = createInsertSchema(tickets).omit({ id: true, createdAt: true, updatedAt: true });
