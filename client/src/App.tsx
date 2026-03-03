@@ -48,11 +48,11 @@ import PricingAlertasPage from "@/pages/pricing/alertas";
 import PricingDashboardPage from "@/pages/pricing/dashboard";
 import MetasVisaoGeralPage from "@/pages/metas/index";
 import MetasGestaoPage from "@/pages/metas/gestao";
-import ConhecimentoPage from "@/pages/conhecimento/index";
-import ConhecimentoNovoPage from "@/pages/conhecimento/novo";
-import ConhecimentoDocumentoPage from "@/pages/conhecimento/documento";
-import ConhecimentoFavoritosPage from "@/pages/conhecimento/favoritos";
-import PromptsPage from "@/pages/conhecimento/prompts";
+import BibliotecaPage from "@/pages/biblioteca/index";
+import BibliotecaNovoPage from "@/pages/biblioteca/novo";
+import BibliotecaDocumentoPage from "@/pages/biblioteca/documento";
+import BibliotecaFavoritosPage from "@/pages/biblioteca/favoritos";
+import BibliotecaPromptsPage from "@/pages/biblioteca/prompts";
 import MacgyverIAPage from "@/pages/macgyver-ia/index";
 import FluxogramasPage from "@/pages/fluxogramas/index";
 import FlowchartEditorPage from "@/pages/fluxogramas/editor";
@@ -254,34 +254,34 @@ function Router() {
           <PricingDashboardPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/conhecimento">
+      <Route path="/biblioteca">
         <ProtectedRoute requiredPermission="conhecimento">
-          <ConhecimentoPage />
+          <BibliotecaPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/conhecimento/novo">
+      <Route path="/biblioteca/novo">
         <ProtectedRoute requiredPermission="conhecimento">
-          <ConhecimentoNovoPage />
+          <BibliotecaNovoPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/conhecimento/documentos">
+      <Route path="/biblioteca/documentos">
         <ProtectedRoute requiredPermission="conhecimento">
-          <ConhecimentoPage />
+          <BibliotecaPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/conhecimento/favoritos">
+      <Route path="/biblioteca/favoritos">
         <ProtectedRoute requiredPermission="conhecimento">
-          <ConhecimentoFavoritosPage />
+          <BibliotecaFavoritosPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/conhecimento/prompts">
+      <Route path="/biblioteca/prompts">
         <ProtectedRoute requiredPermission="conhecimento">
-          <PromptsPage />
+          <BibliotecaPromptsPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/conhecimento/:id">
+      <Route path="/biblioteca/:id">
         <ProtectedRoute requiredPermission="conhecimento">
-          <ConhecimentoDocumentoPage />
+          <BibliotecaDocumentoPage />
         </ProtectedRoute>
       </Route>
       <Route path="/login" component={LoginPage} />

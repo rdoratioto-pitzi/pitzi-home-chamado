@@ -183,7 +183,7 @@ A Renov Home possui os seguintes modulos:
 - OKRs: objetivos e resultados-chave trimestrais
 - Logistica: simulacao de frete (Correios), logistica reversa, rastreamento, impressao de etiquetas
 - Pricing: monitoramento de precos de smartphones/iPhones com alertas e historico
-- Base de Conhecimento: documentacao interna aprovada
+- Biblioteca: documentacao interna aprovada
 - Reunioes: gestao de reunioes com pautas e atas
 - Fluxogramas: criacao e gestao de fluxogramas de processos
 
@@ -227,7 +227,7 @@ Alertas: ${alertsContext || "Nenhum alerta configurado"}
 Total Pedidos: ${logisticaPedidos.length}
 ${logisticaContext || "Nenhum pedido de logistica reversa"}
 
--- Base de Conhecimento --
+-- Biblioteca --
 Documentos Aprovados: ${knowledgeDocs.length}
 ${docsContext || "Nenhum documento disponivel"}
 

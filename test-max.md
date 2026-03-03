@@ -1,0 +1,1 @@
+# Max funcionando no Ubuntu! 🚀&#10;- Data: 03/03/2026&#10;- Local: Mac Mini Ubuntu 24.04&#10;- Workspace: /home/matheus/Documentos/workspaces/renov.home&#10;- Status: Operacional ✅
