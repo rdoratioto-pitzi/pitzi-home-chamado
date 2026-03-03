@@ -27,6 +27,15 @@ export function registerPricingRoutes(router: Router) {
       }
 
       const data = await response.json();
+
+      // Filtrando dispositivos Xiaomi e Redmi
+      if (data.items && Array.isArray(data.items)) {
+        data.items = data.items.filter((item: any) => {
+          const brand = (item.manufacturerName || "").toUpperCase();
+          return !brand.includes("XIAOMI") && !brand.includes("XIOMI") && !brand.includes("REDMI");
+        });
+      }
+
       res.json(data);
     } catch (error) {
       console.error("Pricing eligible-devices error:", error);
