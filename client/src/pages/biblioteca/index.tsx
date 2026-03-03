@@ -38,7 +38,7 @@ const STATUS_OPTIONS = [
   { value: 'archived', label: 'Arquivado' },
 ];
 
-export default function ConhecimentoPage() {
+export default function BibliotecaPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [areaFilter, setAreaFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");

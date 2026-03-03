@@ -835,7 +835,7 @@ export const insertMetaCheckinSchema = baseInsertMetaCheckinSchema.extend({
 export type InsertMetaCheckin = z.infer<typeof insertMetaCheckinSchema>;
 export type MetaCheckin = typeof metaCheckins.$inferSelect;
 
-// ============== KNOWLEDGE BASE (Base de Conhecimento) ==============
+// ============== BIBLIOTECA ==============
 
 // Main documents table
 export const knowledgeDocuments = pgTable("knowledge_documents", {

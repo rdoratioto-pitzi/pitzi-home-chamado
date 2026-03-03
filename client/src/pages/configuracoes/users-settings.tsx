@@ -60,7 +60,7 @@ const MODULES = [
   { key: "okrs", label: "OKRs" },
   { key: "logistica", label: "Logística" },
   { key: "pricing", label: "Pricing" },
-  { key: "conhecimento", label: "Base de Conhecimento" },
+  { key: "conhecimento", label: "Biblioteca" },
   { key: "apis", label: "Integrações" },
   { key: "configuracoes", label: "Configurações" },
 ] as const;
@@ -99,7 +99,7 @@ const formSchema = z.object({
     okrs: z.boolean(),
     logistica: z.boolean(),
     pricing: z.boolean().default(true),
-    conhecimento: z.boolean().default(true),
+    biblioteca: z.boolean().default(true),
     apis: z.boolean(),
     configuracoes: z.boolean(),
   }),
