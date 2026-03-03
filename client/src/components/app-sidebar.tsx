@@ -155,10 +155,10 @@ const pricingSubItems = [
   { title: "Relatórios", url: "/pricing/relatorios", icon: FileSpreadsheet },
 ];
 
-const conhecimentoSubItems = [
-{ title: "Biblioteca", url: "/conhecimento", icon: LayoutDashboard },
-  { title: "Meus Favoritos", url: "/conhecimento/favoritos", icon: Star },
-  { title: "Prompts", url: "/conhecimento/prompts", icon: Sparkles },
+const bibliotecaSubItems = [
+{ title: "Biblioteca", url: "/biblioteca", icon: LayoutDashboard },
+  { title: "Meus Favoritos", url: "/biblioteca/favoritos", icon: Star },
+  { title: "Prompts", url: "/biblioteca/prompts", icon: Sparkles },
 ];
 
 function getCurrentUser() {
@@ -216,13 +216,13 @@ export function AppSidebar() {
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
-  const [conhecimentoOpen, setConhecimentoOpen] = useState(location.startsWith("/conhecimento"));
+  const [bibliotecaOpen, setBibliotecaOpen] = useState(location.startsWith("/biblioteca"));
 
   const isMetasActive = location.startsWith("/metas");
   const isLogisticaActive = location.startsWith("/logistica");
   const isApisActive = location.startsWith("/apis");
   const isPricingActive = location.startsWith("/pricing");
-  const isConhecimentoActive = location.startsWith("/conhecimento");
+  const isBibliotecaActive = location.startsWith("/biblioteca");
 
   const permissions = useMemo(() => {
     try {
@@ -235,7 +235,7 @@ export function AppSidebar() {
           fluxogramas: true,
           logistica: true,
           pricing: true,
-          conhecimento: true,
+          biblioteca: true,
           apis: true,
           configuracoes: true,
           estoques: true,
@@ -257,7 +257,7 @@ export function AppSidebar() {
       fluxogramas: false,
       logistica: false,
       pricing: false,
-      conhecimento: false,
+      biblioteca: false,
       apis: false,
       configuracoes: false,
       estoques: false,
@@ -274,7 +274,7 @@ export function AppSidebar() {
   const hasMetasAccess = permissions.okrs === true;
   const hasLogisticaAccess = permissions.logistica === true;
   const hasPricingAccess = permissions.pricing === true;
-  const hasConhecimentoAccess = permissions.conhecimento === true;
+  const hasBibliotecaAccess = permissions.biblioteca === true;
   const hasApisAccess = permissions.apis === true;
   const hasConfiguracoesAccess = permissions.configuracoes === true;
 
@@ -468,18 +468,18 @@ export function AppSidebar() {
                 </Collapsible>
               )}
 
-              {hasConhecimentoAccess && (
-                <Collapsible open={conhecimentoOpen} onOpenChange={setConhecimentoOpen}>
+              {hasBibliotecaAccess && (
+                <Collapsible open={bibliotecaOpen} onOpenChange={setBibliotecaOpen}>
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isConhecimentoActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
-                        isActive={isConhecimentoActive}
-                        data-testid="link-conhecimento"
+                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isBibliotecaActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        isActive={isBibliotecaActive}
+                        data-testid="link-biblioteca"
                       >
-                        <BookOpen className={`h-[20px] w-[20px] ${isConhecimentoActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">Base de Conhecimento</span>
-                        {conhecimentoOpen ? (
+                        <BookOpen className={`h-[20px] w-[20px] ${isBibliotecaActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">Biblioteca</span>
+                        {bibliotecaOpen ? (
                           <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                         ) : (
                           <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
@@ -488,12 +488,12 @@ export function AppSidebar() {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
-                        {conhecimentoSubItems.map((subItem) => {
+                        {bibliotecaSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-conhecimento-${subItem.url.split("/").pop()}`}>
+                                <Link href={subItem.url} data-testid={`link-biblioteca-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[13.5px]">{subItem.title}</span>
                                 </Link>
