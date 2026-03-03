@@ -107,6 +107,32 @@ async function testDatabaseConnection() {
 
 /**
  * --------------------------------------------------
+ * AUTO-MIGRATION: ensure production schema is up-to-date
+ * --------------------------------------------------
+ */
+async function autoMigrateSchema() {
+  if (!pool) return;
+  try {
+    console.log('[migration] Checking schema...');
+    const migrations: string[] = [
+      `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS satisfaction_rating integer`,
+      `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS satisfaction_comment text`,
+      `ALTER TABLE tickets ADD COLUMN IF NOT EXISTS satisfaction_date timestamp`,
+      `ALTER TABLE prompts_library ADD COLUMN IF NOT EXISTS translated_content text`,
+      `ALTER TABLE prompts_library ADD COLUMN IF NOT EXISTS translated_at timestamp`,
+      `ALTER TABLE prompts_library ADD COLUMN IF NOT EXISTS is_translated boolean DEFAULT false`,
+    ];
+    for (const sql of migrations) {
+      try { await pool.query(sql); } catch {}
+    }
+    console.log('[migration] Schema check complete.');
+  } catch (error: any) {
+    console.error('[migration] Error:', error.message);
+  }
+}
+
+/**
+ * --------------------------------------------------
  * GLOBAL ERROR CAPTURE (elimina erros silenciosos)
  * --------------------------------------------------
  */
@@ -282,6 +308,9 @@ export const asyncHandler =
   try {
     // Test database connection on startup
     await testDatabaseConnection();
+    
+    // Auto-migrate schema (add missing columns)
+    await autoMigrateSchema();
     
     // Fix Omie config on startup
     await fixOmieConfig();
