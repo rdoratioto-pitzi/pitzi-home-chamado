@@ -28,6 +28,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowUpDown,
+  BarChart3,
   LayoutGrid,
   List,
   Download,
@@ -52,6 +53,7 @@ import type { Ticket, User, SlaRule } from "@shared/schema";
 import { TicketDialog } from "./ticket-dialog";
 import { TicketDetailSheet } from "./ticket-detail-sheet";
 import { TicketKanban } from "./ticket-kanban";
+import { CSATAnalytics } from "./csat-analytics";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -305,7 +307,11 @@ export default function ChamadosPage() {
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [periodFilter, setPeriodFilter] = useState<"month" | "year" | "total">("year");
-  const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid">("list");
+  const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid" | "analytics">("list");
+  
+  // Get current user info for admin check
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const isAdmin = currentUser?.isAdmin === true || currentUser?.isAdmin === "true" || currentUser?.perfilAcesso === "diretor";
 
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
     queryKey: ["/api/tickets"],
@@ -712,6 +718,17 @@ export default function ChamadosPage() {
                   >
                     <Trello className="h-3.5 w-3.5" />
                   </Button>
+                  {isAdmin && (
+                    <Button
+                      variant={viewMode === "analytics" ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={() => setViewMode("analytics")}
+                      title="CSAT Analytics"
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -799,6 +816,8 @@ export default function ChamadosPage() {
                     : "Tente ajustar os filtros de busca"}
                 </p>
               </div>
+            ) : viewMode === "analytics" ? (
+              <CSATAnalytics />
             ) : viewMode === "kanban" ? (
               <TicketKanban
                 tickets={filteredTickets}

@@ -37,4 +37,15 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 
 ---
 
+## 🚀 Comandos OpenClaw (Terminal)
+
+| Comando | Descrição |
+|---------|-----------|
+| `openclaw-start` | Inicia o gateway do OpenClaw |
+| `openclaw-stop` | Para o gateway |
+| `openclaw-status` | Verifica se está rodando |
+| `openclaw-logs` | Mostra logs em tempo real |
+
+---
+
 Add whatever helps you do your job. This is your cheat sheet.

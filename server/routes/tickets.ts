@@ -13,6 +13,7 @@ import {
   sendTicketStatusChangedEmail,
   sendTicketCommentEmail,
   sendMentionNotificationEmail,
+  sendCSATReceivedEmail,
 } from "../email-service";
 
 export function registerTicketRoutes(router: Router) {
@@ -353,5 +354,190 @@ export function registerTicketRoutes(router: Router) {
   router.get("/api/ticket-responsaveis/find/:categoria/:tipo", requireAuth, async (req, res) => {
     const responsavelId = await storage.findResponsavelForTicket(req.params.categoria, req.params.tipo);
     res.json({ responsavelId });
+  });
+
+  // CSAT - Analytics (apenas admins)
+  router.get("/api/tickets/csat/analytics", requireAuth, async (req, res) => {
+    try {
+      const { isAdmin } = getSessionUser(req);
+      
+      if (!isAdmin) {
+        return res.status(403).json({ error: "Apenas administradores podem acessar analytics" });
+      }
+
+      const allTickets = await storage.getTickets();
+      const users = await storage.getUsers();
+      
+      // Filtrar tickets com CSAT
+      const ticketsWithCSAT = allTickets.filter(t => 
+        t.satisfactionRating !== null && t.satisfactionRating !== undefined
+      );
+
+      // Métricas gerais
+      const totalTickets = allTickets.filter(t => t.status === 'resolved' || t.status === 'closed').length;
+      const totalEvaluations = ticketsWithCSAT.length;
+      const evaluationRate = totalTickets > 0 ? (totalEvaluations / totalTickets) * 100 : 0;
+
+      // CSAT Score médio
+      const averageRating = ticketsWithCSAT.length > 0 
+        ? ticketsWithCSAT.reduce((sum, t) => sum + (t.satisfactionRating || 0), 0) / ticketsWithCSAT.length 
+        : 0;
+
+      // Distribuição de notas
+      const ratingDistribution = [1, 2, 3, 4, 5].map(rating => ({
+        rating,
+        count: ticketsWithCSAT.filter(t => t.satisfactionRating === rating).length,
+        percentage: ticketsWithCSAT.length > 0 
+          ? (ticketsWithCSAT.filter(t => t.satisfactionRating === rating).length / ticketsWithCSAT.length) * 100 
+          : 0
+      }));
+
+      // Top responsáveis (melhores avaliações)
+      const responsibleStats = users.map(user => {
+        const userTickets = ticketsWithCSAT.filter(t => t.assigneeId === user.id);
+        const avgRating = userTickets.length > 0 
+          ? userTickets.reduce((sum, t) => sum + (t.satisfactionRating || 0), 0) / userTickets.length 
+          : 0;
+        return {
+          userId: user.id,
+          userName: user.name,
+          totalEvaluations: userTickets.length,
+          averageRating: Math.round(avgRating * 10) / 10,
+          ratings: [1, 2, 3, 4, 5].map(r => userTickets.filter(t => t.satisfactionRating === r).length)
+        };
+      }).filter(s => s.totalEvaluations > 0)
+        .sort((a, b) => b.averageRating - a.averageRating);
+
+      // Comentários negativos (notas 1-2)
+      const negativeComments = ticketsWithCSAT
+        .filter(t => (t.satisfactionRating || 0) <= 2 && t.satisfactionComment)
+        .map(t => ({
+          ticketId: t.id,
+          ticketCode: t.code,
+          ticketTitle: t.title,
+          rating: t.satisfactionRating,
+          comment: t.satisfactionComment,
+          createdAt: t.satisfactionCreatedAt,
+          assigneeId: t.assigneeId
+        }))
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+        .slice(0, 10);
+
+      // Tendência temporal (últimos 30 dias)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const recentEvaluations = ticketsWithCSAT
+        .filter(t => t.satisfactionCreatedAt && new Date(t.satisfactionCreatedAt) >= thirtyDaysAgo)
+        .sort((a, b) => new Date(a.satisfactionCreatedAt || 0).getTime() - new Date(b.satisfactionCreatedAt || 0).getTime());
+
+      // Agrupar por dia para tendência
+      const trendByDay: Record<string, { sum: number; count: number }> = {};
+      recentEvaluations.forEach(t => {
+        const day = t.satisfactionCreatedAt ? new Date(t.satisfactionCreatedAt).toISOString().split('T')[0] : 'unknown';
+        if (!trendByDay[day]) trendByDay[day] = { sum: 0, count: 0 };
+        trendByDay[day].sum += t.satisfactionRating || 0;
+        trendByDay[day].count++;
+      });
+
+      const trend = Object.entries(trendByDay).map(([date, data]) => ({
+        date,
+        rating: Math.round((data.sum / data.count) * 10) / 10,
+        count: data.count
+      })).sort((a, b) => a.date.localeCompare(b.date));
+
+      res.json({
+        overview: {
+          totalTickets,
+          totalEvaluations,
+          evaluationRate: Math.round(evaluationRate * 100) / 100,
+          averageRating: Math.round(averageRating * 100) / 100
+        },
+        ratingDistribution,
+        topResponsibles: responsibleStats.slice(0, 5),
+        negativeComments,
+        trend
+      });
+    } catch (error: any) {
+      console.error("Error fetching CSAT analytics:", error);
+      res.status(500).json({ error: "Failed to fetch CSAT analytics" });
+    }
+  });
+
+  // CSAT - Avaliação de satisfação
+  router.patch("/api/tickets/:id/satisfaction", requireAuth, async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      const ticket = await storage.getTicket(getId(req));
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Ticket not found" });
+      }
+
+      // Validar que apenas o solicitante pode avaliar
+      if (ticket.requesterId !== userId) {
+        return res.status(403).json({ error: "Apenas o solicitante pode avaliar este chamado" });
+      }
+
+      // Validar que o ticket está closed ou resolved
+      if (ticket.status !== "closed" && ticket.status !== "resolved") {
+        return res.status(400).json({ error: "Apenas chamados fechados ou resolvidos podem ser avaliados" });
+      }
+
+      // Validar se já foi avaliado
+      if (ticket.satisfactionRating !== null && ticket.satisfactionRating !== undefined) {
+        return res.status(400).json({ error: "Este chamado já foi avaliado" });
+      }
+
+      // Validar rating
+      const { rating, comment } = req.body;
+      if (!rating || rating < 1 || rating > 5 || !Number.isInteger(rating)) {
+        return res.status(400).json({ error: "Rating deve ser um número inteiro entre 1 e 5" });
+      }
+
+      // Validar comentário (opcional, até 500 caracteres)
+      if (comment && comment.length > 500) {
+        return res.status(400).json({ error: "Comentário deve ter no máximo 500 caracteres" });
+      }
+
+      // Atualizar avaliação
+      const updatedTicket = await storage.updateTicket(getId(req), {
+        satisfactionRating: rating,
+        satisfactionComment: comment || null,
+        satisfactionCreatedAt: new Date(),
+      });
+
+      // Enviar email de notificação para o responsável
+      if (updatedTicket.assigneeId) {
+        const assignee = await storage.getUser(updatedTicket.assigneeId);
+        if (assignee) {
+          sendCSATReceivedEmail(
+            updatedTicket,
+            rating,
+            comment || null,
+            assignee
+          ).catch(console.error);
+        }
+      }
+
+      // Criar notificação in-app para o responsável
+      if (updatedTicket.assigneeId && updatedTicket.assigneeId !== userId) {
+        const starsText = rating === 5 ? "⭐⭐⭐⭐⭐" : rating === 4 ? "⭐⭐⭐⭐" : rating === 3 ? "⭐⭐⭐" : rating === 2 ? "⭐⭐" : "⭐";
+        storage.createNotification({
+          userId: updatedTicket.assigneeId,
+          fromUserId: userId,
+          title: "Avaliação de chamado recebida",
+          message: `Seu atendimento no chamado "${ticket.title}" foi avaliado com ${starsText} (${rating}/5)`,
+          module: "chamados",
+          entityId: ticket.id,
+          linkUrl: `/chamados?ticket=${ticket.id}`,
+        }).catch(console.error);
+      }
+
+      res.json(updatedTicket);
+    } catch (error: any) {
+      console.error("Error submitting satisfaction:", error);
+      res.status(500).json({ error: "Failed to submit satisfaction rating" });
+    }
   });
 }
