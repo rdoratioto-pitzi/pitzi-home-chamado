@@ -1,5 +1,27 @@
 import { Router } from "express";
 import { z } from "zod";
+import * as bwipjs from "bwip-js";
+
+// Helper function to generate Code128 barcode as base64 PNG
+async function generateBarcodeBase64(imei: string): Promise<string> {
+  try {
+    // Generate barcode as PNG buffer
+    const pngBuffer = await bwipjs.toBuffer({
+      bcid: 'code128',
+      text: imei,
+      scale: 2,
+      height: 6,
+      includetext: false,
+      textxalign: 'center',
+    });
+    
+    // Convert to base64
+    return pngBuffer.toString('base64');
+  } catch (error) {
+    console.error('Error generating barcode:', error);
+    throw error;
+  }
+}
 
 export function registerLabelRoutes(router: Router) {
   // ============== LABEL PRINTING (IMPRESSÃO DE ETIQUETAS) ==============
@@ -23,8 +45,8 @@ export function registerLabelRoutes(router: Router) {
       const { imei, deviceDescription, deviceErpCode, triador } = validationResult.data;
       const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
 
-      // Return barcode as base64 along with label data
-      const barcodeBase64 = ""; // Temporarily disable
+      // Generate barcode as base64 PNG
+      const barcodeBase64 = await generateBarcodeBase64(imei);
 
       res.json({
         success: true,
@@ -80,8 +102,18 @@ export function registerLabelRoutes(router: Router) {
         return res.status(400).json({ error: "IMEI inválido. Deve ter exatamente 15 dígitos." });
       }
 
+      // Generate barcode as PNG buffer
+      const pngBuffer = await bwipjs.toBuffer({
+        bcid: 'code128',
+        text: imei,
+        scale: 2,
+        height: 8,
+        includetext: false,
+        textxalign: 'center',
+      });
+
       res.set("Content-Type", "image/png");
-      res.send(""); // Temporarily disable
+      res.send(pngBuffer);
     } catch (error: any) {
       console.error("Barcode generation error:", error);
       res.status(500).json({ error: error.message || "Failed to generate barcode" });

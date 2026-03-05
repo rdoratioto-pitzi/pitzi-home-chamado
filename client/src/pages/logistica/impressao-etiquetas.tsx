@@ -264,8 +264,8 @@ export default function ImpressaoEtiquetasPage() {
       align-items: center;
       padding-bottom: 1mm;
     }
-    .barcode-area img { 
-      width: 100%;
+    .barcode-area img {
+      width: auto;
       height: auto;
       max-height: 14mm;
     }
@@ -581,8 +581,8 @@ export default function ImpressaoEtiquetasPage() {
                 )}
                 Imprimir Etiqueta
               </Button>
-              <Button 
-                variant="outline"
+              <Button
+                variant="secondary"
                 size="lg"
                 onClick={handleDownload}
                 data-testid="button-download-zpl"
