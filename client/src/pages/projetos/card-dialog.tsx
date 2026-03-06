@@ -518,7 +518,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(u => (
+                            {users.filter(u => u.status === "active").sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(u => (
                               <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -541,7 +541,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(u => (
+                            {users.filter(u => u.status === "active").sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(u => (
                               <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                             ))}
                           </SelectContent>

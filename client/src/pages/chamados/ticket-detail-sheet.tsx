@@ -670,7 +670,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Não atribuído</SelectItem>
-                  {users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((u) => (
+                  {users.filter(u => u.status === "active").sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((u) => (
                     <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                   ))}
                 </SelectContent>
