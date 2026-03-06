@@ -94,7 +94,7 @@ All three interfaces work together to power our AI-driven trade-in platform, ena
 2. **Tickets** - Support management
 3. **Projects** - Kanban project tracking
 4. **Meetings** - Meeting scheduler
-5. **Macgyver AI** - Strategic AI assistant (PRIORITY #1)
+5. **Chat IA** - Strategic AI assistant (PRIORITY #1)
 6. **Logistics** - Operational tracking
 7. **Pricing** - Price monitoring
 8. **Knowledge Base** - Internal documentation

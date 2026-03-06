@@ -52,7 +52,7 @@ Você está auxiliando o desenvolvimento do **Renov Home**, sistema de gestão o
 [Descrever em 1-2 linhas]
 
 📌 MÓDULO:
-[Tickets/Projects/Meetings/Macgyver/BI/etc ou N/A]
+[Tickets/Projects/Meetings/Chat IA/BI/etc ou N/A]
 
 💡 CONTEXTO ESPECÍFICO:
 [Informações não documentadas relevantes agora]
@@ -140,7 +140,7 @@ Pull Request → Review Marcelo → Merge
 | **Tickets** | ✅ Produção | Átila | Sistema de suporte técnico |
 | **Projects** | ✅ Produção | Marcelo | Gestão de projetos Kanban |
 | **Meetings** | ⚠️ Bug conhecido | Juan | Agendamento de reuniões |
-| **Macgyver AI** | 🚧 Em desenvolvimento | Matheus | Assistente IA estratégico |
+| **Chat IA** | 🚧 Em desenvolvimento | Matheus | Assistente IA estratégico |
 | **Logistics** | ✅ Produção | [definir] | Rastreamento operacional |
 | **Pricing** | ✅ Produção | [definir] | Monitoramento de preços |
 | **Knowledge Base** | ✅ Produção | [definir] | Base de conhecimento |
@@ -181,8 +181,8 @@ R: Veja [03-GOVERNANCA.md](03-GOVERNANCA.md)
 **P: Bug no módulo de Meetings?**  
 R: Sim, issue conhecida em `/docs/modulos/meetings.md`
 
-**P: Qual a prioridade atual?**  
-R: Macgyver AI - ver [ROADMAP.md](ROADMAP.md)
+**P: Qual a prioridade atual?**
+R: Chat IA - ver [ROADMAP.md](ROADMAP.md)
 
 ### Comandos Úteis
 

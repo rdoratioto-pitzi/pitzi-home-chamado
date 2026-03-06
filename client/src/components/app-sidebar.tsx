@@ -77,7 +77,7 @@ const allMenuItems = [
   },
   {
 title: "Chat IA",
-    url: "/macgyver-ia",
+url: "/chat-ia",
     icon: Bot,
     module: null,
   },

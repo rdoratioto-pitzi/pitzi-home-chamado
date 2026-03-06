@@ -159,7 +159,7 @@ git push origin feature/minha-feature
 - [ ] Tickets
 - [ ] Projects
 - [ ] Meetings
-- [ ] Macgyver AI
+- [ ] Chat IA
 - [ ] Logistics
 - [ ] Pricing
 - [ ] Knowledge Base
@@ -474,7 +474,7 @@ git push origin main --force
 | `module:tickets` | Tickets |
 | `module:projects` | Projects |
 | `module:meetings` | Meetings |
-| `module:macgyver` | Macgyver AI |
+| `module:chat-ia` | Chat IA |
 | `module:logistics` | Logistics |
 | `module:pricing` | Pricing |
 | `module:kb` | Knowledge Base |
@@ -487,7 +487,7 @@ git push origin main --force
 ### Matheus (CEO / Tech Lead)
 - **Decisões de produto:** Features e prioridades
 - **Estratégia técnica:** Direção de longo prazo
-- **Macgyver AI:** Lead do módulo
+- **Chat IA:** Lead do módulo
 - **Aprovações:** Decisões de negócio
 
 ### Marcelo (CTO)
