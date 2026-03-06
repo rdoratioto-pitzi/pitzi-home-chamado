@@ -59,6 +59,10 @@ import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 import UpdatesPage from "@/pages/updates/index";
 import GitAnalyticsPage from "@/pages/git-analytics/index";
 import EstoquesPage from "@/pages/estoques/index";
+import EstoquesPosicaoPage from "@/pages/estoques/posicao";
+import EstoquesContagemPage from "@/pages/estoques/contagem";
+import EstoquesRelatorioContagensPage from "@/pages/estoques/relatorio-contagens";
+import EstoquesDashboardPage from "@/pages/estoques/dashboard";
 import OmieIntegration from "@/pages/integrations/omie/OmieIntegration";
 
 function Router() {
@@ -303,6 +307,26 @@ function Router() {
       <Route path="/estoques">
         <ProtectedRoute requiredPermission="estoques">
           <EstoquesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/posicao">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesPosicaoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/contagem">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesContagemPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/relatorio-contagens">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesRelatorioContagensPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/dashboard">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesDashboardPage />
         </ProtectedRoute>
       </Route>
       <Route path="/integrations/omie">
