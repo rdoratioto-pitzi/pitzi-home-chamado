@@ -26,6 +26,7 @@ import {
   Search,
   FileSpreadsheet,
   LineChart,
+  PieChart,
   TrendingDown,
   Bell,
   BookOpen,
@@ -111,12 +112,6 @@ title: "Chat IA",
     icon: Workflow,
     module: "fluxogramas" as keyof ModulePermissions,
   },
-  {
-    title: "Estoques",
-    url: "/estoques",
-    icon: Warehouse,
-    module: "estoques" as keyof ModulePermissions,
-  },
 ];
 
 const metasSubItems = [
@@ -159,6 +154,13 @@ const bibliotecaSubItems = [
 { title: "Biblioteca", url: "/biblioteca", icon: LayoutDashboard },
   { title: "Meus Favoritos", url: "/biblioteca/favoritos", icon: Star },
   { title: "Prompts", url: "/biblioteca/prompts", icon: Sparkles },
+];
+
+const estoquesSubItems = [
+  { title: "Posição Estoques", url: "/estoques/posicao", icon: BarChart3 },
+  { title: "Contagem Interna", url: "/estoques/contagem", icon: ClipboardList },
+  { title: "Relatório Contagens", url: "/estoques/relatorio-contagens", icon: FileSpreadsheet },
+  { title: "Dashboard", url: "/estoques/dashboard", icon: PieChart },
 ];
 
 function getCurrentUser() {
@@ -217,12 +219,14 @@ export function AppSidebar() {
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
   const [bibliotecaOpen, setBibliotecaOpen] = useState(location.startsWith("/biblioteca"));
+  const [estoquesOpen, setEstoquesOpen] = useState(location.startsWith("/estoques"));
 
   const isMetasActive = location.startsWith("/metas");
   const isLogisticaActive = location.startsWith("/logistica");
   const isApisActive = location.startsWith("/apis");
   const isPricingActive = location.startsWith("/pricing");
   const isBibliotecaActive = location.startsWith("/biblioteca");
+  const isEstoquesActive = location.startsWith("/estoques");
 
   const permissions = useMemo(() => {
     try {
@@ -277,6 +281,7 @@ export function AppSidebar() {
   const hasBibliotecaAccess = permissions.biblioteca === true;
   const hasApisAccess = permissions.apis === true;
   const hasConfiguracoesAccess = permissions.configuracoes === true;
+  const hasEstoquesAccess = permissions.estoques === true;
 
   const handleLogout = async () => {
     try {
@@ -455,6 +460,45 @@ export function AppSidebar() {
                             <SidebarMenuSubItem key={subItem.url}>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {hasEstoquesAccess && (
+                <Collapsible open={estoquesOpen} onOpenChange={setEstoquesOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isEstoquesActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        isActive={isEstoquesActive}
+                        data-testid="link-estoques"
+                      >
+                        <Package className={`h-[20px] w-[20px] ${isEstoquesActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">Estoques</span>
+                        {estoquesOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                        {estoquesSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[13.5px]">{subItem.title}</span>
                                 </Link>
