@@ -90,7 +90,7 @@ const formSchema = z.object({
     okrs: z.boolean(),
     logistica: z.boolean(),
     pricing: z.boolean().default(true),
-    biblioteca: z.boolean().default(true),
+    conhecimento: z.boolean().default(true),
     apis: z.boolean(),
     configuracoes: z.boolean(),
   }),
@@ -573,7 +573,7 @@ export function UsersSettings() {
                     </FormControl>
                     <FormMessage />
                     <div className="mt-2">
-                      <PasswordStrengthIndicator password={field.value} />
+                      <PasswordStrengthIndicator password={field.value || ""} />
                     </div>
                   </FormItem>
                 )}
@@ -594,7 +594,7 @@ export function UsersSettings() {
                         </FormControl>
                         <SelectContent>
                           {areas.map(area => (
-                            <SelectItem key={area.value} value={area.value}>{area.label}</SelectItem>
+                            <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
