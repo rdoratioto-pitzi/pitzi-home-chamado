@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileBrowser } from "@/components/conhecimento/file-browser";
-import { 
-  Search, 
+import { useMetaAreas } from "@/hooks/use-meta-areas";
+import {
+  Search,
   Plus,
   FileText,
   BookOpen,
@@ -29,8 +30,6 @@ const TIPOS = [
   { value: 'faq', label: 'FAQs', icon: HelpCircle, color: 'bg-pink-500' },
 ];
 
-const AREAS = ['TI', 'RH', 'Comercial', 'Financeiro', 'Marketing', 'Operações'];
-
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Rascunho' },
   { value: 'review', label: 'Em Revisão' },
@@ -43,6 +42,8 @@ export default function BibliotecaPage() {
   const [areaFilter, setAreaFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  const { data: areas = [] } = useMetaAreas();
 
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['/api/knowledge/documents'],
@@ -88,8 +89,8 @@ export default function BibliotecaPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as Áreas</SelectItem>
-              {AREAS.map(area => (
-                <SelectItem key={area} value={area}>{area}</SelectItem>
+              {areas.map((area: any) => (
+                <SelectItem key={area.name} value={area.name}>{area.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
