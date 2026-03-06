@@ -235,7 +235,7 @@ export function AppSidebar() {
           fluxogramas: true,
           logistica: true,
           pricing: true,
-          biblioteca: true,
+          conhecimento: true,
           apis: true,
           configuracoes: true,
           estoques: true,
@@ -257,7 +257,7 @@ export function AppSidebar() {
       fluxogramas: false,
       logistica: false,
       pricing: false,
-      biblioteca: false,
+      conhecimento: false,
       apis: false,
       configuracoes: false,
       estoques: false,
@@ -274,7 +274,7 @@ export function AppSidebar() {
   const hasMetasAccess = permissions.okrs === true;
   const hasLogisticaAccess = permissions.logistica === true;
   const hasPricingAccess = permissions.pricing === true;
-  const hasBibliotecaAccess = permissions.biblioteca === true;
+  const hasBibliotecaAccess = permissions.conhecimento === true;
   const hasApisAccess = permissions.apis === true;
   const hasConfiguracoesAccess = permissions.configuracoes === true;
 

@@ -2374,7 +2374,7 @@ export class DatabaseStorage implements IStorage {
     limit?: number;
     offset?: number;
   }): Promise<GitPullRequest[]> {
-    if (!db) return [];
+    if (!db) throw new Error("Database not connected");
     try {
       // Build WHERE conditions
       const conditions: string[] = [];
@@ -2453,7 +2453,7 @@ export class DatabaseStorage implements IStorage {
         ${offsetClause}
       `;
 
-      const result = await db.query(query, params);
+      const result = await db.execute(sql`${sql.raw(query)}`);
       return result.rows as GitPullRequest[];
     } catch (error) {
       console.error("[storage] getGitPullRequests error:", error);

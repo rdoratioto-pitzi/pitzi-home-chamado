@@ -73,7 +73,7 @@ export default function FavoritosPage() {
   };
 
   const getAreaLabel = (area: string) => {
-    return areas.find(a => a.value === area)?.label || area;
+    return areas.find(a => a.name === area)?.name || area;
   };
 
   const isLoading = docsLoading || favsLoading;
