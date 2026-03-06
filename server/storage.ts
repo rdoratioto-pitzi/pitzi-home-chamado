@@ -387,20 +387,6 @@ import {
   markNotificationRead(id: string, userId: string): Promise<Notification | undefined>;
   markAllNotificationsRead(userId: string): Promise<void>;
 
-  // IMEI.info Stats
-  getImeiInfoStats(): Promise<any[]>;
-  getImeiInfoStat(id: string): Promise<any | undefined>;
-  createImeiInfoStats(stats: any): Promise<any>;
-  updateImeiInfoStat(id: string, data: Partial<any>): Promise<any | undefined>;
-  deleteImeiInfoStat(id: string): Promise<boolean>;
-
-  // IMEI.info Alerts
-  getImeiInfoAlerts(): Promise<any[]>;
-  getImeiInfoAlert(id: string): Promise<any | undefined>;
-  createImeiInfoAlert(alert: any): Promise<any>;
-  updateImeiInfoAlert(id: string, data: Partial<any>): Promise<any | undefined>;
-  deleteImeiInfoAlert(id: string): Promise<boolean>;
-
   // Prompts Library
   getPrompts(filters?: { category?: string; search?: string; onlyActive?: boolean }): Promise<PromptLibrary[]>;
   getPrompt(id: string): Promise<PromptLibrary | undefined>;
@@ -2156,19 +2142,6 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // IMEI.info Stats (Mocked as they are missing from schema)
-  async getImeiInfoStats(): Promise<any[]> { return []; }
-  async getImeiInfoStat(id: string): Promise<any | undefined> { return undefined; }
-  async createImeiInfoStats(stats: any): Promise<any> { return stats; }
-  async updateImeiInfoStat(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
-  async deleteImeiInfoStat(id: string): Promise<boolean> { return false; }
-
-  // IMEI.info Alerts (Mocked as they are missing from schema)
-  async getImeiInfoAlerts(): Promise<any[]> { return []; }
-  async getImeiInfoAlert(id: string): Promise<any | undefined> { return undefined; }
-  async createImeiInfoAlert(alert: any): Promise<any> { return alert; }
-  async updateImeiInfoAlert(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
-  async deleteImeiInfoAlert(id: string): Promise<boolean> { return false; }
   // ============== GIT ANALYTICS - REPOSITORIES ==============
   
   async getGitRepositories(tenantId?: string): Promise<GitRepository[]> {
