@@ -348,7 +348,7 @@ export default function ApiRsLogisticaPage() {
                       </div>
 
                       <p className="text-xs text-muted-foreground">
-                        O token padrão <code className="bg-muted px-1 rounded">Renov123</code> é utilizado para autenticação em todas as requisições.
+                        O token de autenticação deve ser obtido através do painel de configurações ou solicitado ao administrador do sistema.
                       </p>
                     </CardContent>
                   </Card>

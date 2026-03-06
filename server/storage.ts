@@ -439,7 +439,7 @@ export class DatabaseStorage implements IStorage {
       id: "mock-admin-id",
       name: "Matheus",
       email: "Matheus@renovsmart.com.br",
-      password: "ma061184",
+      password: "MOCK_PASSWORD_DO_NOT_USE",
       isAdmin: true,
       perfilAcesso: "diretor",
       status: "active",
@@ -469,7 +469,7 @@ export class DatabaseStorage implements IStorage {
         id: "mock-admin2-id",
         name: "Administrador",
         email: "admin@renov.com.br",
-        password: "admin123",
+        password: "MOCK_PASSWORD_DO_NOT_USE",
         modulePermissions: JSON.stringify({
           chamados: true,
           projetos: true,

@@ -37,8 +37,15 @@ import createMemoryStore from "memorystore";
 const MemoryStore = createMemoryStore(session);
 
 export function setupSession(app: Express) {
-  const sessionSecret = process.env.SESSION_SECRET || "renov-home-session-secret-dev-fallback";
   const isProduction = process.env.NODE_ENV === "production";
+  
+  // Em produção, SESSION_SECRET é obrigatório
+  if (isProduction && !process.env.SESSION_SECRET) {
+    throw new Error("CRITICAL: SESSION_SECRET must be set in production environment");
+  }
+  
+  // Fallback apenas para desenvolvimento
+  const sessionSecret = process.env.SESSION_SECRET || "dev-only-fallback-change-in-production";
 
   if (isProduction) {
     app.set("trust proxy", 1);
