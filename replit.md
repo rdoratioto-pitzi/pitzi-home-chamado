@@ -28,7 +28,7 @@ Renov Home adopts a client-server architecture with a clear separation of concer
 - **Backend:** Built with Node.js and Express in TypeScript, using in-memory storage (MemStorage) for MVP. Exposes a RESTful API at `/api/...`.
 - **Authentication & Data Isolation:** Server-side session management with `express-session`, `requireAuth` middleware, and data isolation per module based on user roles and ownership. Admin users have elevated access. Brand settings endpoints (logo_url_light, logo_url_dark, favicon_url) are publicly accessible.
 - **Access Control by Module:**
-    - **Macgyver IA:** 100% private per user (no admin bypass).
+    - **Chat IA:** 100% private per user (no admin bypass).
     - **Chamados (Tickets):** Public - all authenticated users see all tickets.
     - **Projects:** 3-way visibility (private/shared/public) with member management via `projectMembers` table. Private = owner only, Shared = owner + members, Public = all tenant users.
     - **Flowcharts:** Private by default, with optional shared visibility via `permissions` JSON field.
@@ -46,7 +46,7 @@ Renov Home adopts a client-server architecture with a clear separation of concer
 - **Email Notifications:** Implemented for key events in Ticket management using professional HTML templates.
 - **User Management:** Granular permissions per module, user invitation system.
 - **Configuration Management:** Dynamic field configuration and automatic assignment rules.
-- **AI Chat Module (Macgyver IA):** Features a ChatGPT/Gemini-style assistant integrated with platform data. It uses a database for chat history, a backend with SSE for streaming responses, and a frontend with conversation history, markdown rendering, and a dynamic model picker. Includes slash commands, quick prompts, syntax highlighting, follow-up suggestions, and conversation export. Context from all modules, including aggregated statistics, is used to inform AI responses.
+- **AI Chat Module (Chat IA):** Features a ChatGPT/Gemini-style assistant integrated with platform data. It uses a database for chat history, a backend with SSE for streaming responses, and a frontend with conversation history, markdown rendering, and a dynamic model picker. Includes slash commands, quick prompts, syntax highlighting, follow-up suggestions, and conversation export. Context from all modules, including aggregated statistics, is used to inform AI responses.
 
 ## External Dependencies
 

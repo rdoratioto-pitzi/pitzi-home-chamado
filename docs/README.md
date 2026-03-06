@@ -22,7 +22,7 @@
 - **[Tickets](modulos/tickets.md)** - Sistema de suporte técnico
 - **[Projects](modulos/projects.md)** - Gestão de projetos Kanban
 - **[Meetings](modulos/meetings.md)** ⚠️ *Bug conhecido: recurring meetings*
-- **[Macgyver AI](modulos/macgyver-ai.md)** 🚧 *Em desenvolvimento ativo - PRIORIDADE*
+- **[Chat IA](modulos/macgyver-ai.md)** 🚧 *Em desenvolvimento ativo - PRIORIDADE*
 - **[Logistics](modulos/logistics.md)** - Rastreamento operacional
 - **[Pricing](modulos/pricing.md)** - Monitoramento de preços
 - **[Knowledge Base](modulos/knowledge-base.md)** - Base de conhecimento
