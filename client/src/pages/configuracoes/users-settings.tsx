@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getCurrentUser, isAdmin as checkIsAdmin } from "@/lib/permissions";
+import { useMetaAreas } from "@/hooks/use-meta-areas";
 import {
   Table,
   TableBody,
@@ -65,16 +66,6 @@ const MODULES = [
   { key: "configuracoes", label: "Configurações" },
 ] as const;
 
-const AREAS_NEGOCIO = [
-  { value: "LAB", label: "Laboratório" },
-  { value: "RH", label: "Recursos Humanos" },
-  { value: "COM", label: "Comercial" },
-  { value: "FIN", label: "Financeiro" },
-  { value: "MKT", label: "Marketing" },
-  { value: "OPS", label: "Operações" },
-  { value: "TI", label: "Tecnologia" },
-];
-
 const PERFIS_ACESSO = [
   { value: "assistente", label: "Assistente" },
   { value: "analista", label: "Analista" },
@@ -114,6 +105,7 @@ export function UsersSettings() {
   const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: areas = [] } = useMetaAreas();
 
   useEffect(() => {
     const checkAdminStatus = () => {
@@ -601,7 +593,7 @@ export function UsersSettings() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {AREAS_NEGOCIO.map(area => (
+                          {areas.map(area => (
                             <SelectItem key={area.value} value={area.value}>{area.label}</SelectItem>
                           ))}
                         </SelectContent>
