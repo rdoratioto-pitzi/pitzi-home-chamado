@@ -510,6 +510,7 @@ function CollaboratorsDialog({
     return allUsers
       .filter(
         (u: any) =>
+          u.status === "active" &&
           u.id !== currentUserId &&
           u.id !== flowchart?.ownerId &&
           !collaboratorIds.includes(u.id) &&
@@ -948,8 +949,9 @@ function FlowchartEditorInner() {
   const filteredMentionUsers = useMemo(() => {
     if (!allUsers) return [];
     return allUsers.filter((u: any) =>
-      u.name?.toLowerCase().includes(mentionQuery) ||
-      u.email?.toLowerCase().includes(mentionQuery)
+      u.status === "active" &&
+      (u.name?.toLowerCase().includes(mentionQuery) ||
+      u.email?.toLowerCase().includes(mentionQuery))
     ).slice(0, 5);
   }, [allUsers, mentionQuery]);
 

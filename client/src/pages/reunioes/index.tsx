@@ -151,10 +151,11 @@ export default function ReunioesPage() {
   });
 
   const filteredUsers = useMemo(() => {
-    if (!participantInput) return users;
+    const activeUsers = users.filter(u => u.status === "active");
+    if (!participantInput) return activeUsers;
     const search = participantInput.toLowerCase();
-    return users.filter(u => 
-      u.name.toLowerCase().includes(search) || 
+    return activeUsers.filter(u =>
+      u.name.toLowerCase().includes(search) ||
       u.email.toLowerCase().includes(search)
     );
   }, [users, participantInput]);

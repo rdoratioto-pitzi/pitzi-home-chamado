@@ -361,7 +361,7 @@ export function KeyResultDialog({ open, onOpenChange, objectiveId }: KeyResultDi
                     Selecione as pessoas responsáveis por este resultado-chave
                   </FormDescription>
                   <div className="grid grid-cols-2 gap-2 mt-2 max-h-48 overflow-y-auto border rounded-lg p-3">
-                    {users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((user) => (
+                    {users.filter(u => u.status === "active").sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((user) => (
                       <FormField
                         key={user.id}
                         control={form.control}
