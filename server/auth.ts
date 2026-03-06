@@ -63,11 +63,20 @@ export function setupSession(app: Express) {
       cookie: {
         httpOnly: true,
         secure: isProduction,
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias em milissegundos
+        maxAge: 24 * 60 * 60 * 1000, // 24 horas - sessão padrão reduzida para segurança
         sameSite: "lax",
+        path: "/",
       },
     })
   );
+
+  // Sliding expiration: estende a sessão a cada atividade do usuário
+  app.use((req, res, next) => {
+    if (req.session?.userId && req.session.cookie) {
+      req.session.touch();
+    }
+    next();
+  });
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {

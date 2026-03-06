@@ -1,10 +1,29 @@
 import { Router } from "express";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import { storage } from "../storage";
 import { sendPasswordResetEmail } from "../email-service";
 
+// Rate limiter para tentativas de login - protege contra força bruta
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5, // 5 tentativas por janela
+  message: { success: false, message: "Muitas tentativas de login. Tente novamente em 15 minutos." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter para recuperação de senha
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 3, // 3 solicitações por hora
+  message: { success: false, message: "Muitas solicitações. Tente novamente em 1 hora." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 export function registerAuthRoutes(router: Router) {
-  router.post("/api/auth/login", async (req, res) => {
+  router.post("/api/auth/login", loginLimiter, async (req, res) => {
     try {
       const loginBodySchema = z.object({
         email: z.string().email("Email inválido"),
@@ -38,8 +57,9 @@ export function registerAuthRoutes(router: Router) {
       req.session.userId = user.id;
       req.session.isAdmin = user.isAdmin === true;
 
+      // Sessão com rememberMe reduzida para 7 dias (antes era 30)
       if (validated.rememberMe) {
-        req.session.cookie.maxAge = 30 * 24 * 60 * 60 * 1000;
+        req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000;
       } else {
         req.session.cookie.maxAge = 24 * 60 * 60 * 1000;
       }
@@ -103,7 +123,7 @@ export function registerAuthRoutes(router: Router) {
     email: z.string().email("Email inválido"),
   });
 
-  router.post("/api/auth/forgot-password", async (req, res) => {
+  router.post("/api/auth/forgot-password", forgotPasswordLimiter, async (req, res) => {
     try {
       const validated = forgotPasswordSchema.parse(req.body);
       console.log(`[auth] Password reset request for: ${validated.email}`);
