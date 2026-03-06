@@ -2042,7 +2042,7 @@ export default function TarefasPage() {
                                 data-testid={`input-action-responsible-${index}`}
                               />
                               <datalist id={`action-responsible-${index}`}>
-                                {users.map(u => (
+                                {users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(u => (
                                   <option key={u.id} value={u.name} />
                                 ))}
                               </datalist>

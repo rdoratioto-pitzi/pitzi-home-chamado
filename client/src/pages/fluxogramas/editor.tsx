@@ -507,14 +507,17 @@ function CollaboratorsDialog({
   });
 
   const filteredUsers = useMemo(() => {
-    return allUsers.filter(
-      (u: any) =>
-        u.id !== currentUserId &&
-        u.id !== flowchart?.ownerId &&
-        !collaboratorIds.includes(u.id) &&
-        (u.name?.toLowerCase().includes(searchUser.toLowerCase()) ||
-          u.email?.toLowerCase().includes(searchUser.toLowerCase()))
-    ).slice(0, 8);
+    return allUsers
+      .filter(
+        (u: any) =>
+          u.id !== currentUserId &&
+          u.id !== flowchart?.ownerId &&
+          !collaboratorIds.includes(u.id) &&
+          (u.name?.toLowerCase().includes(searchUser.toLowerCase()) ||
+            u.email?.toLowerCase().includes(searchUser.toLowerCase()))
+      )
+      .sort((a: any, b: any) => a.name.localeCompare(b.name, 'pt-BR'))
+      .slice(0, 8);
   }, [allUsers, searchUser, collaboratorIds, currentUserId, flowchart?.ownerId]);
 
   return (
@@ -687,7 +690,7 @@ function FlowchartEditorInner() {
 
   const onConnect: OnConnect = useCallback(
     (params) => {
-      const newEdge = {
+      const newEdge: Edge = {
         ...params,
         id: `edge_${Date.now()}`,
         type: "smoothstep",

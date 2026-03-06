@@ -549,11 +549,14 @@ export async function executeTool(toolName: string, args: Record<string, any>): 
         
         if (query) {
           const lowerQuery = query.toLowerCase();
-          filtered = filtered.filter(u => 
-            u.name.toLowerCase().includes(lowerQuery) || 
+          filtered = filtered.filter(u =>
+            u.name.toLowerCase().includes(lowerQuery) ||
             u.email.toLowerCase().includes(lowerQuery)
           );
         }
+        
+        // Sort alphabetically by name
+        filtered.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
         
         return {
           success: true,
