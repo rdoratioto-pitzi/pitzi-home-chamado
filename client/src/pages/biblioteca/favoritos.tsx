@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
-  Star, 
+import { useMetaAreas } from "@/hooks/use-meta-areas";
+import {
+  Star,
   StarOff,
   ChevronRight,
   BookOpen,
@@ -24,16 +25,6 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-const AREAS = [
-  { value: "LAB", label: "Laboratório" },
-  { value: "RH", label: "Recursos Humanos" },
-  { value: "COM", label: "Comercial" },
-  { value: "FIN", label: "Financeiro" },
-  { value: "MKT", label: "Marketing" },
-  { value: "OPS", label: "Operações" },
-  { value: "TI", label: "Tecnologia" },
-];
-
 const STATUS_OPTIONS = [
   { value: "rascunho", label: "Rascunho", color: "bg-gray-500/10 text-gray-600" },
   { value: "em_analise", label: "Em Análise", color: "bg-yellow-500/10 text-yellow-600" },
@@ -45,6 +36,7 @@ export default function FavoritosPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const user = getCurrentUser();
+  const { data: areas = [] } = useMetaAreas();
 
   const { data: documents, isLoading: docsLoading } = useQuery<KnowledgeDocument[]>({
     queryKey: ["/api/conhecimento"],
@@ -81,7 +73,7 @@ export default function FavoritosPage() {
   };
 
   const getAreaLabel = (area: string) => {
-    return AREAS.find(a => a.value === area)?.label || area;
+    return areas.find(a => a.value === area)?.label || area;
   };
 
   const isLoading = docsLoading || favsLoading;
