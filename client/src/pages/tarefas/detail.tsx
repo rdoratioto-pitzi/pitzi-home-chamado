@@ -838,6 +838,7 @@ export default function TaskDetailPage() {
                   <div className="absolute z-20 left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-32 overflow-y-auto">
                     {users
                       .filter(u => u.name.toLowerCase().includes(mentionQuery) || u.email.toLowerCase().includes(mentionQuery))
+                      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
                       .slice(0, 5)
                       .map(user => (
                         <button

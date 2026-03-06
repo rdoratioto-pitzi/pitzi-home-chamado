@@ -85,9 +85,9 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   });
 
   const activeUsers = users.filter(u => u.status === "active");
-  const filteredUsers = activeUsers.filter(u => 
-    u.name.toLowerCase().includes(mentionFilter.toLowerCase())
-  );
+  const filteredUsers = activeUsers
+    .filter(u => u.name.toLowerCase().includes(mentionFilter.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
   const handleCommentChange = (value: string) => {
     setNewComment(value);
@@ -518,7 +518,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {users.map(u => (
+                            {users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(u => (
                               <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -541,7 +541,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {users.map(u => (
+                            {users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(u => (
                               <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                             ))}
                           </SelectContent>

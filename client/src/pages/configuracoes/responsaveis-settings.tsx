@@ -320,7 +320,7 @@ export function ResponsaveisSettings() {
                   <SelectValue placeholder="Selecione o responsável" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.filter(u => u.status === "active").map((user) => (
+                  {users.filter(u => u.status === "active").sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name}
                     </SelectItem>
