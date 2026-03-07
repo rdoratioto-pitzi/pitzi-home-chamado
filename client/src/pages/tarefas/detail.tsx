@@ -262,8 +262,6 @@ export default function TaskDetailPage() {
     
     setIsSubmitting(true);
     try {
-      console.log('Enviando comentário:', { content: newComment.trim() });
-      
       const response = await fetch(`/api/tasks/${id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -278,7 +276,6 @@ export default function TaskDetailPage() {
       }
 
       const comment = await response.json();
-      console.log('Comentário criado:', comment);
       
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "comments"] });
       setNewComment('');

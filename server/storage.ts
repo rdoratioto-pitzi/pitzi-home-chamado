@@ -1869,7 +1869,6 @@ export class DatabaseStorage implements IStorage {
     if (!db) {
       // Store in memory when database is not available
       this.mockUpdates.unshift(newUpdate);
-      console.log("[storage] Update created in memory (DB unavailable):", newUpdate.id);
       return newUpdate;
     }
     
@@ -1897,7 +1896,6 @@ export class DatabaseStorage implements IStorage {
       const index = this.mockUpdates.findIndex(u => u.id === id);
       if (index !== -1) {
         this.mockUpdates[index] = { ...this.mockUpdates[index], ...updateData };
-        console.log("[storage] Update updated in memory (DB unavailable):", id);
         return this.mockUpdates[index];
       }
       return undefined;
@@ -1923,7 +1921,6 @@ export class DatabaseStorage implements IStorage {
       const index = this.mockUpdates.findIndex(u => u.id === id);
       if (index !== -1) {
         this.mockUpdates.splice(index, 1);
-        console.log("[storage] Update deleted from memory (DB unavailable):", id);
         return true;
       }
       return false;
@@ -1953,25 +1950,11 @@ export class DatabaseStorage implements IStorage {
     if (!db) throw new Error("Database not connected");
     
     try {
-      console.log("[Storage.getPrompts] Iniciando busca com filtros:", filters);
-      
-      // Primeiro, verificar o que existe no banco (debug)
-      const debugResult = await db.execute(sql`
-        SELECT COUNT(*) as total,
-               COUNT(CASE WHEN is_active = true THEN 1 END) as active_true,
-               COUNT(CASE WHEN is_active = false THEN 1 END) as active_false,
-               COUNT(CASE WHEN is_active IS NULL THEN 1 END) as active_null
-        FROM prompts_library
-      `);
-      console.log("[Storage.getPrompts] Debug - Status do banco:", debugResult.rows[0]);
-      
       // Query simples - buscar todos os prompts sem filtro de is_active primeiro
       const result = await db.execute(sql`
         SELECT * FROM prompts_library
         ORDER BY usage_count DESC
       `);
-      
-      console.log(`[Storage.getPrompts] Query sem filtro retornou ${result.rows.length} prompts`);
       
       // Se não há filtros de onlyActive, mostrar todos
       let prompts = result.rows as PromptLibrary[];
@@ -1983,7 +1966,6 @@ export class DatabaseStorage implements IStorage {
           const isActive = (p as any).is_active ?? (p as any).isActive;
           return isActive === true || isActive === 'true' || isActive === 1 || isActive === '1';
         });
-        console.log(`[Storage.getPrompts] Após filtro is_active=true: ${prompts.length}`);
       }
 
       // Map snake_case to camelCase for consistency
@@ -2004,7 +1986,6 @@ export class DatabaseStorage implements IStorage {
       // Aplicar filtros em memória
       if (filters?.category) {
         prompts = prompts.filter(p => p.category === filters.category);
-        console.log(`[Storage.getPrompts] Após filtro de categoria: ${prompts.length}`);
       }
       
       if (filters?.search) {
@@ -2014,10 +1995,7 @@ export class DatabaseStorage implements IStorage {
           p.description?.toLowerCase().includes(searchLower) ||
           p.name?.toLowerCase().includes(searchLower)
         );
-        console.log(`[Storage.getPrompts] Após filtro de busca: ${prompts.length}`);
       }
-      
-      console.log(`[Storage.getPrompts] Retornando ${prompts.length} prompts`);
       
       return prompts;
     } catch (error) {
@@ -2310,7 +2288,6 @@ export class DatabaseStorage implements IStorage {
           deletions: sql`EXCLUDED.deletions`,
         }
       }).returning();
-      console.log(`[storage] createGitCommitsBatch: upserted ${result.length} commits`);
       return result.length;
     } catch (error: any) {
       console.error("[storage] createGitCommitsBatch error:", error);

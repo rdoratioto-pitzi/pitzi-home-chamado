@@ -133,8 +133,6 @@ export function migrateFromSessionStorage(): void {
       // Limpa sessionStorage após migração
       sessionStorage.removeItem("user");
       sessionStorage.removeItem("modulePermissions");
-      
-      console.log("[auth] Dados migrados de sessionStorage para localStorage");
     }
   } catch (error) {
     console.error("[auth] Erro na migração de sessionStorage:", error);
