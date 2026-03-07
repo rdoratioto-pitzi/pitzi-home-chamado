@@ -53,7 +53,7 @@ import BibliotecaNovoPage from "@/pages/biblioteca/novo";
 import BibliotecaDocumentoPage from "@/pages/biblioteca/documento";
 import BibliotecaFavoritosPage from "@/pages/biblioteca/favoritos";
 import BibliotecaPromptsPage from "@/pages/biblioteca/prompts";
-import MacgyverIAPage from "@/pages/macgyver-ia/index";
+import ChatIAPage from "@/pages/macgyver-ia/index";
 import FluxogramasPage from "@/pages/fluxogramas/index";
 import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 import UpdatesPage from "@/pages/updates/index";
@@ -73,9 +73,9 @@ function Router() {
           <Home />
         </ProtectedRoute>
       </Route>
-      <Route path="/macgyver-ia">
+      <Route path="/chat-ia">
         <ProtectedRoute>
-          <MacgyverIAPage />
+          <ChatIAPage />
         </ProtectedRoute>
       </Route>
       <Route path="/chamados">
