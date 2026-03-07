@@ -62,6 +62,7 @@ import EstoquesPage from "@/pages/estoques/index";
 import EstoquesPosicaoPage from "@/pages/estoques/posicao";
 import EstoquesContagemPage from "@/pages/estoques/contagem";
 import EstoquesRelatorioContagensPage from "@/pages/estoques/relatorio-contagens";
+import EstoquesRelatorioContagemDetalhePage from "@/pages/estoques/relatorio-contagens/[id]";
 import EstoquesDashboardPage from "@/pages/estoques/dashboard";
 import OmieIntegration from "@/pages/integrations/omie/OmieIntegration";
 
@@ -322,6 +323,11 @@ function Router() {
       <Route path="/estoques/relatorio-contagens">
         <ProtectedRoute requiredPermission="estoques">
           <EstoquesRelatorioContagensPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/relatorio-contagens/:id">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesRelatorioContagemDetalhePage />
         </ProtectedRoute>
       </Route>
       <Route path="/estoques/dashboard">
