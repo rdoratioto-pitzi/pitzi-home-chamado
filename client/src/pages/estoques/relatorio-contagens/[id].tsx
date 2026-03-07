@@ -1,4 +1,5 @@
-import React from "react";
+import { STATUS_CONTAGEM_MAP } from "../utils";
+import { fetchWithAuth } from "@/lib/queryClient";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useParams } from "wouter";
 import { ArrowLeft, FileSpreadsheet } from "lucide-react";
@@ -23,41 +24,35 @@ async function parseJson(res: Response) {
 }
 
 async function fetchResumo(id: string) {
-  const res = await fetch(`/api/estoques/contagens/${id}/resumo`);
+  const res = await fetchWithAuth(`/api/estoques/contagens/${id}/resumo`);
   const data = await parseJson(res);
   if (!res.ok) throw new Error(data.error || "Erro ao buscar resumo");
   return data.data;
 }
 
 async function fetchCategoria(id: string) {
-  const res = await fetch(`/api/estoques/contagens/${id}/categoria`);
+  const res = await fetchWithAuth(`/api/estoques/contagens/${id}/categoria`);
   const data = await parseJson(res);
   if (!res.ok) throw new Error(data.error || "Erro ao buscar categorias");
   return data.data || [];
 }
 
 async function fetchItens(id: string) {
-  const res = await fetch(`/api/estoques/contagens/${id}/itens-comparativo`);
+  const res = await fetchWithAuth(`/api/estoques/contagens/${id}/itens-comparativo`);
   const data = await parseJson(res);
   if (!res.ok) throw new Error(data.error || "Erro ao buscar itens");
   return data.data || [];
 }
 
 async function fetchDivergencias(id: string) {
-  const res = await fetch(`/api/estoques/contagens/${id}/divergencias`);
+  const res = await fetchWithAuth(`/api/estoques/contagens/${id}/divergencias`);
   const data = await parseJson(res);
   if (!res.ok) throw new Error(data.error || "Erro ao buscar divergências");
   return data.data || [];
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    em_andamento: { label: "Em Andamento", className: "bg-blue-100 text-blue-800 hover:bg-blue-100" },
-    finalizada: { label: "Finalizada", className: "bg-gray-100 text-gray-800 hover:bg-gray-100" },
-    em_analise: { label: "Em Análise", className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" },
-    aprovada: { label: "Aprovada", className: "bg-green-100 text-green-800 hover:bg-green-100" },
-  };
-  const config = map[status] ?? { label: status, className: "" };
+  const config = STATUS_CONTAGEM_MAP[status] ?? { label: status, className: "" };
   return <Badge className={config.className}>{config.label}</Badge>;
 }
 

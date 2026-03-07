@@ -5,13 +5,14 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getCurrentUser } from "@/lib/permissions";
+import { fetchWithAuth } from "@/lib/queryClient";
 import { GiroEstoque } from "./components/giro-estoque";
 import { CurvaABC } from "./components/curva-abc";
 import { AgingReport } from "./components/aging-report";
 import { Tendencias } from "./components/tendencias";
 
 async function fetchJson(url: string) {
-  const res = await fetch(url);
+  const res = await fetchWithAuth(url);
   if (!res.ok) throw new Error(`Erro ${res.status}`);
   const data = await res.json();
   return data.data;

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrency } from "../../utils";
+import { fetchWithAuth } from "@/lib/queryClient";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -46,9 +48,6 @@ interface CurvaABCData {
   }>;
 }
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-
 const BADGE_COLORS: Record<string, string> = {
   A: "bg-emerald-100 text-emerald-800 border-emerald-300",
   B: "bg-amber-100 text-amber-800 border-amber-300",
@@ -92,15 +91,13 @@ function ClasseCard({ classe, dados }: { classe: "A" | "B" | "C"; dados?: { qtde
 }
 
 async function fetchCurvaABC(): Promise<CurvaABCData> {
-  const res = await fetch("/api/estoques/dashboard/curva-abc");
+  const res = await fetchWithAuth("/api/estoques/dashboard/curva-abc");
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error("[CurvaABC] HTTP", res.status, body);
     throw new Error(`HTTP ${res.status}: ${body}`);
   }
   const json = await res.json();
   if (!json.data) {
-    console.error("[CurvaABC] Resposta sem campo data:", json);
     throw new Error("Resposta inválida do servidor");
   }
   return json.data;

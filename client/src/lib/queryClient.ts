@@ -1,11 +1,14 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { clearAuth, getAuthToken } from "./auth";
 
+let _handlingUnauthorized = false;
+
 function handleUnauthorized() {
-  // Limpa dados de autenticação do localStorage
+  if (_handlingUnauthorized) return;
+  _handlingUnauthorized = true;
+
   clearAuth();
-  
-  // Redireciona para login se não estiver lá
+
   if (window.location.pathname !== "/login") {
     window.location.href = "/login";
   }
