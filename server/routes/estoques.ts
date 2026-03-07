@@ -60,7 +60,6 @@ async function getCachedProdutos(): Promise<any[]> {
   console.log('[Estoque Routes] Cached', cachedProdutos.length, 'products');
   return cachedProdutos;
 }
->>>>>>> 56b9c11e4c884b5c183a9cc667e7670d1e6ee23b
 
 export function registerEstoqueRoutes(router: Router) {
 
