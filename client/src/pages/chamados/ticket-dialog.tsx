@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import type { User, Setting, Ticket } from "@shared/schema";
+import type { Setting, Ticket } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RichTextarea } from "@/components/rich-textarea";
+import { UserSelect } from "@/components/ui/user-select";
 import {
   Select,
   SelectContent,
@@ -96,10 +97,6 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
   const queryClient = useQueryClient();
   const [showSuccess, setShowSuccess] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
-
-  const { data: users = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
-  });
 
   const currentUser = getCurrentUser();
 
@@ -486,24 +483,15 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Responsável (opcional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-ticket-assignee" aria-label="Responsável">
-                          <SelectValue placeholder="Atribuição automática" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="auto">Atribuição automática</SelectItem>
-                        {users
-                          .filter(u => u.status === "active")
-                          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-                          .map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <UserSelect
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Atribuição automática"
+                        emptyMessage="Nenhum usuário encontrado"
+                        showAutoOption={true}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
