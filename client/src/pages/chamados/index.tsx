@@ -456,6 +456,34 @@ export default function ChamadosPage() {
   const dentroPrazoPerc = stats.total > 0 ? Math.round((stats.dentroPrazo / stats.total) * 100) : 0;
   const emAtrasoPerc = stats.total > 0 ? Math.round((stats.emAtraso / stats.total) * 100) : 0;
 
+  const MAX_EXCEL_CELL_LENGTH = 32767;
+
+  const stripHtml = (html: string | undefined | null): string => {
+    if (!html) return "";
+    // Replace common HTML entities
+    let text = html
+      .replace(/&nbsp;/g, " ")
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">")
+      .replace(/"/g, '"')
+      .replace(/'/g, "'");
+    // Remove base64 images (data:image/...)
+    text = text.replace(/<img[^>]*src=["']data:image\/[^"']*["'][^>]*>/gi, "");
+    text = text.replace(/data:image\/[^;]+;base64,[^\s"']+/g, "");
+    // Remove all HTML tags
+    text = text.replace(/<[^>]*>/g, "");
+    // Clean up multiple spaces and line breaks
+    text = text.replace(/\s+/g, " ").trim();
+    return text;
+  };
+
+  const truncateText = (text: string | undefined | null, maxLength: number = MAX_EXCEL_CELL_LENGTH): string => {
+    if (!text) return "";
+    const cleanText = stripHtml(text);
+    return cleanText.length > maxLength ? cleanText.substring(0, maxLength) : cleanText;
+  };
+
   const exportToExcel = () => {
     const data = filteredTickets.map((ticket) => {
       const requester = getUser(ticket.requesterId);
@@ -464,8 +492,8 @@ export default function ChamadosPage() {
       const slaInfo = getSlaForTicket(ticket, slaRules);
       return {
         "Código": ticket.code || "",
-        "Título": ticket.title,
-        "Descrição": ticket.description,
+        "Título": truncateText(ticket.title),
+        "Descrição": truncateText(ticket.description),
         "Categoria": ticket.category,
         "Tipo": ticket.type || "Bug",
         "Local": ticket.location || "",
