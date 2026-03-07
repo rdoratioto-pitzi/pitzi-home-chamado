@@ -58,10 +58,6 @@ export function Filtros({
     onClear?.();
   };
 
-  const handleApplyFilters = () => {
-    // Os filtros já foram aplicados em tempo real através do onFilterChange
-  };
-
   return (
     <div className="bg-card rounded-lg border p-4 mb-6">
       {/* Linha 1: IMEI, Código ERP, Categoria, Marca */}
@@ -125,8 +121,8 @@ export function Filtros({
         </Select>
       </div>
 
-      {/* Linha 2: Modelo, Capacidade, Botões */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Linha 2: Modelo, Capacidade, Botão Limpar */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Select Modelo */}
         <Select
           value={filters.modelo}
@@ -164,12 +160,6 @@ export function Filtros({
         >
           <X className="h-4 w-4" />
           Limpar Filtros
-        </Button>
-
-        {/* Botão Aplicar */}
-        <Button onClick={handleApplyFilters} className="flex items-center gap-2">
-          <Search className="h-4 w-4" />
-          Aplicar
         </Button>
       </div>
     </div>

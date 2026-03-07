@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { ClipboardList, Play, CheckCircle2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, fetchWithAuth } from "@/lib/queryClient";
 import { BarcodeReader } from "./components/barcode-reader";
 import { ManualInput } from "./components/manual-input";
 import { ListaItens } from "./components/lista-itens";
@@ -42,7 +42,7 @@ export default function EstoquesContagemPage() {
   const { data: contagemAtiva, isLoading: isLoadingContagem, refetch: refetchContagem } = useQuery<Contagem | null>({
     queryKey: ["/api/estoques/contagens/ativa"],
     queryFn: async () => {
-      const res = await fetch("/api/estoques/contagens/ativa");
+      const res = await fetchWithAuth("/api/estoques/contagens/ativa");
       if (!res.ok) throw new Error("Erro ao buscar contagem ativa");
       const data = await res.json();
       return data.data;
@@ -54,7 +54,7 @@ export default function EstoquesContagemPage() {
     queryKey: ["/api/estoques/contagens", contagemAtiva?.id, "itens"],
     queryFn: async () => {
       if (!contagemAtiva?.id) return [];
-      const res = await fetch(`/api/estoques/contagens/${contagemAtiva.id}/itens`);
+      const res = await fetchWithAuth(`/api/estoques/contagens/${contagemAtiva.id}/itens`);
       if (!res.ok) throw new Error("Erro ao buscar itens");
       const data = await res.json();
       return data.data;
@@ -65,10 +65,8 @@ export default function EstoquesContagemPage() {
   // Mutation para iniciar contagem
   const iniciarContagem = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/estoques/contagens", {
+      const res = await fetchWithAuth("/api/estoques/contagens", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
       });
       if (!res.ok) {
         const data = await res.json();
@@ -96,10 +94,8 @@ export default function EstoquesContagemPage() {
   const adicionarItem = useMutation({
     mutationFn: async ({ imei, metodoLeitura }: { imei: string; metodoLeitura: string }) => {
       if (!contagemAtiva?.id) throw new Error("Sem contagem ativa");
-      const res = await fetch(`/api/estoques/contagens/${contagemAtiva.id}/item`, {
+      const res = await fetchWithAuth(`/api/estoques/contagens/${contagemAtiva.id}/item`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({ imei, metodoLeitura }),
       });
       if (!res.ok) {
@@ -139,10 +135,8 @@ export default function EstoquesContagemPage() {
   const finalizarContagem = useMutation({
     mutationFn: async () => {
       if (!contagemAtiva?.id) throw new Error("Sem contagem ativa");
-      const res = await fetch(`/api/estoques/contagens/${contagemAtiva.id}/finalizar`, {
+      const res = await fetchWithAuth(`/api/estoques/contagens/${contagemAtiva.id}/finalizar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
       });
       if (!res.ok) {
         const data = await res.json();

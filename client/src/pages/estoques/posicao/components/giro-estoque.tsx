@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { fetchWithAuth } from "@/lib/queryClient";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,15 +43,13 @@ interface GiroEstoqueData {
 }
 
 async function fetchGiroEstoque(periodo: string): Promise<GiroEstoqueData> {
-  const res = await fetch(`/api/estoques/dashboard/giro?periodo=${periodo}`);
+  const res = await fetchWithAuth(`/api/estoques/dashboard/giro?periodo=${periodo}`);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.error("[GiroEstoque] HTTP", res.status, body);
     throw new Error(`HTTP ${res.status}: ${body}`);
   }
   const json = await res.json();
   if (!json.data) {
-    console.error("[GiroEstoque] Resposta sem campo data:", json);
     throw new Error("Resposta inválida do servidor");
   }
   return json.data;
