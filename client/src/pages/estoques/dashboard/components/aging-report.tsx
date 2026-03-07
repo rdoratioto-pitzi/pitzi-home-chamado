@@ -108,6 +108,7 @@ export function AgingReport({ dados, isLoading }: Props) {
           <div className="grid grid-cols-2 gap-2">
             {FAIXAS.map(({ key, icon: Icon, color, bg }) => {
               const faixa = resumo[key as keyof typeof resumo];
+              if (!faixa) return null;
               return (
                 <div key={key} className={`rounded-lg border p-2.5 ${bg}`}>
                   <div className="flex items-center gap-1.5 mb-1">
