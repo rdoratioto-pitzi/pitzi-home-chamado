@@ -5,6 +5,7 @@
 import { Package, DollarSign, TrendingUp } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCurrency, formatNumber } from "../../utils";
 
 interface TotaisCardsProps {
   qtdeTotal: number;
@@ -13,22 +14,6 @@ interface TotaisCardsProps {
   isLoading: boolean;
 }
 
-/**
- * Formata número para formato brasileiro
- */
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("pt-BR").format(value);
-}
-
-/**
- * Formata valor em reais
- */
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
 
 export function TotaisCards({
   qtdeTotal,

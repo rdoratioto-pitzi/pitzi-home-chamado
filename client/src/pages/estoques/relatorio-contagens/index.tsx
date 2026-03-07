@@ -1,9 +1,10 @@
-import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { FileSpreadsheet, Eye } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { STATUS_CONTAGEM_MAP } from "../utils";
+import { fetchWithAuth } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,20 +32,14 @@ interface ContagemListItem {
 }
 
 async function fetchContagens(): Promise<ContagemListItem[]> {
-  const res = await fetch("/api/estoques/contagens");
+  const res = await fetchWithAuth("/api/estoques/contagens");
   if (!res.ok) throw new Error("Erro ao buscar contagens");
   const data = await res.json();
   return data.data || [];
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    em_andamento: { label: "Em Andamento", className: "bg-blue-100 text-blue-800 hover:bg-blue-100" },
-    finalizada: { label: "Finalizada", className: "bg-gray-100 text-gray-800 hover:bg-gray-100" },
-    em_analise: { label: "Em Análise", className: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100" },
-    aprovada: { label: "Aprovada", className: "bg-green-100 text-green-800 hover:bg-green-100" },
-  };
-  const config = map[status] ?? { label: status, className: "" };
+  const config = STATUS_CONTAGEM_MAP[status] ?? { label: status, className: "" };
   return <Badge className={config.className}>{config.label}</Badge>;
 }
 

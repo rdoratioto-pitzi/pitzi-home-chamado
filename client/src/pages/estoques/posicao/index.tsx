@@ -6,6 +6,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
+import { fetchWithAuth } from "@/lib/queryClient";
 import { PageHeader } from "@/components/page-header";
 import { TotaisCards } from "./components/totais-cards";
 import { Filtros, type EstoqueFilters } from "./components/filtros";
@@ -60,7 +61,13 @@ interface EstoqueTotais {
 // Fetch posição de estoques
 async function fetchPosicaoEstoque(filters: EstoqueFilters): Promise<EstoqueItem[]> {
   const params = new URLSearchParams();
-  
+
+  if (filters.imei) {
+    params.append("imei", filters.imei);
+  }
+  if (filters.codigoErp) {
+    params.append("codigoErp", filters.codigoErp);
+  }
   if (filters.categoria && filters.categoria !== "all") {
     params.append("categoria", filters.categoria);
   }
@@ -70,11 +77,11 @@ async function fetchPosicaoEstoque(filters: EstoqueFilters): Promise<EstoqueItem
   if (filters.modelo && filters.modelo !== "all") {
     params.append("modelo", filters.modelo);
   }
-  if (filters.codigoErp) {
-    params.append("codigoErp", filters.codigoErp);
+  if (filters.capacidade) {
+    params.append("capacidade", filters.capacidade);
   }
   
-  const response = await fetch(`/api/estoques/posicao?${params.toString()}`);
+  const response = await fetchWithAuth(`/api/estoques/posicao?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to fetch stock position");
   }
@@ -84,7 +91,7 @@ async function fetchPosicaoEstoque(filters: EstoqueFilters): Promise<EstoqueItem
 
 // Fetch totais de estoques
 async function fetchTotaisEstoque(): Promise<EstoqueTotais> {
-  const response = await fetch("/api/estoques/posicao/totais");
+  const response = await fetchWithAuth("/api/estoques/posicao/totais");
   if (!response.ok) {
     throw new Error("Failed to fetch totals");
   }
@@ -94,7 +101,7 @@ async function fetchTotaisEstoque(): Promise<EstoqueTotais> {
 
 // Fetch categorias
 async function fetchCategorias(): Promise<string[]> {
-  const response = await fetch("/api/estoques/filtros/categorias");
+  const response = await fetchWithAuth("/api/estoques/filtros/categorias");
   if (!response.ok) {
     throw new Error("Failed to fetch categorias");
   }
@@ -104,7 +111,7 @@ async function fetchCategorias(): Promise<string[]> {
 
 // Fetch marcas
 async function fetchMarcas(): Promise<string[]> {
-  const response = await fetch("/api/estoques/filtros/marcas");
+  const response = await fetchWithAuth("/api/estoques/filtros/marcas");
   if (!response.ok) {
     throw new Error("Failed to fetch marcas");
   }
@@ -114,7 +121,7 @@ async function fetchMarcas(): Promise<string[]> {
 
 // Fetch modelos
 async function fetchModelos(): Promise<string[]> {
-  const response = await fetch("/api/estoques/filtros/modelos");
+  const response = await fetchWithAuth("/api/estoques/filtros/modelos");
   if (!response.ok) {
     throw new Error("Failed to fetch modelos");
   }
@@ -124,7 +131,7 @@ async function fetchModelos(): Promise<string[]> {
 
 // Exportar para Excel
 async function exportToExcel() {
-  const response = await fetch("/api/estoques/posicao/export");
+  const response = await fetchWithAuth("/api/estoques/posicao/export");
   if (!response.ok) {
     throw new Error("Failed to export");
   }
