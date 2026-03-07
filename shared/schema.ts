@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1358,3 +1358,115 @@ export const aiPromptExecutions = pgTable("ai_prompt_executions", {
 export const insertAiPromptExecutionSchema = createInsertSchema(aiPromptExecutions);
 export type InsertAiPromptExecution = z.infer<typeof insertAiPromptExecutionSchema>;
 export type AiPromptExecution = typeof aiPromptExecutions.$inferSelect;
+
+// ============== ESTOQUES MODULE ==============
+
+// Enums as constants for frontend usage
+export const CONTAGEM_STATUS = ['em_andamento', 'finalizada', 'em_analise', 'aprovada'] as const;
+export const METODO_LEITURA = ['barcode', 'manual'] as const;
+export const TIPO_DIVERGENCIA = ['falta', 'sobra'] as const;
+export const TIPO_AJUSTE = ['entrada', 'saida', 'transferencia'] as const;
+
+export type ContagemStatus = typeof CONTAGEM_STATUS[number];
+export type MetodoLeitura = typeof METODO_LEITURA[number];
+export type TipoDivergencia = typeof TIPO_DIVERGENCIA[number];
+export type TipoAjuste = typeof TIPO_AJUSTE[number];
+
+// Tabelas
+
+// 1. estoquesContagens (contagens de estoque - cabeçalho)
+export const estoquesContagens = pgTable("estoques_contagens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
+  codigo: text("codigo").notNull().unique(),
+  responsavelId: varchar("responsavel_id").references(() => users.id),
+  status: text("status").notNull().default("em_andamento"),
+  dataInicio: timestamp("data_inicio").defaultNow(),
+  dataFim: timestamp("data_fim"),
+  totalItensContados: integer("total_itens_contados").default(0),
+  totalItensSistema: integer("total_itens_sistema"),
+  divergencia: integer("divergencia"),
+  acuracidade: decimal("acuracidade", { precision: 5, scale: 2 }),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEstoquesContagemSchema = createInsertSchema(estoquesContagens).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEstoquesContagem = z.infer<typeof insertEstoquesContagemSchema>;
+export type EstoquesContagem = typeof estoquesContagens.$inferSelect;
+
+// 2. estoquesContagemItens (itens contados - detalhe)
+export const estoquesContagemItens = pgTable("estoques_contagem_itens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contagemId: varchar("contagem_id").references(() => estoquesContagens.id, { onDelete: "cascade" }),
+  imei: text("imei").notNull(),
+  codigoErp: text("codigo_erp"),
+  modelo: text("modelo"),
+  categoria: text("categoria"),
+  marca: text("marca"),
+  metodoLeitura: text("metodo_leitura").notNull(),
+  contadoEm: timestamp("contado_em").defaultNow(),
+  contadoPor: varchar("contado_por").references(() => users.id),
+}, (table) => ({
+  uniqContagemImei: unique().on(table.contagemId, table.imei),
+}));
+
+export const insertEstoquesContagemItemSchema = createInsertSchema(estoquesContagemItens).omit({ id: true, contadoEm: true });
+export type InsertEstoquesContagemItem = z.infer<typeof insertEstoquesContagemItemSchema>;
+export type EstoquesContagemItem = typeof estoquesContagemItens.$inferSelect;
+
+// 3. estoquesContagemLogs (auditoria)
+export const estoquesContagemLogs = pgTable("estoques_contagem_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contagemId: varchar("contagem_id").references(() => estoquesContagens.id),
+  userId: varchar("user_id").references(() => users.id),
+  acao: text("acao").notNull(),
+  imei: text("imei"),
+  detalhes: jsonb("detalhes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEstoquesContagemLogSchema = createInsertSchema(estoquesContagemLogs).omit({ id: true, createdAt: true });
+export type InsertEstoquesContagemLog = z.infer<typeof insertEstoquesContagemLogSchema>;
+export type EstoquesContagemLog = typeof estoquesContagemLogs.$inferSelect;
+
+// 4. estoquesContagemDivergencias (divergências encontradas)
+export const estoquesContagemDivergencias = pgTable("estoques_contagem_divergencias", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contagemId: varchar("contagem_id").references(() => estoquesContagens.id, { onDelete: "cascade" }),
+  tipo: text("tipo").notNull(),
+  imei: text("imei"),
+  codigoErp: text("codigo_erp"),
+  modelo: text("modelo"),
+  categoria: text("categoria"),
+  marca: text("marca"),
+  ultimaMovimentacao: timestamp("ultima_movimentacao"),
+  possivelCausa: text("possivel_causa"),
+  statusAnalise: text("status_analise").default("pendente"),
+  observacaoAnalise: text("observacao_analise"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEstoquesContagemDivergenciaSchema = createInsertSchema(estoquesContagemDivergencias).omit({ id: true, createdAt: true });
+export type InsertEstoquesContagemDivergencia = z.infer<typeof insertEstoquesContagemDivergenciaSchema>;
+export type EstoquesContagemDivergencia = typeof estoquesContagemDivergencias.$inferSelect;
+
+// 5. estoquesAjustes (ajustes de inventário)
+export const estoquesAjustes = pgTable("estoques_ajustes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contagemId: varchar("contagem_id").references(() => estoquesContagens.id),
+  divergenciaId: varchar("divergencia_id").references(() => estoquesContagemDivergencias.id),
+  tipoAjuste: text("tipo_ajuste").notNull(),
+  imei: text("imei"),
+  codigoErp: text("codigo_erp"),
+  quantidade: integer("quantidade"),
+  justificativa: text("justificativa").notNull(),
+  aprovadoPor: varchar("aprovado_por").references(() => users.id),
+  aprovadoEm: timestamp("aprovado_em"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEstoquesAjusteSchema = createInsertSchema(estoquesAjustes).omit({ id: true, createdAt: true });
+export type InsertEstoquesAjuste = z.infer<typeof insertEstoquesAjusteSchema>;
+export type EstoquesAjuste = typeof estoquesAjustes.$inferSelect;

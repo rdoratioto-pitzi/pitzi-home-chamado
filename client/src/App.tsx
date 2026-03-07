@@ -53,12 +53,16 @@ import BibliotecaNovoPage from "@/pages/biblioteca/novo";
 import BibliotecaDocumentoPage from "@/pages/biblioteca/documento";
 import BibliotecaFavoritosPage from "@/pages/biblioteca/favoritos";
 import BibliotecaPromptsPage from "@/pages/biblioteca/prompts";
-import MacgyverIAPage from "@/pages/macgyver-ia/index";
+import ChatIAPage from "@/pages/macgyver-ia/index";
 import FluxogramasPage from "@/pages/fluxogramas/index";
 import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 import UpdatesPage from "@/pages/updates/index";
 import GitAnalyticsPage from "@/pages/git-analytics/index";
-import EstoquesPage from "@/pages/estoques/index";
+import EstoquesPosicaoPage from "@/pages/estoques/posicao";
+import EstoquesContagemPage from "@/pages/estoques/contagem";
+import EstoquesRelatorioContagensPage from "@/pages/estoques/relatorio-contagens";
+import EstoquesRelatorioContagemDetalhePage from "@/pages/estoques/relatorio-contagens/[id]";
+import EstoquesDashboardPage from "@/pages/estoques/dashboard";
 import OmieIntegration from "@/pages/integrations/omie/OmieIntegration";
 
 function Router() {
@@ -69,9 +73,9 @@ function Router() {
           <Home />
         </ProtectedRoute>
       </Route>
-      <Route path="/macgyver-ia">
+      <Route path="/chat-ia">
         <ProtectedRoute>
-          <MacgyverIAPage />
+          <ChatIAPage />
         </ProtectedRoute>
       </Route>
       <Route path="/chamados">
@@ -302,7 +306,32 @@ function Router() {
       </Route>
       <Route path="/estoques">
         <ProtectedRoute requiredPermission="estoques">
-          <EstoquesPage />
+          <EstoquesPosicaoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/posicao">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesPosicaoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/contagem">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesContagemPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/relatorio-contagens">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesRelatorioContagensPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/relatorio-contagens/:id">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesRelatorioContagemDetalhePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/dashboard">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesDashboardPage />
         </ProtectedRoute>
       </Route>
       <Route path="/integrations/omie">

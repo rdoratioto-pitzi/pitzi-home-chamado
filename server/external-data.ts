@@ -1,6 +1,6 @@
 /**
  * External Data Service
- * Provides real-time external data fetching capabilities for the Macgyver AI
+ * Provides real-time external data fetching capabilities for the Chat IA
  * Currently supports weather data via Open-Meteo API (free, no API key required)
  */
 
