@@ -25,6 +25,7 @@ export interface EstoqueFilters {
 interface FiltrosProps {
   filters: EstoqueFilters;
   onFilterChange: (filters: EstoqueFilters) => void;
+  onClear?: () => void;
   categorias: string[];
   marcas: string[];
   modelos: string[];
@@ -33,6 +34,7 @@ interface FiltrosProps {
 export function Filtros({
   filters,
   onFilterChange,
+  onClear,
   categorias,
   marcas,
   modelos,
@@ -53,12 +55,11 @@ export function Filtros({
       modelo: "",
       capacidade: "",
     });
+    onClear?.();
   };
 
   const handleApplyFilters = () => {
     // Os filtros já foram aplicados em tempo real através do onFilterChange
-    // Esta função pode ser usada para ações adicionais se necessário
-    console.log("Filtros aplicados:", filters);
   };
 
   return (

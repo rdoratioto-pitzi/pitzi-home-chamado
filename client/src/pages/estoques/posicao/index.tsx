@@ -3,7 +3,7 @@
  * Exibe dados de estoque em tempo real via integração Omie
  * Acesso conforme permissões configuradas no cadastro de usuários
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
@@ -13,6 +13,40 @@ import { Tabela, type EstoqueItem } from "./components/tabela";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser, type CurrentUser } from "@/lib/permissions";
+
+const FILTERS_STORAGE_KEY = "estoques_posicao_filters";
+const FILTERS_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+function loadFiltersFromStorage(): EstoqueFilters | null {
+  try {
+    const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!raw) return null;
+    const { filters, savedAt } = JSON.parse(raw);
+    if (Date.now() - savedAt > FILTERS_TTL_MS) {
+      localStorage.removeItem(FILTERS_STORAGE_KEY);
+      return null;
+    }
+    return filters;
+  } catch {
+    return null;
+  }
+}
+
+function saveFiltersToStorage(filters: EstoqueFilters) {
+  try {
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ filters, savedAt: Date.now() }));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearFiltersFromStorage() {
+  try {
+    localStorage.removeItem(FILTERS_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 interface EstoqueTotais {
   qtdeTotal: number;
@@ -132,16 +166,29 @@ function hasEstoqueAccess(user: CurrentUser | null): boolean {
 export default function EstoquesPosicaoPage() {
   const { toast } = useToast();
   
-  // Estado local
-  const [filters, setFilters] = useState<EstoqueFilters>({
-    imei: "",
-    codigoErp: "",
-    categoria: "",
-    marca: "",
-    modelo: "",
-    capacidade: "",
+  // Estado local — inicializa do localStorage se disponível
+  const [filters, setFilters] = useState<EstoqueFilters>(() => {
+    const saved = loadFiltersFromStorage();
+    return saved ?? {
+      imei: "",
+      codigoErp: "",
+      categoria: "",
+      marca: "",
+      modelo: "",
+      capacidade: "",
+    };
   });
+  // Filtros debounçados (300ms) para evitar requests a cada tecla
+  const [debouncedFilters, setDebouncedFilters] = useState<EstoqueFilters>(filters);
   const [viewMode, setViewMode] = useState<"categoria" | "item">("item");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilters(filters);
+      saveFiltersToStorage(filters);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [filters]);
   
   // Obter usuário atual do sistema de autenticação
   const user = getCurrentUser();
@@ -151,35 +198,45 @@ export default function EstoquesPosicaoPage() {
   
   // Fetch dados de estoques (apenas se tiver acesso)
   const { data: estoqueData, isLoading: isLoadingEstoque } = useQuery({
-    queryKey: ["estoquePosicao", filters],
-    queryFn: () => fetchPosicaoEstoque(filters),
+    queryKey: ["estoquePosicao", debouncedFilters],
+    queryFn: () => fetchPosicaoEstoque(debouncedFilters),
     enabled: hasAccess,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
-  
+
   // Fetch totais
   const { data: totais, isLoading: isLoadingTotais } = useQuery({
     queryKey: ["estoqueTotais"],
     queryFn: fetchTotaisEstoque,
     enabled: hasAccess,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
-  
+
   // Fetch filtros dinâmicos
   const { data: categorias } = useQuery({
     queryKey: ["estoqueCategorias"],
     queryFn: fetchCategorias,
     enabled: hasAccess,
+    staleTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
-  
+
   const { data: marcas } = useQuery({
     queryKey: ["estoqueMarcas"],
     queryFn: fetchMarcas,
     enabled: hasAccess,
+    staleTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
-  
+
   const { data: modelos } = useQuery({
     queryKey: ["estoqueModelos"],
     queryFn: fetchModelos,
     enabled: hasAccess,
+    staleTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
   
   // Handler de exportação
@@ -241,6 +298,7 @@ export default function EstoquesPosicaoPage() {
       <Filtros
         filters={filters}
         onFilterChange={setFilters}
+        onClear={clearFiltersFromStorage}
         categorias={categorias || []}
         marcas={marcas || []}
         modelos={modelos || []}

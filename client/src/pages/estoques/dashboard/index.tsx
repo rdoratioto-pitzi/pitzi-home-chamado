@@ -29,7 +29,7 @@ export default function EstoquesDashboardPage() {
     queryFn: () => fetchJson(`/api/estoques/dashboard/giro?periodo=${periodoGiro}`),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: abcData, isLoading: isLoadingAbc, refetch: refetchAbc } = useQuery({
@@ -37,7 +37,7 @@ export default function EstoquesDashboardPage() {
     queryFn: () => fetchJson('/api/estoques/dashboard/curva-abc'),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: agingData, isLoading: isLoadingAging, refetch: refetchAging } = useQuery({
@@ -45,7 +45,7 @@ export default function EstoquesDashboardPage() {
     queryFn: () => fetchJson('/api/estoques/dashboard/aging'),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: tendenciasData, isLoading: isLoadingTendencias, refetch: refetchTendencias } = useQuery({
@@ -53,7 +53,7 @@ export default function EstoquesDashboardPage() {
     queryFn: () => fetchJson(`/api/estoques/dashboard/tendencias?periodo=${periodoTendencias}`),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   function handleRefreshAll() {
