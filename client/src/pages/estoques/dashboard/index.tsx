@@ -10,6 +10,7 @@ import { GiroEstoque } from "./components/giro-estoque";
 import { CurvaABC } from "./components/curva-abc";
 import { AgingReport } from "./components/aging-report";
 import { Tendencias } from "./components/tendencias";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 async function fetchJson(url: string) {
   const res = await fetchWithAuth(url);
@@ -25,36 +26,40 @@ export default function EstoquesDashboardPage() {
   const [periodoGiro, setPeriodoGiro] = useState<string>('90d');
   const [periodoTendencias, setPeriodoTendencias] = useState<string>('12m');
 
-  const { data: giroData, isLoading: isLoadingGiro, refetch: refetchGiro } = useQuery({
+  const { data: giroData, isLoading: isLoadingGiro, isError: isErrorGiro, refetch: refetchGiro } = useQuery({
     queryKey: ['dashboard-giro', periodoGiro],
     queryFn: () => fetchJson(`/api/estoques/dashboard/giro?periodo=${periodoGiro}`),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: 2,
   });
 
-  const { data: abcData, isLoading: isLoadingAbc, refetch: refetchAbc } = useQuery({
+  const { data: abcData, isLoading: isLoadingAbc, isError: isErrorAbc, refetch: refetchAbc } = useQuery({
     queryKey: ['dashboard-curva-abc'],
     queryFn: () => fetchJson('/api/estoques/dashboard/curva-abc'),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: 2,
   });
 
-  const { data: agingData, isLoading: isLoadingAging, refetch: refetchAging } = useQuery({
+  const { data: agingData, isLoading: isLoadingAging, isError: isErrorAging, refetch: refetchAging } = useQuery({
     queryKey: ['dashboard-aging'],
     queryFn: () => fetchJson('/api/estoques/dashboard/aging'),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: 2,
   });
 
-  const { data: tendenciasData, isLoading: isLoadingTendencias, refetch: refetchTendencias } = useQuery({
+  const { data: tendenciasData, isLoading: isLoadingTendencias, isError: isErrorTendencias, refetch: refetchTendencias } = useQuery({
     queryKey: ['dashboard-tendencias', periodoTendencias],
     queryFn: () => fetchJson(`/api/estoques/dashboard/tendencias?periodo=${periodoTendencias}`),
     enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: 2,
   });
 
   function handleRefreshAll() {
@@ -99,31 +104,58 @@ export default function EstoquesDashboardPage() {
         </Button>
       </div>
 
+      {/* Aviso global se todas as queries falharam */}
+      {isErrorGiro && isErrorAbc && isErrorAging && isErrorTendencias && (
+        <Alert variant="destructive" className="mb-6">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Erro ao carregar dashboard</AlertTitle>
+          <AlertDescription>
+            Não foi possível obter dados do Omie. Verifique a integração e tente novamente.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Grid 2x2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <GiroEstoque
-          dados={giroData}
-          isLoading={isLoadingGiro}
-          periodo={periodoGiro}
-          onPeriodoChange={setPeriodoGiro}
-        />
+        <ErrorBoundary>
+          <GiroEstoque
+            dados={giroData}
+            isLoading={isLoadingGiro}
+            isError={isErrorGiro}
+            onRetry={refetchGiro}
+            periodo={periodoGiro}
+            onPeriodoChange={setPeriodoGiro}
+          />
+        </ErrorBoundary>
 
-        <CurvaABC
-          dados={abcData}
-          isLoading={isLoadingAbc}
-        />
+        <ErrorBoundary>
+          <CurvaABC
+            dados={abcData}
+            isLoading={isLoadingAbc}
+            isError={isErrorAbc}
+            onRetry={refetchAbc}
+          />
+        </ErrorBoundary>
 
-        <AgingReport
-          dados={agingData}
-          isLoading={isLoadingAging}
-        />
+        <ErrorBoundary>
+          <AgingReport
+            dados={agingData}
+            isLoading={isLoadingAging}
+            isError={isErrorAging}
+            onRetry={refetchAging}
+          />
+        </ErrorBoundary>
 
-        <Tendencias
-          dados={tendenciasData}
-          isLoading={isLoadingTendencias}
-          periodo={periodoTendencias}
-          onPeriodoChange={setPeriodoTendencias}
-        />
+        <ErrorBoundary>
+          <Tendencias
+            dados={tendenciasData}
+            isLoading={isLoadingTendencias}
+            isError={isErrorTendencias}
+            onRetry={refetchTendencias}
+            periodo={periodoTendencias}
+            onPeriodoChange={setPeriodoTendencias}
+          />
+        </ErrorBoundary>
       </div>
     </div>
   );
