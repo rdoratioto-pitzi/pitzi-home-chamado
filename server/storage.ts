@@ -2147,10 +2147,12 @@ export class DatabaseStorage implements IStorage {
   async getGitRepositories(tenantId?: string): Promise<GitRepository[]> {
     if (!db) return [];
     try {
+      // Filter only active repositories
+      const activeCondition = eq(gitRepositories.isActive, true);
       if (tenantId) {
-        return await db.select().from(gitRepositories).where(eq(gitRepositories.tenantId, tenantId)).orderBy(desc(gitRepositories.createdAt));
+        return await db.select().from(gitRepositories).where(and(eq(gitRepositories.tenantId, tenantId), activeCondition)).orderBy(desc(gitRepositories.createdAt));
       }
-      return await db.select().from(gitRepositories).orderBy(desc(gitRepositories.createdAt));
+      return await db.select().from(gitRepositories).where(activeCondition).orderBy(desc(gitRepositories.createdAt));
     } catch (error) {
       console.error("[storage] getGitRepositories error:", error);
       return [];

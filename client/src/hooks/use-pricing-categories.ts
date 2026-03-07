@@ -9,7 +9,7 @@ export function usePricingCategories() {
   return useQuery<PricingCategory[]>({
     queryKey: ["pricing-categories"],
     queryFn: async () => {
-      const response = await fetch("/api/pricing/devices");
+      const response = await fetch("/api/pricing/devices?isActive=true");
       if (!response.ok) throw new Error("Erro ao carregar categorias");
       const devices = await response.json();
       // Extract unique manufacturers as categories
