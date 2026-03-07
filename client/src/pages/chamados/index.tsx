@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -321,7 +321,7 @@ export default function ChamadosPage() {
   const [slaFilter, setSlaFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [periodFilter, setPeriodFilter] = useState<"month" | "year" | "total">("year");
+  const [periodFilter, setPeriodFilter] = useState<"month" | "year" | "total" | "previousMonth" | "execution">("year");
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid" | "analytics">("list");
   
   // Get current user info for admin check
@@ -390,8 +390,15 @@ export default function ChamadosPage() {
       if (periodFilter === "month") {
         return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
       }
+      if (periodFilter === "previousMonth") {
+        const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        return date.getMonth() === prevMonth.getMonth() && date.getFullYear() === prevMonth.getFullYear();
+      }
       if (periodFilter === "year") {
         return date.getFullYear() === now.getFullYear();
+      }
+      if (periodFilter === "execution") {
+        return t.status === "open" || t.status === "in_progress" || t.status === "blocked";
       }
       return true;
     });
@@ -464,6 +471,23 @@ export default function ChamadosPage() {
     historicalTotal: tickets.length,
   };
 
+  // Calcular total de resolvidos no mês anterior (usando dataResolucao)
+  const previousMonthResolved = useMemo(() => {
+    if (periodFilter !== "previousMonth") return 0;
+    
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    
+    return tickets.filter(t => {
+      if (t.status !== "resolved" && t.status !== "closed") return false;
+      const dataResolucao = t.dataResolucao ? new Date(t.dataResolucao) : null;
+      if (!dataResolucao) return false;
+      
+      return dataResolucao.getMonth() === prevMonth.getMonth() &&
+             dataResolucao.getFullYear() === prevMonth.getFullYear();
+    }).length;
+  }, [periodFilter, tickets]);
+
   const openPerc = stats.total > 0 ? Math.round((stats.open / stats.total) * 100) : 0;
   const inProgressPerc = stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0;
   const blockedPerc = stats.total > 0 ? Math.round((stats.blocked / stats.total) * 100) : 0;
@@ -517,6 +541,7 @@ export default function ChamadosPage() {
         "Solicitante": requester?.name || "",
         "Responsável": assignee?.name || "",
         "Abertura": ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "",
+        "Resolução": ticket.dataResolucao ? new Date(ticket.dataResolucao).toLocaleDateString("pt-BR") : "",
         "Tempo Aberto": timeOpen.text,
         "SLA": slaInfo.slaHoras !== null ? `${slaInfo.slaHoras}h` : "—",
         "Status SLA": slaInfo.status === "dentro_prazo" ? "Dentro do Prazo" : slaInfo.status === "em_atraso" ? "Em Atraso" : "—",
@@ -564,6 +589,14 @@ export default function ChamadosPage() {
               Mês Vigente
             </Button>
             <Button
+              variant={periodFilter === "previousMonth" ? "secondary" : "ghost"}
+              size="sm"
+              className={`h-8 px-4 text-[12px] font-bold transition-all ${periodFilter === "previousMonth" ? "shadow-sm" : ""}`}
+              onClick={() => setPeriodFilter("previousMonth")}
+            >
+              Mês Anterior
+            </Button>
+            <Button
               variant={periodFilter === "year" ? "secondary" : "ghost"}
               size="sm"
               className={`h-8 px-4 text-[12px] font-bold transition-all ${periodFilter === "year" ? "shadow-sm" : ""}`}
@@ -578,6 +611,14 @@ export default function ChamadosPage() {
               onClick={() => setPeriodFilter("total")}
             >
               Total Histórico
+            </Button>
+            <Button
+              variant={periodFilter === "execution" ? "secondary" : "ghost"}
+              size="sm"
+              className={`h-8 px-4 text-[12px] font-bold transition-all ${periodFilter === "execution" ? "shadow-sm" : ""}`}
+              onClick={() => setPeriodFilter("execution")}
+            >
+              Em Tratativa
             </Button>
           </div>
           <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest bg-primary/5 px-3 py-1 rounded-full border border-primary/10">
@@ -671,10 +712,20 @@ export default function ChamadosPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold tracking-tight text-green-600 mb-1" data-testid="text-resolved-tickets">{stats.resolved}</div>
+              <div className="text-4xl font-bold tracking-tight text-green-600 mb-1" data-testid="text-resolved-tickets">
+                {periodFilter === "previousMonth" ? (
+                  <span>
+                    {stats.resolved} <span className="text-green-400 text-2xl">/</span> {previousMonthResolved}
+                  </span>
+                ) : (
+                  stats.resolved
+                )}
+              </div>
               <div className="flex items-center gap-1 mt-2">
                 <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-green-50 text-green-700 border-green-200">{resolvedPerc}%</Badge>
-                <p className="text-[11px] font-medium text-muted-foreground">do período</p>
+                <p className="text-[11px] font-medium text-muted-foreground">
+                  {periodFilter === "previousMonth" ? "resolvidos / total mês" : "do período"}
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -722,7 +773,7 @@ export default function ChamadosPage() {
           {/* Label de período ativo */}
           <div className="mt-2 text-center">
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Período: {periodFilter === "month" ? "Mês Vigente" : periodFilter === "year" ? "Este Ano" : "Total Histórico"}
+              Período: {periodFilter === "month" ? "Mês Vigente" : periodFilter === "previousMonth" ? "Mês Anterior" : periodFilter === "year" ? "Este Ano" : periodFilter === "execution" ? "Em Tratativa" : "Total Histórico"}
             </span>
           </div>
         </div>
@@ -987,6 +1038,7 @@ export default function ChamadosPage() {
                         {sortField === "createdAt" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                       </Button>
                     </TableHead>
+                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Resolução</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tempo Aberto</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">SLA</TableHead>
                     <TableHead className="text-[12px] font-bold uppercase tracking-wider">Status SLA</TableHead>
@@ -1052,6 +1104,9 @@ export default function ChamadosPage() {
                           </TableCell>
                           <TableCell className="text-[12px] text-muted-foreground">
                             {formatDisplayDate(ticket.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-[12px] text-muted-foreground">
+                            {ticket.dataResolucao ? formatDisplayDate(ticket.dataResolucao) : "—"}
                           </TableCell>
                           <TableCell>
                             {(() => {
