@@ -68,6 +68,8 @@ const EstoquesContagemPage             = lazy(() => import("@/pages/estoques/con
 const EstoquesRelatorioContagensPage   = lazy(() => import("@/pages/estoques/relatorio-contagens"));
 const EstoquesRelatorioContagemDetalhePage = lazy(() => import("@/pages/estoques/relatorio-contagens/[id]"));
 const EstoquesDashboardPage            = lazy(() => import("@/pages/estoques/dashboard"));
+const EstoquesPipelinePage             = lazy(() => import("@/pages/estoques/pipeline"));
+const EstoquesLeadTimePage             = lazy(() => import("@/pages/estoques/lead-time"));
 const OmieIntegration                  = lazy(() => import("@/pages/integrations/omie/OmieIntegration"));
 
 function Router() {
@@ -339,6 +341,16 @@ function Router() {
       <Route path="/estoques/dashboard">
         <ProtectedRoute requiredPermission="estoques">
           <EstoquesDashboardPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/pipeline">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesPipelinePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/lead-time">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesLeadTimePage />
         </ProtectedRoute>
       </Route>
       <Route path="/integrations/omie">

@@ -40,6 +40,8 @@ import {
   Sparkles,
   GitBranch,
   Warehouse,
+  GitMerge,
+  Clock,
 } from "lucide-react";
 import {
   Sidebar,
@@ -161,6 +163,8 @@ const estoquesSubItems = [
   { title: "Contagem Interna", url: "/estoques/contagem", icon: ClipboardList },
   { title: "Relatório Contagens", url: "/estoques/relatorio-contagens", icon: FileSpreadsheet },
   { title: "Dashboard", url: "/estoques/dashboard", icon: PieChart },
+  { title: "Pipeline", url: "/estoques/pipeline", icon: GitMerge },
+  { title: "Lead Time", url: "/estoques/lead-time", icon: Clock },
 ];
 
 function getCurrentUser() {
