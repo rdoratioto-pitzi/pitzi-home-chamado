@@ -488,6 +488,20 @@ export default function ChamadosPage() {
     }).length;
   }, [periodFilter, tickets]);
 
+  // Calcular total de resolvidos nos últimos 30 dias (usado para "Em Tratativa")
+  const last30DaysResolved = useMemo(() => {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    return tickets.filter(t => {
+      if (t.status !== "resolved" && t.status !== "closed") return false;
+      const dataResolucao = t.dataResolucao ? new Date(t.dataResolucao) : null;
+      if (!dataResolucao) return false;
+      
+      return dataResolucao >= thirtyDaysAgo && dataResolucao <= now;
+    }).length;
+  }, [tickets]);
+
   const openPerc = stats.total > 0 ? Math.round((stats.open / stats.total) * 100) : 0;
   const inProgressPerc = stats.total > 0 ? Math.round((stats.inProgress / stats.total) * 100) : 0;
   const blockedPerc = stats.total > 0 ? Math.round((stats.blocked / stats.total) * 100) : 0;
@@ -717,6 +731,10 @@ export default function ChamadosPage() {
                   <span>
                     {stats.resolved} <span className="text-green-400 text-2xl">/</span> {previousMonthResolved}
                   </span>
+                ) : periodFilter === "execution" ? (
+                  <span>
+                    {stats.resolved} <span className="text-green-400 text-2xl">/</span> {last30DaysResolved}
+                  </span>
                 ) : (
                   stats.resolved
                 )}
@@ -724,7 +742,7 @@ export default function ChamadosPage() {
               <div className="flex items-center gap-1 mt-2">
                 <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-green-50 text-green-700 border-green-200">{resolvedPerc}%</Badge>
                 <p className="text-[11px] font-medium text-muted-foreground">
-                  {periodFilter === "previousMonth" ? "resolvidos / total mês" : "do período"}
+                  {periodFilter === "previousMonth" ? "resolvidos / total mês" : periodFilter === "execution" ? "resolvidos / últimos 30 dias" : "do período"}
                 </p>
               </div>
             </CardContent>
