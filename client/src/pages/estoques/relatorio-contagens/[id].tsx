@@ -231,6 +231,6 @@ export default function EstoquesRelatorioContagemDetalhePage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+g    </div>
   );
 }
