@@ -11,6 +11,7 @@ import { TotaisCards } from "./components/totais-cards";
 import { Filtros, type EstoqueFilters } from "./components/filtros";
 import { Tabela, type EstoqueItem } from "./components/tabela";
 import { CurvaABC } from "./components/curva-abc";
+import { GiroEstoque } from "./components/giro-estoque";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -329,9 +330,7 @@ export default function EstoquesPosicaoPage() {
         </TabsContent>
 
         <TabsContent value="giro">
-          <div className="py-12 text-center text-muted-foreground">
-            Em desenvolvimento...
-          </div>
+          <GiroEstoque />
         </TabsContent>
       </Tabs>
     </div>
