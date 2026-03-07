@@ -58,7 +58,6 @@ import FluxogramasPage from "@/pages/fluxogramas/index";
 import FlowchartEditorPage from "@/pages/fluxogramas/editor";
 import UpdatesPage from "@/pages/updates/index";
 import GitAnalyticsPage from "@/pages/git-analytics/index";
-import EstoquesPage from "@/pages/estoques/index";
 import EstoquesPosicaoPage from "@/pages/estoques/posicao";
 import EstoquesContagemPage from "@/pages/estoques/contagem";
 import EstoquesRelatorioContagensPage from "@/pages/estoques/relatorio-contagens";
@@ -307,7 +306,7 @@ function Router() {
       </Route>
       <Route path="/estoques">
         <ProtectedRoute requiredPermission="estoques">
-          <EstoquesPage />
+          <EstoquesPosicaoPage />
         </ProtectedRoute>
       </Route>
       <Route path="/estoques/posicao">

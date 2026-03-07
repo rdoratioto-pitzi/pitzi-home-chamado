@@ -229,6 +229,10 @@ export function AppSidebar() {
   const [bibliotecaOpen, setBibliotecaOpen] = useState(location.startsWith("/biblioteca"));
   const [estoquesOpen, setEstoquesOpen] = useState(location.startsWith("/estoques"));
 
+  useEffect(() => {
+    if (location.startsWith("/estoques")) setEstoquesOpen(true);
+  }, [location]);
+
   const isMetasActive = location.startsWith("/metas");
   const isLogisticaActive = location.startsWith("/logistica");
   const isApisActive = location.startsWith("/apis");
@@ -360,39 +364,42 @@ export function AppSidebar() {
               })}
 
               {hasEstoquesAccess && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    className={`h-11 px-3 transition-all duration-200 rounded-lg ${isEstoquesActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
-                    isActive={isEstoquesActive}
-                    data-testid="link-estoques"
-                    onClick={() => setEstoquesOpen(!estoquesOpen)}
-                  >
-                    <Warehouse className={`h-[20px] w-[20px] ${isEstoquesActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-[14px]">Estoques</span>
-                    {estoquesOpen ? (
-                      <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
-                    ) : (
-                      <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
-                    )}
-                  </SidebarMenuButton>
-                  {estoquesOpen && (
-                    <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
-                      {estoquesSubItems.map((subItem) => {
-                        const isSubActive = location === subItem.url;
-                        return (
-                          <SidebarMenuSubItem key={subItem.url}>
-                            <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
-                              <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
-                                <subItem.icon className="h-4 w-4 mr-2" />
-                                <span className="text-[13.5px]">{subItem.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        );
-                      })}
-                    </SidebarMenuSub>
-                  )}
-                </SidebarMenuItem>
+                <Collapsible open={estoquesOpen} onOpenChange={setEstoquesOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isEstoquesActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        isActive={isEstoquesActive}
+                        data-testid="link-estoques"
+                      >
+                        <Warehouse className={`h-[20px] w-[20px] ${isEstoquesActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">Estoques</span>
+                        {estoquesOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                        {estoquesSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
               )}
 
               {hasMetasAccess && (
