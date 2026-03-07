@@ -38,7 +38,6 @@ export function useAuthSync() {
 
       // Token foi adicionado (login em outra aba)
       if (!oldToken && newToken) {
-        console.log("[authSync] Login detectado em outra aba");
         // Invalida queries para buscar dados atualizados
         queryClient.invalidateQueries();
         // Recarrega a página para garantir que os dados estão sincronizados
@@ -51,7 +50,6 @@ export function useAuthSync() {
 
       // Token foi removido (logout em outra aba)
       if (oldToken && !newToken) {
-        console.log("[authSync] Logout detectado em outra aba");
         // Limpa o cache do React Query
         queryClient.clear();
         // Redireciona para login se não estiver lá
@@ -68,7 +66,6 @@ export function useAuthSync() {
     const { type } = event.detail;
     
     if (type === "logout") {
-      console.log("[authSync] Logout detectado na mesma aba");
       queryClient.clear();
       if (window.location.pathname !== "/login") {
         setLocation("/login");

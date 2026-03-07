@@ -151,7 +151,6 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
 
   useEffect(() => {
     if (ticket) {
-      console.log('[TicketDetailSheet] Carregando ticket:', ticket.id);
       setComment("");
       setEditedDescription(ticket.description || '');
       // Extrair imagens do HTML da descrição + anexos existentes
@@ -202,7 +201,6 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
       if (!ticket) {
         throw new Error('Nenhum chamado selecionado');
       }
-      console.log('[TicketDetailSheet] Iniciando edição da descrição');
       setIsEditingDescription(true);
     } catch (error) {
       console.error('[TicketDetailSheet] Erro ao abrir edição:', error);
@@ -250,8 +248,6 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
     
     setIsSubmitting(true);
     try {
-      console.log('Enviando comentário ticket:', { content: comment.trim() });
-      
       const response = await fetch(`/api/tickets/${ticket?.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -269,7 +265,6 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
       }
 
       const commentData = await response.json();
-      console.log('Comentário criado:', commentData);
       
       queryClient.invalidateQueries({ queryKey: ["/api/tickets", ticket?.id, "comments"] });
       setComment('');

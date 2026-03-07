@@ -298,7 +298,6 @@ export default function ReunioesPage() {
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
-      console.log("[createAreaMutation] Sending data to API:", data);
       return apiRequest("POST", "/api/task-tags", data);
     },
     onSuccess: () => {
@@ -767,7 +766,6 @@ export default function ReunioesPage() {
   };
 
   const handleSaveArea = () => {
-    console.log("[handleSaveArea] Saving area with data:", newArea);
     if (editingArea) {
       updateAreaMutation.mutate({ id: editingArea.id, data: newArea });
     } else {

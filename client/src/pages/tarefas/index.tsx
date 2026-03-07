@@ -99,15 +99,12 @@ function EditableStatus({ task, onUpdate }: { task: Task; onUpdate: (id: string,
   const config = statusConfig[task.status as keyof typeof statusConfig] || statusConfig.todo;
   const Icon = config.icon;
 
-  console.log('🎯 EditableStatus render:', { taskId: task.id, status: task.status });
-
   return (
     <Select
       value={task.status}
       open={isOpen}
       onOpenChange={setIsOpen}
       onValueChange={(value) => {
-        console.log('📝 Status mudando de', task.status, 'para', value);
         onUpdate(task.id, { status: value });
         setIsOpen(false);
       }}
@@ -153,15 +150,12 @@ function EditablePriority({ task, onUpdate }: { task: Task; onUpdate: (id: strin
   const [isOpen, setIsOpen] = useState(false);
   const config = priorityConfig[task.priority as keyof typeof priorityConfig] || priorityConfig.medium;
 
-  console.log('🎯 EditablePriority render:', { taskId: task.id, priority: task.priority });
-
   return (
     <Select
       value={task.priority}
       open={isOpen}
       onOpenChange={setIsOpen}
       onValueChange={(value) => {
-        console.log('📝 Prioridade mudando de', task.priority, 'para', value);
         onUpdate(task.id, { priority: value });
         setIsOpen(false);
       }}
@@ -201,8 +195,6 @@ function EditableDate({ task, onUpdate }: { task: Task; onUpdate: (id: string, u
   const [isOpen, setIsOpen] = useState(false);
   const date = task.dueDate ? new Date(task.dueDate) : undefined;
 
-  console.log('🎯 EditableDate render:', { taskId: task.id, dueDate: task.dueDate });
-
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
@@ -222,7 +214,6 @@ function EditableDate({ task, onUpdate }: { task: Task; onUpdate: (id: string, u
           mode="single"
           selected={date}
           onSelect={(newDate) => {
-            console.log('📝 Data mudando de', task.dueDate, 'para', newDate);
             if (newDate) {
               onUpdate(task.id, { dueDate: newDate });
             }
@@ -240,15 +231,12 @@ function EditableTag({ task, tags, onUpdate }: { task: Task; tags: TaskArea[]; o
   const [isOpen, setIsOpen] = useState(false);
   const currentTag = tags.find(t => t.id === task.tagId);
 
-  console.log('🎯 EditableTag render:', { taskId: task.id, tagId: task.tagId, currentTag: currentTag?.name });
-
   return (
     <Select
       value={task.tagId || ""}
       open={isOpen}
       onOpenChange={setIsOpen}
       onValueChange={(value) => {
-        console.log('📝 Tag mudando de', task.tagId, 'para', value);
         onUpdate(task.id, { tagId: value || null });
         setIsOpen(false);
       }}
@@ -415,8 +403,6 @@ export default function TarefasPage() {
   // Handler de atualização inline
   const handleInlineUpdate = useCallback(async (taskId: string, updates: Partial<Task>) => {
     try {
-      console.log('🔄 Atualizando tarefa:', taskId, updates);
-      
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 
@@ -430,8 +416,6 @@ export default function TarefasPage() {
         throw new Error(error.error || 'Erro ao atualizar');
       }
 
-      console.log('✅ Tarefa atualizada com sucesso');
-      
       // Invalidar queries para recarregar dados
       await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       
@@ -501,8 +485,6 @@ export default function TarefasPage() {
   // Handler para checkbox de conclusão de tarefa
   const handleTaskComplete = useCallback(async (taskId: string, checked: boolean) => {
     try {
-      console.log('☑️ Marcando tarefa como', checked ? 'concluída' : 'não concluída', { taskId });
-      
       const newStatus = checked ? 'done' : 'todo';
       
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -516,7 +498,6 @@ export default function TarefasPage() {
         throw new Error(error.error || 'Erro ao atualizar');
       }
 
-      console.log('✅ Status da tarefa atualizado');
       await queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       
       toast({ 

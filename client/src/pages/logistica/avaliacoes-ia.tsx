@@ -234,15 +234,6 @@ export default function EficienciaAvaliacoesIaPage() {
       const evolucaoData = await evolucaoRes.json();
       const dispositivosData = await dispositivosRes.json();
       
-      console.log("[EficienciaAvaliacoes]Detalhes:", detalhesData);
-      console.log("[EficienciaAvaliacoes]Resumo:", resumoData);
-      console.log("[EficienciaAvaliacoes]Dispositivos:", dispositivosData);
-      
-      // Log first detail to check structure
-      if (Array.isArray(detalhesData) && detalhesData.length > 0) {
-        console.log("[EficienciaAvaliacoes]Primeiro registro:", detalhesData[0]);
-      }
-      
       // Handle detalhes data
       if (Array.isArray(detalhesData)) {
         setDetalhes(detalhesData);

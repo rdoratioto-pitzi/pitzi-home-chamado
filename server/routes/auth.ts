@@ -32,27 +32,20 @@ export function registerAuthRoutes(router: Router) {
       });
 
       const validated = loginBodySchema.parse(req.body);
-      console.log(`[auth] Login attempt for: ${validated.email}, rememberMe: ${validated.rememberMe}`);
       const users = await storage.getUsers();
       const user = users.find(u => u.email.toLowerCase() === validated.email.toLowerCase());
 
       if (!user) {
-        console.log(`[auth] User not found: ${validated.email}`);
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
 
-      console.log(`[auth] User found: ${user.email}, status: ${user.status}, isAdmin: ${user.isAdmin}`);
       if (user.password !== validated.password) {
-        console.log(`[auth] Password mismatch for: ${user.email}`);
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
 
       if (user.status !== "active") {
-        console.log(`[auth] User inactive: ${user.email}`);
         return res.status(401).json({ success: false, message: "Sua conta está inativa. Entre em contato com o administrador." });
       }
-
-      console.log(`[auth] Login successful for: ${user.email}, isAdmin: ${user.isAdmin}`);
 
       req.session.userId = user.id;
       req.session.isAdmin = user.isAdmin === true;
@@ -126,17 +119,14 @@ export function registerAuthRoutes(router: Router) {
   router.post("/api/auth/forgot-password", forgotPasswordLimiter, async (req, res) => {
     try {
       const validated = forgotPasswordSchema.parse(req.body);
-      console.log(`[auth] Password reset request for: ${validated.email}`);
       const users = await storage.getUsers();
       const user = users.find(u => u.email.toLowerCase() === validated.email.toLowerCase());
 
       if (!user) {
-        console.log(`[auth] Password reset - user not found: ${validated.email}`);
         return res.json({ success: true, message: "Se o email estiver cadastrado, você receberá uma nova senha temporária." });
       }
 
       if (user.status !== "active") {
-        console.log(`[auth] Password reset - user inactive: ${validated.email}`);
         return res.json({ success: true, message: "Se o email estiver cadastrado, você receberá uma nova senha temporária." });
       }
 
@@ -147,11 +137,9 @@ export function registerAuthRoutes(router: Router) {
       }
 
       await storage.updateUser(user.id, { password: temporaryPassword });
-      console.log(`[auth] Temporary password set for: ${validated.email}`);
 
       try {
         await sendPasswordResetEmail(user, temporaryPassword);
-        console.log(`[auth] Password reset email sent to: ${validated.email}`);
       } catch (emailError) {
         console.error(`[auth] Failed to send password reset email:`, emailError);
         return res.status(500).json({ success: false, message: "Erro ao enviar o email. Tente novamente mais tarde." });
