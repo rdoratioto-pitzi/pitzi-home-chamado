@@ -10,7 +10,9 @@ import { PageHeader } from "@/components/page-header";
 import { TotaisCards } from "./components/totais-cards";
 import { Filtros, type EstoqueFilters } from "./components/filtros";
 import { Tabela, type EstoqueItem } from "./components/tabela";
+import { CurvaABC } from "./components/curva-abc";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser, type CurrentUser } from "@/lib/permissions";
 
@@ -285,33 +287,53 @@ export default function EstoquesPosicaoPage() {
         title="Posição de Estoques"
         description="Consulta em tempo real do estoque via integração Omie"
       />
-      
-      {/* Cards Totalizadores */}
-      <TotaisCards
-        qtdeTotal={totais?.qtdeTotal || 0}
-        valorTotal={totais?.valorTotal || 0}
-        custoMedioUnitario={totais?.custoMedioUnitario || 0}
-        isLoading={isLoadingTotais}
-      />
-      
-      {/* Filtros */}
-      <Filtros
-        filters={filters}
-        onFilterChange={setFilters}
-        onClear={clearFiltersFromStorage}
-        categorias={categorias || []}
-        marcas={marcas || []}
-        modelos={modelos || []}
-      />
-      
-      {/* Tabela */}
-      <Tabela
-        data={estoqueData || []}
-        isLoading={isLoadingEstoque}
-        viewMode={viewMode}
-        onExport={handleExport}
-        onViewModeChange={setViewMode}
-      />
+
+      <Tabs defaultValue="consulta" className="w-full">
+        <TabsList className="mb-6 grid w-full grid-cols-3">
+          <TabsTrigger value="consulta">Consulta</TabsTrigger>
+          <TabsTrigger value="curva-abc">Curva ABC</TabsTrigger>
+          <TabsTrigger value="giro">Giro de Estoque</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="consulta">
+          {/* Cards Totalizadores */}
+          <TotaisCards
+            qtdeTotal={totais?.qtdeTotal || 0}
+            valorTotal={totais?.valorTotal || 0}
+            custoMedioUnitario={totais?.custoMedioUnitario || 0}
+            isLoading={isLoadingTotais}
+          />
+
+          {/* Filtros */}
+          <Filtros
+            filters={filters}
+            onFilterChange={setFilters}
+            onClear={clearFiltersFromStorage}
+            categorias={categorias || []}
+            marcas={marcas || []}
+            modelos={modelos || []}
+          />
+
+          {/* Tabela */}
+          <Tabela
+            data={estoqueData || []}
+            isLoading={isLoadingEstoque}
+            viewMode={viewMode}
+            onExport={handleExport}
+            onViewModeChange={setViewMode}
+          />
+        </TabsContent>
+
+        <TabsContent value="curva-abc">
+          <CurvaABC />
+        </TabsContent>
+
+        <TabsContent value="giro">
+          <div className="py-12 text-center text-muted-foreground">
+            Em desenvolvimento...
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
