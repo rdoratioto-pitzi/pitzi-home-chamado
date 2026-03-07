@@ -16,50 +16,7 @@ import {
   users,
 } from "@shared/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
-
-// Cache simples para dados do Omie (evita 5 chamadas idênticas por page load)
-let cachedProdutos: any[] | null = null;
-let cacheTimestamp = 0;
-const CACHE_TTL = 60_000; // 60 segundos
-
-async function getCachedProdutos(): Promise<any[]> {
-  const now = Date.now();
-  if (cachedProdutos && (now - cacheTimestamp) < CACHE_TTL) {
-    console.log('[Estoque Routes] Using cached products (' + cachedProdutos.length + ' items)');
-    return cachedProdutos;
-  }
-
-  console.log('[Estoque Routes] Fetching products from Omie API...');
-  const params = [{ pagina: 1, registros_por_pagina: 500 }];
-  const data = await omieService.callApi("geral/produtos", "ListarProdutos", params);
-
-  let parsedData = data;
-  if (typeof data === 'string') {
-    try { parsedData = JSON.parse(data); } catch (e) { /* ignore */ }
-  }
-
-  let produtos = null;
-  if (parsedData?.produto_servico_cadastro) {
-    produtos = parsedData.produto_servico_cadastro;
-  } else if (parsedData?.produtos?.produto_servico_cadastro) {
-    produtos = parsedData.produtos.produto_servico_cadastro;
-  } else if (Array.isArray(parsedData)) {
-    produtos = parsedData;
-  } else if (parsedData) {
-    produtos = [parsedData];
-  }
-
-  if (!produtos) {
-    cachedProdutos = [];
-  } else {
-    cachedProdutos = (Array.isArray(produtos) ? produtos : [produtos])
-      .filter((p: any) => p.codigo_produto || p.codigo);
-  }
-
-  cacheTimestamp = now;
-  console.log('[Estoque Routes] Cached', cachedProdutos.length, 'products');
-  return cachedProdutos;
-}
+import { getCachedProdutos } from "../services/estoque-cache.service";
 
 export function registerEstoqueRoutes(router: Router) {
 

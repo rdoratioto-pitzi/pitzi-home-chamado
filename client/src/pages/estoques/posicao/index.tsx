@@ -191,6 +191,8 @@ export default function EstoquesPosicaoPage() {
   // Filtros debounçados (300ms) para evitar requests a cada tecla
   const [debouncedFilters, setDebouncedFilters] = useState<EstoqueFilters>(filters);
   const [viewMode, setViewMode] = useState<"categoria" | "item">("item");
+  // Lazy-mount: só renderiza as abas após o usuário visitá-las
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["consulta"]));
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -296,7 +298,11 @@ export default function EstoquesPosicaoPage() {
         description="Consulta em tempo real do estoque via integração Omie"
       />
 
-      <Tabs defaultValue="consulta" className="w-full">
+      <Tabs
+        defaultValue="consulta"
+        className="w-full"
+        onValueChange={(tab) => setVisitedTabs((prev) => new Set([...prev, tab]))}
+      >
         <TabsList className="mb-6 grid w-full grid-cols-3">
           <TabsTrigger value="consulta">Consulta</TabsTrigger>
           <TabsTrigger value="curva-abc">Curva ABC</TabsTrigger>
@@ -333,11 +339,11 @@ export default function EstoquesPosicaoPage() {
         </TabsContent>
 
         <TabsContent value="curva-abc">
-          <CurvaABC />
+          {visitedTabs.has("curva-abc") && <CurvaABC />}
         </TabsContent>
 
         <TabsContent value="giro">
-          <GiroEstoque />
+          {visitedTabs.has("giro") && <GiroEstoque />}
         </TabsContent>
       </Tabs>
     </div>

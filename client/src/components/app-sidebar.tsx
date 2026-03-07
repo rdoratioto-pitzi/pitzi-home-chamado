@@ -213,12 +213,13 @@ export function AppSidebar() {
         return newUser;
       });
     };
+    // Escuta mudanças de outras abas (evento nativo)
     window.addEventListener("storage", handleStorageChange);
-    // Poll to catch updates within the same tab - increased to 5 seconds to reduce server load
-    const interval = setInterval(handleStorageChange, 5000);
+    // Escuta mudanças na mesma aba (evento customizado disparado por saveAuth/clearAuth)
+    window.addEventListener("authChanged", handleStorageChange);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
-      clearInterval(interval);
+      window.removeEventListener("authChanged", handleStorageChange);
     };
   }, []);
 
