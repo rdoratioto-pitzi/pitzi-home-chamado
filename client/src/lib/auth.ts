@@ -25,13 +25,13 @@ export function saveAuth(data: AuthData): void {
   try {
     localStorage.setItem(AUTH_TOKEN_KEY, data.token);
     localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
-    
+
     // Dispara evento customizado para notificar outras partes da aplicação
-    window.dispatchEvent(new CustomEvent("authChanged", { 
-      detail: { type: "login", user: data.user } 
+    window.dispatchEvent(new CustomEvent("authChanged", {
+      detail: { type: "login", user: data.user }
     }));
-  } catch (error) {
-    console.error("[auth] Erro ao salvar dados de autenticação:", error);
+  } catch {
+    // ignore storage errors
   }
 }
 
@@ -77,13 +77,13 @@ export function clearAuth(): void {
   try {
     localStorage.removeItem(AUTH_TOKEN_KEY);
     localStorage.removeItem(USER_DATA_KEY);
-    
+
     // Dispara evento customizado para notificar outras partes da aplicação
-    window.dispatchEvent(new CustomEvent("authChanged", { 
-      detail: { type: "logout" } 
+    window.dispatchEvent(new CustomEvent("authChanged", {
+      detail: { type: "logout" }
     }));
-  } catch (error) {
-    console.error("[auth] Erro ao limpar dados de autenticação:", error);
+  } catch {
+    // ignore storage errors
   }
 }
 
@@ -105,13 +105,13 @@ export function updateAuthUser(user: Partial<CurrentUser>): void {
     if (currentUser) {
       const updatedUser = { ...currentUser, ...user };
       localStorage.setItem(USER_DATA_KEY, JSON.stringify(updatedUser));
-      
-      window.dispatchEvent(new CustomEvent("authChanged", { 
-        detail: { type: "update", user: updatedUser } 
+
+      window.dispatchEvent(new CustomEvent("authChanged", {
+        detail: { type: "update", user: updatedUser }
       }));
     }
-  } catch (error) {
-    console.error("[auth] Erro ao atualizar dados do usuário:", error);
+  } catch {
+    // ignore storage errors
   }
 }
 
@@ -122,21 +122,13 @@ export function updateAuthUser(user: Partial<CurrentUser>): void {
 export function migrateFromSessionStorage(): void {
   try {
     const sessionUser = sessionStorage.getItem("user");
-    const sessionPerms = sessionStorage.getItem("modulePermissions");
-    
+
     if (sessionUser && !getAuthUser()) {
-      const user = JSON.parse(sessionUser);
-      // Gera um token baseado no ID do usuário (será substituído pelo token real do servidor)
-      const tempToken = `session_${user.id}_${Date.now()}`;
-      saveAuth({ token: tempToken, user });
-      
-      // Limpa sessionStorage após migração
+      // Limpa sessionStorage sem migrar — o token fake causaria 401 permanente
       sessionStorage.removeItem("user");
       sessionStorage.removeItem("modulePermissions");
-      
-      console.log("[auth] Dados migrados de sessionStorage para localStorage");
     }
-  } catch (error) {
-    console.error("[auth] Erro na migração de sessionStorage:", error);
+  } catch {
+    // ignore
   }
 }

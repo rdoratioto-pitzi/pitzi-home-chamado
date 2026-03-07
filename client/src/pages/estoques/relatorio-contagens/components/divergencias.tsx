@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchWithAuth } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -128,9 +129,8 @@ export function Divergencias({ divergencias, isLoading, contagemId }: Divergenci
 
   const ajusteMutation = useMutation({
     mutationFn: async (body: object) => {
-      const res = await fetch("/api/estoques/ajustes", {
+      const res = await fetchWithAuth("/api/estoques/ajustes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
       const json = await res.json();

@@ -2,9 +2,10 @@
  * Componente de Tabela para Posição de Estoques
  * Exibe dados em formato tabular com ordenação, paginação e toggle categoria/item
  */
-import { useState, useMemo } from "react";
-import { Download, ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useMemo, Fragment } from "react";
+import { Download, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatCurrency, formatNumber } from "../../utils";
 import {
   Table,
   TableBody,
@@ -53,22 +54,6 @@ interface TabelaProps {
 type SortField = keyof EstoqueItem;
 type SortDirection = "asc" | "desc";
 
-/**
- * Formata valor em reais
- */
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value);
-}
-
-/**
- * Formata número para formato brasileiro
- */
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat("pt-BR").format(value);
-}
 
 export function Tabela({
   data,
@@ -309,9 +294,9 @@ export function Tabela({
                 </TableRow>
               ) : (
                 groupedData && Object.entries(groupedData).map(([categoria, items]) => (
-                  <>
+                  <Fragment key={categoria}>
                     {/* Linha de cabeçalho da categoria */}
-                    <TableRow key={`cat-${categoria}`} className="bg-muted/50">
+                    <TableRow className="bg-muted/50">
                       <TableCell colSpan={9} className="font-bold">
                         {categoria} ({items.length} itens)
                       </TableCell>
@@ -331,7 +316,7 @@ export function Tabela({
                       </TableRow>
                     ))}
                     {/* Subtotal da categoria */}
-                    <TableRow key={`subtotal-${categoria}`} className="bg-muted font-bold">
+                    <TableRow className="bg-muted font-bold">
                       <TableCell colSpan={4}>Subtotal</TableCell>
                       <TableCell className="text-right">
                         {formatNumber(items.reduce((sum, i) => sum + i.estoqueDisponivel, 0))}
@@ -342,7 +327,7 @@ export function Tabela({
                       </TableCell>
                       <TableCell colSpan={2}></TableCell>
                     </TableRow>
-                  </>
+                  </Fragment>
                 ))
               )
             )}
