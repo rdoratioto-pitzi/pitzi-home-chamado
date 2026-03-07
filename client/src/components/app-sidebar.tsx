@@ -203,11 +203,19 @@ export function AppSidebar() {
 
   useEffect(() => {
     const handleStorageChange = () => {
-      setCurrentUser(getCurrentUser());
+      const newUser = getCurrentUser();
+      // Only update if user data actually changed to prevent unnecessary re-renders
+      setCurrentUser(prevUser => {
+        if (!prevUser && !newUser) return prevUser;
+        if (prevUser && newUser && prevUser.id === newUser.id
+          && prevUser.isAdmin === newUser.isAdmin
+          && prevUser.modulePermissions === newUser.modulePermissions) return prevUser;
+        return newUser;
+      });
     };
     window.addEventListener("storage", handleStorageChange);
-    // Poll to catch updates within the same tab since sessionStorage doesn't trigger 'storage' event across tabs
-    const interval = setInterval(handleStorageChange, 1000);
+    // Poll to catch updates within the same tab - increased to 5 seconds to reduce server load
+    const interval = setInterval(handleStorageChange, 5000);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       clearInterval(interval);
@@ -281,7 +289,15 @@ export function AppSidebar() {
   const hasBibliotecaAccess = permissions.biblioteca === true;
   const hasApisAccess = permissions.apis === true;
   const hasConfiguracoesAccess = permissions.configuracoes === true;
-  const hasEstoquesAccess = permissions.estoques === true;
+  
+  // CORREÇÃO: Verificação mais robusta para acesso ao módulo Estoques
+  // Garante que o menu apareça se:
+  // 1. O usuário for admin (tem acesso total)
+  // 2. As permissões incluírem explicitamente estoques: true
+  // 3. O usuário estiver em uma página do módulo Estoques (indicação de acesso)
+  const hasEstoquesPermission = permissions.estoques === true;
+  const isInEstoquesPage = location.startsWith("/estoques");
+  const hasEstoquesAccess = currentUser?.isAdmin === true || currentUser?.isAdmin === "true" || hasEstoquesPermission || isInEstoquesPage;
 
   const handleLogout = async () => {
     try {
@@ -342,6 +358,42 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+
+              {hasEstoquesAccess && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    className={`h-11 px-3 transition-all duration-200 rounded-lg ${isEstoquesActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                    isActive={isEstoquesActive}
+                    data-testid="link-estoques"
+                    onClick={() => setEstoquesOpen(!estoquesOpen)}
+                  >
+                    <Warehouse className={`h-[20px] w-[20px] ${isEstoquesActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className="text-[14px]">Estoques</span>
+                    {estoquesOpen ? (
+                      <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                    ) : (
+                      <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                    )}
+                  </SidebarMenuButton>
+                  {estoquesOpen && (
+                    <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                      {estoquesSubItems.map((subItem) => {
+                        const isSubActive = location === subItem.url;
+                        return (
+                          <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                              <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
+                                <subItem.icon className="h-4 w-4 mr-2" />
+                                <span className="text-[13.5px]">{subItem.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  )}
+                </SidebarMenuItem>
+              )}
 
               {hasMetasAccess && (
                 <Collapsible open={metasOpen} onOpenChange={setMetasOpen}>
@@ -460,45 +512,6 @@ export function AppSidebar() {
                             <SidebarMenuSubItem key={subItem.url}>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[13.5px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-
-              {hasEstoquesAccess && (
-                <Collapsible open={estoquesOpen} onOpenChange={setEstoquesOpen}>
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isEstoquesActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
-                        isActive={isEstoquesActive}
-                        data-testid="link-estoques"
-                      >
-                        <Package className={`h-[20px] w-[20px] ${isEstoquesActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">Estoques</span>
-                        {estoquesOpen ? (
-                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
-                        ) : (
-                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
-                        )}
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
-                        {estoquesSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[13.5px]">{subItem.title}</span>
                                 </Link>
@@ -635,7 +648,7 @@ export function UserProfileMenu() {
       setCurrentUser(getCurrentUser());
     };
     window.addEventListener("storage", handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
+    const interval = setInterval(handleStorageChange, 5000);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       clearInterval(interval);

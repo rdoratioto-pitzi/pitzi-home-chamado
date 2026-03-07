@@ -1,297 +1,365 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, Plus } from "lucide-react";
-import { PageHeader } from "@/components/page-header";
+import React, { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { PageHeader } from "@/components/page-header";
+import { ClipboardList, Play, CheckCircle2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import { BarcodeReader } from "./components/barcode-reader";
 import { ManualInput } from "./components/manual-input";
 import { ListaItens } from "./components/lista-itens";
+import { ConfirmFinalizar, SucessoFinalizacao } from "./components/confirm-finalizar";
 
 interface Contagem {
   id: string;
   codigo: string;
   status: string;
-  dataInicio: string | null;
+  dataInicio: string;
   totalItensContados: number;
+  responsavelId: string;
 }
 
 interface ContagemItem {
   id: string;
   imei: string;
-  contadoEm: string | null;
+  codigoErp: string | null;
+  modelo: string | null;
+  categoria: string | null;
+  marca: string | null;
   metodoLeitura: string;
-}
-
-async function parseJsonSafe(res: Response) {
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`Servidor retornou resposta inválida (${res.status}). Tente novamente.`);
-  }
-}
-
-async function fetchContagemAtiva(): Promise<Contagem | null> {
-  const res = await fetch("/api/estoques/contagens/ativa");
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data.error || "Erro ao buscar contagem ativa");
-  return data.data;
-}
-
-async function fetchItens(contagemId: string): Promise<ContagemItem[]> {
-  const res = await fetch(`/api/estoques/contagens/${contagemId}/itens`);
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data.error || "Erro ao buscar itens");
-  return data.data || [];
-}
-
-async function iniciarContagem(): Promise<Contagem> {
-  const res = await fetch("/api/estoques/contagens", { method: "POST" });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data.error || "Erro ao iniciar contagem");
-  return data.data;
-}
-
-async function adicionarItem(
-  contagemId: string,
-  imei: string,
-  metodoLeitura: string
-): Promise<ContagemItem> {
-  const res = await fetch(`/api/estoques/contagens/${contagemId}/item`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imei, metodoLeitura }),
-  });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data.error || "Erro ao adicionar item");
-  return data.data;
-}
-
-async function finalizarContagem(contagemId: string): Promise<Contagem> {
-  const res = await fetch(`/api/estoques/contagens/${contagemId}/finalizar`, {
-    method: "POST",
-  });
-  const data = await parseJsonSafe(res);
-  if (!res.ok) throw new Error(data.error || "Erro ao finalizar contagem");
-  return data.data;
+  contadoEm: string;
 }
 
 export default function EstoquesContagemPage() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [manualError, setManualError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showConfirmFinalizar, setShowConfirmFinalizar] = useState(false);
-  const [finalizada, setFinalizada] = useState(false);
+  const [showSucesso, setShowSucesso] = useState(false);
 
-  const { data: contagemAtiva, isLoading: isLoadingContagem } = useQuery({
-    queryKey: ["contagem-ativa"],
-    queryFn: fetchContagemAtiva,
+  // Buscar contagem ativa
+  const { data: contagemAtiva, isLoading: isLoadingContagem, refetch: refetchContagem } = useQuery<Contagem | null>({
+    queryKey: ["/api/estoques/contagens/ativa"],
+    queryFn: async () => {
+      const res = await fetch("/api/estoques/contagens/ativa");
+      if (!res.ok) throw new Error("Erro ao buscar contagem ativa");
+      const data = await res.json();
+      return data.data;
+    },
   });
 
-  const { data: itens = [], isLoading: isLoadingItens } = useQuery({
-    queryKey: ["contagem-itens", contagemAtiva?.id],
-    queryFn: () => fetchItens(contagemAtiva!.id),
+  // Buscar itens da contagem
+  const { data: itensContados = [], isLoading: isLoadingItens, refetch: refetchItens } = useQuery<ContagemItem[]>({
+    queryKey: ["/api/estoques/contagens", contagemAtiva?.id, "itens"],
+    queryFn: async () => {
+      if (!contagemAtiva?.id) return [];
+      const res = await fetch(`/api/estoques/contagens/${contagemAtiva.id}/itens`);
+      if (!res.ok) throw new Error("Erro ao buscar itens");
+      const data = await res.json();
+      return data.data;
+    },
     enabled: !!contagemAtiva?.id,
-    refetchInterval: 5000,
   });
 
-  const iniciarMutation = useMutation({
-    mutationFn: iniciarContagem,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contagem-ativa"] });
-      toast({ title: "Contagem iniciada com sucesso!" });
+  // Mutation para iniciar contagem
+  const iniciarContagem = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/estoques/contagens", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao iniciar contagem");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/estoques/contagens/ativa"] });
+      toast({
+        title: "Contagem iniciada",
+        description: `Código: ${data.data.codigo}`,
+      });
     },
     onError: (error: Error) => {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: error.message,
+      });
     },
   });
 
-  const adicionarMutation = useMutation({
-    mutationFn: ({ imei, metodo }: { imei: string; metodo: string }) =>
-      adicionarItem(contagemAtiva!.id, imei, metodo),
-    onSuccess: (_, variables) => {
-      setManualError(null);
-      queryClient.invalidateQueries({ queryKey: ["contagem-itens", contagemAtiva?.id] });
-      queryClient.invalidateQueries({ queryKey: ["contagem-ativa"] });
-      toast({ title: `IMEI ${variables.imei} adicionado` });
+  // Mutation para adicionar item
+  const adicionarItem = useMutation({
+    mutationFn: async ({ imei, metodoLeitura }: { imei: string; metodoLeitura: string }) => {
+      if (!contagemAtiva?.id) throw new Error("Sem contagem ativa");
+      const res = await fetch(`/api/estoques/contagens/${contagemAtiva.id}/item`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ imei, metodoLeitura }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao adicionar item");
+      }
+      return res.json();
     },
-    onError: (error: Error, variables) => {
-      const msg = error.message.includes("já foi contado")
-        ? `IMEI ${variables.imei} já foi contado nesta contagem`
-        : error.message;
-      setManualError(msg);
-      toast({ title: "Erro", description: msg, variant: "destructive" });
+    onSuccess: (data) => {
+      setError(null);
+      refetchItens();
+      queryClient.invalidateQueries({ queryKey: ["/api/estoques/contagens/ativa"] });
+      toast({
+        title: "✓ Item adicionado",
+        description: `IMEI ${data.data.imei} contado com sucesso`,
+      });
+    },
+    onError: (error: Error) => {
+      setError(error.message);
+      if (error.message.includes("já foi contado")) {
+        toast({
+          variant: "destructive",
+          title: "⚠️ IMEI duplicado",
+          description: error.message,
+        });
+      } else if (error.message.includes("15 dígitos")) {
+        toast({
+          variant: "destructive",
+          title: "IMEI inválido",
+          description: error.message,
+        });
+      }
     },
   });
 
-  const finalizarMutation = useMutation({
-    mutationFn: () => finalizarContagem(contagemAtiva!.id),
+  // Mutation para finalizar contagem
+  const finalizarContagem = useMutation({
+    mutationFn: async () => {
+      if (!contagemAtiva?.id) throw new Error("Sem contagem ativa");
+      const res = await fetch(`/api/estoques/contagens/${contagemAtiva.id}/finalizar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Erro ao finalizar contagem");
+      }
+      return res.json();
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["contagem-ativa"] });
       setShowConfirmFinalizar(false);
-      setFinalizada(true);
-      toast({ title: "Contagem finalizada com sucesso!" });
+      setShowSucesso(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/estoques/contagens/ativa"] });
+      toast({
+        title: "Contagem finalizada",
+        description: "Os resultados serão analisados pela equipe administrativa",
+      });
     },
     onError: (error: Error) => {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: error.message,
+      });
     },
   });
 
-  function handleScan(imei: string) {
-    adicionarMutation.mutate({ imei, metodo: "barcode" });
-  }
+  const handleScan = (imei: string) => {
+    adicionarItem.mutate({ imei, metodoLeitura: "barcode" });
+  };
 
-  function handleManualSubmit(imei: string) {
-    setManualError(null);
-    adicionarMutation.mutate({ imei, metodo: "manual" });
-  }
+  const handleManualSubmit = (imei: string) => {
+    adicionarItem.mutate({ imei, metodoLeitura: "manual" });
+  };
 
-  const isAdding = adicionarMutation.isPending;
+  const handleFinalizar = () => {
+    setShowConfirmFinalizar(true);
+  };
 
-  // Pós-finalização
-  if (finalizada) {
+  const handleConfirmFinalizar = () => {
+    finalizarContagem.mutate();
+  };
+
+  const handleNovaContagem = () => {
+    setShowSucesso(false);
+    setError(null);
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // Cenário 1: Sem contagem ativa
+  if (!contagemAtiva && !isLoadingContagem) {
     return (
       <div className="container mx-auto py-6">
         <PageHeader
           title="Contagem Interna"
-          description="Contagem física de estoque"
+          description="Contagem física de estoque às cegas"
         />
+
         <Card className="max-w-md mx-auto mt-8">
-          <CardContent className="flex flex-col items-center gap-4 py-10">
-            <CheckCircle className="h-16 w-16 text-green-500" />
-            <h2 className="text-xl font-semibold text-center">
-              Contagem finalizada com sucesso!
-            </h2>
-            <p className="text-sm text-muted-foreground text-center">
-              Os resultados serão analisados pela equipe administrativa.
-            </p>
-            <Button onClick={() => setFinalizada(false)}>
-              Iniciar Nova Contagem
-            </Button>
+          <CardContent className="pt-6">
+            <div className="text-center space-y-4">
+              <div className="p-4 rounded-full bg-muted mx-auto w-fit">
+                <ClipboardList className="h-12 w-12 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-lg font-medium">Nenhuma contagem em andamento</p>
+                <p className="text-sm text-muted-foreground">
+                  Inicie uma nova contagem para registrar os itens do estoque
+                </p>
+              </div>
+              <Button
+                onClick={() => iniciarContagem.mutate()}
+                disabled={iniciarContagem.isPending}
+                className="w-full"
+                size="lg"
+              >
+                {iniciarContagem.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Iniciando...
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    Iniciar Nova Contagem
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
 
+  // Loading inicial
+  if (isLoadingContagem) {
+    return (
+      <div className="container mx-auto py-6">
+        <PageHeader
+          title="Contagem Interna"
+          description="Contagem física de estoque às cegas"
+        />
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    );
+  }
+
+  // Cenário 2: Com contagem ativa
   return (
     <div className="container mx-auto py-6 space-y-6">
       <PageHeader
         title="Contagem Interna"
-        description="Contagem física de estoque"
+        description="Contagem física de estoque às cegas"
       />
 
-      {isLoadingContagem ? (
-        <div className="h-40 rounded-lg bg-muted animate-pulse" />
-      ) : !contagemAtiva ? (
-        // Sem contagem ativa
-        <Card className="max-w-md mx-auto">
-          <CardContent className="flex flex-col items-center gap-4 py-10">
-            <p className="text-muted-foreground">Nenhuma contagem em andamento</p>
-            <Button
-              size="lg"
-              onClick={() => iniciarMutation.mutate()}
-              disabled={iniciarMutation.isPending}
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              {iniciarMutation.isPending ? "Iniciando..." : "Iniciar Nova Contagem"}
-            </Button>
+      {/* Header da Contagem */}
+      <Card className="mb-6">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <ClipboardList className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">{contagemAtiva?.codigo}</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Início: {contagemAtiva?.dataInicio ? formatDate(contagemAtiva.dataInicio) : "-"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary" className="bg-green-100 text-green-800">
+                Em Andamento
+              </Badge>
+              <Badge variant="outline" className="text-lg px-3 py-1">
+                {itensContados.length} itens contados
+              </Badge>
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* Área de Ações */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <BarcodeReader
+          onScan={handleScan}
+          disabled={adicionarItem.isPending}
+        />
+        <ManualInput
+          onSubmit={handleManualSubmit}
+          disabled={adicionarItem.isPending}
+          error={error}
+        />
+        <Card className="border-dashed border-2">
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center space-y-3 text-center h-full justify-center">
+              <div className="p-4 rounded-full bg-green-100">
+                <CheckCircle2 className="h-10 w-10 text-green-600" />
+              </div>
+              <div>
+                <p className="font-medium">Finalizar Contagem</p>
+                <p className="text-sm text-muted-foreground">
+                  Encerrar e enviar para análise
+                </p>
+              </div>
+              <Button
+                variant="default"
+                className="w-full bg-green-600 hover:bg-green-700"
+                onClick={handleFinalizar}
+                disabled={itensContados.length === 0 || finalizarContagem.isPending}
+              >
+                {finalizarContagem.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Finalizando...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Finalizar
+                  </>
+                )}
+              </Button>
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <>
-          {/* Header da contagem */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
-            <div className="space-y-0.5">
-              <p className="text-sm text-muted-foreground">Código</p>
-              <p className="font-mono font-semibold">{contagemAtiva.codigo}</p>
-            </div>
-            <div className="space-y-0.5">
-              <p className="text-sm text-muted-foreground">Início</p>
-              <p className="text-sm">
-                {contagemAtiva.dataInicio
-                  ? new Date(contagemAtiva.dataInicio).toLocaleString("pt-BR")
-                  : "--"}
-              </p>
-            </div>
-            <div className="space-y-0.5">
-              <p className="text-sm text-muted-foreground">Status</p>
-              <Badge variant="secondary">Em Andamento</Badge>
-            </div>
-            <div className="space-y-0.5">
-              <p className="text-sm text-muted-foreground">Itens</p>
-              <p className="text-2xl font-bold">{contagemAtiva.totalItensContados ?? 0}</p>
-            </div>
-          </div>
+      </div>
 
-          {/* Área de ações */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <BarcodeReader onScan={handleScan} disabled={isAdding} />
-            <ManualInput
-              onSubmit={handleManualSubmit}
-              disabled={isAdding}
-              error={manualError}
-            />
+      {/* Lista de Itens Contados */}
+      <ListaItens itens={itensContados} isLoading={isLoadingItens} />
 
-            {/* Finalizar */}
-            <Card
-              className="border-2 border-dashed border-destructive/40 cursor-pointer hover:border-destructive/80 transition-colors"
-              onClick={() => setShowConfirmFinalizar(true)}
-            >
-              <CardContent className="flex flex-col items-center justify-center gap-3 py-8">
-                <CheckCircle className="h-12 w-12 text-destructive/60" />
-                <div className="text-center">
-                  <p className="font-medium">Finalizar Contagem</p>
-                  <p className="text-sm text-muted-foreground">Encerrar e salvar</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+      {/* Modal de Confirmação */}
+      <ConfirmFinalizar
+        open={showConfirmFinalizar}
+        onOpenChange={setShowConfirmFinalizar}
+        onConfirm={handleConfirmFinalizar}
+        totalItens={itensContados.length}
+        isLoading={finalizarContagem.isPending}
+      />
 
-          {/* Lista de itens */}
-          <ListaItens itens={itens} isLoading={isLoadingItens} />
-        </>
-      )}
-
-      {/* Dialog de confirmação */}
-      <AlertDialog open={showConfirmFinalizar} onOpenChange={setShowConfirmFinalizar}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Finalizar Contagem?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Você está finalizando a contagem com{" "}
-              <strong>{contagemAtiva?.totalItensContados ?? 0} itens</strong> contados.
-              <br />
-              <span className="text-destructive font-medium">
-                Esta ação não pode ser desfeita.
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Continuar Contando</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive hover:bg-destructive/90"
-              onClick={() => finalizarMutation.mutate()}
-              disabled={finalizarMutation.isPending}
-            >
-              {finalizarMutation.isPending ? "Finalizando..." : "Confirmar Finalização"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Modal de Sucesso */}
+      <SucessoFinalizacao
+        open={showSucesso}
+        onOpenChange={setShowSucesso}
+        onNovaContagem={handleNovaContagem}
+      />
     </div>
   );
 }
