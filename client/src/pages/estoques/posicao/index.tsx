@@ -5,7 +5,7 @@
  */
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, RefreshCw } from "lucide-react";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { PageHeader } from "@/components/page-header";
 import { TotaisCards } from "./components/totais-cards";
@@ -14,9 +14,11 @@ import { Tabela, type EstoqueItem } from "./components/tabela";
 import { CurvaABC } from "./components/curva-abc";
 import { GiroEstoque } from "./components/giro-estoque";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser, type CurrentUser } from "@/lib/permissions";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 const FILTERS_STORAGE_KEY = "estoques_posicao_filters";
 const FILTERS_TTL_MS = 24 * 60 * 60 * 1000; // 24 horas
@@ -209,21 +211,23 @@ export default function EstoquesPosicaoPage() {
   const hasAccess = hasEstoqueAccess(user);
   
   // Fetch dados de estoques (apenas se tiver acesso)
-  const { data: estoqueData, isLoading: isLoadingEstoque } = useQuery({
+  const { data: estoqueData, isLoading: isLoadingEstoque, isError: isErrorEstoque, refetch: refetchEstoque } = useQuery({
     queryKey: ["estoquePosicao", debouncedFilters],
     queryFn: () => fetchPosicaoEstoque(debouncedFilters),
     enabled: hasAccess,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: 2,
   });
 
   // Fetch totais
-  const { data: totais, isLoading: isLoadingTotais } = useQuery({
+  const { data: totais, isLoading: isLoadingTotais, isError: isErrorTotais, refetch: refetchTotais } = useQuery({
     queryKey: ["estoqueTotais"],
     queryFn: fetchTotaisEstoque,
     enabled: hasAccess,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: 2,
   });
 
   // Fetch filtros dinâmicos
@@ -310,6 +314,20 @@ export default function EstoquesPosicaoPage() {
         </TabsList>
 
         <TabsContent value="consulta">
+          {/* Erro ao buscar totais */}
+          {isErrorTotais && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Erro ao carregar totais</AlertTitle>
+              <AlertDescription className="flex items-center justify-between">
+                <span>Não foi possível obter dados do Omie. Verifique a integração.</span>
+                <Button variant="outline" size="sm" onClick={() => refetchTotais()} className="ml-4 gap-1">
+                  <RefreshCw className="h-3 w-3" /> Tentar novamente
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Cards Totalizadores */}
           <TotaisCards
             qtdeTotal={totais?.qtdeTotal || 0}
@@ -328,6 +346,20 @@ export default function EstoquesPosicaoPage() {
             modelos={modelos || []}
           />
 
+          {/* Erro ao buscar dados */}
+          {isErrorEstoque && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Erro ao carregar estoque</AlertTitle>
+              <AlertDescription className="flex items-center justify-between">
+                <span>Não foi possível obter dados do Omie. Tente novamente.</span>
+                <Button variant="outline" size="sm" onClick={() => refetchEstoque()} className="ml-4 gap-1">
+                  <RefreshCw className="h-3 w-3" /> Tentar novamente
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Tabela */}
           <Tabela
             data={estoqueData || []}
@@ -339,11 +371,19 @@ export default function EstoquesPosicaoPage() {
         </TabsContent>
 
         <TabsContent value="curva-abc">
-          {visitedTabs.has("curva-abc") && <CurvaABC />}
+          {visitedTabs.has("curva-abc") && (
+            <ErrorBoundary>
+              <CurvaABC />
+            </ErrorBoundary>
+          )}
         </TabsContent>
 
         <TabsContent value="giro">
-          {visitedTabs.has("giro") && <GiroEstoque />}
+          {visitedTabs.has("giro") && (
+            <ErrorBoundary>
+              <GiroEstoque />
+            </ErrorBoundary>
+          )}
         </TabsContent>
       </Tabs>
     </div>
