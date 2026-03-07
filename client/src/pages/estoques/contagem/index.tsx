@@ -272,23 +272,23 @@ export default function EstoquesContagemPage() {
       {/* Header da Contagem */}
       <Card className="mb-6">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
+              <div className="p-2 rounded-lg bg-primary/10 shrink-0">
                 <ClipboardList className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-lg">{contagemAtiva?.codigo}</CardTitle>
+                <CardTitle className="text-base sm:text-lg">{contagemAtiva?.codigo}</CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Início: {contagemAtiva?.dataInicio ? formatDate(contagemAtiva.dataInicio) : "-"}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 Em Andamento
               </Badge>
-              <Badge variant="outline" className="text-lg px-3 py-1">
+              <Badge variant="outline" className="text-base px-3 py-1">
                 {itensContados.length} itens contados
               </Badge>
             </div>
@@ -297,7 +297,7 @@ export default function EstoquesContagemPage() {
       </Card>
 
       {/* Área de Ações */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <BarcodeReader
           onScan={handleScan}
           disabled={adicionarItem.isPending}
