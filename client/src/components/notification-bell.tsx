@@ -24,7 +24,8 @@ import {
 } from "@/hooks/use-notification-preferences";
 
 function getCurrentUser() {
-  const stored = sessionStorage.getItem("user");
+  // Verifica localStorage primeiro (novo sistema), depois sessionStorage (compatibilidade)
+  const stored = localStorage.getItem("user_data") || sessionStorage.getItem("user");
   if (!stored) return null;
   try { return JSON.parse(stored); } catch { return null; }
 }
