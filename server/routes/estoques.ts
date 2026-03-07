@@ -5,8 +5,16 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { requireAdmin } from "../middleware/auth";
+import { getSessionUser } from "../middleware/auth";
 import { omieService } from "../services/omie.service";
 import ExcelJS from "exceljs";
+import { db } from "../db";
+import {
+  estoquesContagens,
+  estoquesContagemItens,
+  estoquesContagemLogs,
+} from "@shared/schema";
+import { eq, and, sql, desc } from "drizzle-orm";
 
 export function registerEstoqueRoutes(router: Router) {
   
@@ -484,5 +492,308 @@ export function registerEstoqueRoutes(router: Router) {
     }
   });
   
+  // ============== CONTAGEM INTERNA ==============
+
+  // GET /api/estoques/contagens - Listar todas as contagens (Admin)
+  router.get("/api/estoques/contagens", requireAuth, requireAdmin, async (req, res) => {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+    try {
+      const contagens = await db
+        .select()
+        .from(estoquesContagens)
+        .orderBy(desc(estoquesContagens.createdAt));
+      res.json({ success: true, data: contagens });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/contagens/ativa - Contagem ativa do usuário logado
+  // IMPORTANTE: esta rota deve vir ANTES de /:id para não ser capturada por ela
+  router.get("/api/estoques/contagens/ativa", requireAuth, async (req, res) => {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+    try {
+      const { userId } = getSessionUser(req);
+      const [contagem] = await db
+        .select()
+        .from(estoquesContagens)
+        .where(
+          and(
+            eq(estoquesContagens.responsavelId, userId),
+            eq(estoquesContagens.status, "em_andamento")
+          )
+        )
+        .limit(1);
+      res.json({ success: true, data: contagem || null });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/estoques/contagens - Iniciar nova contagem
+  router.post("/api/estoques/contagens", requireAuth, async (req, res) => {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+    try {
+      const { userId } = getSessionUser(req);
+
+      // Verificar se já existe contagem em andamento para este usuário
+      const [existing] = await db
+        .select()
+        .from(estoquesContagens)
+        .where(
+          and(
+            eq(estoquesContagens.responsavelId, userId),
+            eq(estoquesContagens.status, "em_andamento")
+          )
+        )
+        .limit(1);
+
+      if (existing) {
+        return res.status(400).json({
+          success: false,
+          error: "Já existe uma contagem em andamento. Finalize-a antes de iniciar outra.",
+        });
+      }
+
+      // Gerar código CNT-YYYYMMDD-XXX
+      const hoje = new Date();
+      const dateStr = hoje.toISOString().slice(0, 10).replace(/-/g, "");
+
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(estoquesContagens)
+        .where(sql`codigo LIKE ${"CNT-" + dateStr + "-%"}`);
+
+      const seq = (Number(countResult?.count ?? 0) + 1).toString().padStart(3, "0");
+      const codigo = `CNT-${dateStr}-${seq}`;
+
+      const [novaContagem] = await db
+        .insert(estoquesContagens)
+        .values({
+          codigo,
+          responsavelId: userId,
+          status: "em_andamento",
+        })
+        .returning();
+
+      // Log de auditoria
+      await db.insert(estoquesContagemLogs).values({
+        contagemId: novaContagem.id,
+        userId,
+        acao: "contagem_iniciada",
+        detalhes: { codigo },
+      });
+
+      res.json({ success: true, data: novaContagem });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/contagens/:id - Detalhes de uma contagem
+  router.get("/api/estoques/contagens/:id", requireAuth, async (req, res) => {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { id } = req.params;
+
+      const [contagem] = await db
+        .select()
+        .from(estoquesContagens)
+        .where(eq(estoquesContagens.id, id))
+        .limit(1);
+
+      if (!contagem) {
+        return res.status(404).json({ success: false, error: "Contagem não encontrada" });
+      }
+
+      // Verificar acesso: própria contagem ou admin
+      if (!isAdmin && contagem.responsavelId !== userId) {
+        return res.status(403).json({ success: false, error: "Acesso negado" });
+      }
+
+      res.json({ success: true, data: contagem });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/estoques/contagens/:id/item - Adicionar item à contagem
+  router.post("/api/estoques/contagens/:id/item", requireAuth, async (req, res) => {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { id } = req.params;
+      const { imei, metodoLeitura } = req.body;
+
+      // Validar IMEI: 15 dígitos numéricos
+      if (!imei || !/^\d{15}$/.test(imei)) {
+        return res.status(400).json({
+          success: false,
+          error: "IMEI inválido - deve ter exatamente 15 dígitos numéricos",
+        });
+      }
+
+      const [contagem] = await db
+        .select()
+        .from(estoquesContagens)
+        .where(eq(estoquesContagens.id, id))
+        .limit(1);
+
+      if (!contagem) {
+        return res.status(404).json({ success: false, error: "Contagem não encontrada" });
+      }
+
+      // Verificar acesso
+      if (!isAdmin && contagem.responsavelId !== userId) {
+        return res.status(403).json({ success: false, error: "Acesso negado" });
+      }
+
+      // Verificar se contagem está em andamento
+      if (contagem.status !== "em_andamento") {
+        return res.status(400).json({
+          success: false,
+          error: "Esta contagem já foi finalizada",
+        });
+      }
+
+      // Verificar duplicidade de IMEI nesta contagem
+      const [itemExistente] = await db
+        .select()
+        .from(estoquesContagemItens)
+        .where(
+          and(
+            eq(estoquesContagemItens.contagemId, id),
+            eq(estoquesContagemItens.imei, imei)
+          )
+        )
+        .limit(1);
+
+      if (itemExistente) {
+        return res.status(400).json({
+          success: false,
+          error: `IMEI ${imei} já foi contado nesta contagem`,
+        });
+      }
+
+      // Inserir item
+      const [novoItem] = await db
+        .insert(estoquesContagemItens)
+        .values({
+          contagemId: id,
+          imei,
+          metodoLeitura: metodoLeitura || "manual",
+          contadoPor: userId,
+        })
+        .returning();
+
+      // Atualizar totalItensContados
+      await db
+        .update(estoquesContagens)
+        .set({
+          totalItensContados: sql`${estoquesContagens.totalItensContados} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(estoquesContagens.id, id));
+
+      // Log de auditoria
+      await db.insert(estoquesContagemLogs).values({
+        contagemId: id,
+        userId,
+        acao: "item_adicionado",
+        imei,
+        detalhes: { metodoLeitura: metodoLeitura || "manual" },
+      });
+
+      res.json({ success: true, data: novoItem });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/contagens/:id/itens - Listar itens da contagem
+  router.get("/api/estoques/contagens/:id/itens", requireAuth, async (req, res) => {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { id } = req.params;
+
+      const [contagem] = await db
+        .select()
+        .from(estoquesContagens)
+        .where(eq(estoquesContagens.id, id))
+        .limit(1);
+
+      if (!contagem) {
+        return res.status(404).json({ success: false, error: "Contagem não encontrada" });
+      }
+
+      if (!isAdmin && contagem.responsavelId !== userId) {
+        return res.status(403).json({ success: false, error: "Acesso negado" });
+      }
+
+      const itens = await db
+        .select()
+        .from(estoquesContagemItens)
+        .where(eq(estoquesContagemItens.contagemId, id))
+        .orderBy(desc(estoquesContagemItens.contadoEm));
+
+      res.json({ success: true, data: itens });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/estoques/contagens/:id/finalizar - Finalizar contagem
+  router.post("/api/estoques/contagens/:id/finalizar", requireAuth, async (req, res) => {
+    if (!db) return res.status(503).json({ error: "Database unavailable" });
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const { id } = req.params;
+
+      const [contagem] = await db
+        .select()
+        .from(estoquesContagens)
+        .where(eq(estoquesContagens.id, id))
+        .limit(1);
+
+      if (!contagem) {
+        return res.status(404).json({ success: false, error: "Contagem não encontrada" });
+      }
+
+      if (!isAdmin && contagem.responsavelId !== userId) {
+        return res.status(403).json({ success: false, error: "Acesso negado" });
+      }
+
+      if (contagem.status !== "em_andamento") {
+        return res.status(400).json({
+          success: false,
+          error: "Esta contagem já foi finalizada",
+        });
+      }
+
+      const [contagemFinalizada] = await db
+        .update(estoquesContagens)
+        .set({
+          status: "finalizada",
+          dataFim: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(estoquesContagens.id, id))
+        .returning();
+
+      await db.insert(estoquesContagemLogs).values({
+        contagemId: id,
+        userId,
+        acao: "contagem_finalizada",
+        detalhes: { totalItensContados: contagem.totalItensContados },
+      });
+
+      res.json({ success: true, data: contagemFinalizada });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   console.log('[Estoque Routes] Routes registered successfully');
 }
