@@ -38,7 +38,8 @@ import {
   Edit,
   Trash2,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Check
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -61,6 +62,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 const priorityColors: Record<string, string> = {
   low: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-700",
@@ -303,6 +317,7 @@ export default function ChamadosPage() {
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [slaFilter, setSlaFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -811,20 +826,57 @@ export default function ChamadosPage() {
                     <SelectItem value="negocio">Negócio</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
-                  <SelectTrigger className="w-full sm:w-[160px] h-10 text-[13px]" data-testid="select-assignee-filter">
-                    <SelectValue placeholder="Responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Responsável</SelectItem>
-                    {users
-                      .filter(u => u.status === "active")
-                      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-                      .map(user => (
-                        <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full sm:w-[200px] h-10 text-[13px] justify-between font-normal"
+                      data-testid="select-assignee-filter"
+                    >
+                      {assigneeFilter === "all"
+                        ? "Responsável"
+                        : users.find(u => u.id === assigneeFilter)?.name || "Responsável"}
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[200px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar responsável..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="all"
+                            onSelect={() => {
+                              setAssigneeFilter("all");
+                              setAssigneeOpen(false);
+                            }}
+                          >
+                            <Check className={`mr-2 h-4 w-4 ${assigneeFilter === "all" ? "opacity-100" : "opacity-0"}`} />
+                            Todos
+                          </CommandItem>
+                          {users
+                            .filter(u => u.status === "active")
+                            .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+                            .map(user => (
+                              <CommandItem
+                                key={user.id}
+                                value={user.name}
+                                onSelect={() => {
+                                  setAssigneeFilter(user.id);
+                                  setAssigneeOpen(false);
+                                }}
+                              >
+                                <Check className={`mr-2 h-4 w-4 ${assigneeFilter === user.id ? "opacity-100" : "opacity-0"}`} />
+                                {user.name}
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
