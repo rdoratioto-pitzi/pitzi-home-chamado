@@ -2,76 +2,94 @@ import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ClipboardList } from "lucide-react";
+import { Loader2, Package } from "lucide-react";
 
 interface ContagemItem {
   id: string;
   imei: string;
-  contadoEm: string | null;
+  codigoErp: string | null;
+  modelo: string | null;
+  categoria: string | null;
+  marca: string | null;
   metodoLeitura: string;
+  contadoEm: string;
 }
 
 interface ListaItensProps {
   itens: ContagemItem[];
-  isLoading?: boolean;
+  isLoading: boolean;
 }
 
-export function ListaItens({ itens, isLoading = false }: ListaItensProps) {
-  function formatTime(dateStr: string | null) {
-    if (!dateStr) return "--:--";
-    return new Date(dateStr).toLocaleTimeString("pt-BR", {
+export function ListaItens({ itens, isLoading }: ListaItensProps) {
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString("pt-BR", {
       hour: "2-digit",
       minute: "2-digit",
+      second: "2-digit",
     });
-  }
+  };
 
-  function maskImei(imei: string) {
-    if (imei.length <= 8) return imei;
-    return imei.slice(0, 6) + "***" + imei.slice(-4);
-  }
+  const formatImei = (imei: string) => {
+    // Show first 6 and last 3 digits, hide middle
+    return `${imei.substring(0, 6)}***${imei.substring(12, 15)}`;
+  };
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-base">
-          <div className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Package className="h-5 w-5" />
             Itens Contados
-          </div>
+          </CardTitle>
           <Badge variant="secondary" className="text-sm">
-            {isLoading ? "..." : itens.length}
+            {itens.length} {itens.length === 1 ? "item" : "itens"}
           </Badge>
-        </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent>
         {isLoading ? (
-          <div className="space-y-2 p-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-10 w-full rounded bg-muted animate-pulse" />
-            ))}
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : itens.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-            <ClipboardList className="h-10 w-10 mb-2 opacity-30" />
-            <p className="text-sm">Nenhum item contado ainda</p>
+          <div className="text-center py-8 text-muted-foreground">
+            <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+            <p>Nenhum item contado ainda</p>
+            <p className="text-sm">Escaneie ou digite um IMEI para começar</p>
           </div>
         ) : (
-          <ScrollArea className="h-64">
-            <div className="divide-y">
+          <ScrollArea className="h-[300px] pr-4">
+            <div className="space-y-2">
               {itens.map((item, index) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between px-4 py-2.5 text-sm hover:bg-muted/30"
+                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xs text-muted-foreground w-6 text-right">
-                      {itens.length - index}
+                    <span className="text-sm font-medium text-muted-foreground w-6">
+                      #{index + 1}
                     </span>
-                    <span className="font-mono">{maskImei(item.imei)}</span>
+                    <div>
+                      <p className="font-mono text-sm font-medium">
+                        {formatImei(item.imei)}
+                      </p>
+                      {item.modelo && (
+                        <p className="text-xs text-muted-foreground">
+                          {item.modelo}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {formatTime(item.contadoEm)}
-                  </span>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">
+                      {formatTime(item.contadoEm)}
+                    </p>
+                    <Badge variant="outline" className="text-xs">
+                      {item.metodoLeitura === 'barcode' ? 'Scanner' : 'Manual'}
+                    </Badge>
+                  </div>
                 </div>
               ))}
             </div>

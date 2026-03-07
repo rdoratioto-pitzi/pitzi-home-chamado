@@ -1,18 +1,18 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Keyboard } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Keyboard, X } from "lucide-react";
 
 interface ManualInputProps {
   onSubmit: (imei: string) => void;
-  disabled?: boolean;
-  error?: string | null;
+  disabled: boolean;
+  error: string | null;
 }
 
-export function ManualInput({ onSubmit, disabled = false, error }: ManualInputProps) {
+export function ManualInput({ onSubmit, disabled, error }: ManualInputProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [imei, setImei] = useState("");
+  const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -21,50 +21,59 @@ export function ManualInput({ onSubmit, disabled = false, error }: ManualInputPr
     }
   }, [isOpen]);
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value.replace(/\D/g, "").slice(0, 15);
-    setImei(value);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && imei.length === 15) {
-      handleSubmit();
+  useEffect(() => {
+    if (!error) {
+      setInputValue("");
     }
-    if (e.key === "Escape") {
-      handleCancel();
+  }, [error]);
+
+  const handleToggle = () => {
+    if (isOpen) {
+      setInputValue("");
     }
-  }
+    setIsOpen(!isOpen);
+  };
 
-  function handleSubmit() {
-    if (imei.length !== 15) return;
-    onSubmit(imei);
-    setImei("");
-    // Manter aberto para digitação sequencial
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ""); // Only numbers
+    setInputValue(value);
+  };
 
-  function handleCancel() {
+  const handleSubmit = () => {
+    if (inputValue.length === 15) {
+      onSubmit(inputValue);
+      setInputValue("");
+    }
+  };
+
+  const handleCancel = () => {
+    setInputValue("");
     setIsOpen(false);
-    setImei("");
-  }
-
-  const isValid = imei.length === 15;
+  };
 
   if (!isOpen) {
     return (
       <Card
-        className={`border-2 border-dashed cursor-pointer transition-colors ${
-          disabled
-            ? "border-muted opacity-50"
-            : "border-muted-foreground/30 hover:border-primary/50"
-        }`}
-        onClick={!disabled ? () => setIsOpen(true) : undefined}
+        className="border-dashed border-2 cursor-pointer hover:border-primary/70 transition-colors"
+        onClick={!disabled ? handleToggle : undefined}
       >
-        <CardContent className="flex flex-col items-center justify-center gap-3 py-8">
-          <Keyboard className="h-12 w-12 text-muted-foreground" />
-          <div className="text-center">
-            <p className="font-medium">Inserção Manual do IMEI</p>
-            <p className="text-sm text-muted-foreground">Clique para digitar o IMEI</p>
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center space-y-3 text-center">
+            <div className="p-4 rounded-full bg-primary/10">
+              <Keyboard className="h-10 w-10 text-primary" />
+            </div>
+            <div>
+              <p className="font-medium">Inserção Manual</p>
+              <p className="text-sm text-muted-foreground">Digitar IMEI manualmente</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleToggle}
+              disabled={disabled}
+            >
+              Abrir Input
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -72,53 +81,72 @@ export function ManualInput({ onSubmit, disabled = false, error }: ManualInputPr
   }
 
   return (
-    <Card className="border-2 border-primary">
-      <CardContent className="flex flex-col gap-4 py-6">
-        <div className="flex items-center gap-2">
-          <Keyboard className="h-5 w-5 text-primary" />
-          <p className="font-medium">Inserção Manual do IMEI</p>
-        </div>
+    <Card className="border-dashed border-2 border-primary/50">
+      <CardContent className="pt-6">
+        <div className="flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="font-medium">Digite o IMEI</p>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCancel}
+              disabled={disabled}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
 
-        <div className="space-y-2">
-          <label htmlFor="imei-input" className="text-sm font-medium">IMEI</label>
-          <div className="relative">
+          <div className="space-y-2">
             <Input
-              id="imei-input"
               ref={inputRef}
               type="text"
-              inputMode="numeric"
+              value={inputValue}
+              onChange={handleInputChange}
               placeholder="Digite o IMEI (15 dígitos)"
-              value={imei}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
+              maxLength={15}
               disabled={disabled}
-              className={error ? "border-destructive" : ""}
+              className="text-center text-lg tracking-widest font-mono"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && inputValue.length === 15) {
+                  handleSubmit();
+                }
+              }}
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-              {imei.length}/15
-            </span>
-          </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-        </div>
 
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={handleCancel}
-            disabled={disabled}
-          >
-            Cancelar
-          </Button>
-          <Button
-            className="flex-1"
-            onClick={handleSubmit}
-            disabled={!isValid || disabled}
-          >
-            Adicionar
-          </Button>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Dígitos: {inputValue.length}/15</span>
+              {inputValue.length > 0 && inputValue.length < 15 && (
+                <span className="text-amber-600">Faltam {15 - inputValue.length} dígitos</span>
+              )}
+              {inputValue.length === 15 && (
+                <span className="text-green-600">IMEI completo</span>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCancel}
+              disabled={disabled}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={inputValue.length !== 15 || disabled}
+              className="flex-1"
+            >
+              Adicionar
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

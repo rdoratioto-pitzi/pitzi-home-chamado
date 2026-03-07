@@ -106,20 +106,26 @@ async function exportToExcel() {
 
 /**
  * Verifica se o usuário tem acesso ao módulo de estoques
- * basedo nas permissões configuradas
+ * baseado nas permissões configuradas
  */
 function hasEstoqueAccess(user: CurrentUser | null): boolean {
   if (!user) return false;
-  
+
   // Administradores têm acesso total
   if (user.isAdmin) return true;
-  
-  // Verifica se o módulo 'estoques' está nas permissões do usuário
+
+  // Verifica se o módulo 'estoques' está nas permissões do usuário (JSON)
   if (user.modulePermissions) {
-    const permissions = user.modulePermissions.split(",").map(p => p.trim().toLowerCase());
-    return permissions.includes("estoques");
+    try {
+      const permissions = typeof user.modulePermissions === "string"
+        ? JSON.parse(user.modulePermissions)
+        : user.modulePermissions;
+      return permissions.estoques === true;
+    } catch {
+      return false;
+    }
   }
-  
+
   return false;
 }
 

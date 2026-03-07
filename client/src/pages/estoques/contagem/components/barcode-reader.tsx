@@ -1,120 +1,125 @@
-import React, { useRef, useState, useEffect } from "react";
-import { ScanBarcode } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Barcode, Loader2 } from "lucide-react";
 
 interface BarcodeReaderProps {
   onScan: (imei: string) => void;
-  disabled?: boolean;
+  disabled: boolean;
 }
 
-export function BarcodeReader({ onScan, disabled = false }: BarcodeReaderProps) {
+export function BarcodeReader({ onScan, disabled }: BarcodeReaderProps) {
+  const [isScanning, setIsScanning] = useState(false);
+  const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isActive, setIsActive] = useState(false);
-  const bufferRef = useRef("");
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Leitores USB enviam os caracteres muito rápido (< 50ms entre keystrokes)
-  // e terminam com Enter. Capturamos via input hidden.
   useEffect(() => {
-    if (isActive && inputRef.current) {
+    if (isScanning && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [isActive]);
+  }, [isScanning]);
 
-  function handleActivate() {
-    setIsActive(true);
-    // Pequeno delay para garantir render do input antes do focus
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }
+  const handleStartScan = () => {
+    setIsScanning(true);
+    setInputValue("");
+  };
 
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const value = e.target.value.replace(/\D/g, "");
-    bufferRef.current = value;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, ""); // Only numbers
+    setInputValue(value);
 
-    // Auto-submit com 15 dígitos
-    if (value.length >= 15) {
-      submitImei(value.slice(0, 15));
-      e.target.value = "";
-      bufferRef.current = "";
+    // Auto-submit when 15 digits reached
+    if (value.length === 15) {
+      handleSubmit(value);
     }
-  }
+  };
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      const imei = bufferRef.current.replace(/\D/g, "");
-      if (imei.length === 15) {
-        submitImei(imei);
-        (e.target as HTMLInputElement).value = "";
-        bufferRef.current = "";
-      }
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && inputValue.length > 0) {
+      handleSubmit(inputValue);
+    } else if (e.key === "Escape") {
+      setIsScanning(false);
+      setInputValue("");
     }
-    // Limpar timer de inatividade
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      // Se o usuário parou de digitar por 3s sem completar, limpar buffer
-      bufferRef.current = "";
-      if (inputRef.current) inputRef.current.value = "";
-    }, 3000);
-  }
+  };
 
-  function submitImei(imei: string) {
-    onScan(imei);
-    setIsActive(false);
-  }
+  const handleSubmit = (imei: string) => {
+    if (imei.length === 15) {
+      onScan(imei);
+      setInputValue("");
+      setIsScanning(false);
+    }
+  };
 
-  function handleBlur() {
-    // Pequeno delay para evitar desativar ao clicar em outro elemento
-    setTimeout(() => setIsActive(false), 200);
+  const handleCancel = () => {
+    setIsScanning(false);
+    setInputValue("");
+  };
+
+  if (isScanning) {
+    return (
+      <Card className="border-dashed border-2 border-primary/50">
+        <CardContent className="pt-6">
+          <div className="flex flex-col items-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Aguardando leitura...</p>
+
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Escaneie ou digite o IMEI"
+              className="w-full h-12 text-center text-lg tracking-widest border-2 border-primary rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-primary"
+              maxLength={15}
+              autoComplete="off"
+            />
+
+            <p className="text-xs text-muted-foreground">
+              {inputValue.length}/15 dígitos
+            </p>
+
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleCancel} disabled={disabled}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => handleSubmit(inputValue)}
+                disabled={inputValue.length !== 15 || disabled}
+              >
+                Adicionar
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
     <Card
-      className={`border-2 border-dashed cursor-pointer transition-colors ${
-        isActive
-          ? "border-primary bg-primary/5"
-          : disabled
-          ? "border-muted opacity-50"
-          : "border-muted-foreground/30 hover:border-primary/50"
-      }`}
-      onClick={!disabled && !isActive ? handleActivate : undefined}
+      className="border-dashed border-2 cursor-pointer hover:border-primary/70 transition-colors"
+      onClick={!disabled ? handleStartScan : undefined}
     >
-      <CardContent className="flex flex-col items-center justify-center gap-3 py-8">
-        <ScanBarcode
-          className={`h-12 w-12 ${isActive ? "text-primary animate-pulse" : "text-muted-foreground"}`}
-        />
-        <div className="text-center">
-          <p className="font-medium">
-            {isActive ? "Aguardando leitura..." : "Leitura por Código de Barras"}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {isActive ? "Escaneie o IMEI agora" : "Use leitor USB ou câmera"}
-          </p>
-        </div>
-        {isActive && (
+      <CardContent className="pt-6">
+        <div className="flex flex-col items-center space-y-3 text-center">
+          <div className="p-4 rounded-full bg-primary/10">
+            <Barcode className="h-10 w-10 text-primary" />
+          </div>
+          <div>
+            <p className="font-medium">Escanear Código de Barras</p>
+            <p className="text-sm text-muted-foreground">Use leitor USB ou câmera</p>
+          </div>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsActive(false);
-            }}
+            onClick={handleStartScan}
+            disabled={disabled}
           >
-            Cancelar
+            Iniciar Leitura
           </Button>
-        )}
-        {/* Input oculto para capturar entrada do leitor USB */}
-        <input
-          ref={inputRef}
-          type="text"
-          inputMode="numeric"
-          className="sr-only"
-          onChange={handleInputChange}
-          onKeyDown={handleKeyDown}
-          onBlur={handleBlur}
-          disabled={!isActive || disabled}
-          aria-label="Entrada do leitor de código de barras"
-        />
+        </div>
       </CardContent>
     </Card>
   );
