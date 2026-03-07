@@ -224,7 +224,7 @@ function EditableDate({ task, onUpdate }: { task: Task; onUpdate: (id: string, u
           onSelect={(newDate) => {
             console.log('📝 Data mudando de', task.dueDate, 'para', newDate);
             if (newDate) {
-              onUpdate(task.id, { dueDate: newDate.toISOString() });
+              onUpdate(task.id, { dueDate: newDate });
             }
             setIsOpen(false);
           }}

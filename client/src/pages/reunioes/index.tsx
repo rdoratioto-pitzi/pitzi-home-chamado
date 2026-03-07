@@ -202,7 +202,7 @@ export default function ReunioesPage() {
       label: 'Data',
       className: 'w-[120px]',
       render: (value: any, row: Task) => {
-        const meetingData = row.meetingData as any;
+        const meetingData = row.meetingData ? JSON.parse(row.meetingData as string) : {};
         const date = meetingData?.date || row.dueDate;
         return date ? new Date(date).toLocaleDateString('pt-BR') : '-';
       }
@@ -212,7 +212,7 @@ export default function ReunioesPage() {
       label: 'Horário',
       className: 'w-[100px]',
       render: (value: any, row: Task) => {
-        const meetingData = row.meetingData as any;
+        const meetingData = row.meetingData ? JSON.parse(row.meetingData as string) : {};
         return meetingData?.time || '-';
       }
     },
