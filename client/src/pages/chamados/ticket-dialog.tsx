@@ -380,8 +380,18 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                 name="location"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
+                    <FormLabel className="flex items-center gap-1">
                       Local <span className="text-destructive">*</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[250px]">
+                          <p className="text-xs">
+                            <strong>Local</strong> indica o sistema ou ambiente onde o problema ocorreu.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
@@ -482,7 +492,19 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                 name="assigneeId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Responsável (opcional)</FormLabel>
+                    <FormLabel className="flex items-center gap-1">
+                      Responsável (opcional)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[280px]">
+                          <p className="text-xs">
+                            <strong>Responsável</strong> define quem irá atender o chamado. Deixe vazio para atribuição automática.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
                     <FormControl>
                       <UserSelect
                         value={field.value}
@@ -498,7 +520,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
               />
             </div>
 
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter className="gap-2">
               <Button 
                 type="button" 
                 variant="outline" 
