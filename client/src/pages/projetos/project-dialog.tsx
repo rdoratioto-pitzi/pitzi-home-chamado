@@ -116,6 +116,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSubmit: externalO
 
   const filteredUsersForMembers = useMemo(() => {
     return users
+      .filter(u => u.status === "active")
       .filter(u => {
         if (u.id === ownerId) return false;
         if (memberIds.includes(u.id)) return false;

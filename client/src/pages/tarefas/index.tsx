@@ -1554,7 +1554,7 @@ export default function TarefasPage() {
                   {memberSearchInput && (
                     <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
                       {users
-                        .filter(u => 
+                        .filter(u => u.status === "active" &&
                           !newArea.memberIds.includes(u.id) &&
                           (u.name.toLowerCase().includes(memberSearchInput.toLowerCase()) ||
                            u.email.toLowerCase().includes(memberSearchInput.toLowerCase()))
@@ -1578,7 +1578,8 @@ export default function TarefasPage() {
                             <span className="text-muted-foreground text-xs">({user.email})</span>
                           </button>
                         ))}
-                      {users.filter(u => 
+                      {users.filter(u =>
+                        u.status === "active" &&
                         !newArea.memberIds.includes(u.id) &&
                         u.name.toLowerCase().includes(memberSearchInput.toLowerCase())
                       ).length === 0 && (
@@ -2043,7 +2044,7 @@ export default function TarefasPage() {
                                 data-testid={`input-action-responsible-${index}`}
                               />
                               <datalist id={`action-responsible-${index}`}>
-                                {users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(u => (
+                                {users.filter(u => u.status === "active").sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(u => (
                                   <option key={u.id} value={u.name} />
                                 ))}
                               </datalist>

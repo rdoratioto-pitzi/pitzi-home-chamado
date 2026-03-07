@@ -975,7 +975,7 @@ export default function TaskDetailPage() {
                 {showMentionSuggestions && (
                   <div className="absolute z-20 left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-32 overflow-y-auto">
                     {users
-                      .filter(u => u.name.toLowerCase().includes(mentionQuery) || u.email.toLowerCase().includes(mentionQuery))
+                      .filter(u => u.status === "active" && (u.name.toLowerCase().includes(mentionQuery) || u.email.toLowerCase().includes(mentionQuery)))
                       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
                       .slice(0, 5)
                       .map(user => (
@@ -997,7 +997,7 @@ export default function TaskDetailPage() {
                           <span className="text-muted-foreground text-xs">({user.email})</span>
                         </button>
                       ))}
-                    {users.filter(u => u.name.toLowerCase().includes(mentionQuery)).length === 0 && (
+                    {users.filter(u => u.status === "active" && u.name.toLowerCase().includes(mentionQuery)).length === 0 && (
                       <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado</div>
                     )}
                   </div>

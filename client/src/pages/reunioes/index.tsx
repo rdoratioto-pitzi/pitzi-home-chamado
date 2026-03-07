@@ -1430,7 +1430,7 @@ export default function ReunioesPage() {
                   {memberSearchInput && (
                     <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
                       {users
-                        .filter(u => 
+                        .filter(u => u.status === "active" &&
                           !newArea.memberIds.includes(u.id) &&
                           (u.name.toLowerCase().includes(memberSearchInput.toLowerCase()) ||
                            u.email.toLowerCase().includes(memberSearchInput.toLowerCase()))
@@ -1454,7 +1454,8 @@ export default function ReunioesPage() {
                             <span className="text-muted-foreground text-xs">({user.email})</span>
                           </button>
                         ))}
-                      {users.filter(u => 
+                      {users.filter(u =>
+                        u.status === "active" &&
                         !newArea.memberIds.includes(u.id) &&
                         u.name.toLowerCase().includes(memberSearchInput.toLowerCase())
                       ).length === 0 && (
