@@ -61,7 +61,8 @@ const CARD_BORDER: Record<string, string> = {
   C: "border-l-slate-400",
 };
 
-function ClasseCard({ classe, dados }: { classe: "A" | "B" | "C"; dados: { qtde: number; valor: number; pctItens: number; pctValor: number } }) {
+function ClasseCard({ classe, dados }: { classe: "A" | "B" | "C"; dados?: { qtde: number; valor: number; pctItens: number; pctValor: number } }) {
+  if (!dados) return null;
   return (
     <Card className={`border-l-4 ${CARD_BORDER[classe]}`}>
       <CardHeader className="pb-2">
@@ -92,8 +93,16 @@ function ClasseCard({ classe, dados }: { classe: "A" | "B" | "C"; dados: { qtde:
 
 async function fetchCurvaABC(): Promise<CurvaABCData> {
   const res = await fetch("/api/estoques/dashboard/curva-abc");
-  if (!res.ok) throw new Error("Erro ao buscar Curva ABC");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("[CurvaABC] HTTP", res.status, body);
+    throw new Error(`HTTP ${res.status}: ${body}`);
+  }
   const json = await res.json();
+  if (!json.data) {
+    console.error("[CurvaABC] Resposta sem campo data:", json);
+    throw new Error("Resposta inválida do servidor");
+  }
   return json.data;
 }
 

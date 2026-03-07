@@ -1195,7 +1195,12 @@ export function registerEstoqueRoutes(router: Router) {
       const produtos = await getCachedProdutos();
 
       if (produtos.length === 0) {
-        return res.json({ success: true, data: { resumo: {}, itens: [], grafico: [] } });
+        const emptyClasse = { qtde: 0, valor: 0, pctItens: 0, pctValor: 0 };
+        return res.json({ success: true, data: {
+          resumo: { classeA: emptyClasse, classeB: emptyClasse, classeC: emptyClasse, valorTotal: 0, totalItens: 0 },
+          itens: [],
+          grafico: [],
+        }});
       }
 
       // Calcular valor de cada item e ordenar decrescente
