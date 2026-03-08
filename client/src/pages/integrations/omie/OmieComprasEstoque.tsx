@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Package, Warehouse, ShoppingCart, ArrowRightLeft, Search, Loader2, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Package, List, Warehouse, ShoppingCart, ArrowRightLeft, Search, Loader2, Info, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import axios from 'axios';
 
 export default function OmieComprasEstoque() {
@@ -15,6 +15,18 @@ export default function OmieComprasEstoque() {
   const [produtoCodigo, setProdutoCodigo] = useState('');
   const [produtoData, setProdutoData] = useState<any>(null);
   const [produtoLoading, setProdutoLoading] = useState(false);
+
+  // Estados para Listagem de Produtos
+  const [listarFiltros, setListarFiltros] = useState({
+    codigo: '',
+    descricao_like: '',
+    ncm: '',
+    pagina: 1,
+    registros_por_pagina: 10,
+  });
+  const [listarData, setListarData] = useState<any[]>([]);
+  const [listarMeta, setListarMeta] = useState({ total: 0, totalPaginas: 1, pagina: 1 });
+  const [listarLoading, setListarLoading] = useState(false);
 
   // Estados para Consulta de Estoque
   const [estoqueCodigo, setEstoqueCodigo] = useState('');
@@ -67,6 +79,37 @@ export default function OmieComprasEstoque() {
       setProdutoData(null);
     } finally {
       setProdutoLoading(false);
+    }
+  };
+
+  // Handler Listar Produtos com filtros e paginação
+  const handleListarProdutos = async (pagina = listarFiltros.pagina) => {
+    setListarLoading(true);
+    setMessage(null);
+    try {
+      const params: any = {
+        pagina,
+        registros_por_pagina: listarFiltros.registros_por_pagina,
+        apenas_importado_api: 'N',
+      };
+      if (listarFiltros.codigo.trim()) params.codigo = listarFiltros.codigo.trim();
+      if (listarFiltros.descricao_like.trim()) params.descricao_like = listarFiltros.descricao_like.trim();
+      if (listarFiltros.ncm.trim()) params.ncm = listarFiltros.ncm.trim();
+
+      const result = await callOmieApi('geral/produtos/', 'ListarProdutos', [params], 'compras');
+      setListarData(result.produto_servico_cadastro || []);
+      setListarMeta({
+        total: result.total_de_registros || 0,
+        totalPaginas: result.total_de_paginas || 1,
+        pagina,
+      });
+      setListarFiltros(prev => ({ ...prev, pagina }));
+      setMessage({ type: 'success', text: `${result.total_de_registros || 0} produto(s) encontrado(s)` });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.message });
+      setListarData([]);
+    } finally {
+      setListarLoading(false);
     }
   };
 
@@ -125,6 +168,123 @@ export default function OmieComprasEstoque() {
           <AlertDescription>{message.text}</AlertDescription>
         </Alert>
       )}
+
+      {/* LISTAGEM DE PRODUTOS */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <List className="h-5 w-5" />
+            Listagem de Produtos
+          </CardTitle>
+          <CardDescription>Listar produtos com filtros (código, descrição, NCM) e paginação</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label>Código do Produto</Label>
+              <Input
+                placeholder="Ex: 20074A0"
+                value={listarFiltros.codigo}
+                onChange={(e) => setListarFiltros(prev => ({ ...prev, codigo: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && handleListarProdutos(1)}
+              />
+            </div>
+            <div>
+              <Label>Descrição (contém)</Label>
+              <Input
+                placeholder="Ex: iPhone"
+                value={listarFiltros.descricao_like}
+                onChange={(e) => setListarFiltros(prev => ({ ...prev, descricao_like: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && handleListarProdutos(1)}
+              />
+            </div>
+            <div>
+              <Label>NCM</Label>
+              <Input
+                placeholder="Ex: 85171290"
+                value={listarFiltros.ncm}
+                onChange={(e) => setListarFiltros(prev => ({ ...prev, ncm: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && handleListarProdutos(1)}
+              />
+            </div>
+          </div>
+          <Button onClick={() => handleListarProdutos(1)} disabled={listarLoading}>
+            {listarLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
+            Listar Produtos
+          </Button>
+
+          {listarLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : listarData.length > 0 ? (
+            <div className="space-y-3">
+              <div className="border rounded-lg overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Cód. Omie</TableHead>
+                      <TableHead>Código</TableHead>
+                      <TableHead>Descrição</TableHead>
+                      <TableHead>Unidade</TableHead>
+                      <TableHead>NCM</TableHead>
+                      <TableHead>Família</TableHead>
+                      <TableHead>Marca</TableHead>
+                      <TableHead className="text-right">Valor Unitário</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {listarData.map((produto, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-xs">{produto.codigo_produto}</TableCell>
+                        <TableCell className="font-medium">{produto.codigo}</TableCell>
+                        <TableCell>{produto.descricao}</TableCell>
+                        <TableCell>{produto.unidade || '-'}</TableCell>
+                        <TableCell>{produto.ncm || '-'}</TableCell>
+                        <TableCell>{produto.descricao_familia || '-'}</TableCell>
+                        <TableCell>{produto.marca || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(produto.valor_unitario || 0)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={produto.inativo === 'S' ? 'destructive' : 'default'}>
+                            {produto.inativo === 'S' ? 'Inativo' : 'Ativo'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {/* Paginação */}
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>
+                  {listarMeta.total} produto(s) — página {listarMeta.pagina} de {listarMeta.totalPaginas}
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleListarProdutos(listarMeta.pagina - 1)}
+                    disabled={listarMeta.pagina <= 1 || listarLoading}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleListarProdutos(listarMeta.pagina + 1)}
+                    disabled={listarMeta.pagina >= listarMeta.totalPaginas || listarLoading}
+                  >
+                    Próxima
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       {/* CONSULTA DE PRODUTO */}
       <Card>
