@@ -7,10 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ShoppingBag, FileText, Receipt, Search, Loader2, ExternalLink } from 'lucide-react';
+import { ShoppingBag, FileText, Receipt, Search, Loader2, Info } from 'lucide-react';
 import axios from 'axios';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function OmieVendas() {
   // Estados para Pedidos de Venda
@@ -28,30 +27,13 @@ export default function OmieVendas() {
   // Estados para NF-e Produtos
   const [nfeFilters, setNfeFilters] = useState({
     nPagina: 1,
-    nRegPorPagina: 10,
-    dDtEmiIni: '',
-    dDtEmiFim: '',
-    cNumNF: '',
-    cSerie: ''
+    nRegPorPagina: 10
   });
   const [nfeData, setNfeData] = useState<any[]>([]);
   const [nfeLoading, setNfeLoading] = useState(false);
 
-  // Estados para NFS-e Serviços
-  const [nfseFilters, setNfseFilters] = useState({
-    nPagina: 1,
-    nRegPorPagina: 10,
-    dDtEmiIni: '',
-    dDtEmiFim: '',
-    cNumRPS: ''
-  });
-  const [nfseData, setNfseData] = useState<any[]>([]);
-  const [nfseLoading, setNfseLoading] = useState(false);
-
   // Estados gerais
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [xmlDialogOpen, setXmlDialogOpen] = useState(false);
-  const [selectedXml, setSelectedXml] = useState('');
 
   // Função genérica para chamar API
   const callOmieApi = async (endpoint: string, call: string, params: any[], category: string) => {
@@ -77,7 +59,7 @@ export default function OmieVendas() {
     setPedidosLoading(true);
     setMessage(null);
     try {
-      const params = [{
+      const params: any = [{
         pagina: pedidosFilters.pagina,
         registros_por_pagina: pedidosFilters.registros_por_pagina,
         apenas_importado_api: 'N'
@@ -107,7 +89,7 @@ export default function OmieVendas() {
     }
   };
 
-  // Handler NF-e Produtos
+  // Handler NF-e Produtos — endpoint: produtos/nfe/ + ListarNFe
   const handleBuscarNFe = async () => {
     setNfeLoading(true);
     setMessage(null);
@@ -117,58 +99,14 @@ export default function OmieVendas() {
         nRegPorPagina: nfeFilters.nRegPorPagina
       }];
 
-      if (nfeFilters.dDtEmiIni) {
-        params[0].dDtEmiIni = nfeFilters.dDtEmiIni;
-      }
-      if (nfeFilters.dDtEmiFim) {
-        params[0].dDtEmiFim = nfeFilters.dDtEmiFim;
-      }
-      if (nfeFilters.cNumNF) {
-        params[0].cNumNF = nfeFilters.cNumNF;
-      }
-      if (nfeFilters.cSerie) {
-        params[0].cSerie = nfeFilters.cSerie;
-      }
-
-      const result = await callOmieApi('produtos/nfconsultar/', 'ConsultarNF', params, 'vendas');
-      setNfeData(result.nfCadastro || []);
-      setMessage({ type: 'success', text: `${result.total_de_registros || 0} NF-e encontrada(s)` });
+      const result = await callOmieApi('produtos/nfe/', 'ListarNFe', params, 'vendas');
+      setNfeData(result.listagemNfe || []);
+      setMessage({ type: 'success', text: `${result.nTotRegistros || 0} NF-e encontrada(s)` });
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message });
       setNfeData([]);
     } finally {
       setNfeLoading(false);
-    }
-  };
-
-  // Handler NFS-e Serviços
-  const handleBuscarNFSe = async () => {
-    setNfseLoading(true);
-    setMessage(null);
-    try {
-      const params = [{
-        nPagina: nfseFilters.nPagina,
-        nRegPorPagina: nfseFilters.nRegPorPagina
-      }];
-
-      if (nfseFilters.dDtEmiIni) {
-        params[0].dDtEmiIni = nfseFilters.dDtEmiIni;
-      }
-      if (nfseFilters.dDtEmiFim) {
-        params[0].dDtEmiFim = nfseFilters.dDtEmiFim;
-      }
-      if (nfseFilters.cNumRPS) {
-        params[0].cNumRPS = nfseFilters.cNumRPS;
-      }
-
-      const result = await callOmieApi('servicos/nfse/', 'ConsultarNFSe', params, 'vendas');
-      setNfseData(result.nfseEncontradas || []);
-      setMessage({ type: 'success', text: `${result.nTotalRegistros || 0} NFS-e encontrada(s)` });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
-      setNfseData([]);
-    } finally {
-      setNfseLoading(false);
     }
   };
 
@@ -178,6 +116,19 @@ export default function OmieVendas() {
     if (statusLower?.includes('faturad') || statusLower?.includes('autoriz')) return 'default';
     if (statusLower?.includes('pendent') || statusLower?.includes('abert')) return 'secondary';
     return 'outline';
+  };
+
+  // Traduz etapa do pedido
+  const traduzEtapa = (etapa: string) => {
+    const etapas: Record<string, string> = {
+      '10': 'Em aberto',
+      '20': 'Em andamento',
+      '40': 'Faturado parcial',
+      '50': 'Faturado',
+      '60': 'Entregue',
+      '70': 'Cancelado'
+    };
+    return etapas[etapa] || etapa || '-';
   };
 
   return (
@@ -202,7 +153,7 @@ export default function OmieVendas() {
             <div>
               <Label>Número do Pedido</Label>
               <Input
-                placeholder="Ex: 12345"
+                placeholder="Ex: 15"
                 value={pedidosFilters.filtrar_por_numero_pedido}
                 onChange={(e) => setPedidosFilters(prev => ({ ...prev, filtrar_por_numero_pedido: e.target.value }))}
               />
@@ -251,22 +202,24 @@ export default function OmieVendas() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Número</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Valor Total</TableHead>
+                    <TableHead>Cód. Cliente</TableHead>
+                    <TableHead>Qtde. Itens</TableHead>
                     <TableHead>Data Previsão</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Origem</TableHead>
+                    <TableHead>Etapa</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {pedidosData.map((pedido, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-medium">{pedido.numero_pedido}</TableCell>
-                      <TableCell>{pedido.nome_cliente}</TableCell>
-                      <TableCell>R$ {pedido.valor_total_pedido?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell>{pedido.data_previsao}</TableCell>
+                      <TableCell className="font-medium">{pedido.cabecalho?.numero_pedido}</TableCell>
+                      <TableCell>{pedido.cabecalho?.codigo_cliente}</TableCell>
+                      <TableCell>{pedido.cabecalho?.quantidade_itens}</TableCell>
+                      <TableCell>{pedido.cabecalho?.data_previsao}</TableCell>
+                      <TableCell>{pedido.cabecalho?.origem_pedido || '-'}</TableCell>
                       <TableCell>
-                        <Badge variant={getStatusBadgeVariant(pedido.etapa)}>
-                          {pedido.etapa}
+                        <Badge variant={getStatusBadgeVariant(pedido.cabecalho?.etapa)}>
+                          {traduzEtapa(pedido.cabecalho?.etapa)}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -288,37 +241,21 @@ export default function OmieVendas() {
           <CardDescription>Consultar notas fiscais eletrônicas emitidas</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label>Número NF-e</Label>
+              <Label>Página</Label>
               <Input
-                placeholder="Ex: 12345"
-                value={nfeFilters.cNumNF}
-                onChange={(e) => setNfeFilters(prev => ({ ...prev, cNumNF: e.target.value }))}
+                type="number"
+                value={nfeFilters.nPagina}
+                onChange={(e) => setNfeFilters(prev => ({ ...prev, nPagina: parseInt(e.target.value) || 1 }))}
               />
             </div>
             <div>
-              <Label>Série</Label>
+              <Label>Registros por Página</Label>
               <Input
-                placeholder="Ex: 1"
-                value={nfeFilters.cSerie}
-                onChange={(e) => setNfeFilters(prev => ({ ...prev, cSerie: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Data Inicial (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="01/01/2026"
-                value={nfeFilters.dDtEmiIni}
-                onChange={(e) => setNfeFilters(prev => ({ ...prev, dDtEmiIni: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Data Final (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="31/01/2026"
-                value={nfeFilters.dDtEmiFim}
-                onChange={(e) => setNfeFilters(prev => ({ ...prev, dDtEmiFim: e.target.value }))}
+                type="number"
+                value={nfeFilters.nRegPorPagina}
+                onChange={(e) => setNfeFilters(prev => ({ ...prev, nRegPorPagina: parseInt(e.target.value) || 10 }))}
               />
             </div>
           </div>
@@ -348,19 +285,19 @@ export default function OmieVendas() {
                     <TableRow key={idx}>
                       <TableCell className="font-medium">{nfe.cNumNF}</TableCell>
                       <TableCell>{nfe.cSerie}</TableCell>
-                      <TableCell>{nfe.cNomeCli}</TableCell>
+                      <TableCell>{nfe.cNomeCli || nfe.cRazaoSocialCli || '-'}</TableCell>
                       <TableCell>R$ {nfe.nValorNF?.toFixed(2) || '0.00'}</TableCell>
                       <TableCell>{nfe.dDtEmis}</TableCell>
                       <TableCell className="font-mono text-xs">
                         {nfe.cChaveNFe ? (
                           <span className="truncate max-w-[200px] inline-block" title={nfe.cChaveNFe}>
-                            {nfe.cChaveNFe}
+                            {nfe.cChaveNFe.substring(0, 20)}...
                           </span>
                         ) : '-'}
                       </TableCell>
                       <TableCell>
                         <Badge variant={getStatusBadgeVariant(nfe.cSituacao)}>
-                          {nfe.cSituacao}
+                          {nfe.cSituacao || '-'}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -372,81 +309,26 @@ export default function OmieVendas() {
         </CardContent>
       </Card>
 
-      {/* NFS-e SERVIÇOS */}
-      <Card>
+      {/* NFS-e SERVIÇOS — não disponível */}
+      <Card className="opacity-75">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Receipt className="h-5 w-5" />
-            Notas Fiscais de Serviço (NFS-e)
+            <Receipt className="h-5 w-5 text-muted-foreground" />
+            <span className="text-muted-foreground">Notas Fiscais de Serviço (NFS-e)</span>
           </CardTitle>
           <CardDescription>Consultar notas fiscais de serviço emitidas</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label>Número RPS</Label>
-              <Input
-                placeholder="Ex: 12345"
-                value={nfseFilters.cNumRPS}
-                onChange={(e) => setNfseFilters(prev => ({ ...prev, cNumRPS: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Data Inicial (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="01/01/2026"
-                value={nfseFilters.dDtEmiIni}
-                onChange={(e) => setNfseFilters(prev => ({ ...prev, dDtEmiIni: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Data Final (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="31/01/2026"
-                value={nfseFilters.dDtEmiFim}
-                onChange={(e) => setNfseFilters(prev => ({ ...prev, dDtEmiFim: e.target.value }))}
-              />
+        <CardContent>
+          <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+            <Info className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Endpoint não disponível</p>
+              <p className="text-sm text-muted-foreground">
+                A API de NFS-e do Omie não está habilitada para esta conta.
+                Consulte diretamente no ERP Omie ou entre em contato com o suporte para habilitar o acesso.
+              </p>
             </div>
           </div>
-          <Button onClick={handleBuscarNFSe} disabled={nfseLoading}>
-            {nfseLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
-            Buscar NFS-e
-          </Button>
-
-          {nfseLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : nfseData.length > 0 ? (
-            <div className="border rounded-lg overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>RPS</TableHead>
-                    <TableHead>Número NFS-e</TableHead>
-                    <TableHead>Tomador</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Data Emissão</TableHead>
-                    <TableHead>Situação</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {nfseData.map((nfse, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-medium">{nfse.cNumRPS}</TableCell>
-                      <TableCell>{nfse.cNumNFSe}</TableCell>
-                      <TableCell>{nfse.cNomeTomador}</TableCell>
-                      <TableCell>R$ {nfse.nValorNFSe?.toFixed(2) || '0.00'}</TableCell>
-                      <TableCell>{nfse.dDtEmis}</TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusBadgeVariant(nfse.cSituacao)}>
-                          {nfse.cSituacao}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
     </div>
