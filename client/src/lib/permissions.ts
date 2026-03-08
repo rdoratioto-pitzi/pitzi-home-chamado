@@ -12,6 +12,7 @@ export interface UserPermissions {
   apis: boolean;
   configuracoes: boolean;
   updates: boolean;
+  gitAnalytics: boolean;
   estoques: boolean;
 }
 
@@ -67,6 +68,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     apis: false,
     configuracoes: false,
     updates: false,
+    gitAnalytics: false,
     estoques: false,
   };
 
@@ -87,6 +89,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       apis: true,
       configuracoes: true,
       updates: true,
+      gitAnalytics: true,
       estoques: true,
     };
   }

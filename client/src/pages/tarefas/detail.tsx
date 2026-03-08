@@ -88,6 +88,7 @@ interface MeetingData {
   time?: string;
   location?: string;
   participants?: string[];
+  externalParticipants?: string[];
   agenda?: string;
   discussions?: string;
   decisions?: string[];
@@ -107,6 +108,8 @@ export default function TaskDetailPage() {
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionPosition, setMentionPosition] = useState(0);
+  const [participantSearchInput, setParticipantSearchInput] = useState("");
+  const [externalParticipantInput, setExternalParticipantInput] = useState("");
 
   const { data: task, isLoading } = useQuery<Task>({
     queryKey: ["/api/tasks", id],
@@ -176,6 +179,52 @@ export default function TaskDetailPage() {
     },
   });
 
+  // Handlers for participant management in edit mode
+  const handleAddParticipant = (userId: string) => {
+    if (!editedMeetingData.participants?.includes(userId)) {
+      setEditedMeetingData({
+        ...editedMeetingData,
+        participants: [...(editedMeetingData.participants || []), userId],
+      });
+    }
+    setParticipantSearchInput("");
+  };
+
+  const handleRemoveParticipant = (userId: string) => {
+    setEditedMeetingData({
+      ...editedMeetingData,
+      participants: (editedMeetingData.participants || []).filter((p) => p !== userId),
+    });
+  };
+
+  const handleAddExternalParticipant = () => {
+    if (externalParticipantInput && externalParticipantInput.includes("@")) {
+      if (!editedMeetingData.externalParticipants?.includes(externalParticipantInput)) {
+        setEditedMeetingData({
+          ...editedMeetingData,
+          externalParticipants: [...(editedMeetingData.externalParticipants || []), externalParticipantInput],
+        });
+      }
+      setExternalParticipantInput("");
+    }
+  };
+
+  const handleRemoveExternalParticipant = (email: string) => {
+    setEditedMeetingData({
+      ...editedMeetingData,
+      externalParticipants: (editedMeetingData.externalParticipants || []).filter((p) => p !== email),
+    });
+  };
+
+  // Filter users for participant search (only active users)
+  const filteredUsers = users
+    .filter((user) => user.status === "active")
+    .filter(
+      (user) =>
+        user.name?.toLowerCase().includes(participantSearchInput.toLowerCase()) ||
+        user.email?.toLowerCase().includes(participantSearchInput.toLowerCase())
+    );
+
   const createCommentMutation = useMutation({
     mutationFn: async (data: { content: string; parentCommentId?: string }) => {
       return apiRequest("POST", `/api/tasks/${id}/comments`, data);
@@ -213,8 +262,6 @@ export default function TaskDetailPage() {
     
     setIsSubmitting(true);
     try {
-      console.log('Enviando comentário:', { content: newComment.trim() });
-      
       const response = await fetch(`/api/tasks/${id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,7 +276,6 @@ export default function TaskDetailPage() {
       }
 
       const comment = await response.json();
-      console.log('Comentário criado:', comment);
       
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "comments"] });
       setNewComment('');
@@ -613,25 +659,114 @@ export default function TaskDetailPage() {
                   )}
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Participantes</label>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Participantes (do sistema)</label>
                   {isEditing ? (
-                    <Input
-                      value={editedMeetingData.participants?.join(", ") || ""}
-                      onChange={(e) => setEditedMeetingData({ 
-                        ...editedMeetingData, 
-                        participants: e.target.value.split(",").map(p => p.trim()).filter(Boolean)
-                      })}
-                      placeholder="Nomes separados por vírgula"
-                      data-testid="input-meeting-participants"
-                    />
+                    <>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {(editedMeetingData.participants || []).map((userId) => {
+                          const user = users.find((u) => u.id === userId);
+                          return (
+                            <Badge key={userId} variant="secondary" className="gap-1">
+                              {user?.name || userId}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveParticipant(userId)}
+                                className="ml-1 hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                      <div className="relative">
+                        <Input
+                          value={participantSearchInput}
+                          onChange={(e) => setParticipantSearchInput(e.target.value)}
+                          placeholder="Buscar participante..."
+                          data-testid="input-participant-search"
+                        />
+                        {participantSearchInput && filteredUsers.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                            {filteredUsers
+                              .filter((u) => !(editedMeetingData.participants || []).includes(u.id))
+                              .slice(0, 5)
+                              .map((user) => (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 text-sm"
+                                  onClick={() => handleAddParticipant(user.id)}
+                                >
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                  <span>{user.name}</span>
+                                  <span className="text-muted-foreground text-xs">({user.email})</span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   ) : (
                     <p className="mt-1">
-                      {editedMeetingData.participants?.length 
+                      {editedMeetingData.participants?.length
                         ? editedMeetingData.participants.map(p => {
                             const user = users.find(u => u.id === p);
                             return user?.name || p;
                           }).join(", ")
+                        : "-"
+                      }
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Participantes externos (email)</label>
+                  {isEditing ? (
+                    <>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {(editedMeetingData.externalParticipants || []).map((email) => (
+                          <Badge key={email} variant="outline" className="gap-1">
+                            {email}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveExternalParticipant(email)}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={externalParticipantInput}
+                          onChange={(e) => setExternalParticipantInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddExternalParticipant();
+                            }
+                          }}
+                          placeholder="Adicionar email externo..."
+                          data-testid="input-external-participant"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAddExternalParticipant}
+                          disabled={!externalParticipantInput || !externalParticipantInput.includes("@")}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-1">
+                      {editedMeetingData.externalParticipants?.length
+                        ? editedMeetingData.externalParticipants.join(", ")
                         : "-"
                       }
                     </p>
@@ -837,7 +972,8 @@ export default function TaskDetailPage() {
                 {showMentionSuggestions && (
                   <div className="absolute z-20 left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-32 overflow-y-auto">
                     {users
-                      .filter(u => u.name.toLowerCase().includes(mentionQuery) || u.email.toLowerCase().includes(mentionQuery))
+                      .filter(u => u.status === "active" && (u.name.toLowerCase().includes(mentionQuery) || u.email.toLowerCase().includes(mentionQuery)))
+                      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
                       .slice(0, 5)
                       .map(user => (
                         <button
@@ -858,7 +994,7 @@ export default function TaskDetailPage() {
                           <span className="text-muted-foreground text-xs">({user.email})</span>
                         </button>
                       ))}
-                    {users.filter(u => u.name.toLowerCase().includes(mentionQuery)).length === 0 && (
+                    {users.filter(u => u.status === "active" && u.name.toLowerCase().includes(mentionQuery)).length === 0 && (
                       <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado</div>
                     )}
                   </div>

@@ -74,29 +74,16 @@ export default function ApiAvaliacoesIaPage() {
       }).toString();
 
       const url = `${API_BASE_URL}${endpoint}?${queryString}`;
-      console.log(`[API Test] Request URL: ${url}`);
-      console.log(`[API Test] Request Headers:`, {
-        "Authorization": "Bearer Renov123",
-        "Content-Type": "application/json",
-      });
 
       const response = await fetch(url, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          // Note: Authorization header might need to be added by the server's auth layer
-          // Try without explicit auth - server might use session/cookie auth
         },
       });
 
-      console.log(`[API Test] Response status: ${response.status} ${response.statusText}`);
-      console.log(`[API Test] Response URL: ${response.url}`);
-      console.log(`[API Test] Response type: ${response.type}`);
-      console.log(`[API Test] Response headers:`, Object.fromEntries(response.headers.entries()));
-
       // Get raw response text first for debugging
       const rawText = await response.text();
-      console.log(`[API Test] Raw response (first 500 chars):`, rawText.substring(0, 500));
 
       let data;
       try {

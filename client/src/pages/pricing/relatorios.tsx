@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 import {
   FileSpreadsheet,
   Download,
@@ -48,11 +49,6 @@ import {
 } from "recharts";
 
 const PRICING_API_BASE = "/api/pricing";
-
-const CATEGORIES = [
-  { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
-  { id: "d686a25d-045d-4b8c-9d7c-35a21d29d31b", name: "Android" },
-];
 
 interface AggregatedData {
   manufacturer: string;
@@ -92,9 +88,17 @@ const CHART_COLORS = [
 export default function PricingReportsPage() {
   const [location] = useLocation();
   const { toast } = useToast();
-  const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0].id);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [months, setMonths] = useState("12");
   const [isExporting, setIsExporting] = useState(false);
+  const { data: categoriesData } = usePricingCategories();
+
+  // Set default category once categories are loaded
+  useEffect(() => {
+    if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
+      setSelectedCategory(categoriesData[0].id);
+    }
+  }, [categoriesData, selectedCategory]);
 
   const params = new URLSearchParams(location.split("?")[1] || "");
   const devicesParam = params.get("devices") || "";

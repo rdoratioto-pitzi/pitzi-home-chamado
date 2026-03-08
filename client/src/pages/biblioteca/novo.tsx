@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RichTextarea } from "@/components/rich-textarea";
-import { 
-  Save, 
+import { useMetaAreas } from "@/hooks/use-meta-areas";
+import {
+  Save,
   Send,
   ArrowLeft,
   X,
@@ -27,18 +28,6 @@ import { getCurrentUser } from "@/lib/permissions";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-
-const AREAS = [
-  { value: "LAB", label: "Laboratório" },
-  { value: "RH", label: "Recursos Humanos" },
-  { value: "COM", label: "Comercial" },
-  { value: "FIN", label: "Financeiro" },
-  { value: "MKT", label: "Marketing" },
-  { value: "OPS", label: "Operações" },
-  { value: "TI", label: "Tecnologia" },
-  { value: "DIR", label: "Diretoria" },
-  { value: "ADV", label: "Apoio a Vendas" },
-];
 
 const TIPOS = [
   { value: "politica", label: "Política Interna", code: "POL" },
@@ -83,6 +72,7 @@ export default function NovoDocumentoPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const user = getCurrentUser();
+  const { data: areas = [] } = useMetaAreas();
 
   const [area, setArea] = useState("");
   const [tipo, setTipo] = useState("");
@@ -253,8 +243,8 @@ export default function NovoDocumentoPage() {
                       <SelectValue placeholder="Selecione a área" />
                     </SelectTrigger>
                     <SelectContent>
-                      {AREAS.map(a => (
-                        <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                      {areas.map((a: any) => (
+                        <SelectItem key={a.name} value={a.name}>{a.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

@@ -37,8 +37,15 @@ import createMemoryStore from "memorystore";
 const MemoryStore = createMemoryStore(session);
 
 export function setupSession(app: Express) {
-  const sessionSecret = process.env.SESSION_SECRET || "renov-home-session-secret-dev-fallback";
   const isProduction = process.env.NODE_ENV === "production";
+  
+  // Em produção, SESSION_SECRET é obrigatório
+  if (isProduction && !process.env.SESSION_SECRET) {
+    throw new Error("CRITICAL: SESSION_SECRET must be set in production environment");
+  }
+  
+  // Fallback apenas para desenvolvimento
+  const sessionSecret = process.env.SESSION_SECRET || "dev-only-fallback-change-in-production";
 
   if (isProduction) {
     app.set("trust proxy", 1);
@@ -56,11 +63,20 @@ export function setupSession(app: Express) {
       cookie: {
         httpOnly: true,
         secure: isProduction,
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias em milissegundos
+        maxAge: 24 * 60 * 60 * 1000, // 24 horas - sessão padrão reduzida para segurança
         sameSite: "lax",
+        path: "/",
       },
     })
   );
+
+  // Sliding expiration: estende a sessão a cada atividade do usuário
+  app.use((req, res, next) => {
+    if (req.session?.userId && req.session.cookie) {
+      req.session.touch();
+    }
+    next();
+  });
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {

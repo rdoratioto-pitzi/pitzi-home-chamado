@@ -29,23 +29,11 @@ export default function OmieOverview() {
 
   const loadConfig = async () => {
     try {
-      console.log('[Frontend] Loading Omie config...');
-      
-      // Usar rota de debug temporária para teste
-      const { data } = await axios.get('/api/omie/config', { 
-        withCredentials: true 
+      const { data } = await axios.get('/api/omie/config', {
+        withCredentials: true
       });
       
-      console.log('[Frontend] Config response:', data);
-      
       if (data.success && data.data) {
-        console.log('[Frontend] Config loaded:', {
-          has_app_key: !!data.data.app_key,
-          app_key_length: data.data.app_key?.length || 0,
-          has_app_secret: !!data.data.app_secret,
-          is_active: data.data.is_active
-        });
-        
         setConfig({
           app_key: data.data.app_key || '',
           app_secret: data.data.app_secret || '',
@@ -103,18 +91,12 @@ export default function OmieOverview() {
     setMessage(null);
     
     try {
-      console.log('[Frontend] Saving config...');
-      console.log('[Frontend] App Key length:', tempConfig.app_key.length);
-      console.log('[Frontend] App Secret length:', tempConfig.app_secret.length);
-      
       const { data } = await axios.post('/api/omie/config', {
         app_key: tempConfig.app_key.trim(),
         app_secret: tempConfig.app_secret.trim()
-      }, { 
-        withCredentials: true 
+      }, {
+        withCredentials: true
       });
-      
-      console.log('[Frontend] Save response:', data);
       
       if (data.success) {
         setMessage({ type: 'success', text: 'Credenciais salvas com sucesso!' });
@@ -144,11 +126,7 @@ export default function OmieOverview() {
     setConnectionStatus(null);
     
     try {
-      console.log('[Frontend] Testing Omie connection...');
-      
       const { data } = await axios.post('/api/omie/test');
-      
-      console.log('[Frontend] Test response:', data);
       
       setConnectionStatus(data.connected);
       

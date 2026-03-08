@@ -352,7 +352,7 @@ export function registerTicketRoutes(router: Router) {
   });
 
   router.get("/api/ticket-responsaveis/find/:categoria/:tipo", requireAuth, async (req, res) => {
-    const responsavelId = await storage.findResponsavelForTicket(req.params.categoria, req.params.tipo);
+    const responsavelId = await storage.findResponsavelForTicket(req.params.categoria as string, req.params.tipo as string);
     res.json({ responsavelId });
   });
 
@@ -506,6 +506,10 @@ export function registerTicketRoutes(router: Router) {
         satisfactionComment: comment || null,
         satisfactionCreatedAt: new Date(),
       });
+
+      if (!updatedTicket) {
+        return res.status(404).json({ error: "Ticket not found after update" });
+      }
 
       // Enviar email de notificação para o responsável
       if (updatedTicket.assigneeId) {

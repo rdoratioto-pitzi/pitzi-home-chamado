@@ -151,10 +151,11 @@ export default function ReunioesPage() {
   });
 
   const filteredUsers = useMemo(() => {
-    if (!participantInput) return users;
+    const activeUsers = users.filter(u => u.status === "active");
+    if (!participantInput) return activeUsers;
     const search = participantInput.toLowerCase();
-    return users.filter(u => 
-      u.name.toLowerCase().includes(search) || 
+    return activeUsers.filter(u =>
+      u.name.toLowerCase().includes(search) ||
       u.email.toLowerCase().includes(search)
     );
   }, [users, participantInput]);
@@ -201,7 +202,7 @@ export default function ReunioesPage() {
       label: 'Data',
       className: 'w-[120px]',
       render: (value: any, row: Task) => {
-        const meetingData = row.meetingData as any;
+        const meetingData = row.meetingData ? JSON.parse(row.meetingData as string) : {};
         const date = meetingData?.date || row.dueDate;
         return date ? new Date(date).toLocaleDateString('pt-BR') : '-';
       }
@@ -211,7 +212,7 @@ export default function ReunioesPage() {
       label: 'Horário',
       className: 'w-[100px]',
       render: (value: any, row: Task) => {
-        const meetingData = row.meetingData as any;
+        const meetingData = row.meetingData ? JSON.parse(row.meetingData as string) : {};
         return meetingData?.time || '-';
       }
     },
@@ -297,7 +298,6 @@ export default function ReunioesPage() {
 
   const createAreaMutation = useMutation({
     mutationFn: async (data: typeof newArea) => {
-      console.log("[createAreaMutation] Sending data to API:", data);
       return apiRequest("POST", "/api/task-tags", data);
     },
     onSuccess: () => {
@@ -766,7 +766,6 @@ export default function ReunioesPage() {
   };
 
   const handleSaveArea = () => {
-    console.log("[handleSaveArea] Saving area with data:", newArea);
     if (editingArea) {
       updateAreaMutation.mutate({ id: editingArea.id, data: newArea });
     } else {
@@ -1429,7 +1428,7 @@ export default function ReunioesPage() {
                   {memberSearchInput && (
                     <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
                       {users
-                        .filter(u => 
+                        .filter(u => u.status === "active" &&
                           !newArea.memberIds.includes(u.id) &&
                           (u.name.toLowerCase().includes(memberSearchInput.toLowerCase()) ||
                            u.email.toLowerCase().includes(memberSearchInput.toLowerCase()))
@@ -1453,7 +1452,8 @@ export default function ReunioesPage() {
                             <span className="text-muted-foreground text-xs">({user.email})</span>
                           </button>
                         ))}
-                      {users.filter(u => 
+                      {users.filter(u =>
+                        u.status === "active" &&
                         !newArea.memberIds.includes(u.id) &&
                         u.name.toLowerCase().includes(memberSearchInput.toLowerCase())
                       ).length === 0 && (
