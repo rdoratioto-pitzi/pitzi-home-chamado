@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { 
+import { useMetaAreas } from "@/hooks/use-meta-areas";
+import {
   ArrowLeft,
   Star,
   StarOff,
@@ -37,16 +38,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-const AREAS = [
-  { value: "LAB", label: "Laboratório" },
-  { value: "RH", label: "Recursos Humanos" },
-  { value: "COM", label: "Comercial" },
-  { value: "FIN", label: "Financeiro" },
-  { value: "MKT", label: "Marketing" },
-  { value: "OPS", label: "Operações" },
-  { value: "TI", label: "Tecnologia" },
-];
-
+// Tipos de documento (pode ser movido para API no futuro)
 const TIPOS = [
   { value: "politica", label: "Política Interna" },
   { value: "pop", label: "POP" },
@@ -81,6 +73,7 @@ export default function DocumentoPage() {
   const { toast } = useToast();
   const user = getCurrentUser();
   const userIsAdmin = isAdmin();
+  const { data: areas = [] } = useMetaAreas();
 
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -156,7 +149,7 @@ export default function DocumentoPage() {
     return u?.name || "Usuário desconhecido";
   };
 
-  const getAreaLabel = (area: string) => AREAS.find(a => a.value === area)?.label || area;
+  const getAreaLabel = (area: string) => areas.find((a: any) => a.name === area)?.name || area;
   const getTipoLabel = (tipo: string) => TIPOS.find(t => t.value === tipo)?.label || tipo;
 
   if (isLoading) {

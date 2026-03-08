@@ -954,7 +954,7 @@ export default function GestaoMetasPage() {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {activeUsers.map((user) => (
+                    {activeUsers.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((user) => (
                       <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                     ))}
                   </SelectContent>

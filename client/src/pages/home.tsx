@@ -129,7 +129,7 @@ const modules: ModuleCard[] = [
     href: "/biblioteca",
     color: "text-indigo-600 dark:text-indigo-400",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
-    permissionKey: "biblioteca",
+    permissionKey: "conhecimento",
   },
   {
     title: "Git Analytics",
@@ -138,6 +138,7 @@ const modules: ModuleCard[] = [
     href: "/git-analytics",
     color: "text-indigo-600 dark:text-indigo-400",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
+    permissionKey: "gitAnalytics"
   },
 ];
 

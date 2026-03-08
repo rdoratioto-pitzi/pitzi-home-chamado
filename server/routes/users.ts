@@ -8,6 +8,8 @@ import { sendPasswordResetEmail, sendWelcomeEmail } from "../email-service";
 export function registerUserRoutes(router: Router) {
   router.get("/api/users", requireAuth, async (req, res) => {
     const users = await storage.getUsers();
+    // Sort alphabetically by name
+    users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
     const safeUsers = users.map(({ password, ...user }) => user);
     res.json(safeUsers);
   });
