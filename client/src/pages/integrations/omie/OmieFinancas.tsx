@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DollarSign, TrendingDown, TrendingUp, Wallet, Search, Loader2, AlertTriangle } from 'lucide-react';
+import { TrendingDown, TrendingUp, Wallet, Search, Loader2, AlertTriangle, Info } from 'lucide-react';
 import axios from 'axios';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -35,16 +35,6 @@ export default function OmieFinancas() {
   const [receberData, setReceberData] = useState<any[]>([]);
   const [receberLoading, setReceberLoading] = useState(false);
   const [receberTotals, setReceberTotals] = useState({ total: 0, vencidas: 0, recebidas: 0 });
-
-  // Estados para Movimento de Caixa
-  const [caixaFilters, setCaixaFilters] = useState({
-    dDtIni: '',
-    dDtFim: '',
-    cTipo: 'T'
-  });
-  const [caixaData, setCaixaData] = useState<any[]>([]);
-  const [caixaLoading, setCaixaLoading] = useState(false);
-  const [caixaTotals, setCaixaTotals] = useState({ entradas: 0, saidas: 0, saldo: 0 });
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -144,46 +134,6 @@ export default function OmieFinancas() {
       setReceberTotals({ total: 0, vencidas: 0, recebidas: 0 });
     } finally {
       setReceberLoading(false);
-    }
-  };
-
-  // Handler Movimento de Caixa
-  const handleBuscarCaixa = async () => {
-    setCaixaLoading(true);
-    setMessage(null);
-    try {
-      const params = [{
-        cTipo: caixaFilters.cTipo
-      }];
-
-      if (caixaFilters.dDtIni) {
-        params[0].dDtIni = caixaFilters.dDtIni;
-      }
-      if (caixaFilters.dDtFim) {
-        params[0].dDtFim = caixaFilters.dDtFim;
-      }
-
-      const result = await callOmieApi('financas/mcc/', 'ConsultarMovimentoCaixa', params, 'financas');
-      const movimentos = result.movimentoCaixaEncontrado || [];
-      setCaixaData(movimentos);
-
-      // Calcular totais
-      const entradas = movimentos
-        .filter((m: any) => m.cTipo === 'E')
-        .reduce((sum: number, m: any) => sum + (m.nValor || 0), 0);
-      const saidas = movimentos
-        .filter((m: any) => m.cTipo === 'S')
-        .reduce((sum: number, m: any) => sum + (m.nValor || 0), 0);
-      const saldo = entradas - saidas;
-      setCaixaTotals({ entradas, saidas, saldo });
-
-      setMessage({ type: 'success', text: `${result.nTotalRegistros || 0} movimento(s) encontrado(s)` });
-    } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
-      setCaixaData([]);
-      setCaixaTotals({ entradas: 0, saidas: 0, saldo: 0 });
-    } finally {
-      setCaixaLoading(false);
     }
   };
 
@@ -289,19 +239,19 @@ export default function OmieFinancas() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Número</TableHead>
-                    <TableHead>Fornecedor</TableHead>
+                    <TableHead>Número Doc.</TableHead>
+                    <TableHead>Cód. Fornecedor</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead>Vencimento</TableHead>
-                    <TableHead>Pagamento</TableHead>
+                    <TableHead>Previsão</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {pagarData.map((conta, idx) => (
                     <TableRow key={idx} className={isVencido(conta.data_vencimento) && conta.status_titulo !== 'PAGO' ? 'bg-red-50' : ''}>
-                      <TableCell className="font-medium">{conta.numero_documento_fiscal}</TableCell>
-                      <TableCell>{conta.razao_social || 'N/A'}</TableCell>
+                      <TableCell className="font-medium">{conta.numero_documento_fiscal || '-'}</TableCell>
+                      <TableCell className="text-xs font-mono">{conta.codigo_cliente_fornecedor}</TableCell>
                       <TableCell>R$ {conta.valor_documento?.toFixed(2) || '0.00'}</TableCell>
                       <TableCell>
                         {conta.data_vencimento}
@@ -309,7 +259,7 @@ export default function OmieFinancas() {
                           <AlertTriangle className="h-3 w-3 inline ml-1 text-red-600" />
                         )}
                       </TableCell>
-                      <TableCell>{conta.data_pagamento || '-'}</TableCell>
+                      <TableCell>{conta.data_previsao || '-'}</TableCell>
                       <TableCell>
                         <Badge variant={getStatusBadgeVariant(conta.status_titulo)}>
                           {conta.status_titulo}
@@ -403,19 +353,19 @@ export default function OmieFinancas() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Número</TableHead>
-                    <TableHead>Cliente</TableHead>
+                    <TableHead>Número Doc.</TableHead>
+                    <TableHead>Cód. Cliente</TableHead>
                     <TableHead>Valor</TableHead>
                     <TableHead>Vencimento</TableHead>
-                    <TableHead>Recebimento</TableHead>
+                    <TableHead>Previsão</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {receberData.map((conta, idx) => (
                     <TableRow key={idx} className={isVencido(conta.data_vencimento) && conta.status_titulo !== 'RECEBIDO' ? 'bg-red-50' : ''}>
-                      <TableCell className="font-medium">{conta.numero_documento_fiscal}</TableCell>
-                      <TableCell>{conta.razao_social || 'N/A'}</TableCell>
+                      <TableCell className="font-medium">{conta.numero_documento_fiscal || '-'}</TableCell>
+                      <TableCell className="text-xs font-mono">{conta.codigo_cliente_fornecedor}</TableCell>
                       <TableCell>R$ {conta.valor_documento?.toFixed(2) || '0.00'}</TableCell>
                       <TableCell>
                         {conta.data_vencimento}
@@ -423,7 +373,7 @@ export default function OmieFinancas() {
                           <AlertTriangle className="h-3 w-3 inline ml-1 text-red-600" />
                         )}
                       </TableCell>
-                      <TableCell>{conta.data_recebimento || '-'}</TableCell>
+                      <TableCell>{conta.data_previsao || '-'}</TableCell>
                       <TableCell>
                         <Badge variant={getStatusBadgeVariant(conta.status_titulo)}>
                           {conta.status_titulo}
@@ -438,116 +388,26 @@ export default function OmieFinancas() {
         </CardContent>
       </Card>
 
-      {/* MOVIMENTO DE CAIXA */}
-      <Card>
+      {/* MOVIMENTO DE CAIXA — não disponível */}
+      <Card className="opacity-75">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Wallet className="h-5 w-5" />
-            Movimento de Caixa
+            <Wallet className="h-5 w-5 text-muted-foreground" />
+            <span className="text-muted-foreground">Movimento de Caixa</span>
           </CardTitle>
           <CardDescription>Consultar entradas e saídas de caixa</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* KPIs */}
-          {caixaData.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-green-600">R$ {caixaTotals.entradas.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Total Entradas</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-red-600">R$ {caixaTotals.saidas.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Total Saídas</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className={`text-2xl font-bold ${caixaTotals.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    R$ {caixaTotals.saldo.toFixed(2)}
-                  </div>
-                  <p className="text-xs text-muted-foreground">Saldo</p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label>Data Inicial (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="01/01/2026"
-                value={caixaFilters.dDtIni}
-                onChange={(e) => setCaixaFilters(prev => ({ ...prev, dDtIni: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Data Final (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="31/01/2026"
-                value={caixaFilters.dDtFim}
-                onChange={(e) => setCaixaFilters(prev => ({ ...prev, dDtFim: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Tipo</Label>
-              <Select value={caixaFilters.cTipo} onValueChange={(v) => setCaixaFilters(prev => ({ ...prev, cTipo: v }))}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="T">Todos</SelectItem>
-                  <SelectItem value="E">Entrada</SelectItem>
-                  <SelectItem value="S">Saída</SelectItem>
-                </SelectContent>
-              </Select>
+        <CardContent>
+          <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+            <Info className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Endpoint não disponível</p>
+              <p className="text-sm text-muted-foreground">
+                A API de Movimento de Caixa do Omie não está habilitada para esta conta.
+                Consulte diretamente no ERP Omie ou entre em contato com o suporte para habilitar o acesso.
+              </p>
             </div>
           </div>
-          <Button onClick={handleBuscarCaixa} disabled={caixaLoading}>
-            {caixaLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
-            Buscar Movimentos
-          </Button>
-
-          {caixaLoading ? (
-            <Skeleton className="h-64 w-full" />
-          ) : caixaData.length > 0 ? (
-            <div className="border rounded-lg overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Categoria</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {caixaData.map((mov, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell>{mov.dDtMov}</TableCell>
-                      <TableCell>{mov.cDescricao || 'N/A'}</TableCell>
-                      <TableCell>
-                        <Badge variant={mov.cTipo === 'E' ? 'default' : 'secondary'}>
-                          {mov.cTipo === 'E' ? (
-                            <><TrendingUp className="h-3 w-3 mr-1 inline" />Entrada</>
-                          ) : (
-                            <><TrendingDown className="h-3 w-3 mr-1 inline" />Saída</>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className={mov.cTipo === 'E' ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
-                        R$ {mov.nValor?.toFixed(2) || '0.00'}
-                      </TableCell>
-                      <TableCell>{mov.cCategoria || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
     </div>

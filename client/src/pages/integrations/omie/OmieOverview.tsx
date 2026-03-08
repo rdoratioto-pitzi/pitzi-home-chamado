@@ -6,12 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, XCircle, Key, Server, Database, Edit2, Save, X, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, Key, Server, Database, Edit2, Save, X, Loader2, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
-
-// Configurar axios global para enviar cookies
-axios.defaults.withCredentials = true;
-axios.defaults.baseURL = '';
 
 export default function OmieOverview() {
   const [config, setConfig] = useState({ app_key: '', app_secret: '', is_active: false });
@@ -22,6 +18,8 @@ export default function OmieOverview() {
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<boolean | null>(null);
+  const [showSecret, setShowSecret] = useState(false);
+  const [showEditSecret, setShowEditSecret] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -59,7 +57,8 @@ export default function OmieOverview() {
 
   const handleEdit = () => {
     setEditMode(true);
-    setTempConfig({ app_key: config.app_key, app_secret: '' });
+    setTempConfig({ app_key: config.app_key, app_secret: config.app_secret });
+    setShowEditSecret(false);
     setMessage(null);
   };
 
@@ -226,13 +225,24 @@ export default function OmieOverview() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="app_secret">App Secret</Label>
-                <Input
-                  id="app_secret"
-                  type="password"
-                  placeholder="Digite o App Secret"
-                  value={tempConfig.app_secret}
-                  onChange={(e) => setTempConfig(prev => ({ ...prev, app_secret: e.target.value }))}
-                />
+                <div className="relative">
+                  <Input
+                    id="app_secret"
+                    type={showEditSecret ? 'text' : 'password'}
+                    placeholder="Digite o App Secret"
+                    value={tempConfig.app_secret}
+                    onChange={(e) => setTempConfig(prev => ({ ...prev, app_secret: e.target.value }))}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditSecret(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    tabIndex={-1}
+                  >
+                    {showEditSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </>
           ) : (
@@ -245,8 +255,21 @@ export default function OmieOverview() {
               </div>
               <div className="space-y-2">
                 <Label>App Secret</Label>
-                <div className="bg-muted px-3 py-2 rounded-md text-sm font-mono">
-                  {config.app_key ? '••••••••••••••••••••' : 'Não configurado'}
+                <div className="bg-muted px-3 py-2 rounded-md text-sm font-mono flex items-center justify-between">
+                  <span className="truncate">
+                    {config.app_secret
+                      ? (showSecret ? config.app_secret : '••••••••••••••••••••')
+                      : 'Não configurado'}
+                  </span>
+                  {config.app_secret && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSecret(v => !v)}
+                      className="ml-2 shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                      {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  )}
                 </div>
               </div>
             </>
