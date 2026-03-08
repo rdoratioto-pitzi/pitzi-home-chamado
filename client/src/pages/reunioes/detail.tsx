@@ -110,7 +110,7 @@ export default function MeetingDetailPage() {
 
   const { data: meeting, isLoading } = useQuery<Task>({
     queryKey: ["/api/tasks", id],
-    refetchInterval: 5000, // Poll every 5 seconds for shared meetings
+    refetchInterval: 30000, // Poll every 30 seconds for shared meetings
   });
 
   const { data: comments = [] } = useQuery<TaskCommentWithUser[]>({
@@ -121,7 +121,7 @@ export default function MeetingDetailPage() {
       return res.json();
     },
     enabled: !!id,
-    refetchInterval: 5000, // Poll every 5 seconds for comments
+    refetchInterval: 30000, // Poll every 30 seconds for comments
   });
 
   const { data: areas = [] } = useQuery<TaskArea[]>({

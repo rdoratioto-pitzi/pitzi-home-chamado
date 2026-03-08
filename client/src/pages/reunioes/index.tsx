@@ -168,7 +168,7 @@ export default function ReunioesPage() {
       if (!res.ok) throw new Error("Failed to fetch meetings");
       return res.json();
     },
-    refetchInterval: 5000, // Poll every 5 seconds for shared meetings
+    refetchInterval: 30000, // Poll every 30 seconds for shared meetings
   });
 
   const { data: meetings = [], isLoading: tasksLoading } = useQuery<Task[]>({
@@ -182,7 +182,7 @@ export default function ReunioesPage() {
       if (!res.ok) throw new Error("Failed to fetch meetings");
       return res.json();
     },
-    refetchInterval: 5000, // Poll every 5 seconds for shared meetings
+    refetchInterval: 30000, // Poll every 30 seconds for shared meetings
   });
 
   // Definição das colunas da tabela de reuniões

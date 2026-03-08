@@ -124,8 +124,8 @@ export function useAuthSync() {
         method: "POST",
         credentials: "include",
       });
-    } catch (error) {
-      console.error("[authSync] Erro ao fazer logout:", error);
+    } catch {
+      // ignore logout api errors — always clear local auth
     } finally {
       // Limpa dados locais independentemente do resultado da API
       clearAuth();
