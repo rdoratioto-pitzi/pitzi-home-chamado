@@ -9,6 +9,7 @@
 
 import cron from "node-cron";
 import { storage } from "../storage";
+import { getCachedProdutos } from "../services/estoque-cache.service";
 import { 
   addDays, 
   addWeeks, 
@@ -411,6 +412,15 @@ export function startRecurrenceJob(): void {
   cron.schedule("15 * * * *", async () => {
     console.log("[RecurrenceJob] Executando job de recorrência...");
     await processRecurringMeetings();
+
+    // Aquece o cache Omie junto com o job horário, para que nenhum usuário
+    // fique esperando pela chamada à API externa na primeira requisição pós-TTL.
+    try {
+      await getCachedProdutos();
+      console.log("[RecurrenceJob] Cache Omie aquecido com sucesso");
+    } catch (err: any) {
+      console.error("[RecurrenceJob] Falha ao aquecer cache Omie:", err.message);
+    }
   });
   
   console.log("[RecurrenceJob] Job de recorrência agendado para executar a cada hora (minuto 15)");

@@ -4,14 +4,19 @@ import { clearAuth, getAuthToken } from "./auth";
 let _handlingUnauthorized = false;
 
 function handleUnauthorized() {
+  // Na página de login, um 401 é só "senha errada" — limpa auth mas não
+  // seta a flag nem redireciona. Isso evita que a flag fique presa após
+  // uma tentativa de login frustrada, quebrando o redirecionamento futuro.
+  if (window.location.pathname === "/login") {
+    clearAuth();
+    return;
+  }
+
   if (_handlingUnauthorized) return;
   _handlingUnauthorized = true;
 
   clearAuth();
-
-  if (window.location.pathname !== "/login") {
-    window.location.href = "/login";
-  }
+  window.location.href = "/login";
 }
 
 async function throwIfResNotOk(res: Response) {

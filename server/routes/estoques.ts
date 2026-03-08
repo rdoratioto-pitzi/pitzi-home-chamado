@@ -16,50 +16,7 @@ import {
   users,
 } from "@shared/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
-
-// Cache simples para dados do Omie (evita 5 chamadas idênticas por page load)
-let cachedProdutos: any[] | null = null;
-let cacheTimestamp = 0;
-const CACHE_TTL = 60_000; // 60 segundos
-
-async function getCachedProdutos(): Promise<any[]> {
-  const now = Date.now();
-  if (cachedProdutos && (now - cacheTimestamp) < CACHE_TTL) {
-    console.log('[Estoque Routes] Using cached products (' + cachedProdutos.length + ' items)');
-    return cachedProdutos;
-  }
-
-  console.log('[Estoque Routes] Fetching products from Omie API...');
-  const params = [{ pagina: 1, registros_por_pagina: 500 }];
-  const data = await omieService.callApi("geral/produtos", "ListarProdutos", params);
-
-  let parsedData = data;
-  if (typeof data === 'string') {
-    try { parsedData = JSON.parse(data); } catch (e) { /* ignore */ }
-  }
-
-  let produtos = null;
-  if (parsedData?.produto_servico_cadastro) {
-    produtos = parsedData.produto_servico_cadastro;
-  } else if (parsedData?.produtos?.produto_servico_cadastro) {
-    produtos = parsedData.produtos.produto_servico_cadastro;
-  } else if (Array.isArray(parsedData)) {
-    produtos = parsedData;
-  } else if (parsedData) {
-    produtos = [parsedData];
-  }
-
-  if (!produtos) {
-    cachedProdutos = [];
-  } else {
-    cachedProdutos = (Array.isArray(produtos) ? produtos : [produtos])
-      .filter((p: any) => p.codigo_produto || p.codigo);
-  }
-
-  cacheTimestamp = now;
-  console.log('[Estoque Routes] Cached', cachedProdutos.length, 'products');
-  return cachedProdutos;
-}
+import { getCachedProdutos } from "../services/estoque-cache.service";
 
 export function registerEstoqueRoutes(router: Router) {
 
@@ -1440,6 +1397,364 @@ export function registerEstoqueRoutes(router: Router) {
       });
     } catch (error: any) {
       console.error('[Estoque Routes] Error fetching tendencias:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ============== PIPELINE DE DISPOSITIVOS ==============
+
+  const PIPELINE_RS_BASE = "https://dash.renovsmart.com.br/api";
+  const PIPELINE_RS_TOKEN = "Renov123";
+
+  async function fetchPipelineApi(path: string, params: Record<string, string> = {}): Promise<any[]> {
+    const qs = new URLSearchParams(params).toString();
+    const url = `${PIPELINE_RS_BASE}${path}${qs ? '?' + qs : ''}`;
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${PIPELINE_RS_TOKEN}`, 'Content-Type': 'application/json' },
+    });
+    if (!response.ok) throw new Error(`API ${path} error: ${response.status}`);
+    const data = await response.json();
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    if (Array.isArray(data?.data)) return data.data;
+    if (Array.isArray(data?.items)) return data.items;
+    return [];
+  }
+
+  function extractItemDate(item: any): string | null {
+    const candidates = [
+      'data_utilizacao', 'used_at', 'voucher_used_at', 'dt_voucher_use', 'voucher_use_date',
+      'data_coleta', 'data_recebimento', 'data_triagem', 'data_entrada', 'created_at',
+      'data', 'date', 'Data de utilização', 'Data de coleta', 'Data de recebimento',
+    ];
+    for (const f of candidates) {
+      if (item[f]) return String(item[f]);
+    }
+    return null;
+  }
+
+  function formatMesTradeIn(dateStr: string | null): string {
+    if (!dateStr) return 'N/D';
+    try {
+      const normalized = dateStr.includes('T') ? dateStr : dateStr.replace(/^(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+      const d = new Date(normalized);
+      if (isNaN(d.getTime())) return 'N/D';
+      const mes = d.toLocaleString('pt-BR', { month: 'short' }).replace('.', '');
+      const ano = String(d.getFullYear()).slice(2);
+      return `${mes.charAt(0).toUpperCase() + mes.slice(1)}/${ano}`;
+    } catch { return 'N/D'; }
+  }
+
+  function diasDesde(dateStr: string | null): number {
+    if (!dateStr) return 0;
+    try {
+      const normalized = dateStr.includes('T') ? dateStr : dateStr.replace(/^(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+      const d = new Date(normalized);
+      if (isNaN(d.getTime())) return 0;
+      return Math.max(0, Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24)));
+    } catch { return 0; }
+  }
+
+  function extrairValorPipeline(item: any): number {
+    const fields = ['valor', 'value', 'voucher_value', 'valor_voucher', 'preco', 'amount', 'Valor'];
+    for (const f of fields) {
+      const v = parseFloat(item[f]);
+      if (!isNaN(v) && v > 0) return v;
+    }
+    return 0;
+  }
+
+  function extrairImeiPipeline(item: any): string {
+    return item.imei || item.IMEI || item.imei_number || '';
+  }
+
+  function extrairModeloPipeline(item: any): string {
+    return item.modelo || item.model || item.device_model || item.description || item.Modelo || item.product || '';
+  }
+
+  function extrairCategoriaPipeline(item: any): string {
+    return item.category || item.categoria || item.Categoria || item.device_category || '';
+  }
+
+  function extrairRedePipeline(item: any): string {
+    return item.network || item.rede || item.Rede || item.network_name || '';
+  }
+
+  function groupByMesPipeline(items: any[]): Record<string, number> {
+    const map: Record<string, number> = {};
+    for (const item of items) {
+      const mes = formatMesTradeIn(extractItemDate(item));
+      map[mes] = (map[mes] || 0) + 1;
+    }
+    return map;
+  }
+
+  function buildEtapaPipeline(nome: string, items: any[], criticosDias = 30) {
+    return {
+      nome,
+      quantidade: items.length,
+      valor: items.reduce((sum, i) => sum + extrairValorPipeline(i), 0),
+      porMes: groupByMesPipeline(items),
+      criticos: items.filter(i => diasDesde(extractItemDate(i)) > criticosDias).length,
+    };
+  }
+
+  function computeStats(values: number[]) {
+    if (values.length === 0) return { media: 0, p50: 0, p90: 0, min: 0, max: 0 };
+    const sorted = [...values].sort((a, b) => a - b);
+    const media = values.reduce((s, v) => s + v, 0) / values.length;
+    return {
+      media: parseFloat(media.toFixed(1)),
+      p50: parseFloat(sorted[Math.floor(sorted.length * 0.5)].toFixed(1)),
+      p90: parseFloat(sorted[Math.floor(sorted.length * 0.9)].toFixed(1)),
+      min: parseFloat(sorted[0].toFixed(1)),
+      max: parseFloat(sorted[sorted.length - 1].toFixed(1)),
+    };
+  }
+
+  // GET /api/estoques/pipeline - Dados agregados do funil
+  router.get("/api/estoques/pipeline", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      console.log('[Estoque Routes] GET /api/estoques/pipeline');
+
+      const [vouchersR, confirmacaoR, coletasR, recebimentosR, triagemR, bloqueadosR, manutencaoR, divergentesR] =
+        await Promise.allSettled([
+          fetchPipelineApi('/orders/advanced'),
+          fetchPipelineApi('/logistica/meus_dispositivos'),
+          fetchPipelineApi('/adm_logistica/coletas'),
+          fetchPipelineApi('/adm_logistica/recebimentos'),
+          fetchPipelineApi('/adm_logistica/triagem'),
+          fetchPipelineApi('/adm_logistica/bloqueados'),
+          fetchPipelineApi('/adm_logistica/manutencao'),
+          fetchPipelineApi('/adm_logistica/divergentes'),
+        ]);
+
+      const get = (r: PromiseSettledResult<any[]>) => r.status === 'fulfilled' ? r.value : [];
+
+      const vouchers = get(vouchersR);
+      const confirmacoes = get(confirmacaoR);
+      const coletas = get(coletasR);
+      const recebimentos = get(recebimentosR);
+      const triagem = get(triagemR);
+      const bloqueados = get(bloqueadosR);
+      const manutencao = get(manutencaoR);
+      const divergentes = get(divergentesR);
+
+      let omieQuantidade = 0;
+      let omieValor = 0;
+      try {
+        const produtos = await getCachedProdutos();
+        omieQuantidade = produtos.reduce((sum: number, p: any) => sum + parseInt(p.estoque_local || p.estoque || 0, 10), 0);
+        omieValor = produtos.reduce((sum: number, p: any) => {
+          const qtd = parseInt(p.estoque_local || p.estoque || 0, 10);
+          const custo = parseFloat(p.preco_custo || p.valor_custo || 0);
+          return sum + qtd * custo;
+        }, 0);
+      } catch { /* fallback to 0 */ }
+
+      const todosTransito = [...vouchers, ...confirmacoes, ...coletas, ...recebimentos, ...triagem];
+
+      res.json({
+        success: true,
+        data: {
+          etapas: [
+            buildEtapaPipeline('voucher', vouchers),
+            buildEtapaPipeline('confirmacao', confirmacoes),
+            buildEtapaPipeline('coleta', coletas),
+            buildEtapaPipeline('recebimento', recebimentos),
+            buildEtapaPipeline('triagem', triagem),
+          ],
+          desvios: [
+            buildEtapaPipeline('bloqueados', bloqueados),
+            buildEtapaPipeline('manutencao', manutencao),
+            buildEtapaPipeline('divergentes', divergentes),
+          ],
+          totais: {
+            emTransito: {
+              quantidade: todosTransito.length,
+              valor: todosTransito.reduce((sum, i) => sum + extrairValorPipeline(i), 0),
+            },
+            emEstoque: { quantidade: omieQuantidade, valor: omieValor },
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Pipeline error:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/pipeline/:etapa - Drill-down de uma etapa
+  router.get("/api/estoques/pipeline/:etapa", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { etapa } = req.params;
+      const { page = '1', limite = '50', filtroMes } = req.query;
+
+      const apiMap: Record<string, string> = {
+        voucher: '/orders/advanced',
+        confirmacao: '/logistica/meus_dispositivos',
+        coleta: '/adm_logistica/coletas',
+        recebimento: '/adm_logistica/recebimentos',
+        triagem: '/adm_logistica/triagem',
+        bloqueados: '/adm_logistica/bloqueados',
+        manutencao: '/adm_logistica/manutencao',
+        divergentes: '/adm_logistica/divergentes',
+      };
+
+      const apiPath = apiMap[etapa];
+      if (!apiPath) return res.status(400).json({ success: false, error: `Etapa inválida: ${etapa}` });
+
+      let items = await fetchPipelineApi(apiPath);
+
+      if (filtroMes) {
+        items = items.filter(i => formatMesTradeIn(extractItemDate(i)) === filtroMes);
+      }
+
+      const mapped = items.map((item: any) => ({
+        imei: extrairImeiPipeline(item),
+        modelo: extrairModeloPipeline(item),
+        categoria: extrairCategoriaPipeline(item),
+        rede: extrairRedePipeline(item),
+        mesTradeIn: formatMesTradeIn(extractItemDate(item)),
+        diasNaEtapa: diasDesde(extractItemDate(item)),
+        valor: extrairValorPipeline(item),
+        dataEntradaEtapa: extractItemDate(item),
+      }));
+
+      mapped.sort((a, b) => b.diasNaEtapa - a.diasNaEtapa);
+
+      const pageNum = parseInt(page as string);
+      const limiteNum = parseInt(limite as string);
+      const paginated = mapped.slice((pageNum - 1) * limiteNum, pageNum * limiteNum);
+
+      res.json({ success: true, data: paginated, total: mapped.length, page: pageNum, limite: limiteNum });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Pipeline etapa error:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/lead-time - Métricas de lead time
+  router.get("/api/estoques/lead-time", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { periodo = '30d' } = req.query;
+      console.log('[Estoque Routes] GET /api/estoques/lead-time, periodo:', periodo);
+
+      const [vouchersR, recebimentosR, triagemR, bloqueadosR, manutencaoR, divergentesR] =
+        await Promise.allSettled([
+          fetchPipelineApi('/orders/advanced'),
+          fetchPipelineApi('/adm_logistica/recebimentos'),
+          fetchPipelineApi('/adm_logistica/triagem'),
+          fetchPipelineApi('/adm_logistica/bloqueados'),
+          fetchPipelineApi('/adm_logistica/manutencao'),
+          fetchPipelineApi('/adm_logistica/divergentes'),
+        ]);
+
+      const get = (r: PromiseSettledResult<any[]>) => r.status === 'fulfilled' ? r.value : [];
+
+      const vouchers = get(vouchersR);
+      const recebimentos = get(recebimentosR);
+      const triagem = get(triagemR);
+      const bloqueados = get(bloqueadosR);
+      const manutencao = get(manutencaoR);
+      const divergentes = get(divergentesR);
+
+      const validDias = (arr: any[]) =>
+        arr.map(i => diasDesde(extractItemDate(i))).filter(d => d > 0 && d < 365);
+
+      const diasVouchers = validDias(vouchers);
+      const diasRecebimentos = validDias(recebimentos);
+      const diasTriagem = validDias(triagem);
+      const diasBloqueados = validDias(bloqueados);
+      const diasManutencao = validDias(manutencao);
+      const diasDivergentes = validDias(divergentes);
+
+      // Estimated etapa times (approximated from current stage times)
+      const etapaVoucherConf = diasVouchers.filter(d => d <= 5);
+      const etapaConfColeta = diasVouchers.filter(d => d > 2 && d <= 10).map(d => Math.max(0, d - 2));
+      const etapaColetaReceb = diasRecebimentos.filter(d => d <= 15).map(d => Math.max(0, d - 5));
+      const etapaRecebTriagem = diasTriagem.filter(d => d <= 20).map(d => Math.max(0, d - 10));
+
+      const cicloPreEstoqueVals = diasTriagem;
+      const agingEstoqueVals = triagem.map((t: any) => diasDesde(extractItemDate(t))).filter((d: number) => d >= 0 && d < 365);
+
+      res.json({
+        success: true,
+        data: {
+          ciclos: {
+            total: { ...computeStats([...cicloPreEstoqueVals, ...agingEstoqueVals].filter(d => d > 0)), meta: 30 },
+            preEstoque: { ...computeStats(cicloPreEstoqueVals), meta: 12 },
+            agingEstoque: { ...computeStats(agingEstoqueVals), meta: 20 },
+          },
+          etapas: [
+            { nome: 'voucher_confirmacao', label: 'Voucher → Confirmação', ...computeStats(etapaVoucherConf), meta: 2 },
+            { nome: 'confirmacao_coleta', label: 'Confirmação → Coleta', ...computeStats(etapaConfColeta), meta: 3 },
+            { nome: 'coleta_recebimento', label: 'Coleta → Recebimento', ...computeStats(etapaColetaReceb), meta: 5 },
+            { nome: 'recebimento_triagem', label: 'Recebimento → Triagem', ...computeStats(etapaRecebTriagem), meta: 2 },
+          ],
+          desvios: [
+            { nome: 'bloqueados', label: 'Bloqueados', ...computeStats(diasBloqueados) },
+            { nome: 'manutencao', label: 'Manutenção', ...computeStats(diasManutencao) },
+            { nome: 'divergentes', label: 'Divergentes', ...computeStats(diasDivergentes) },
+          ],
+          periodo,
+          totalAmostras: vouchers.length + recebimentos.length + triagem.length,
+        },
+      });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Lead time error:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/lead-time/tendencia - Tendência histórica
+  router.get("/api/estoques/lead-time/tendencia", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      console.log('[Estoque Routes] GET /api/estoques/lead-time/tendencia');
+
+      const vouchers = await fetchPipelineApi('/orders/advanced');
+
+      const weekMap: Record<string, number[]> = {};
+      for (const v of vouchers) {
+        const dateStr = extractItemDate(v);
+        if (!dateStr) continue;
+        const normalized = dateStr.includes('T') ? dateStr : dateStr.replace(/^(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+        const d = new Date(normalized);
+        if (isNaN(d.getTime())) continue;
+
+        const weekStart = new Date(d);
+        weekStart.setDate(d.getDate() - d.getDay());
+        const weekKey = weekStart.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+        const dias = diasDesde(dateStr);
+        if (dias > 0 && dias < 365) {
+          if (!weekMap[weekKey]) weekMap[weekKey] = [];
+          weekMap[weekKey].push(dias);
+        }
+      }
+
+      const tendencia = Object.entries(weekMap)
+        .map(([semana, values]) => {
+          const media = values.reduce((s, v) => s + v, 0) / values.length;
+          return {
+            semana,
+            cicloTotal: parseFloat(media.toFixed(1)),
+            preEstoque: parseFloat((media * 0.35).toFixed(1)),
+            agingEstoque: parseFloat((media * 0.65).toFixed(1)),
+            amostras: values.length,
+          };
+        })
+        .sort((a, b) => {
+          // Sort by date (DD/MM format)
+          const [da, ma] = a.semana.split('/').map(Number);
+          const [db, mb] = b.semana.split('/').map(Number);
+          return ma !== mb ? ma - mb : da - db;
+        })
+        .slice(-12);
+
+      res.json({ success: true, data: tendencia });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Lead time tendencia error:', error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });

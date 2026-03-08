@@ -91,8 +91,9 @@ export function ManualInput({ onSubmit, disabled, error }: ManualInputProps) {
               size="icon"
               onClick={handleCancel}
               disabled={disabled}
+              aria-label="Fechar input manual"
             >
-              <X className="h-4 w-4" />
+              <X className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
 
@@ -100,11 +101,14 @@ export function ManualInput({ onSubmit, disabled, error }: ManualInputProps) {
             <Input
               ref={inputRef}
               type="text"
+              inputMode="numeric"
               value={inputValue}
               onChange={handleInputChange}
               placeholder="Digite o IMEI (15 dígitos)"
               maxLength={15}
               disabled={disabled}
+              aria-label="Campo IMEI — 15 dígitos numéricos"
+              aria-describedby="imei-counter"
               className="text-center text-lg tracking-widest font-mono"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && inputValue.length === 15) {
@@ -113,7 +117,7 @@ export function ManualInput({ onSubmit, disabled, error }: ManualInputProps) {
               }}
             />
 
-            <div className="flex justify-between text-xs text-muted-foreground">
+            <div id="imei-counter" className="flex justify-between text-xs text-muted-foreground" aria-live="polite">
               <span>Dígitos: {inputValue.length}/15</span>
               {inputValue.length > 0 && inputValue.length < 15 && (
                 <span className="text-amber-600">Faltam {15 - inputValue.length} dígitos</span>

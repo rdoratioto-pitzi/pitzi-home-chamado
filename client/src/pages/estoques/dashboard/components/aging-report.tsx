@@ -39,6 +39,8 @@ interface AgingDados {
 interface Props {
   dados: AgingDados | undefined;
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 const FAIXAS = [
@@ -77,7 +79,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   );
 };
 
-export function AgingReport({ dados, isLoading }: Props) {
+export function AgingReport({ dados, isLoading, isError, onRetry }: Props) {
   if (isLoading) {
     return (
       <Card>
@@ -85,6 +87,27 @@ export function AgingReport({ dados, isLoading }: Props) {
         <CardContent className="space-y-4">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-40 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <AlertCircle className="h-5 w-5 text-orange-500" />
+            Aging Report
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+          <p className="text-sm">Não foi possível carregar os dados.</p>
+          {onRetry && (
+            <button onClick={onRetry} className="text-xs underline hover:text-foreground">
+              Tentar novamente
+            </button>
+          )}
         </CardContent>
       </Card>
     );
