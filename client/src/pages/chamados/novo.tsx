@@ -147,7 +147,7 @@ export default function NovoChamadoPage() {
       location: "",
       priority: "medium",
       impact: "medio",
-      assigneeId: "auto",
+      assigneeId: undefined,
     },
   });
 
@@ -156,10 +156,13 @@ export default function NovoChamadoPage() {
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
+      if (!currentUser?.id) {
+        throw new Error("Usuário não autenticado");
+      }
       const payload: Record<string, unknown> = {
         ...data,
         attachments: attachments.length > 0 ? JSON.stringify(attachments.map(a => a.url)) : null,
-        requesterId: currentUser?.id || "admin",
+        requesterId: currentUser.id,
         status: "open",
         code: "",
       };

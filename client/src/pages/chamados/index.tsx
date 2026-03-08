@@ -331,10 +331,8 @@ export default function ChamadosPage() {
   });
 
   useEffect(() => {
-    // Remove old URL parameter handling - now we use routes
-    const params = new URLSearchParams(window.location.search);
-    const ticketCode = params.get("id");
-    if (ticketCode) {
+    // Clean URL if legacy query parameters exist
+    if (window.location.search) {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, []);
