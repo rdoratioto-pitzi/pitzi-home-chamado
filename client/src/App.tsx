@@ -317,7 +317,7 @@ function Router() {
       </Route>
       <Route path="/estoques">
         <ProtectedRoute requiredPermission="estoques">
-          <EstoquesPosicaoPage />
+          <EstoquesDashboardPage />
         </ProtectedRoute>
       </Route>
       <Route path="/estoques/posicao">
