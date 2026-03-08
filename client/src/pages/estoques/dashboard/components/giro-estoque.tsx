@@ -32,6 +32,8 @@ interface GiroDados {
 interface Props {
   dados: GiroDados | undefined;
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   periodo: string;
   onPeriodoChange: (p: string) => void;
 }
@@ -54,7 +56,7 @@ function GiroStatus({ giro }: { giro: number }) {
   return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Crítico</Badge>;
 }
 
-export function GiroEstoque({ dados, isLoading, periodo, onPeriodoChange }: Props) {
+export function GiroEstoque({ dados, isLoading, isError, onRetry, periodo, onPeriodoChange }: Props) {
   const giroGeral = dados?.giroGeral ?? 0;
   const diasEmEstoque = dados?.diasEmEstoque ?? 0;
   const porCategoria = dados?.porCategoria ?? [];
@@ -67,6 +69,27 @@ export function GiroEstoque({ dados, isLoading, periodo, onPeriodoChange }: Prop
         <CardContent className="space-y-4">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-48 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <RotateCcw className="h-5 w-5 text-blue-500" />
+            Giro de Estoque
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+          <p className="text-sm">Não foi possível carregar os dados.</p>
+          {onRetry && (
+            <button onClick={onRetry} className="text-xs underline hover:text-foreground">
+              Tentar novamente
+            </button>
+          )}
         </CardContent>
       </Card>
     );

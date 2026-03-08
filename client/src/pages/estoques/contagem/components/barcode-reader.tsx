@@ -67,10 +67,12 @@ export function BarcodeReader({ onScan, disabled }: BarcodeReaderProps) {
             <input
               ref={inputRef}
               type="text"
+              inputMode="numeric"
               value={inputValue}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               placeholder="Escaneie ou digite o IMEI"
+              aria-label="Campo de leitura IMEI — escaneie o código de barras ou digite 15 dígitos"
               className="w-full h-12 text-center text-lg tracking-widest border-2 border-primary rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-primary"
               maxLength={15}
               autoComplete="off"
