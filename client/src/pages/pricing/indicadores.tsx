@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 import {
   Table,
   TableBody,
@@ -32,11 +33,6 @@ import {
   Info,
 } from "lucide-react";
 import { Link } from "wouter";
-
-const CATEGORIES = [
-  { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
-  { id: "d686a25d-045d-4b8c-9d7c-35a21d29d31b", name: "Android" },
-];
 
 interface EligibleDevice {
   categoryId: string;
@@ -59,7 +55,15 @@ function formatCurrency(value: number): string {
 }
 
 export default function IndicadoresPage() {
-  const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0].id);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const { data: categoriesData } = usePricingCategories();
+
+  // Set default category once categories are loaded
+  useEffect(() => {
+    if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
+      setSelectedCategory(categoriesData[0].id);
+    }
+  }, [categoriesData, selectedCategory]);
 
   const { data: devicesData, isLoading, refetch } = useQuery<EligibleDevicesResponse>({
     queryKey: ["pricing-devices", selectedCategory],
@@ -122,7 +126,7 @@ export default function IndicadoresPage() {
       .sort((a, b) => a.storage - b.storage);
   }, [devices]);
 
-  const categoryName = CATEGORIES.find((c) => c.id === selectedCategory)?.name || "";
+  const categoryName = categoriesData?.find((c) => c.id === selectedCategory)?.name || "";
 
   return (
     <div className="flex flex-col h-full">
@@ -138,7 +142,7 @@ export default function IndicadoresPage() {
               <SelectValue placeholder="Selecione" />
             </SelectTrigger>
             <SelectContent>
-              {CATEGORIES.map((cat) => (
+              {categoriesData?.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   {cat.name}
                 </SelectItem>

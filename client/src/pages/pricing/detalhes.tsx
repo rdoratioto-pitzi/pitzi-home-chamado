@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 import {
   BarChart3,
   TrendingDown,
@@ -60,11 +61,6 @@ import {
 } from "recharts";
 
 const PRICING_API_BASE = "/api/pricing";
-
-const CATEGORIES = [
-  { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
-  { id: "d686a25d-045d-4b8c-9d7c-35a21d29d31b", name: "Android" },
-];
 
 interface AggregatedData {
   manufacturer: string;
@@ -105,14 +101,16 @@ export default function PricingDetailsPage() {
   const { toast } = useToast();
   const [months, setMonths] = useState("12");
   const [isExporting, setIsExporting] = useState(false);
+  const { data: categoriesData } = usePricingCategories();
 
   const params = new URLSearchParams(location.split("?")[1] || "");
-  const category = params.get("category") || CATEGORIES[0].id;
+  const categoryParam = params.get("category");
+  const category = categoryParam || categoriesData?.[0]?.id || "";
   const brand = params.get("brand") || "";
   const model = params.get("model") || "";
   const storage = params.get("storage") || "";
 
-  const categoryName = CATEGORIES.find((c) => c.id === category)?.name || "";
+  const categoryName = categoriesData?.find((c) => c.id === category)?.name || "";
   const deviceName = `${brand} ${model} ${storage}GB`;
 
   const { data: aggData, isLoading: isLoadingAgg, refetch: refetchAgg } = useQuery<AggregatedData[]>({

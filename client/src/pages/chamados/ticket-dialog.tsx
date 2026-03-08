@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import type { User, Setting, Ticket } from "@shared/schema";
+import type { Setting, Ticket } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RichTextarea } from "@/components/rich-textarea";
+import { UserSelect } from "@/components/ui/user-select";
 import {
   Select,
   SelectContent,
@@ -96,10 +97,6 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
   const queryClient = useQueryClient();
   const [showSuccess, setShowSuccess] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
-
-  const { data: users = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
-  });
 
   const currentUser = getCurrentUser();
 
@@ -383,8 +380,18 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                 name="location"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>
+                    <FormLabel className="flex items-center gap-1">
                       Local <span className="text-destructive">*</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[250px]">
+                          <p className="text-xs">
+                            <strong>Local</strong> indica o sistema ou ambiente onde o problema ocorreu.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
@@ -485,32 +492,35 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
                 name="assigneeId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Responsável (opcional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-ticket-assignee" aria-label="Responsável">
-                          <SelectValue placeholder="Atribuição automática" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="auto">Atribuição automática</SelectItem>
-                        {users
-                          .filter(u => u.status === "active")
-                          .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-                          .map((user) => (
-                            <SelectItem key={user.id} value={user.id}>
-                              {user.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel className="flex items-center gap-1">
+                      Responsável (opcional)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-[280px]">
+                          <p className="text-xs">
+                            <strong>Responsável</strong> define quem irá atender o chamado. Deixe vazio para atribuição automática.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
+                    <FormControl>
+                      <UserSelect
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Atribuição automática"
+                        emptyMessage="Nenhum usuário encontrado"
+                        showAutoOption={true}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
-            <DialogFooter className="gap-2 sm:gap-0">
+            <DialogFooter className="gap-2">
               <Button 
                 type="button" 
                 variant="outline" 

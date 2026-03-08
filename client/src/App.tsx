@@ -95,6 +95,16 @@ function Router() {
           <CSATAnalytics />
         </ProtectedRoute>
       </Route>
+      <Route path="/chamados/novo">
+        <ProtectedRoute requiredPermission="chamados">
+          <NovoChamadoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/chamados/:id">
+        <ProtectedRoute requiredPermission="chamados">
+          <TicketDetailPage />
+        </ProtectedRoute>
+      </Route>
       <Route path="/projetos">
         <ProtectedRoute requiredPermission="projetos">
           <ProjetosPage />

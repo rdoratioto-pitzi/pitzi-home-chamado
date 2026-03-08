@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getCurrentUser, isAdmin as checkIsAdmin } from "@/lib/permissions";
+import { useMetaAreas } from "@/hooks/use-meta-areas";
 import {
   Table,
   TableBody,
@@ -65,16 +66,6 @@ const MODULES = [
   { key: "configuracoes", label: "Configurações" },
 ] as const;
 
-const AREAS_NEGOCIO = [
-  { value: "LAB", label: "Laboratório" },
-  { value: "RH", label: "Recursos Humanos" },
-  { value: "COM", label: "Comercial" },
-  { value: "FIN", label: "Financeiro" },
-  { value: "MKT", label: "Marketing" },
-  { value: "OPS", label: "Operações" },
-  { value: "TI", label: "Tecnologia" },
-];
-
 const PERFIS_ACESSO = [
   { value: "assistente", label: "Assistente" },
   { value: "analista", label: "Analista" },
@@ -99,7 +90,7 @@ const formSchema = z.object({
     okrs: z.boolean(),
     logistica: z.boolean(),
     pricing: z.boolean().default(true),
-    biblioteca: z.boolean().default(true),
+    conhecimento: z.boolean().default(true),
     apis: z.boolean(),
     configuracoes: z.boolean(),
   }),
@@ -114,6 +105,7 @@ export function UsersSettings() {
   const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { data: areas = [] } = useMetaAreas();
 
   useEffect(() => {
     const checkAdminStatus = () => {
@@ -581,7 +573,7 @@ export function UsersSettings() {
                     </FormControl>
                     <FormMessage />
                     <div className="mt-2">
-                      <PasswordStrengthIndicator password={field.value} />
+                      <PasswordStrengthIndicator password={field.value || ""} />
                     </div>
                   </FormItem>
                 )}
@@ -601,8 +593,8 @@ export function UsersSettings() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {AREAS_NEGOCIO.map(area => (
-                            <SelectItem key={area.value} value={area.value}>{area.label}</SelectItem>
+                          {areas.map(area => (
+                            <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
