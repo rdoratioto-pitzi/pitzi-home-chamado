@@ -456,12 +456,6 @@ export function registerTaskRoutes(router: Router) {
     const sharedTasks = finalTasks.filter(t => t.visibility === 'shared' && t.createdBy !== userId).length;
     const publicTasks = finalTasks.filter(t => t.visibility === 'public' && t.createdBy !== userId).length;
 
-    console.log(`[AUDIT] User ${userId} (isAdmin: ${isAdmin}) acessou ${finalTasks.length} tarefas:`);
-    console.log(`[AUDIT]   - Próprias: ${ownTasks}`);
-    console.log(`[AUDIT]   - Atribuídas: ${assignedTasks}`);
-    console.log(`[AUDIT]   - Compartilhadas: ${sharedTasks}`);
-    console.log(`[AUDIT]   - Públicas: ${publicTasks}`);
-
     res.json(finalTasks);
   });
 

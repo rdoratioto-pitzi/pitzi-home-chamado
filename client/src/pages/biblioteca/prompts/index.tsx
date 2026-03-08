@@ -78,13 +78,6 @@ export default function PromptsPage() {
     "database": "Banco de Dados",
   };
 
-  // Debug log
-  console.log("[PromptsPage] Dados carregados:", { 
-    promptsCount: prompts.length, 
-    isLoading,
-    selectedCategory 
-  });
-
   return (
     <div className="container mx-auto py-6 space-y-6">
       <PageHeader

@@ -115,13 +115,16 @@ export function ProjectDialog({ open, onOpenChange, project, onSubmit: externalO
   }, [open, project?.id]);
 
   const filteredUsersForMembers = useMemo(() => {
-    return users.filter(u => {
-      if (u.id === ownerId) return false;
-      if (memberIds.includes(u.id)) return false;
-      if (!memberSearchInput) return true;
-      const search = memberSearchInput.toLowerCase();
-      return u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search);
-    });
+    return users
+      .filter(u => u.status === "active")
+      .filter(u => {
+        if (u.id === ownerId) return false;
+        if (memberIds.includes(u.id)) return false;
+        if (!memberSearchInput) return true;
+        const search = memberSearchInput.toLowerCase();
+        return u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
   }, [users, ownerId, memberIds, memberSearchInput]);
 
   const mutation = useMutation({
@@ -214,7 +217,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSubmit: externalO
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {users.map((user) => (
+                      {users.filter(u => u.status === "active").sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.name}
                         </SelectItem>
