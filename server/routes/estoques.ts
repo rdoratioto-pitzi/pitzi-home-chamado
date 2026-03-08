@@ -17,6 +17,7 @@ import {
 } from "@shared/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
 import { getCachedProdutos } from "../services/estoque-cache.service";
+import { getCachedPosEstoque } from "../services/estoque-pos.service";
 
 export function registerEstoqueRoutes(router: Router) {
 
@@ -455,66 +456,75 @@ export function registerEstoqueRoutes(router: Router) {
 
       console.log('[Estoque Routes] GET /api/estoques/posicao - Fetching stock position');
 
-      const produtosArray = await getCachedProdutos();
+      // Carregar catálogo e posição de estoques em paralelo
+      const [produtosArray, posEstoqueIndex] = await Promise.all([
+        getCachedProdutos(),
+        getCachedPosEstoque(),
+      ]);
 
       if (produtosArray.length === 0) {
         return res.json({ success: true, data: [] });
       }
 
-      // Aplicar filtros
+      // Aplicar filtros (usa p.codigo — código ERP do usuário)
       let filteredProdutos = produtosArray;
-      
+
       if (categoria) {
         filteredProdutos = filteredProdutos.filter((p: any) =>
+          p.descricao_familia?.toLowerCase().includes((categoria as string).toLowerCase()) ||
           p.categoria?.toLowerCase().includes((categoria as string).toLowerCase())
         );
       }
-      
+
       if (marca) {
         filteredProdutos = filteredProdutos.filter((p: any) =>
           p.marca?.toLowerCase().includes((marca as string).toLowerCase())
         );
       }
-      
+
       if (modelo) {
         filteredProdutos = filteredProdutos.filter((p: any) =>
-          p.descricao?.toLowerCase().includes((modelo as string).toLowerCase()) ||
-          p.modelo?.toLowerCase().includes((modelo as string).toLowerCase())
+          p.descricao?.toLowerCase().includes((modelo as string).toLowerCase())
         );
       }
-      
+
       if (codigoErp) {
+        const q = (codigoErp as string).toLowerCase();
         filteredProdutos = filteredProdutos.filter((p: any) =>
-          p.codigo_produto?.toString().includes(codigoErp as string)
+          p.codigo?.toLowerCase().includes(q)
         );
       }
-      
+
       console.log('[Estoque Routes] Filtered products:', filteredProdutos.length);
-      
-      // Formatar dados para a tabela
-      const formattedData = filteredProdutos.map((p: any) => ({
-        codigoErp: p.codigo_produto || p.codigo || '',
-        descricao: p.descricao || '',
-        categoria: p.categoria || '',
-        marca: p.marca || '',
-        modelo: p.modelo || p.descricao || '',
-        unidade: p.unidade || 'UN',
-        // Estoque - buscar em call separada se necessário
-        estoqueDisponivel: parseInt(p.estoque_local || p.estoque || 0, 10),
-        // Custo - usar valor de custo ou preço de custo
-        custoUnitario: parseFloat(p.preco_custo || p.valor_custo || 0),
-        // Valor venda - usar preço de venda
-        valorVenda: parseFloat(p.preco_venda || p.valor_unitario || 0),
-        // Calcular custo total
-        custoTotal: 0, // Será calculado no frontend
-        // Calcular markup
-        markup: 0, // Será calculado no frontend
-      }));
-      
+
+      // Formatar dados para a tabela — join com posição de estoque real
+      const formattedData = filteredProdutos.map((p: any) => {
+        const locais = posEstoqueIndex.get(p.codigo) ?? [];
+        const estoqueDisponivel = locais.reduce((s: number, l: any) => s + (l.nSaldo ?? 0), 0);
+        const custoUnitario = locais.length > 0 ? (locais[0].nCMC ?? 0) : 0;
+        const valorVenda = parseFloat(p.valor_unitario || 0);
+        const custoTotal = estoqueDisponivel * custoUnitario;
+        const markup = custoUnitario > 0 ? ((valorVenda - custoUnitario) / custoUnitario) * 100 : 0;
+
+        return {
+          codigoErp: p.codigo || '',
+          descricao: p.descricao || '',
+          categoria: p.descricao_familia || p.categoria || '',
+          marca: p.marca || '',
+          modelo: p.descricao || '',
+          unidade: p.unidade || 'UN',
+          estoqueDisponivel,
+          custoUnitario,
+          valorVenda,
+          custoTotal,
+          markup,
+        };
+      });
+
       console.log('[Estoque Routes] Returning', formattedData.length, 'products');
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         data: formattedData,
         total: formattedData.length
       });
@@ -529,38 +539,32 @@ export function registerEstoqueRoutes(router: Router) {
     try {
       console.log('[Estoque Routes] GET /api/estoques/posicao/totais - Calculating totals');
 
-      const produtosArray = await getCachedProdutos();
+      const posEstoqueIndex = await getCachedPosEstoque();
 
-      if (produtosArray.length === 0) {
+      if (posEstoqueIndex.size === 0) {
         return res.json({
           success: true,
           data: { qtdeTotal: 0, valorTotal: 0, custoMedioUnitario: 0 }
         });
       }
-      
-      // Calcular totais
+
       let qtdeTotal = 0;
       let valorTotal = 0;
-      
-      produtosArray.forEach((p: any) => {
-        const qtde = parseInt(p.estoque_local || p.estoque || 0, 10);
-        const custo = parseFloat(p.preco_custo || p.valor_custo || 0);
-        
-        qtdeTotal += qtde;
-        valorTotal += (qtde * custo);
+
+      posEstoqueIndex.forEach((locais) => {
+        const saldo = locais.reduce((s: number, l: any) => s + (l.nSaldo ?? 0), 0);
+        const cmc = locais.length > 0 ? (locais[0].nCMC ?? 0) : 0;
+        qtdeTotal += saldo;
+        valorTotal += saldo * cmc;
       });
-      
+
       const custoMedioUnitario = qtdeTotal > 0 ? valorTotal / qtdeTotal : 0;
-      
+
       console.log('[Estoque Routes] Totals:', { qtdeTotal, valorTotal, custoMedioUnitario });
-      
-      res.json({ 
-        success: true, 
-        data: {
-          qtdeTotal,
-          valorTotal,
-          custoMedioUnitario
-        }
+
+      res.json({
+        success: true,
+        data: { qtdeTotal, valorTotal, custoMedioUnitario }
       });
     } catch (error: any) {
       console.error('[Estoque Routes] Error calculating totals:', error.message);
@@ -573,19 +577,22 @@ export function registerEstoqueRoutes(router: Router) {
     try {
       console.log('[Estoque Routes] GET /api/estoques/posicao/export - Exporting to Excel');
 
-      const produtosArray = await getCachedProdutos();
+      const [produtosArray, posEstoqueIndex] = await Promise.all([
+        getCachedProdutos(),
+        getCachedPosEstoque(),
+      ]);
 
       if (produtosArray.length === 0) {
         return res.status(404).json({ error: "Nenhum produto encontrado" });
       }
-      
+
       // Criar workbook Excel
       const workbook = new ExcelJS.Workbook();
       workbook.creator = "Renov Home";
       workbook.created = new Date();
-      
+
       const worksheet = workbook.addWorksheet("Posição de Estoques");
-      
+
       // Adicionar cabeçalhos
       worksheet.columns = [
         { header: "Código ERP", key: "codigoErp", width: 15 },
@@ -599,24 +606,25 @@ export function registerEstoqueRoutes(router: Router) {
         { header: "Valor Venda (R$)", key: "valorVenda", width: 18 },
         { header: "Markup (%)", key: "markup", width: 12 }
       ];
-      
-      // Adicionar dados
+
+      // Adicionar dados — join com posição de estoque real
       produtosArray.forEach((p: any) => {
-        const qtde = parseInt(p.estoque_local || p.estoque || 0, 10);
-        const custo = parseFloat(p.preco_custo || p.valor_custo || 0);
-        const venda = parseFloat(p.preco_venda || p.valor_unitario || 0);
+        const locais = posEstoqueIndex.get(p.codigo) ?? [];
+        const qtde = locais.reduce((s: number, l: any) => s + (l.nSaldo ?? 0), 0);
+        const custo = locais.length > 0 ? (locais[0].nCMC ?? 0) : 0;
+        const venda = parseFloat(p.valor_unitario || 0);
         const custoTotal = qtde * custo;
         const markup = custo > 0 ? ((venda - custo) / custo) * 100 : 0;
-        
+
         worksheet.addRow({
-          codigoErp: p.codigo_produto || p.codigo || '',
+          codigoErp: p.codigo || '',
           descricao: p.descricao || '',
-          categoria: p.categoria || '',
+          categoria: p.descricao_familia || p.categoria || '',
           marca: p.marca || '',
-          modelo: p.modelo || p.descricao || '',
+          modelo: p.descricao || '',
           estoqueDisponivel: qtde,
           custoUnitario: custo,
-          custoTotal: custoTotal,
+          custoTotal,
           valorVenda: venda,
           markup: markup.toFixed(2)
         });

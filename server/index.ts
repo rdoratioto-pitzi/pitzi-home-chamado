@@ -41,22 +41,14 @@ async function fixOmieConfig() {
       await pool?.query(`
         INSERT INTO omie_config (app_key, app_secret, is_active)
         VALUES ($1, $2, $3)
-      `, ['3512564154099', 'e7036f3b188d5b658319e2f97a62fcca', true]);
+      `, ['3512564154099', '3bf7b7131fe0f76a23f567387841fbb8', true]);
       
       console.log('[Omie Setup] ✓ Credenciais inseridas com sucesso');
     } else {
       console.log('[Omie Setup] ✓ Configuração existente encontrada');
       console.log('  - App Key:', configCheck.rows[0].app_key?.substring(0, 5) + '...');
       console.log('  - Ativo:', configCheck.rows[0].is_active);
-      
-      // Atualizar credenciais para garantir que estão corretas
-      await pool?.query(`
-        UPDATE omie_config 
-        SET app_key = $1, app_secret = $2, is_active = $3, updated_at = NOW()
-        WHERE id = $4
-      `, ['3512564154099', 'e7036f3b188d5b658319e2f97a62fcca', true, configCheck.rows[0].id]);
-      
-      console.log('[Omie Setup] ✓ Credenciais atualizadas');
+      // Não sobrescrever credenciais salvas pelo usuário
     }
     
     // Verificar tabela de logs
@@ -121,6 +113,29 @@ async function autoMigrateSchema() {
       `ALTER TABLE prompts_library ADD COLUMN IF NOT EXISTS translated_content text`,
       `ALTER TABLE prompts_library ADD COLUMN IF NOT EXISTS translated_at timestamp`,
       `ALTER TABLE prompts_library ADD COLUMN IF NOT EXISTS is_translated boolean DEFAULT false`,
+      // Omie integration tables
+      `CREATE TABLE IF NOT EXISTS omie_config (
+        id SERIAL PRIMARY KEY,
+        app_key VARCHAR(255) NOT NULL,
+        app_secret VARCHAR(255) NOT NULL,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE TABLE IF NOT EXISTS omie_sync_log (
+        id SERIAL PRIMARY KEY,
+        endpoint VARCHAR(255) NOT NULL,
+        category VARCHAR(100),
+        status VARCHAR(50) NOT NULL,
+        total_records INTEGER DEFAULT 0,
+        request_params JSONB,
+        response_data JSONB,
+        error_message TEXT,
+        synced_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_omie_sync_category ON omie_sync_log(category)`,
+      `CREATE INDEX IF NOT EXISTS idx_omie_sync_status ON omie_sync_log(status)`,
+      `CREATE INDEX IF NOT EXISTS idx_omie_sync_synced_at ON omie_sync_log(synced_at DESC)`,
     ];
     for (const sql of migrations) {
       try { await pool.query(sql); } catch {}
@@ -383,6 +398,15 @@ export const asyncHandler =
 
         // Iniciar cron job de sincronização Git Analytics
         startGitSyncJob();
+
+        // Pré-aquecer cache de posição de estoques em background (não bloqueia startup)
+        import("./services/estoque-pos.service").then(({ getCachedPosEstoque }) => {
+          getCachedPosEstoque().then((idx) => {
+            log(`[EstoquePos] Cache pré-aquecido — ${idx.size} produtos`, "estoque-pos");
+          }).catch((err: any) => {
+            console.error("[EstoquePos] Falha no pré-aquecimento:", err.message);
+          });
+        }).catch(() => {});
 
         // Verificar se a tabela de prompts está vazia e executar sincronização inicial
         // Usando importação dinâmica para evitar erros de módulo na inicialização
