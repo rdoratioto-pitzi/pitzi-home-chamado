@@ -1992,5 +1992,359 @@ export function registerEstoqueRoutes(router: Router) {
     }
   });
 
+  // ============== RASTREABILIDADE ==============
+
+  function extrairAwbItem(item: any): string {
+    return item.awb || item.tracking_code || item.codigo_rastreamento || item.rastreamento || '';
+  }
+
+  function extrairResponsavelItem(item: any): string {
+    return item.vendedor || item.seller_name || item.employee || item.gerente || item.manager ||
+      item.conferente || item.receiver || item.triador || item.responsavel || item.user || '';
+  }
+
+  function extrairLocalItem(item: any): string {
+    return item.filial || item.store || item.loja || item.local || item.location || item.cd || '';
+  }
+
+  function extrairNotaItem(item: any): string {
+    return item.nf_entrada || item.nota_fiscal || item.nf || item.invoice || '';
+  }
+
+  function extrairVoucherCode(item: any): string {
+    return item.voucher || item.voucher_code || item.codigo || item.code || '';
+  }
+
+  function matchImei(item: any, imei: string): boolean {
+    const itemImei = (item.imei || item.IMEI || item.imei_number || '').toString().trim();
+    return itemImei === imei.trim();
+  }
+
+  // GET /api/estoques/rastreabilidade/busca
+  router.get('/api/estoques/rastreabilidade/busca', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { termo, tipo = 'imei' } = req.query as { termo?: string; tipo?: string };
+
+      if (!termo) {
+        return res.status(400).json({ success: false, error: 'Parâmetro "termo" é obrigatório' });
+      }
+
+      const termoStr = String(termo).trim().toLowerCase();
+
+      const [vouchersR, confirmacaoR, coletasR, recebimentosR, triagemR, bloqueadosR, manutencaoR, divergentesR] =
+        await Promise.allSettled([
+          fetchPipelineApi('/orders/advanced'),
+          fetchPipelineApi('/logistica/meus_dispositivos'),
+          fetchPipelineApi('/adm_logistica/coletas'),
+          fetchPipelineApi('/adm_logistica/recebimentos'),
+          fetchPipelineApi('/adm_logistica/triagem'),
+          fetchPipelineApi('/adm_logistica/bloqueados'),
+          fetchPipelineApi('/adm_logistica/manutencao'),
+          fetchPipelineApi('/adm_logistica/divergentes'),
+        ]);
+
+      const get = (r: PromiseSettledResult<any[]>) => r.status === 'fulfilled' ? r.value : [];
+
+      const all = [
+        { items: get(vouchersR),      etapa: 'Voucher',       status: 'VOUCHER_UTILIZADO'  },
+        { items: get(confirmacaoR),   etapa: 'Confirmação',   status: 'CONFIRMACAO_GERENTE' },
+        { items: get(coletasR),       etapa: 'Coleta',        status: 'COLETA_SOLICITADA'  },
+        { items: get(recebimentosR),  etapa: 'Recebimento',   status: 'RECEBIMENTO'        },
+        { items: get(triagemR),       etapa: 'Triagem',       status: 'TRIAGEM_FINALIZADA' },
+        { items: get(bloqueadosR),    etapa: 'Bloqueados',    status: 'BLOQUEADO'          },
+        { items: get(manutencaoR),    etapa: 'Manutenção',    status: 'MANUTENCAO'         },
+        { items: get(divergentesR),   etapa: 'Divergentes',   status: 'DIVERGENTE'         },
+      ];
+
+      const resultados: any[] = [];
+      const imeisSeen = new Set<string>();
+
+      for (const { items, etapa, status } of all) {
+        for (const item of items) {
+          let match = false;
+
+          if (tipo === 'imei') {
+            match = matchImei(item, String(termo).trim());
+          } else if (tipo === 'voucher') {
+            match = extrairVoucherCode(item).toLowerCase().includes(termoStr);
+          } else if (tipo === 'awb') {
+            match = extrairAwbItem(item).toLowerCase().includes(termoStr);
+          } else if (tipo === 'coleta') {
+            const coleta = String(item.codigo_coleta || item.coleta_id || item.id || '').toLowerCase();
+            match = coleta.includes(termoStr);
+          }
+
+          if (match) {
+            const imei = extrairImeiPipeline(item);
+            if (!imeisSeen.has(imei)) {
+              imeisSeen.add(imei);
+              resultados.push({
+                imei,
+                voucher:    extrairVoucherCode(item),
+                modelo:     extrairModeloPipeline(item),
+                status,
+                etapaAtual: etapa,
+              });
+            }
+          }
+        }
+      }
+
+      res.json({ success: true, data: { resultados, total: resultados.length } });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Rastreabilidade busca error:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/rastreabilidade/:imei – Timeline completa do dispositivo
+  router.get('/api/estoques/rastreabilidade/:imei', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { imei } = req.params;
+
+      if (!imei || imei.length < 10) {
+        return res.status(400).json({ success: false, error: 'IMEI inválido' });
+      }
+
+      const [vouchersR, confirmacaoR, coletasR, recebimentosR, triagemR, bloqueadosR, manutencaoR, divergentesR] =
+        await Promise.allSettled([
+          fetchPipelineApi('/orders/advanced'),
+          fetchPipelineApi('/logistica/meus_dispositivos'),
+          fetchPipelineApi('/adm_logistica/coletas'),
+          fetchPipelineApi('/adm_logistica/recebimentos'),
+          fetchPipelineApi('/adm_logistica/triagem'),
+          fetchPipelineApi('/adm_logistica/bloqueados'),
+          fetchPipelineApi('/adm_logistica/manutencao'),
+          fetchPipelineApi('/adm_logistica/divergentes'),
+        ]);
+
+      const get = (r: PromiseSettledResult<any[]>) => r.status === 'fulfilled' ? r.value : [];
+
+      const voucherItem    = get(vouchersR).find(i     => matchImei(i, imei));
+      const confirmacaoItem = get(confirmacaoR).find(i  => matchImei(i, imei));
+      const coletaItem     = get(coletasR).find(i       => matchImei(i, imei));
+      const recebimentoItem = get(recebimentosR).find(i => matchImei(i, imei));
+      const triagemItem    = get(triagemR).find(i       => matchImei(i, imei));
+      const bloqueadoItem  = get(bloqueadosR).find(i    => matchImei(i, imei));
+      const manutencaoItem = get(manutencaoR).find(i    => matchImei(i, imei));
+      const divergenteItem = get(divergentesR).find(i   => matchImei(i, imei));
+
+      const anyItem = voucherItem || confirmacaoItem || coletaItem || recebimentoItem ||
+        triagemItem || bloqueadoItem || manutencaoItem || divergenteItem;
+
+      if (!anyItem) {
+        return res.status(404).json({ success: false, error: `Dispositivo IMEI ${imei} não encontrado` });
+      }
+
+      // ── Info básica ─────────────────────────────────────────────────────────
+      const modelo       = extrairModeloPipeline(anyItem);
+      const categoria    = extrairCategoriaPipeline(anyItem);
+      const rede         = extrairRedePipeline(voucherItem || anyItem);
+      const filial       = extrairLocalItem(voucherItem || anyItem);
+      const valorVoucher = extrairValorPipeline(voucherItem || anyItem);
+      const voucher      = extrairVoucherCode(voucherItem || anyItem);
+      const dataVoucher  = voucherItem ? extractItemDate(voucherItem) : null;
+      const mesTradeIn   = formatMesTradeIn(dataVoucher);
+
+      // ── Timeline ────────────────────────────────────────────────────────────
+      const timeline: any[] = [];
+
+      if (voucherItem) {
+        timeline.push({
+          etapa: 'VOUCHER_UTILIZADO', label: 'Voucher Utilizado',
+          data:        extractItemDate(voucherItem),
+          responsavel: extrairResponsavelItem(voucherItem),
+          local:       extrairLocalItem(voucherItem),
+          detalhes:    { voucher: extrairVoucherCode(voucherItem), rede, filial },
+        });
+      }
+
+      if (confirmacaoItem) {
+        timeline.push({
+          etapa: 'CONFIRMACAO_GERENTE', label: 'Confirmação Gerente',
+          data:        extractItemDate(confirmacaoItem),
+          responsavel: extrairResponsavelItem(confirmacaoItem),
+          local:       null, detalhes: null,
+        });
+      }
+
+      if (coletaItem) {
+        timeline.push({
+          etapa: 'COLETA_SOLICITADA', label: 'Coleta Solicitada',
+          data:        extractItemDate(coletaItem),
+          responsavel: null, local: null,
+          detalhes: {
+            operador: coletaItem.transportadora || coletaItem.carrier || coletaItem.operador || null,
+            awb:      extrairAwbItem(coletaItem),
+          },
+        });
+      }
+
+      if (recebimentoItem) {
+        timeline.push({
+          etapa: 'RECEBIMENTO', label: 'Recebimento',
+          data:        extractItemDate(recebimentoItem),
+          responsavel: extrairResponsavelItem(recebimentoItem),
+          local:       extrairLocalItem(recebimentoItem),
+          detalhes:    null,
+        });
+      }
+
+      if (divergenteItem) {
+        timeline.push({
+          etapa: 'TRIAGEM_DIVERGENTE', label: 'Triagem – Divergente',
+          data:        extractItemDate(divergenteItem),
+          responsavel: extrairResponsavelItem(divergenteItem),
+          local: null, desvio: true,
+          detalhes: { motivo: divergenteItem.motivo || divergenteItem.reason || divergenteItem.observacao || null },
+        });
+      }
+
+      if (bloqueadoItem) {
+        timeline.push({
+          etapa: 'BLOQUEADO', label: 'Bloqueado',
+          data:        extractItemDate(bloqueadoItem),
+          responsavel: extrairResponsavelItem(bloqueadoItem),
+          local: null, desvio: true,
+          detalhes: { motivo: bloqueadoItem.motivo || bloqueadoItem.reason || 'iCloud/Google Lock' },
+        });
+      }
+
+      if (manutencaoItem) {
+        timeline.push({
+          etapa: 'MANUTENCAO', label: 'Manutenção',
+          data:        extractItemDate(manutencaoItem),
+          responsavel: extrairResponsavelItem(manutencaoItem),
+          local: null, desvio: true,
+          detalhes: { tipo: manutencaoItem.tipo_manutencao || manutencaoItem.tipo || 'Reparo' },
+        });
+      }
+
+      if (triagemItem) {
+        timeline.push({
+          etapa: 'TRIAGEM_FINALIZADA', label: 'Triagem Finalizada',
+          data:        extractItemDate(triagemItem),
+          responsavel: extrairResponsavelItem(triagemItem),
+          local: null,
+          detalhes: {
+            nfEntrada: extrairNotaItem(triagemItem),
+            grade:     triagemItem.grade || triagemItem.grau || triagemItem.quality_grade || null,
+          },
+        });
+      }
+
+      // Ordenar por data
+      timeline.sort((a, b) => {
+        if (!a.data) return -1;
+        if (!b.data) return 1;
+        const na = a.data.includes('T') ? a.data : a.data.replace(/^(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+        const nb = b.data.includes('T') ? b.data : b.data.replace(/^(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+        return new Date(na).getTime() - new Date(nb).getTime();
+      });
+
+      // ── Status atual ────────────────────────────────────────────────────────
+      let statusAtual = 'EM_PROCESSAMENTO';
+      if (triagemItem)    statusAtual = 'EM_ESTOQUE';
+      if (bloqueadoItem)  statusAtual = 'BLOQUEADO';
+      if (manutencaoItem) statusAtual = 'MANUTENCAO';
+      if (divergenteItem) statusAtual = 'DIVERGENTE';
+
+      // ── Dados de venda Omie ─────────────────────────────────────────────────
+      let vendaInfo: any = null;
+      try {
+        const produtos = await getCachedProdutos();
+        const produto = produtos.find((p: any) => {
+          const desc = (p.descricao || '').toLowerCase();
+          const cod  = (p.codigo || '').toLowerCase();
+          return desc.includes(imei.toLowerCase()) || cod.includes(imei.toLowerCase());
+        });
+        if (produto) {
+          statusAtual = 'VENDIDO';
+          vendaInfo = {
+            status:     'VENDIDO',
+            nfVenda:    produto.nf_saida || produto.nota_fiscal_saida || null,
+            valorVenda: parseFloat(produto.preco_venda || produto.valor_venda || 0),
+            dataVenda:  produto.data_venda || null,
+          };
+          timeline.push({
+            etapa: 'VENDIDO', label: 'Vendido',
+            data:        vendaInfo.dataVenda,
+            responsavel: null, local: null,
+            detalhes: { nfSaida: vendaInfo.nfVenda, valorVenda: vendaInfo.valorVenda },
+          });
+        }
+      } catch { /* Omie indisponível */ }
+
+      // ── Métricas ────────────────────────────────────────────────────────────
+      function parseMs(dateStr: string | null): number | null {
+        if (!dateStr) return null;
+        try {
+          const n = dateStr.includes('T') ? dateStr : dateStr.replace(/^(\d{2})\/(\d{2})\/(\d{4})/, '$3-$2-$1');
+          const ms = new Date(n).getTime();
+          return isNaN(ms) ? null : ms;
+        } catch { return null; }
+      }
+
+      const agora           = Date.now();
+      const dataVoucherMs   = parseMs(dataVoucher);
+      const dataTriagemMs   = triagemItem ? parseMs(extractItemDate(triagemItem)) : null;
+      const dataVendaMs     = vendaInfo?.dataVenda ? parseMs(vendaInfo.dataVenda) : null;
+
+      const toDias = (ms: number) => Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
+
+      const cicloTotal = dataVoucherMs !== null
+        ? toDias((dataVendaMs ?? agora) - dataVoucherMs) : null;
+      const cicloPreEstoque = dataVoucherMs !== null && dataTriagemMs !== null
+        ? toDias(dataTriagemMs - dataVoucherMs) : null;
+      const agingEstoque = dataTriagemMs !== null
+        ? toDias((dataVendaMs ?? agora) - dataTriagemMs) : null;
+
+      // Tempo em desvio
+      const desvioItem = divergenteItem || bloqueadoItem || manutencaoItem;
+      let tempoDesvio = null;
+      let tipoDesvio  = null;
+      if (desvioItem) {
+        const ms = parseMs(extractItemDate(desvioItem));
+        if (ms !== null) {
+          tempoDesvio = toDias(agora - ms);
+          tipoDesvio  = divergenteItem ? 'Divergente' : bloqueadoItem ? 'Bloqueado' : 'Manutenção';
+        }
+      }
+
+      // Margem bruta
+      let margemBruta = null;
+      if (vendaInfo?.valorVenda && valorVoucher) {
+        const m = vendaInfo.valorVenda - valorVoucher;
+        margemBruta = { valor: m, percentual: parseFloat(((m / vendaInfo.valorVenda) * 100).toFixed(1)) };
+      }
+
+      res.json({
+        success: true,
+        data: {
+          dispositivo: {
+            imei,
+            modelo,
+            categoria,
+            grade:      anyItem.grade || anyItem.grau || anyItem.quality_grade || null,
+            mesTradeIn,
+          },
+          origem: { voucher, rede, filial, valorVoucher },
+          statusAtual: vendaInfo ?? { status: statusAtual },
+          timeline,
+          metricas: {
+            cicloTotal:      cicloTotal !== null      ? { dias: cicloTotal,      meta: 30, status: cicloTotal      <= 30 ? 'ok' : 'acima' } : null,
+            cicloPreEstoque: cicloPreEstoque !== null ? { dias: cicloPreEstoque, meta: 12, status: cicloPreEstoque <= 12 ? 'ok' : 'acima' } : null,
+            agingEstoque:    agingEstoque !== null    ? { dias: agingEstoque,    meta: 20, status: agingEstoque    <= 20 ? 'ok' : 'acima' } : null,
+            tempoEmDesvio:   tempoDesvio !== null     ? { dias: tempoDesvio, tipo: tipoDesvio } : null,
+            margemBruta,
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Rastreabilidade timeline error:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   console.log('[Estoque Routes] Routes registered successfully');
 }
