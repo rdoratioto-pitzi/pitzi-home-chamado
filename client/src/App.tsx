@@ -14,6 +14,8 @@ import { useAuthSync } from "@/hooks/useAuthSync";
 import Home from "@/pages/home";
 import ChamadosPage from "@/pages/chamados/index";
 import CSATAnalytics from "@/pages/chamados/csat-analytics";
+import NovoChamadoPage from "@/pages/chamados/novo";
+import TicketDetailPage from "@/pages/chamados/[id]";
 import ProjetosPage from "@/pages/projetos/index";
 import KanbanPage from "@/pages/projetos/kanban";
 import TarefasPage from "@/pages/tarefas/index";
@@ -82,6 +84,16 @@ function Router() {
       <Route path="/chamados/csat-analytics">
         <ProtectedRoute requiredPermission="chamados">
           <CSATAnalytics />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/chamados/novo">
+        <ProtectedRoute requiredPermission="chamados">
+          <NovoChamadoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/chamados/:id">
+        <ProtectedRoute requiredPermission="chamados">
+          <TicketDetailPage />
         </ProtectedRoute>
       </Route>
       <Route path="/projetos">

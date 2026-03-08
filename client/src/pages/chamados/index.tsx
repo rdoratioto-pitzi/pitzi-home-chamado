@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { useState, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,8 +52,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import type { Ticket, User, SlaRule } from "@shared/schema";
-import { TicketDialog } from "./ticket-dialog";
-import { TicketDetailSheet } from "./ticket-detail-sheet";
 import { TicketKanban } from "./ticket-kanban";
 import { CSATAnalytics } from "./csat-analytics";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -310,8 +309,7 @@ type SortField = "code" | "title" | "category" | "priority" | "status" | "create
 type SortOrder = "asc" | "desc";
 
 export default function ChamadosPage() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -333,17 +331,13 @@ export default function ChamadosPage() {
   });
 
   useEffect(() => {
-    if (tickets.length === 0 || isLoading) return;
+    // Remove old URL parameter handling - now we use routes
     const params = new URLSearchParams(window.location.search);
     const ticketCode = params.get("id");
-    if (ticketCode && !selectedTicket) {
-      const ticket = tickets.find((t) => t.code === ticketCode);
-      if (ticket) {
-        setSelectedTicket(ticket);
-        window.history.replaceState({}, "", window.location.pathname);
-      }
+    if (ticketCode) {
+      window.history.replaceState({}, "", window.location.pathname);
     }
-  }, [tickets, isLoading]);
+  }, []);
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -584,7 +578,7 @@ export default function ChamadosPage() {
         title="Gestão de Chamados"
         breadcrumbs={[{ label: "Chamados" }]}
         actions={
-          <Button onClick={() => setIsDialogOpen(true)} data-testid="button-new-ticket">
+          <Button onClick={() => setLocation("/chamados/novo")} data-testid="button-new-ticket">
             <Plus className="h-4 w-4 mr-2" />
             Novo Chamado
           </Button>
@@ -971,7 +965,7 @@ export default function ChamadosPage() {
               <TicketKanban
                 tickets={filteredTickets}
                 users={users}
-                onTicketClick={setSelectedTicket}
+                onTicketClick={(ticket) => setLocation(`/chamados/${ticket.id}`)}
               />
             ) : (
               <Table className="border-collapse">
@@ -1070,7 +1064,7 @@ export default function ChamadosPage() {
                         <TableRow
                           key={ticket.id}
                           className="cursor-pointer hover:bg-muted/30 transition-colors"
-                          onClick={() => setSelectedTicket(ticket)}
+                          onClick={() => setLocation(`/chamados/${ticket.id}`)}
                           data-testid={`row-ticket-${ticket.id}`}
                         >
                           <TableCell>
@@ -1182,7 +1176,7 @@ export default function ChamadosPage() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation();
-                                  setSelectedTicket(ticket);
+                                  setLocation(`/chamados/${ticket.id}`);
                                 }}>
                                   <Edit className="h-4 w-4 mr-2" />
                                   Editar
@@ -1211,8 +1205,6 @@ export default function ChamadosPage() {
         </Card>
       </main>
 
-      <TicketDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
-      <TicketDetailSheet ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
     </div>
   );
 }
