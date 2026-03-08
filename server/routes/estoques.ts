@@ -16,8 +16,34 @@ import {
   users,
 } from "@shared/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
-import { getCachedProdutos } from "../services/estoque-cache.service";
-import { getCachedPosEstoque } from "../services/estoque-pos.service";
+import { getCachedProdutos, invalidateEstoqueCache } from "../services/estoque-cache.service";
+import { getCachedPosEstoque, invalidatePosEstoqueCache } from "../services/estoque-pos.service";
+
+// ─── Helpers de classificação por descrição ───────────────────────────────────
+
+function extrairCategoria(descricao: string): string {
+  const d = (descricao || '').toUpperCase();
+  if (d.includes('IPHONE') || d.includes('APPLE')) return 'iPhone';
+  if (d.includes('GALAXY') || d.includes('SAMSUNG')) return 'Samsung';
+  if (d.includes('MOTOROLA') || d.includes('MOTO ') || d.includes('MOTO G') || d.includes('MOTO E')) return 'Motorola';
+  if (d.includes('XIAOMI') || d.includes('REDMI') || d.includes('POCO')) return 'Xiaomi';
+  if (d.includes('LG ')) return 'LG';
+  if (d.includes('REALME')) return 'Realme';
+  if (d.includes('NOKIA')) return 'Nokia';
+  return 'Outros';
+}
+
+function extrairMarca(descricao: string): string {
+  const d = (descricao || '').toUpperCase();
+  if (d.includes('APPLE') || d.includes('IPHONE')) return 'Apple';
+  if (d.includes('SAMSUNG') || d.includes('GALAXY')) return 'Samsung';
+  if (d.includes('MOTOROLA') || d.includes('MOTO ') || d.includes('MOTO G') || d.includes('MOTO E')) return 'Motorola';
+  if (d.includes('XIAOMI') || d.includes('REDMI') || d.includes('POCO')) return 'Xiaomi';
+  if (d.includes('LG ')) return 'LG';
+  if (d.includes('REALME')) return 'Realme';
+  if (d.includes('NOKIA')) return 'Nokia';
+  return 'Outros';
+}
 
 export function registerEstoqueRoutes(router: Router) {
 
@@ -450,83 +476,72 @@ export function registerEstoqueRoutes(router: Router) {
   // ============== POSIÇÃO DE ESTOQUES ==============
   
   // GET /api/estoques/posicao - Obter posição de estoques
+  // Usa getCachedPosEstoque() como fonte primária para garantir que TODOS os
+  // produtos com saldo apareçam, independente de paginação do catálogo.
   router.get("/api/estoques/posicao", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { categoria, marca, modelo, codigoErp } = req.query;
 
       console.log('[Estoque Routes] GET /api/estoques/posicao - Fetching stock position');
 
-      // Carregar catálogo e posição de estoques em paralelo
-      const [produtosArray, posEstoqueIndex] = await Promise.all([
-        getCachedProdutos(),
-        getCachedPosEstoque(),
-      ]);
+      const posEstoqueIndex = await getCachedPosEstoque();
 
-      if (produtosArray.length === 0) {
-        return res.json({ success: true, data: [] });
+      if (posEstoqueIndex.size === 0) {
+        return res.json({ success: true, data: [], total: 0 });
       }
 
-      // Aplicar filtros (usa p.codigo — código ERP do usuário)
-      let filteredProdutos = produtosArray;
-
-      if (categoria) {
-        filteredProdutos = filteredProdutos.filter((p: any) =>
-          p.descricao_familia?.toLowerCase().includes((categoria as string).toLowerCase()) ||
-          p.categoria?.toLowerCase().includes((categoria as string).toLowerCase())
-        );
-      }
-
-      if (marca) {
-        filteredProdutos = filteredProdutos.filter((p: any) =>
-          p.marca?.toLowerCase().includes((marca as string).toLowerCase())
-        );
-      }
-
-      if (modelo) {
-        filteredProdutos = filteredProdutos.filter((p: any) =>
-          p.descricao?.toLowerCase().includes((modelo as string).toLowerCase())
-        );
-      }
-
-      if (codigoErp) {
-        const q = (codigoErp as string).toLowerCase();
-        filteredProdutos = filteredProdutos.filter((p: any) =>
-          p.codigo?.toLowerCase().includes(q)
-        );
-      }
-
-      console.log('[Estoque Routes] Filtered products:', filteredProdutos.length);
-
-      // Formatar dados para a tabela — join com posição de estoque real
-      const formattedData = filteredProdutos.map((p: any) => {
-        const locais = posEstoqueIndex.get(p.codigo) ?? [];
-        const estoqueDisponivel = locais.reduce((s: number, l: any) => s + (l.nSaldo ?? 0), 0);
-        const custoUnitario = locais.length > 0 ? (locais[0].nCMC ?? 0) : 0;
-        const valorVenda = parseFloat(p.valor_unitario || 0);
+      // Montar lista de items a partir do índice de posição (fonte primária)
+      const allItems: any[] = [];
+      posEstoqueIndex.forEach((locais, codigo) => {
+        const primeiro = locais[0];
+        const descricao = primeiro?.cDescricao || '';
+        const estoqueDisponivel = locais.reduce((s, l) => s + (l.nSaldo ?? 0), 0);
+        const custoUnitario = primeiro?.nCMC ?? 0;
+        const valorVenda = primeiro?.nPrecoUnitario ?? 0;
         const custoTotal = estoqueDisponivel * custoUnitario;
         const markup = custoUnitario > 0 ? ((valorVenda - custoUnitario) / custoUnitario) * 100 : 0;
 
-        return {
-          codigoErp: p.codigo || '',
-          descricao: p.descricao || '',
-          categoria: p.descricao_familia || p.categoria || '',
-          marca: p.marca || '',
-          modelo: p.descricao || '',
-          unidade: p.unidade || 'UN',
+        allItems.push({
+          codigoErp: codigo,
+          descricao,
+          categoria: extrairCategoria(descricao),
+          marca: extrairMarca(descricao),
+          modelo: descricao,
+          unidade: 'UN',
           estoqueDisponivel,
           custoUnitario,
           valorVenda,
           custoTotal,
           markup,
-        };
+        });
       });
 
-      console.log('[Estoque Routes] Returning', formattedData.length, 'products');
+      // Aplicar filtros
+      let filteredData = allItems;
+
+      if (categoria && categoria !== 'all') {
+        const q = (categoria as string).toLowerCase();
+        filteredData = filteredData.filter(p => p.categoria.toLowerCase().includes(q));
+      }
+      if (marca && marca !== 'all') {
+        const q = (marca as string).toLowerCase();
+        filteredData = filteredData.filter(p => p.marca.toLowerCase().includes(q));
+      }
+      if (modelo && modelo !== 'all') {
+        const q = (modelo as string).toLowerCase();
+        filteredData = filteredData.filter(p => p.modelo.toLowerCase().includes(q));
+      }
+      if (codigoErp) {
+        const q = (codigoErp as string).toLowerCase();
+        filteredData = filteredData.filter(p => p.codigoErp.toLowerCase().includes(q));
+      }
+
+      console.log('[Estoque Routes] Returning', filteredData.length, 'of', allItems.length, 'products');
 
       res.json({
         success: true,
-        data: formattedData,
-        total: formattedData.length
+        data: filteredData,
+        total: filteredData.length,
       });
     } catch (error: any) {
       console.error('[Estoque Routes] Error fetching stock position:', error.message);
@@ -653,65 +668,101 @@ export function registerEstoqueRoutes(router: Router) {
     }
   });
   
+  // POST /api/estoques/posicao/refresh - Invalidar e recarregar caches de estoque
+  router.post("/api/estoques/posicao/refresh", requireAuth, requireAdmin, async (req, res) => {
+    try {
+      console.log('[Estoque Routes] POST /api/estoques/posicao/refresh - Invalidating caches');
+
+      invalidatePosEstoqueCache();
+      invalidateEstoqueCache();
+
+      // Recarregar proativamente
+      const posEstoqueIndex = await getCachedPosEstoque();
+
+      res.json({
+        success: true,
+        message: 'Cache de estoques atualizado com sucesso',
+        totalProdutos: posEstoqueIndex.size,
+      });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Error refreshing cache:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   // ============== FILTROS DINÂMICOS ==============
   
   // GET /api/estoques/filtros/categorias - Listar categorias únicas
+  // Deriva do PosEstoque para garantir consistência com os dados exibidos na tabela
   router.get("/api/estoques/filtros/categorias", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log('[Estoque Routes] GET /api/estoques/filtros/categorias');
 
-      const produtosArray = await getCachedProdutos();
+      const posEstoqueIndex = await getCachedPosEstoque();
 
-      if (produtosArray.length === 0) {
+      if (posEstoqueIndex.size === 0) {
         return res.json({ success: true, data: [] });
       }
 
-      // Extrair categorias únicas
-      const categorias = [...new Set(produtosArray.map((p: any) => p.categoria).filter(Boolean))];
-      
-      res.json({ success: true, data: categorias.sort() });
+      const categoriasSet = new Set<string>();
+      posEstoqueIndex.forEach((locais) => {
+        const desc = locais[0]?.cDescricao || '';
+        const cat = extrairCategoria(desc);
+        if (cat) categoriasSet.add(cat);
+      });
+
+      res.json({ success: true, data: [...categoriasSet].sort() });
     } catch (error: any) {
       console.error('[Estoque Routes] Error fetching categorias:', error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-  
+
   // GET /api/estoques/filtros/marcas - Listar marcas únicas
+  // Deriva do PosEstoque para garantir consistência com os dados exibidos na tabela
   router.get("/api/estoques/filtros/marcas", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log('[Estoque Routes] GET /api/estoques/filtros/marcas');
 
-      const produtosArray = await getCachedProdutos();
+      const posEstoqueIndex = await getCachedPosEstoque();
 
-      if (produtosArray.length === 0) {
+      if (posEstoqueIndex.size === 0) {
         return res.json({ success: true, data: [] });
       }
 
-      // Extrair marcas únicas
-      const marcas = [...new Set(produtosArray.map((p: any) => p.marca).filter(Boolean))];
-      
-      res.json({ success: true, data: marcas.sort() });
+      const marcasSet = new Set<string>();
+      posEstoqueIndex.forEach((locais) => {
+        const desc = locais[0]?.cDescricao || '';
+        const marca = extrairMarca(desc);
+        if (marca) marcasSet.add(marca);
+      });
+
+      res.json({ success: true, data: [...marcasSet].sort() });
     } catch (error: any) {
       console.error('[Estoque Routes] Error fetching marcas:', error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-  
+
   // GET /api/estoques/filtros/modelos - Listar modelos únicos
+  // Usa as descrições do PosEstoque como modelos
   router.get("/api/estoques/filtros/modelos", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log('[Estoque Routes] GET /api/estoques/filtros/modelos');
 
-      const produtosArray = await getCachedProdutos();
+      const posEstoqueIndex = await getCachedPosEstoque();
 
-      if (produtosArray.length === 0) {
+      if (posEstoqueIndex.size === 0) {
         return res.json({ success: true, data: [] });
       }
 
-      // Extrair modelos únicos (usando descricao ou modelo)
-      const modelos = [...new Set(produtosArray.map((p: any) => p.modelo || p.descricao).filter(Boolean))];
-      
-      res.json({ success: true, data: modelos.sort() });
+      const modelosSet = new Set<string>();
+      posEstoqueIndex.forEach((locais) => {
+        const desc = locais[0]?.cDescricao || '';
+        if (desc) modelosSet.add(desc);
+      });
+
+      res.json({ success: true, data: [...modelosSet].sort() });
     } catch (error: any) {
       console.error('[Estoque Routes] Error fetching modelos:', error.message);
       res.status(500).json({ success: false, error: error.message });
