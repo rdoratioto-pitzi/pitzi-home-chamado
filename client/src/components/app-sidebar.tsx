@@ -160,14 +160,14 @@ const bibliotecaSubItems = [
 ];
 
 const estoquesSubItems = [
-  { title: "Posição Estoques", url: "/estoques/posicao", icon: BarChart3 },
-  { title: "Contagem Interna", url: "/estoques/contagem", icon: ClipboardList },
-  { title: "Relatório Contagens", url: "/estoques/relatorio-contagens", icon: FileSpreadsheet },
   { title: "Dashboard", url: "/estoques/dashboard", icon: PieChart },
+  { title: "Posição Estoques", url: "/estoques/posicao", icon: BarChart3 },
   { title: "Pipeline", url: "/estoques/pipeline", icon: GitMerge },
   { title: "Lead Time", url: "/estoques/lead-time", icon: Clock },
   { title: "Aging Report", url: "/estoques/aging", icon: TrendingDown },
   { title: "Rastreabilidade", url: "/estoques/rastreabilidade", icon: Route },
+  { title: "Contagem Interna", url: "/estoques/contagem", icon: ClipboardList },
+  { title: "Relatório Contagens", url: "/estoques/relatorio-contagens", icon: FileSpreadsheet },
 ];
 
 function getCurrentUser() {
