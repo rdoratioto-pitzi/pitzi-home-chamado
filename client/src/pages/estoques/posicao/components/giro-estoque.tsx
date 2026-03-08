@@ -169,7 +169,7 @@ export function GiroEstoque() {
       </div>
 
       {/* Cards de métricas principais */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <MetricaCard
           titulo="Giro Geral"
           valor={`${data.giroGeral}x`}
@@ -213,7 +213,7 @@ export function GiroEstoque() {
       </Card>
 
       {/* Grid: Tendência + Tabela */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Gráfico de tendência mensal */}
         <Card>
           <CardHeader>

@@ -2,7 +2,8 @@
  * Componente de Filtros para Posição de Estoques
  * Permite filtrar por IMEI, Código ERP, Categoria, Marca, Modelo e Capacidade
  */
-import { Search, X } from "lucide-react";
+import { useState } from "react";
+import { Search, X, SlidersHorizontal, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,6 +40,8 @@ export function Filtros({
   marcas,
   modelos,
 }: FiltrosProps) {
+  const [mobileExpanded, setMobileExpanded] = useState(false);
+
   const handleFilterChange = (key: keyof EstoqueFilters, value: string) => {
     onFilterChange({
       ...filters,
@@ -58,8 +61,37 @@ export function Filtros({
     onClear?.();
   };
 
+  const hasActiveFilters = Object.values(filters).some((v) => v !== "" && v !== "all");
+
   return (
     <div className="bg-card rounded-lg border p-4 mb-6">
+      {/* Header mobile com toggle */}
+      <div className="flex items-center justify-between md:hidden mb-3">
+        <button
+          type="button"
+          aria-expanded={mobileExpanded}
+          aria-controls="filtros-content"
+          onClick={() => setMobileExpanded((v) => !v)}
+          className="flex items-center gap-2 text-sm font-medium"
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          Filtros
+          {hasActiveFilters && (
+            <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+              {Object.values(filters).filter((v) => v !== "" && v !== "all").length}
+            </span>
+          )}
+          {mobileExpanded ? <ChevronUp className="h-4 w-4 ml-1" /> : <ChevronDown className="h-4 w-4 ml-1" />}
+        </button>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={handleClearFilters} className="h-7 px-2 text-xs gap-1">
+            <X className="h-3 w-3" /> Limpar
+          </Button>
+        )}
+      </div>
+
+      {/* Conteúdo dos filtros — sempre visível em md+, colapsável em mobile */}
+      <div id="filtros-content" className={`${mobileExpanded ? "block" : "hidden"} md:block`}>
       {/* Linha 1: IMEI, Código ERP, Categoria, Marca */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         {/* Input IMEI */}
@@ -152,15 +184,17 @@ export function Filtros({
           />
         </div>
 
-        {/* Botão Limpar Filtros */}
+        {/* Botão Limpar Filtros — oculto no mobile (já tem no header) */}
         <Button
           variant="outline"
           onClick={handleClearFilters}
-          className="flex items-center gap-2"
+          className="hidden md:flex items-center gap-2"
+          aria-label="Limpar todos os filtros"
         >
           <X className="h-4 w-4" />
           Limpar Filtros
         </Button>
+      </div>
       </div>
     </div>
   );

@@ -47,6 +47,8 @@ interface TendenciasDados {
 interface Props {
   dados: TendenciasDados | undefined;
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
   periodo: string;
   onPeriodoChange: (p: string) => void;
 }
@@ -73,7 +75,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
-export function Tendencias({ dados, isLoading, periodo, onPeriodoChange }: Props) {
+export function Tendencias({ dados, isLoading, isError, onRetry, periodo, onPeriodoChange }: Props) {
   if (isLoading) {
     return (
       <Card>
@@ -81,6 +83,27 @@ export function Tendencias({ dados, isLoading, periodo, onPeriodoChange }: Props
         <CardContent className="space-y-4">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-48 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="h-5 w-5 text-indigo-500" />
+            Tendências e Projeções
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+          <p className="text-sm">Não foi possível carregar os dados.</p>
+          {onRetry && (
+            <button onClick={onRetry} className="text-xs underline hover:text-foreground">
+              Tentar novamente
+            </button>
+          )}
         </CardContent>
       </Card>
     );
