@@ -32,6 +32,17 @@ export function registerNotificationRoutes(router: Router): void {
     }
   });
 
+  router.put("/api/notifications/read-all", requireAuth, async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      await storage.markAllNotificationsRead(userId);
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(error.status || 500).json({ error: error.message || "Failed to mark all notifications as read" });
+    }
+  });
+
   router.put("/api/notifications/:id/read", requireAuth, async (req, res) => {
     try {
       const { userId } = getSessionUser(req);

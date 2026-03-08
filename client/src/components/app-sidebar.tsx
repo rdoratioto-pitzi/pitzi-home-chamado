@@ -40,6 +40,8 @@ import {
   Sparkles,
   GitBranch,
   Warehouse,
+  GitMerge,
+  Clock,
 } from "lucide-react";
 import {
   Sidebar,
@@ -161,6 +163,8 @@ const estoquesSubItems = [
   { title: "Contagem Interna", url: "/estoques/contagem", icon: ClipboardList },
   { title: "Relatório Contagens", url: "/estoques/relatorio-contagens", icon: FileSpreadsheet },
   { title: "Dashboard", url: "/estoques/dashboard", icon: PieChart },
+  { title: "Pipeline", url: "/estoques/pipeline", icon: GitMerge },
+  { title: "Lead Time", url: "/estoques/lead-time", icon: Clock },
 ];
 
 function getCurrentUser() {
@@ -213,12 +217,13 @@ export function AppSidebar() {
         return newUser;
       });
     };
+    // Escuta mudanças de outras abas (evento nativo)
     window.addEventListener("storage", handleStorageChange);
-    // Poll to catch updates within the same tab - increased to 5 seconds to reduce server load
-    const interval = setInterval(handleStorageChange, 5000);
+    // Escuta mudanças na mesma aba (evento customizado disparado por saveAuth/clearAuth)
+    window.addEventListener("authChanged", handleStorageChange);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
-      clearInterval(interval);
+      window.removeEventListener("authChanged", handleStorageChange);
     };
   }, []);
 

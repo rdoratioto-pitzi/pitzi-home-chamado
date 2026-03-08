@@ -47,6 +47,8 @@ interface CurvaABCDados {
 interface Props {
   dados: CurvaABCDados | undefined;
   isLoading: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 }
 
 const CLASSE_CONFIG = {
@@ -74,7 +76,7 @@ const CustomTooltip = ({ active, payload }: any) => {
   );
 };
 
-export function CurvaABC({ dados, isLoading }: Props) {
+export function CurvaABC({ dados, isLoading, isError, onRetry }: Props) {
   const [filtroClasse, setFiltroClasse] = useState<'todos' | 'A' | 'B' | 'C'>('todos');
 
   if (isLoading) {
@@ -84,6 +86,27 @@ export function CurvaABC({ dados, isLoading }: Props) {
         <CardContent className="space-y-4">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-48 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BarChart2 className="h-5 w-5 text-purple-500" />
+            Curva ABC
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
+          <p className="text-sm">Não foi possível carregar os dados.</p>
+          {onRetry && (
+            <button onClick={onRetry} className="text-xs underline hover:text-foreground">
+              Tentar novamente
+            </button>
+          )}
         </CardContent>
       </Card>
     );
