@@ -71,6 +71,9 @@ const EstoquesDashboardPage            = lazy(() => import("@/pages/estoques/das
 const EstoquesPipelinePage             = lazy(() => import("@/pages/estoques/pipeline"));
 const EstoquesLeadTimePage             = lazy(() => import("@/pages/estoques/lead-time"));
 const OmieIntegration                  = lazy(() => import("@/pages/integrations/omie/OmieIntegration"));
+const NovoChamadoPage                  = lazy(() => import("@/pages/chamados/novo"));
+const TicketDetailPage                 = lazy(() => import("@/pages/chamados/[id]"));
+const EstoquesPage                     = lazy(() => import("@/pages/estoques/index"));
 
 function Router() {
   return (
