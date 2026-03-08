@@ -165,6 +165,7 @@ const estoquesSubItems = [
   { title: "Dashboard", url: "/estoques/dashboard", icon: PieChart },
   { title: "Pipeline", url: "/estoques/pipeline", icon: GitMerge },
   { title: "Lead Time", url: "/estoques/lead-time", icon: Clock },
+  { title: "Aging Report", url: "/estoques/aging", icon: TrendingDown },
 ];
 
 function getCurrentUser() {

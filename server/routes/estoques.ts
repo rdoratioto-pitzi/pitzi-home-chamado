@@ -1759,5 +1759,238 @@ export function registerEstoqueRoutes(router: Router) {
     }
   });
 
+  // ============== AGING REPORT FIFO ==============
+
+  // Config padrão de alertas (in-memory – pode ser migrado para DB futuramente)
+  const agingAlertasConfig: Record<string, { amarelo: number; vermelho: number; critico: number }> = {
+    voucher_confirmacao: { amarelo: 3,  vermelho: 5,  critico: 10 },
+    confirmacao_coleta:  { amarelo: 5,  vermelho: 7,  critico: 14 },
+    em_estoque:          { amarelo: 30, vermelho: 45, critico: 60 },
+    bloqueados:          { amarelo: 15, vermelho: 30, critico: 45 },
+    manutencao:          { amarelo: 15, vermelho: 30, critico: 45 },
+    divergentes:         { amarelo: 10, vermelho: 20, critico: 30 },
+  };
+
+  function getFaixaPreEstoque(dias: number): { nome: string; cor: string } {
+    if (dias <= 7)  return { nome: '0-7d',   cor: 'green'  };
+    if (dias <= 14) return { nome: '8-14d',  cor: 'yellow' };
+    if (dias <= 21) return { nome: '15-21d', cor: 'orange' };
+    if (dias <= 30) return { nome: '22-30d', cor: 'red'    };
+    return                  { nome: '30+d',  cor: 'black'  };
+  }
+
+  function getFaixaEstoque(dias: number): { nome: string; cor: string } {
+    if (dias <= 15) return { nome: '0-15d',  cor: 'green'  };
+    if (dias <= 30) return { nome: '16-30d', cor: 'yellow' };
+    if (dias <= 45) return { nome: '31-45d', cor: 'orange' };
+    if (dias <= 60) return { nome: '46-60d', cor: 'red'    };
+    return                  { nome: '60+d',  cor: 'black'  };
+  }
+
+  // GET /api/estoques/aging/alertas/config
+  router.get('/api/estoques/aging/alertas/config', requireAuth, requireAdmin, (_req, res) => {
+    res.json({ success: true, data: agingAlertasConfig });
+  });
+
+  // PUT /api/estoques/aging/alertas/config
+  router.put('/api/estoques/aging/alertas/config', requireAuth, requireAdmin, (req, res) => {
+    const { etapa, amarelo, vermelho, critico } = req.body;
+    if (!etapa) return res.status(400).json({ success: false, error: 'etapa obrigatória' });
+    agingAlertasConfig[etapa] = { amarelo, vermelho, critico };
+    res.json({ success: true, data: agingAlertasConfig });
+  });
+
+  // GET /api/estoques/aging/matriz – Matriz faixa × etapa (pré-estoque)
+  router.get('/api/estoques/aging/matriz', requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      console.log('[Estoque Routes] GET /api/estoques/aging/matriz');
+
+      const [vouchersR, confirmacaoR, coletasR, recebimentosR, triagemR] = await Promise.allSettled([
+        fetchPipelineApi('/orders/advanced'),
+        fetchPipelineApi('/logistica/meus_dispositivos'),
+        fetchPipelineApi('/adm_logistica/coletas'),
+        fetchPipelineApi('/adm_logistica/recebimentos'),
+        fetchPipelineApi('/adm_logistica/triagem'),
+      ]);
+
+      const get = (r: PromiseSettledResult<any[]>) => r.status === 'fulfilled' ? r.value : [];
+
+      const etapasData: Record<string, any[]> = {
+        voucher:     get(vouchersR),
+        confirmacao: get(confirmacaoR),
+        coleta:      get(coletasR),
+        recebimento: get(recebimentosR),
+        triagem:     get(triagemR),
+      };
+
+      const faixasNomes = ['0-7d', '8-14d', '15-21d', '22-30d', '30+d'];
+      const etapasNomes = ['voucher', 'confirmacao', 'coleta', 'recebimento', 'triagem'];
+      const coresMap: Record<string, string> = {
+        '0-7d': 'green', '8-14d': 'yellow', '15-21d': 'orange', '22-30d': 'red', '30+d': 'black',
+      };
+
+      const faixas = faixasNomes.map(faixaNome => {
+        const etapasCounts: Record<string, number> = {};
+        let total = 0;
+        for (const etapaNome of etapasNomes) {
+          const count = etapasData[etapaNome].filter(item =>
+            getFaixaPreEstoque(diasDesde(extractItemDate(item))).nome === faixaNome
+          ).length;
+          etapasCounts[etapaNome] = count;
+          total += count;
+        }
+        return { nome: faixaNome, cor: coresMap[faixaNome], etapas: etapasCounts, total };
+      });
+
+      const totaisPorEtapa: Record<string, number> = {};
+      for (const e of etapasNomes) totaisPorEtapa[e] = etapasData[e].length;
+      const totalGeral = etapasNomes.reduce((sum, e) => sum + etapasData[e].length, 0);
+      const criticos   = etapasNomes.reduce((sum, e) =>
+        sum + etapasData[e].filter(i => diasDesde(extractItemDate(i)) > 30).length, 0);
+
+      res.json({ success: true, data: { tipo: 'pre-estoque', faixas, totaisPorEtapa, totalGeral, criticos } });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Aging matriz error:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/aging/estoque – Aging em estoque (dias desde triagem)
+  router.get('/api/estoques/aging/estoque', requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      console.log('[Estoque Routes] GET /api/estoques/aging/estoque');
+
+      const triagemItems = await fetchPipelineApi('/adm_logistica/triagem');
+
+      const faixasNomes = ['0-15d', '16-30d', '31-45d', '46-60d', '60+d'];
+      const coresMap: Record<string, string> = {
+        '0-15d': 'green', '16-30d': 'yellow', '31-45d': 'orange', '46-60d': 'red', '60+d': 'black',
+      };
+      const grouped: Record<string, { quantidade: number; valor: number }> = {};
+      for (const fn of faixasNomes) grouped[fn] = { quantidade: 0, valor: 0 };
+
+      let totalQtd = 0, totalValor = 0;
+      for (const item of triagemItems) {
+        const faixa = getFaixaEstoque(diasDesde(extractItemDate(item)));
+        const valor  = extrairValorPipeline(item);
+        grouped[faixa.nome].quantidade += 1;
+        grouped[faixa.nome].valor      += valor;
+        totalQtd  += 1;
+        totalValor += valor;
+      }
+
+      const faixas = faixasNomes.map(fn => ({
+        nome:       fn,
+        cor:        coresMap[fn],
+        quantidade: grouped[fn].quantidade,
+        valor:      grouped[fn].valor,
+        percentual: totalQtd > 0 ? parseFloat(((grouped[fn].quantidade / totalQtd) * 100).toFixed(1)) : 0,
+      }));
+
+      res.json({ success: true, data: { faixas, total: { quantidade: totalQtd, valor: totalValor } } });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Aging estoque error:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/aging/fifo – Lista ordenada do mais antigo ao mais novo
+  router.get('/api/estoques/aging/fifo', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      console.log('[Estoque Routes] GET /api/estoques/aging/fifo');
+
+      const { limite = '50', etapa, faixa, pagina = '1' } = req.query;
+      const lim = Math.min(parseInt(String(limite)), 200);
+      const pag = Math.max(parseInt(String(pagina)), 1);
+
+      const [vouchersR, confirmacaoR, coletasR, recebimentosR, triagemR, bloqueadosR, manutencaoR, divergentesR] =
+        await Promise.allSettled([
+          fetchPipelineApi('/orders/advanced'),
+          fetchPipelineApi('/logistica/meus_dispositivos'),
+          fetchPipelineApi('/adm_logistica/coletas'),
+          fetchPipelineApi('/adm_logistica/recebimentos'),
+          fetchPipelineApi('/adm_logistica/triagem'),
+          fetchPipelineApi('/adm_logistica/bloqueados'),
+          fetchPipelineApi('/adm_logistica/manutencao'),
+          fetchPipelineApi('/adm_logistica/divergentes'),
+        ]);
+
+      const get = (r: PromiseSettledResult<any[]>) => r.status === 'fulfilled' ? r.value : [];
+
+      const etapasData = [
+        { etapa: 'voucher',     label: 'Voucher',      items: get(vouchersR)     },
+        { etapa: 'confirmacao', label: 'Confirmação',  items: get(confirmacaoR)  },
+        { etapa: 'coleta',      label: 'Coleta',       items: get(coletasR)      },
+        { etapa: 'recebimento', label: 'Recebimento',  items: get(recebimentosR) },
+        { etapa: 'triagem',     label: 'Triagem',      items: get(triagemR)      },
+        { etapa: 'bloqueados',  label: 'Bloqueado',    items: get(bloqueadosR)   },
+        { etapa: 'manutencao',  label: 'Manutenção',   items: get(manutencaoR)   },
+        { etapa: 'divergentes', label: 'Divergente',   items: get(divergentesR)  },
+      ];
+
+      const todosList: any[] = [];
+      for (const { etapa: etapaNome, label, items } of etapasData) {
+        if (etapa && etapa !== etapaNome) continue;
+        for (const item of items) {
+          const dias      = diasDesde(extractItemDate(item));
+          const faixaInfo = getFaixaPreEstoque(dias);
+          if (faixa && faixa !== faixaInfo.nome) continue;
+          todosList.push({
+            imei:       extrairImeiPipeline(item),
+            modelo:     extrairModeloPipeline(item),
+            categoria:  extrairCategoriaPipeline(item),
+            mesTradeIn: formatMesTradeIn(extractItemDate(item)),
+            diasTotal:  dias,
+            status:     label,
+            etapa:      etapaNome,
+            valor:      extrairValorPipeline(item),
+            rede:       extrairRedePipeline(item),
+            filial:     item.filial || item.loja || item.store || '',
+            faixa:      faixaInfo.nome,
+            cor:        faixaInfo.cor,
+          });
+        }
+      }
+
+      // Ordenação FIFO: mais antigos primeiro
+      todosList.sort((a, b) => b.diasTotal - a.diasTotal);
+
+      const total        = todosList.length;
+      const totalPaginas = Math.ceil(total / lim) || 1;
+      const inicio       = (pag - 1) * lim;
+      const itens        = todosList.slice(inicio, inicio + lim);
+
+      res.json({ success: true, data: { itens, total, pagina: pag, totalPaginas, limite: lim } });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Aging FIFO error:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/estoques/aging/criar-tarefa – Criar tarefa para itens críticos
+  router.post('/api/estoques/aging/criar-tarefa', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const { imeis, titulo, descricao } = req.body;
+      if (!imeis?.length || !titulo) {
+        return res.status(400).json({ success: false, error: 'imeis e titulo são obrigatórios' });
+      }
+      const user = (req as any).user;
+      const task = await storage.createTask({
+        title:       titulo,
+        description: `${descricao || ''}\n\n📱 IMEIs: ${(imeis as string[]).join(', ')}`,
+        priority:    'high',
+        type:        'task',
+        status:      'todo',
+        visibility:  'shared',
+        tenantId:    user?.tenantId ? String(user.tenantId) : undefined,
+        createdBy:   String(user?.id ?? 'system'),
+      });
+      res.json({ success: true, data: { taskId: task?.id, mensagem: `Tarefa criada para ${imeis.length} dispositivo(s)` } });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Criar tarefa aging error:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
   console.log('[Estoque Routes] Routes registered successfully');
 }
