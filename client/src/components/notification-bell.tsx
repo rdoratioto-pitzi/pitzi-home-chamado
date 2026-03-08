@@ -67,33 +67,47 @@ export function NotificationBell() {
   const initialLoadRef = useRef(true);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  const { data: notifications = [] } = useQuery<Notification[]>({
-    queryKey: ["/api/notifications", user?.id],
-    enabled: !!user?.id,
-    refetchInterval: 8000,
+  // Lista completa: sem polling automático — busca apenas quando o popover é aberto.
+  // Isso elimina requisições periódicas desnecessárias à API.
+  const { data: notifications = [], refetch: refetchNotifications } = useQuery<Notification[]>({
+    queryKey: ["/api/notifications"],
+    enabled: !!user?.id && open,
+    staleTime: 0, // sempre busca fresh ao abrir
   });
 
-  const { data: unreadData } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications", user?.id, "unread-count"],
+  // Contador de não lidas: sem polling — atualiza apenas ao abrir o popover.
+  const { data: unreadData, refetch: refetchUnreadCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/notifications/unread/count"],
     enabled: !!user?.id,
-    refetchInterval: 5000,
+    staleTime: Infinity,
   });
+
+  // Ao abrir o popover, busca lista e contagem atualizadas.
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      refetchNotifications();
+      refetchUnreadCount();
+    }
+  };
 
   const markRead = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("PATCH", `/api/notifications/${id}/read`);
+      // Servidor usa PUT, não PATCH
+      await apiRequest("PUT", `/api/notifications/${id}/read`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
     },
   });
 
   const markAllRead = useMutation({
     mutationFn: async () => {
-      await apiRequest("PATCH", `/api/notifications/${user?.id}/read-all`);
+      await apiRequest("PUT", `/api/notifications/read-all`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread/count"] });
     },
   });
 
@@ -169,7 +183,7 @@ export function NotificationBell() {
   if (!user) return null;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           size="icon"
