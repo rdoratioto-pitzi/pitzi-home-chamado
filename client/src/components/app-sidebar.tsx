@@ -42,6 +42,7 @@ import {
   Warehouse,
   GitMerge,
   Clock,
+  Route,
 } from "lucide-react";
 import {
   Sidebar,
@@ -166,6 +167,7 @@ const estoquesSubItems = [
   { title: "Pipeline", url: "/estoques/pipeline", icon: GitMerge },
   { title: "Lead Time", url: "/estoques/lead-time", icon: Clock },
   { title: "Aging Report", url: "/estoques/aging", icon: TrendingDown },
+  { title: "Rastreabilidade", url: "/estoques/rastreabilidade", icon: Route },
 ];
 
 function getCurrentUser() {
