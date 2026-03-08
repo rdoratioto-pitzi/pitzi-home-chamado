@@ -4,6 +4,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { omieService } from "../services/omie.service";
+import { getCachedPosEstoque } from "../services/estoque-pos.service";
 
 export function registerOmieRoutes(router: Router) {
   
@@ -137,6 +138,37 @@ export function registerOmieRoutes(router: Router) {
         request_params: req.body
       });
       
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/omie/estoque/posicao/:codigo - Posição de estoque por código de produto
+  router.get("/api/omie/estoque/posicao/:codigo", requireAuth, async (req, res) => {
+    try {
+      const codigo = String(req.params.codigo);
+      console.log(`[OMIE Routes] GET /api/omie/estoque/posicao/${codigo}`);
+
+      const index = await getCachedPosEstoque();
+      const entries = index.get(codigo.trim().toUpperCase()) ?? index.get(codigo.trim()) ?? [];
+
+      const totalFisico = entries.reduce((s, e) => s + (e.fisico ?? 0), 0);
+      const totalSaldo = entries.reduce((s, e) => s + (e.nSaldo ?? 0), 0);
+      const totalReservado = entries.reduce((s, e) => s + (e.reservado ?? 0), 0);
+
+      res.json({
+        success: true,
+        data: {
+          codigo,
+          descricao: entries[0]?.cDescricao ?? null,
+          totalFisico,
+          totalSaldo,
+          totalReservado,
+          locais: entries,
+          fromCache: true,
+        }
+      });
+    } catch (error: any) {
+      console.error('[OMIE Routes] Error fetching posicao estoque:', error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });
