@@ -7,150 +7,187 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TrendingDown, TrendingUp, Wallet, Search, Loader2, AlertTriangle, Info } from 'lucide-react';
+import { TrendingDown, TrendingUp, Wallet, Search, Loader2, AlertTriangle, Info, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export default function OmieFinancas() {
-  // Estados para Contas a Pagar
-  const [pagarFilters, setPagarFilters] = useState({
-    nPagina: 1,
-    nRegPorPagina: 10,
-    dDtVencIni: '',
-    dDtVencFim: '',
-    cStatus: 'ALL'
-  });
-  const [pagarData, setPagarData] = useState<any[]>([]);
-  const [pagarLoading, setPagarLoading] = useState(false);
-  const [pagarTotals, setPagarTotals] = useState({ total: 0, vencidas: 0, pagas: 0 });
+const fmt = (v: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 
-  // Estados para Contas a Receber
-  const [receberFilters, setReceberFilters] = useState({
-    nPagina: 1,
-    nRegPorPagina: 10,
-    dDtVencIni: '',
-    dDtVencFim: '',
-    cStatus: 'ALL'
-  });
-  const [receberData, setReceberData] = useState<any[]>([]);
+const isVencido = (dataVenc: string) => {
+  if (!dataVenc) return false;
+  const [dia, mes, ano] = dataVenc.split('/');
+  return new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia)) < new Date();
+};
+
+const getStatusVariant = (status: string): 'destructive' | 'default' | 'secondary' | 'outline' => {
+  const s = status?.toLowerCase();
+  if (s?.includes('vencid')) return 'destructive';
+  if (s?.includes('pag') || s?.includes('receb')) return 'default';
+  if (s?.includes('abert') || s?.includes('pendent')) return 'secondary';
+  return 'outline';
+};
+
+const defaultFilters = {
+  nPagina: 1,
+  nRegPorPagina: 20,
+  dDtVencIni: '',
+  dDtVencFim: '',
+  cStatus: 'ALL',
+};
+
+export default function OmieFinancas() {
+  // Resumo
+  const [resumo, setResumo] = useState<any | null>(null);
+  const [resumoLoading, setResumoLoading] = useState(false);
+  const [resumoError, setResumoError] = useState<string | null>(null);
+
+  // Contas a Pagar
+  const [pagarFilters, setPagarFilters] = useState({ ...defaultFilters });
+  const [pagarResult, setPagarResult] = useState<any | null>(null);
+  const [pagarLoading, setPagarLoading] = useState(false);
+
+  // Contas a Receber
+  const [receberFilters, setReceberFilters] = useState({ ...defaultFilters });
+  const [receberResult, setReceberResult] = useState<any | null>(null);
   const [receberLoading, setReceberLoading] = useState(false);
-  const [receberTotals, setReceberTotals] = useState({ total: 0, vencidas: 0, recebidas: 0 });
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Função genérica para chamar API
-  const callOmieApi = async (endpoint: string, call: string, params: any[], category: string) => {
+  // ── Resumo Financeiro ──────────────────────────────────────────────────────
+  const handleCarregarResumo = async () => {
+    setResumoLoading(true);
+    setResumoError(null);
     try {
-      const { data } = await axios.post('/api/omie/call', {
-        endpoint,
-        call,
-        params,
-        category
-      }, { withCredentials: true });
-
-      if (data.success) {
-        return data.data;
+      const { data } = await axios.post('/api/omie/financas/resumo', {}, { withCredentials: true });
+      if (data.sucesso) {
+        setResumo(data.resumo);
+      } else {
+        throw new Error(data.error || 'Erro ao carregar resumo');
       }
-      throw new Error(data.error || 'Erro na requisição');
     } catch (error: any) {
-      throw new Error(error.response?.data?.error || error.message);
+      const msg = error.response?.data?.error || error.message;
+      setResumoError(msg);
+    } finally {
+      setResumoLoading(false);
     }
   };
 
-  // Handler Contas a Pagar
+  // ── Contas a Pagar ─────────────────────────────────────────────────────────
   const handleBuscarPagar = async () => {
     setPagarLoading(true);
     setMessage(null);
     try {
-      const params = [{
+      const payload: any = {
         nPagina: pagarFilters.nPagina,
-        nRegPorPagina: pagarFilters.nRegPorPagina
-      }];
+        nRegPorPagina: pagarFilters.nRegPorPagina,
+      };
+      if (pagarFilters.dDtVencIni) payload.dDtVencIni = pagarFilters.dDtVencIni;
+      if (pagarFilters.dDtVencFim) payload.dDtVencFim = pagarFilters.dDtVencFim;
+      if (pagarFilters.cStatus !== 'ALL') payload.cStatus = pagarFilters.cStatus;
 
-      if (pagarFilters.dDtVencIni) {
-        params[0].dDtVencIni = pagarFilters.dDtVencIni;
-      }
-      if (pagarFilters.dDtVencFim) {
-        params[0].dDtVencFim = pagarFilters.dDtVencFim;
-      }
-      if (pagarFilters.cStatus !== 'ALL') {
-        params[0].cStatus = pagarFilters.cStatus;
-      }
+      const { data } = await axios.post('/api/omie/financas/contas-pagar', payload, { withCredentials: true });
+      if (!data.sucesso) throw new Error(data.error || 'Erro na requisição');
 
-      const result = await callOmieApi('financas/contapagar/', 'ListarContasPagar', params, 'financas');
-      const contas = result.conta_pagar_cadastro || [];
-      setPagarData(contas);
-
-      // Calcular totais
-      const total = contas.reduce((sum: number, c: any) => sum + (c.valor_documento || 0), 0);
-      const vencidas = contas.filter((c: any) => c.status_titulo === 'VENCIDO').length;
-      const pagas = contas.filter((c: any) => c.status_titulo === 'PAGO').length;
-      setPagarTotals({ total, vencidas, pagas });
-
-      setMessage({ type: 'success', text: `${result.total_de_registros || 0} conta(s) encontrada(s)` });
+      setPagarResult(data);
+      setMessage({ type: 'success', text: `${data.totalRegistros || 0} conta(s) a pagar encontrada(s)` });
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
-      setPagarData([]);
-      setPagarTotals({ total: 0, vencidas: 0, pagas: 0 });
+      setMessage({ type: 'error', text: error.response?.data?.error || error.message });
+      setPagarResult(null);
     } finally {
       setPagarLoading(false);
     }
   };
 
-  // Handler Contas a Receber
+  // ── Contas a Receber ───────────────────────────────────────────────────────
   const handleBuscarReceber = async () => {
     setReceberLoading(true);
     setMessage(null);
     try {
-      const params = [{
+      const payload: any = {
         nPagina: receberFilters.nPagina,
-        nRegPorPagina: receberFilters.nRegPorPagina
-      }];
+        nRegPorPagina: receberFilters.nRegPorPagina,
+      };
+      if (receberFilters.dDtVencIni) payload.dDtVencIni = receberFilters.dDtVencIni;
+      if (receberFilters.dDtVencFim) payload.dDtVencFim = receberFilters.dDtVencFim;
+      if (receberFilters.cStatus !== 'ALL') payload.cStatus = receberFilters.cStatus;
 
-      if (receberFilters.dDtVencIni) {
-        params[0].dDtVencIni = receberFilters.dDtVencIni;
-      }
-      if (receberFilters.dDtVencFim) {
-        params[0].dDtVencFim = receberFilters.dDtVencFim;
-      }
-      if (receberFilters.cStatus !== 'ALL') {
-        params[0].cStatus = receberFilters.cStatus;
-      }
+      const { data } = await axios.post('/api/omie/financas/contas-receber', payload, { withCredentials: true });
+      if (!data.sucesso) throw new Error(data.error || 'Erro na requisição');
 
-      const result = await callOmieApi('financas/contareceber/', 'ListarContasReceber', params, 'financas');
-      const contas = result.conta_receber_cadastro || [];
-      setReceberData(contas);
-
-      // Calcular totais
-      const total = contas.reduce((sum: number, c: any) => sum + (c.valor_documento || 0), 0);
-      const vencidas = contas.filter((c: any) => c.status_titulo === 'VENCIDO').length;
-      const recebidas = contas.filter((c: any) => c.status_titulo === 'RECEBIDO').length;
-      setReceberTotals({ total, vencidas, recebidas });
-
-      setMessage({ type: 'success', text: `${result.total_de_registros || 0} conta(s) encontrada(s)` });
+      setReceberResult(data);
+      setMessage({ type: 'success', text: `${data.totalRegistros || 0} conta(s) a receber encontrada(s)` });
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
-      setReceberData([]);
-      setReceberTotals({ total: 0, vencidas: 0, recebidas: 0 });
+      setMessage({ type: 'error', text: error.response?.data?.error || error.message });
+      setReceberResult(null);
     } finally {
       setReceberLoading(false);
     }
   };
 
-  const getStatusBadgeVariant = (status: string) => {
-    const statusLower = status?.toLowerCase();
-    if (statusLower?.includes('vencid')) return 'destructive';
-    if (statusLower?.includes('pag') || statusLower?.includes('receb')) return 'default';
-    if (statusLower?.includes('abert') || statusLower?.includes('pendent')) return 'secondary';
-    return 'outline';
-  };
-
-  const isVencido = (dataVenc: string) => {
-    if (!dataVenc) return false;
-    const [dia, mes, ano] = dataVenc.split('/');
-    const vencimento = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-    return vencimento < new Date();
-  };
+  const FilterRow = ({
+    filters,
+    onChange,
+    prefix,
+  }: {
+    filters: typeof defaultFilters;
+    onChange: (f: typeof defaultFilters) => void;
+    prefix: string;
+  }) => (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div>
+        <Label>Vencimento Inicial</Label>
+        <Input
+          placeholder="DD/MM/YYYY"
+          value={filters.dDtVencIni}
+          onChange={(e) => onChange({ ...filters, dDtVencIni: e.target.value })}
+        />
+      </div>
+      <div>
+        <Label>Vencimento Final</Label>
+        <Input
+          placeholder="DD/MM/YYYY"
+          value={filters.dDtVencFim}
+          onChange={(e) => onChange({ ...filters, dDtVencFim: e.target.value })}
+        />
+      </div>
+      <div>
+        <Label>Status</Label>
+        <Select value={filters.cStatus} onValueChange={(v) => onChange({ ...filters, cStatus: v })}>
+          <SelectTrigger>
+            <SelectValue placeholder="Todos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">Todos</SelectItem>
+            <SelectItem value="ABERTO">Aberto</SelectItem>
+            {prefix === 'pagar' ? (
+              <SelectItem value="PAGO">Pago</SelectItem>
+            ) : (
+              <SelectItem value="RECEBIDO">Recebido</SelectItem>
+            )}
+            <SelectItem value="VENCIDO">Vencido</SelectItem>
+            <SelectItem value="CANCELADO">Cancelado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label>Registros por página</Label>
+        <Select
+          value={String(filters.nRegPorPagina)}
+          onValueChange={(v) => onChange({ ...filters, nRegPorPagina: parseInt(v) })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10</SelectItem>
+            <SelectItem value="20">20</SelectItem>
+            <SelectItem value="50">50</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6 mt-6">
@@ -159,6 +196,50 @@ export default function OmieFinancas() {
           <AlertDescription>{message.text}</AlertDescription>
         </Alert>
       )}
+
+      {/* RESUMO FINANCEIRO */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-blue-500" />
+                Resumo Financeiro
+              </CardTitle>
+              <CardDescription>Visão consolidada das finanças no Omie</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleCarregarResumo} disabled={resumoLoading}>
+              {resumoLoading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Carregar Resumo
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {resumoLoading ? (
+            <Skeleton className="h-24 w-full" />
+          ) : resumoError ? (
+            <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-lg">
+              <Info className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Resumo não disponível</p>
+                <p className="text-sm text-muted-foreground">{resumoError}</p>
+              </div>
+            </div>
+          ) : resumo ? (
+            <pre className="text-xs bg-muted/50 rounded p-4 overflow-auto max-h-64">
+              {JSON.stringify(resumo, null, 2)}
+            </pre>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Clique em "Carregar Resumo" para obter a visão consolidada.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* CONTAS A PAGAR */}
       <Card>
@@ -170,105 +251,103 @@ export default function OmieFinancas() {
           <CardDescription>Consultar contas a pagar e fornecedores</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* KPIs */}
-          {pagarData.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {pagarResult && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-2">
               <Card>
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold">R$ {pagarTotals.total.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Total a Pagar</p>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold">{fmt(pagarResult.resumo.totalValor)}</div>
+                  <p className="text-xs text-muted-foreground">Total</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-red-600">{pagarTotals.vencidas}</div>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold text-green-600">{fmt(pagarResult.resumo.totalPago)}</div>
+                  <p className="text-xs text-muted-foreground">Pago</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold text-orange-500">{fmt(pagarResult.resumo.saldoAberto)}</div>
+                  <p className="text-xs text-muted-foreground">Saldo Aberto</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold text-red-600">{pagarResult.resumo.qtdVencidas}</div>
                   <p className="text-xs text-muted-foreground">Vencidas</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-green-600">{pagarTotals.pagas}</div>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold text-green-600">{pagarResult.resumo.qtdPagas}</div>
                   <p className="text-xs text-muted-foreground">Pagas</p>
                 </CardContent>
               </Card>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label>Data Vencimento Inicial (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="01/01/2026"
-                value={pagarFilters.dDtVencIni}
-                onChange={(e) => setPagarFilters(prev => ({ ...prev, dDtVencIni: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Data Vencimento Final (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="31/01/2026"
-                value={pagarFilters.dDtVencFim}
-                onChange={(e) => setPagarFilters(prev => ({ ...prev, dDtVencFim: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Status</Label>
-              <Select value={pagarFilters.cStatus} onValueChange={(v) => setPagarFilters(prev => ({ ...prev, cStatus: v }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos</SelectItem>
-                  <SelectItem value="ABERTO">Aberto</SelectItem>
-                  <SelectItem value="PAGO">Pago</SelectItem>
-                  <SelectItem value="VENCIDO">Vencido</SelectItem>
-                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <FilterRow filters={pagarFilters} onChange={setPagarFilters} prefix="pagar" />
+
           <Button onClick={handleBuscarPagar} disabled={pagarLoading}>
-            {pagarLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
+            {pagarLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4 mr-2" />
+            )}
             Buscar Contas a Pagar
           </Button>
 
           {pagarLoading ? (
             <Skeleton className="h-64 w-full" />
-          ) : pagarData.length > 0 ? (
+          ) : pagarResult?.contas?.length > 0 ? (
             <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Número Doc.</TableHead>
-                    <TableHead>Cód. Fornecedor</TableHead>
-                    <TableHead>Valor</TableHead>
+                    <TableHead>Fornecedor</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-right">Pago</TableHead>
                     <TableHead>Vencimento</TableHead>
-                    <TableHead>Previsão</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagarData.map((conta, idx) => (
-                    <TableRow key={idx} className={isVencido(conta.data_vencimento) && conta.status_titulo !== 'PAGO' ? 'bg-red-50' : ''}>
-                      <TableCell className="font-medium">{conta.numero_documento_fiscal || '-'}</TableCell>
-                      <TableCell className="text-xs font-mono">{conta.codigo_cliente_fornecedor}</TableCell>
-                      <TableCell>R$ {conta.valor_documento?.toFixed(2) || '0.00'}</TableCell>
+                  {pagarResult.contas.map((conta: any, idx: number) => (
+                    <TableRow
+                      key={idx}
+                      className={
+                        isVencido(conta.dataVencimento) && conta.statusTitulo !== 'PAGO'
+                          ? 'bg-red-50 dark:bg-red-950/20'
+                          : ''
+                      }
+                    >
+                      <TableCell className="font-medium">{conta.numeroDocumento}</TableCell>
+                      <TableCell className="text-xs">
+                        {conta.nomeFornecedor || (
+                          <span className="font-mono text-muted-foreground">{conta.codigoFornecedor}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{fmt(conta.valorDocumento)}</TableCell>
+                      <TableCell className="text-right text-green-600">{fmt(conta.valorBaixado)}</TableCell>
                       <TableCell>
-                        {conta.data_vencimento}
-                        {isVencido(conta.data_vencimento) && conta.status_titulo !== 'PAGO' && (
+                        {conta.dataVencimento}
+                        {isVencido(conta.dataVencimento) && conta.statusTitulo !== 'PAGO' && (
                           <AlertTriangle className="h-3 w-3 inline ml-1 text-red-600" />
                         )}
                       </TableCell>
-                      <TableCell>{conta.data_previsao || '-'}</TableCell>
                       <TableCell>
-                        <Badge variant={getStatusBadgeVariant(conta.status_titulo)}>
-                          {conta.status_titulo}
+                        <Badge variant={getStatusVariant(conta.statusTitulo)}>
+                          {conta.statusTitulo}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              <div className="px-4 py-2 text-xs text-muted-foreground border-t">
+                Página {pagarResult.pagina} de {pagarResult.totalPaginas} · {pagarResult.totalRegistros} registros
+              </div>
             </div>
           ) : null}
         </CardContent>
@@ -284,105 +363,103 @@ export default function OmieFinancas() {
           <CardDescription>Consultar contas a receber de clientes</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* KPIs */}
-          {receberData.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {receberResult && (
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-2">
               <Card>
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold">R$ {receberTotals.total.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">Total a Receber</p>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold">{fmt(receberResult.resumo.totalValor)}</div>
+                  <p className="text-xs text-muted-foreground">Total</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-red-600">{receberTotals.vencidas}</div>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold text-green-600">{fmt(receberResult.resumo.totalRecebido)}</div>
+                  <p className="text-xs text-muted-foreground">Recebido</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold text-orange-500">{fmt(receberResult.resumo.saldoAberto)}</div>
+                  <p className="text-xs text-muted-foreground">Saldo Aberto</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold text-red-600">{receberResult.resumo.qtdVencidas}</div>
                   <p className="text-xs text-muted-foreground">Vencidas</p>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-green-600">{receberTotals.recebidas}</div>
+                <CardContent className="pt-4">
+                  <div className="text-lg font-bold text-green-600">{receberResult.resumo.qtdRecebidas}</div>
                   <p className="text-xs text-muted-foreground">Recebidas</p>
                 </CardContent>
               </Card>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label>Data Vencimento Inicial (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="01/01/2026"
-                value={receberFilters.dDtVencIni}
-                onChange={(e) => setReceberFilters(prev => ({ ...prev, dDtVencIni: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Data Vencimento Final (DD/MM/YYYY)</Label>
-              <Input
-                placeholder="31/01/2026"
-                value={receberFilters.dDtVencFim}
-                onChange={(e) => setReceberFilters(prev => ({ ...prev, dDtVencFim: e.target.value }))}
-              />
-            </div>
-            <div>
-              <Label>Status</Label>
-              <Select value={receberFilters.cStatus} onValueChange={(v) => setReceberFilters(prev => ({ ...prev, cStatus: v }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">Todos</SelectItem>
-                  <SelectItem value="ABERTO">Aberto</SelectItem>
-                  <SelectItem value="RECEBIDO">Recebido</SelectItem>
-                  <SelectItem value="VENCIDO">Vencido</SelectItem>
-                  <SelectItem value="CANCELADO">Cancelado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <FilterRow filters={receberFilters} onChange={setReceberFilters} prefix="receber" />
+
           <Button onClick={handleBuscarReceber} disabled={receberLoading}>
-            {receberLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
+            {receberLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4 mr-2" />
+            )}
             Buscar Contas a Receber
           </Button>
 
           {receberLoading ? (
             <Skeleton className="h-64 w-full" />
-          ) : receberData.length > 0 ? (
+          ) : receberResult?.contas?.length > 0 ? (
             <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Número Doc.</TableHead>
-                    <TableHead>Cód. Cliente</TableHead>
-                    <TableHead>Valor</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="text-right">Valor</TableHead>
+                    <TableHead className="text-right">Recebido</TableHead>
                     <TableHead>Vencimento</TableHead>
-                    <TableHead>Previsão</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {receberData.map((conta, idx) => (
-                    <TableRow key={idx} className={isVencido(conta.data_vencimento) && conta.status_titulo !== 'RECEBIDO' ? 'bg-red-50' : ''}>
-                      <TableCell className="font-medium">{conta.numero_documento_fiscal || '-'}</TableCell>
-                      <TableCell className="text-xs font-mono">{conta.codigo_cliente_fornecedor}</TableCell>
-                      <TableCell>R$ {conta.valor_documento?.toFixed(2) || '0.00'}</TableCell>
+                  {receberResult.contas.map((conta: any, idx: number) => (
+                    <TableRow
+                      key={idx}
+                      className={
+                        isVencido(conta.dataVencimento) && conta.statusTitulo !== 'RECEBIDO'
+                          ? 'bg-red-50 dark:bg-red-950/20'
+                          : ''
+                      }
+                    >
+                      <TableCell className="font-medium">{conta.numeroDocumento}</TableCell>
+                      <TableCell className="text-xs">
+                        {conta.nomeCliente || (
+                          <span className="font-mono text-muted-foreground">{conta.codigoCliente}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">{fmt(conta.valorDocumento)}</TableCell>
+                      <TableCell className="text-right text-green-600">{fmt(conta.valorBaixado)}</TableCell>
                       <TableCell>
-                        {conta.data_vencimento}
-                        {isVencido(conta.data_vencimento) && conta.status_titulo !== 'RECEBIDO' && (
+                        {conta.dataVencimento}
+                        {isVencido(conta.dataVencimento) && conta.statusTitulo !== 'RECEBIDO' && (
                           <AlertTriangle className="h-3 w-3 inline ml-1 text-red-600" />
                         )}
                       </TableCell>
-                      <TableCell>{conta.data_previsao || '-'}</TableCell>
                       <TableCell>
-                        <Badge variant={getStatusBadgeVariant(conta.status_titulo)}>
-                          {conta.status_titulo}
+                        <Badge variant={getStatusVariant(conta.statusTitulo)}>
+                          {conta.statusTitulo}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              <div className="px-4 py-2 text-xs text-muted-foreground border-t">
+                Página {receberResult.pagina} de {receberResult.totalPaginas} · {receberResult.totalRegistros} registros
+              </div>
             </div>
           ) : null}
         </CardContent>
