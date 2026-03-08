@@ -27,9 +27,9 @@ export default function OmieGeral() {
 
   // Estados para Categorias
   const [categoriasFilters, setCategoriasFilters] = useState({
-    nPagina: 1,
-    nRegPorPagina: 50,
-    cTipo: 'ALL'
+    pagina: 1,
+    registros_por_pagina: 50,
+    cTipoFiltro: 'ALL'  // filtro client-side
   });
   const [categoriasData, setCategoriasData] = useState<any[]>([]);
   const [categoriasLoading, setCategoriasLoading] = useState(false);
@@ -101,13 +101,9 @@ export default function OmieGeral() {
     setMessage(null);
     try {
       const params = [{
-        nPagina: categoriasFilters.nPagina,
-        nRegPorPagina: categoriasFilters.nRegPorPagina
+        pagina: categoriasFilters.pagina,
+        registros_por_pagina: categoriasFilters.registros_por_pagina
       }];
-
-      if (categoriasFilters.cTipo !== 'ALL') {
-        params[0].cTipo = categoriasFilters.cTipo;
-      }
 
       const result = await callOmieApi('geral/categorias/', 'ListarCategorias', params, 'geral');
       setCategoriasData(result.categoria_cadastro || []);
@@ -125,9 +121,10 @@ export default function OmieGeral() {
     setEmpresaLoading(true);
     setMessage(null);
     try {
-      const result = await callOmieApi('geral/empresas/', 'ConsultarEmpresa', [{}], 'geral');
-      setEmpresaData(result);
-      setMessage({ type: 'success', text: 'Dados da empresa carregados com sucesso' });
+      const result = await callOmieApi('geral/empresas/', 'ListarEmpresas', [{ pagina: 1, registros_por_pagina: 1 }], 'geral');
+      const empresa = result.empresas_cadastro?.[0] || null;
+      setEmpresaData(empresa);
+      setMessage({ type: 'success', text: empresa ? 'Dados da empresa carregados com sucesso' : 'Nenhuma empresa encontrada' });
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message });
       setEmpresaData(null);
@@ -264,7 +261,7 @@ export default function OmieGeral() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Tipo de Categoria</Label>
-              <Select value={categoriasFilters.cTipo} onValueChange={(v) => setCategoriasFilters(prev => ({ ...prev, cTipo: v }))}>
+              <Select value={categoriasFilters.cTipoFiltro} onValueChange={(v) => setCategoriasFilters(prev => ({ ...prev, cTipoFiltro: v }))}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
@@ -286,75 +283,61 @@ export default function OmieGeral() {
           {categoriasLoading ? (
             <Skeleton className="h-64 w-full" />
           ) : categoriasData.length > 0 ? (
-            <>
-              {/* Receitas */}
-              {categoriasData.some(c => c.cTipo === 'REC') && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Badge variant="default">Receitas</Badge>
-                    <span className="text-muted-foreground">({categoriasData.filter(c => c.cTipo === 'REC').length})</span>
-                  </h3>
-                  <div className="border rounded-lg overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Código</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {categoriasData.filter(c => c.cTipo === 'REC').map((cat, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{cat.nCodCategoria}</TableCell>
-                            <TableCell>{cat.cNomeCategoria}</TableCell>
-                            <TableCell>
-                              <Badge variant={cat.cInativo === 'S' ? 'destructive' : 'default'} className="text-xs">
-                                {cat.cInativo === 'S' ? 'Inativa' : 'Ativa'}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
+            (() => {
+              // Filtro client-side por tipo
+              const isReceita = (c: any) => c.conta_receita === 'S';
+              const isDespesa = (c: any) => c.conta_despesa === 'S';
+              const receitas = categoriasData.filter(isReceita);
+              const despesas = categoriasData.filter(isDespesa);
+              const outros = categoriasData.filter(c => !isReceita(c) && !isDespesa(c));
 
-              {/* Despesas */}
-              {categoriasData.some(c => c.cTipo === 'DES') && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Badge variant="secondary">Despesas</Badge>
-                    <span className="text-muted-foreground">({categoriasData.filter(c => c.cTipo === 'DES').length})</span>
-                  </h3>
-                  <div className="border rounded-lg overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Código</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {categoriasData.filter(c => c.cTipo === 'DES').map((cat, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{cat.nCodCategoria}</TableCell>
-                            <TableCell>{cat.cNomeCategoria}</TableCell>
-                            <TableCell>
-                              <Badge variant={cat.cInativo === 'S' ? 'destructive' : 'default'} className="text-xs">
-                                {cat.cInativo === 'S' ? 'Inativa' : 'Ativa'}
-                              </Badge>
-                            </TableCell>
+              const filtro = categoriasFilters.cTipoFiltro;
+              const showReceitas = filtro === 'ALL' || filtro === 'REC';
+              const showDespesas = filtro === 'ALL' || filtro === 'DES';
+
+              const renderTabela = (lista: any[], titulo: string, variant: 'default' | 'secondary' | 'outline') => (
+                lista.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Badge variant={variant}>{titulo}</Badge>
+                      <span className="text-muted-foreground">({lista.length})</span>
+                    </h3>
+                    <div className="border rounded-lg overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Código</TableHead>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>Status</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {lista.map((cat, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium font-mono">{cat.codigo}</TableCell>
+                              <TableCell>{cat.descricao}</TableCell>
+                              <TableCell>
+                                <Badge variant={cat.conta_inativa === 'S' ? 'destructive' : 'default'} className="text-xs">
+                                  {cat.conta_inativa === 'S' ? 'Inativa' : 'Ativa'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
-                </div>
-              )}
-            </>
+                )
+              );
+
+              return (
+                <>
+                  {showReceitas && renderTabela(receitas, 'Receitas', 'default')}
+                  {showDespesas && renderTabela(despesas, 'Despesas', 'secondary')}
+                  {filtro === 'ALL' && renderTabela(outros, 'Outros', 'outline')}
+                </>
+              );
+            })()
           ) : null}
         </CardContent>
       </Card>
@@ -392,7 +375,7 @@ export default function OmieGeral() {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">CNPJ</Label>
-                    <p className="text-sm font-medium font-mono">{formatDocument(empresaData.cnpj) || '-'}</p>
+                    <p className="text-sm font-medium font-mono">{empresaData.cnpj || '-'}</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Inscrição Estadual</Label>
@@ -420,7 +403,7 @@ export default function OmieGeral() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Logradouro</Label>
-                    <p className="text-sm">{empresaData.endereco || '-'}, {empresaData.numero || 'S/N'}</p>
+                    <p className="text-sm">{empresaData.endereco || '-'}, {empresaData.endereco_numero || 'S/N'}</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Complemento</Label>
@@ -452,7 +435,7 @@ export default function OmieGeral() {
                       <Phone className="h-3 w-3" />
                       Telefone
                     </Label>
-                    <p className="text-sm">{empresaData.telefone || '-'}</p>
+                    <p className="text-sm">{empresaData.telefone || empresaData.fax_numero || '-'}</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground flex items-center gap-1">
