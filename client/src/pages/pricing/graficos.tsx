@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
-import { usePricingCategories } from "@/hooks/use-pricing-categories";
 import {
   LineChart,
   Line,
@@ -35,6 +34,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import html2canvas from "html2canvas";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 interface EligibleDevice {
   categoryId: string;
@@ -81,19 +81,18 @@ function formatCurrency(value: number): string {
 
 export default function GraficosPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<string>("");
-  const [selectedStorage, setSelectedStorage] = useState<string>("");
-  const [months, setMonths] = useState("6");
-  const chartRef = useRef<HTMLDivElement>(null);
   const { data: categoriesData } = usePricingCategories();
 
-  // Set default category once categories are loaded
   useEffect(() => {
     if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
       setSelectedCategory(categoriesData[0].id);
     }
   }, [categoriesData, selectedCategory]);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedStorage, setSelectedStorage] = useState<string>("");
+  const [months, setMonths] = useState("6");
+  const chartRef = useRef<HTMLDivElement>(null);
 
   const { data: devicesData, isLoading: isLoadingDevices, refetch } = useQuery<EligibleDevicesResponse>({
     queryKey: ["pricing-devices", selectedCategory],
