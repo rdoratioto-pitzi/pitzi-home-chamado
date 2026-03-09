@@ -190,77 +190,99 @@ export function registerGitAnalyticsRoutes(router: Router) {
     }
   });
 
-  // Get developer token usage from OpenRouter
+  // Get developer token usage from OpenRouter + Claude Code (DB)
   router.get("/api/git-analytics/developer-tokens", requireAuth, async (req, res) => {
     try {
-      // Importar configurações
-      const { 
-        DEVELOPER_KEYS, 
-        getAllDevelopers 
+      const { startDate: startDateStr, endDate: endDateStr } = req.query as Record<string, string>;
+
+      // Período: usa query params ou mês atual como fallback
+      const now = new Date();
+      const startDate = startDateStr ? new Date(startDateStr) : new Date(now.getFullYear(), now.getMonth(), 1);
+      const endDate   = endDateStr   ? new Date(endDateStr)   : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const {
+        DEVELOPER_KEYS,
+        getAllDevelopers
       } = await import("../config/openrouter-keys");
-      
-      // Buscar usage de cada desenvolvedor
+
+      // --- Claude Code: buscar do banco (acumulado no período) ---
+      console.log("[developer-tokens] period:", startDate.toISOString().split("T")[0], "to", endDate.toISOString().split("T")[0]);
+      console.log("[developer-tokens] storage.getClaudeCodeUsageByPeriod exists:", typeof storage.getClaudeCodeUsageByPeriod);
+      const claudeRows = await storage.getClaudeCodeUsageByPeriod(startDate, endDate);
+      console.log("[developer-tokens] claudeRows:", claudeRows.length);
+
+      // Agrupar por desenvolvedor
+      const claudeByDev: Record<string, { tokens: number; spend: number; keysCount: number }> = {};
+      for (const row of claudeRows) {
+        if (!claudeByDev[row.developerName]) {
+          claudeByDev[row.developerName] = { tokens: 0, spend: 0, keysCount: 1 };
+        }
+        claudeByDev[row.developerName].tokens += row.totalTokens;
+        // Custo estimado: ~$3/1M input + $15/1M output — simplificado como média de $9/1M total
+        claudeByDev[row.developerName].spend  += (row.totalTokens / 1_000_000) * 9;
+      }
+
+      // União de todos os devs (OpenRouter + Claude Code DB)
+      const allDevelopers = Array.from(new Set([
+        ...getAllDevelopers(),
+        ...Object.keys(claudeByDev),
+      ]));
+
       const tokenUsage = await Promise.all(
-        getAllDevelopers().map(async (developerName) => {
-          const keys = DEVELOPER_KEYS[developerName];
-          
-          // Somar tokens de todas as keys do desenvolvedor
-          let totalTokens = 0;
-          let totalRequests = 0;
-          let totalSpend = 0;
-          
-          for (const key of keys) {
+        allDevelopers.map(async (developerName) => {
+          // --- OpenRouter ---
+          const orKeys = DEVELOPER_KEYS[developerName] || [];
+          let openrouterTokens = 0;
+          let openrouterSpend = 0;
+          let openrouterRequests = 0;
+
+          for (const key of orKeys) {
             try {
-              // Buscar usage da API OpenRouter para esta key específica
               const statsResponse = await fetch(`https://openrouter.ai/api/v1/auth/key`, {
-                headers: {
-                  "Authorization": `Bearer ${key.apiKey}`,
-                },
+                headers: { "Authorization": `Bearer ${key.apiKey}` },
               });
-              
+
               if (statsResponse.ok) {
                 const statsData = await statsResponse.json();
-                
-                // OpenRouter retorna usage como objeto com diferentes campos de custo
-                // O campo 'usage' é o custo total em dólares
-                const usage = statsData.data?.usage || 0;
-                const usageDaily = statsData.data?.usage_daily || 0;
                 const usageMonthly = statsData.data?.usage_monthly || 0;
-                
-                // Para exibir em tokens, vamos usar o valor monthly como referência
-                // Como não temos o número exato de tokens, usamos o custo como proxy
-                // Multiplicamos por um fator para obter um número representativo
-                // (assumindo custo médio de $1 por 1M tokens)
-                const estimatedTokens = Math.round(usageMonthly * 1000000);
-                
-                totalTokens += estimatedTokens;
-                totalSpend += usageMonthly;
-                totalRequests += 1; // Contamos como 1 requisição por key
+                openrouterTokens += Math.round(usageMonthly * 1000000);
+                openrouterSpend  += usageMonthly;
+                openrouterRequests += 1;
               }
-              
             } catch (error) {
               console.error(`Error fetching OpenRouter usage for ${key.keyName}:`, error);
-              // Continuar mesmo se uma key falhar
             }
           }
-          
+
+          // --- Claude Code (do banco) ---
+          const claude = claudeByDev[developerName] || { tokens: 0, spend: 0, keysCount: 0 };
+
+          const totalTokens  = openrouterTokens + claude.tokens;
+          const totalSpend   = openrouterSpend  + claude.spend;
+          const totalRequests = openrouterRequests + (claude.tokens > 0 ? 1 : 0);
+          const keysCount     = orKeys.length + claude.keysCount;
+
           return {
             developerName,
             totalTokens,
             totalRequests,
             totalSpend,
-            keysCount: keys.length,
+            keysCount,
+            openrouterTokens,
+            openrouterSpend,
+            openrouterKeysCount: orKeys.length,
+            anthropicTokens:    claude.tokens,
+            anthropicSpend:     claude.spend,
+            anthropicKeysCount: claude.keysCount,
           };
         })
       );
-      
+
       // Ordenar por tokens (maior → menor)
-      const sorted = tokenUsage
-        .sort((a, b) => b.totalTokens - a.totalTokens);
-        // NÃO filtrar devs com 0 tokens - mostrar todos para debug
-        
+      const sorted = tokenUsage.sort((a, b) => b.totalTokens - a.totalTokens);
+
       res.json(sorted);
-      
+
     } catch (error: any) {
       console.error("Get developer tokens error:", error);
       res.status(500).json({ error: error.message });
@@ -467,6 +489,37 @@ export function registerGitAnalyticsRoutes(router: Router) {
     } catch (error: any) {
       console.error("Get sync status error:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ─── Claude Code Usage (recebe dados do script local de cada dev) ─────────
+  router.post("/api/git-analytics/claude-code-usage", async (req, res) => {
+    try {
+      const secret = process.env.CLAUDE_USAGE_SECRET;
+      if (!secret || req.headers["x-claude-usage-secret"] !== secret) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const bodySchema = z.object({
+        developerName:        z.string().min(1),
+        reportDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        inputTokens:          z.number().int().min(0),
+        outputTokens:         z.number().int().min(0),
+        cacheCreationTokens:  z.number().int().min(0),
+        cacheReadTokens:      z.number().int().min(0),
+        totalTokens:          z.number().int().min(0),
+        sourceMachine:        z.string().optional(),
+      });
+
+      const body = bodySchema.parse(req.body);
+      const report = await storage.upsertClaudeCodeUsage(body);
+
+      console.log(`[claude-usage] ${body.developerName} @ ${body.reportDate}: ${body.totalTokens.toLocaleString()} tokens`);
+      res.json({ ok: true, report });
+
+    } catch (error: any) {
+      console.error("Claude Code usage report error:", error);
+      res.status(400).json({ error: error.message });
     }
   });
 }
