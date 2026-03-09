@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique, bigint, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -688,6 +688,7 @@ export const pricingDevices = pgTable("pricing_devices", {
   specs: text("specs"), // JSON with technical specs
   releaseDate: timestamp("release_date"),
   isActive: boolean("is_active").default(true),
+  lastScrapedAt: timestamp("last_scraped_at"), // Data do último scraping
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -730,6 +731,35 @@ export const pricingAlerts = pgTable("pricing_alerts", {
 export const insertPricingAlertSchema = createInsertSchema(pricingAlerts).omit({ id: true, createdAt: true });
 export type InsertPricingAlert = z.infer<typeof insertPricingAlertSchema>;
 export type PricingAlert = typeof pricingAlerts.$inferSelect;
+
+// ============== PRICING SCRAPED DATA (Concurrent Prices) ==============
+export const pricingScrapedData = pgTable("pricing_scraped_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  deviceId: varchar("device_id").notNull(), // Reference to pricingDevices
+  categoryId: text("category_id").notNull(),
+  manufacturerName: text("manufacturer_name").notNull(),
+  modelName: text("model_name").notNull(),
+  storage: integer("storage").notNull(),
+  // Dados do scraping
+  rawId: text("raw_id"), // ID do scraping na API externa
+  source: text("source").notNull(), // google_shopping, etc
+  productId: text("product_id"),
+  productUrl: text("product_url"),
+  title: text("title"),
+  priceText: text("price_text"),
+  extractedPrice: decimal("extracted_price"),
+  rating: integer("rating"),
+  reviews: integer("reviews"),
+  thumbnail: text("thumbnail"),
+  fromCache: boolean("from_cache").default(false),
+  scrapedAt: timestamp("scraped_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPricingScrapedDataSchema = createInsertSchema(pricingScrapedData).omit({ id: true, createdAt: true });
+export type InsertPricingScrapedData = z.infer<typeof insertPricingScrapedDataSchema>;
+export type PricingScrapedData = typeof pricingScrapedData.$inferSelect;
 
 // ============== HELPER TYPES ==============
 export type LogisticaReversaPedidoWithEventos = LogisticaReversaPedido & {
@@ -1470,3 +1500,25 @@ export const estoquesAjustes = pgTable("estoques_ajustes", {
 export const insertEstoquesAjusteSchema = createInsertSchema(estoquesAjustes).omit({ id: true, createdAt: true });
 export type InsertEstoquesAjuste = z.infer<typeof insertEstoquesAjusteSchema>;
 export type EstoquesAjuste = typeof estoquesAjustes.$inferSelect;
+
+// ─── Claude Code Usage Reports ───────────────────────────────────────────────
+// Alimentada via script local (scripts/report-claude-usage.ts) que cada dev roda 1x/dia
+export const claudeCodeUsageReports = pgTable("claude_code_usage_reports", {
+  id:                   varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerName:        text("developer_name").notNull(),
+  reportDate:           date("report_date").notNull(),
+  inputTokens:          bigint("input_tokens", { mode: "number" }).notNull().default(0),
+  outputTokens:         bigint("output_tokens", { mode: "number" }).notNull().default(0),
+  cacheCreationTokens:  bigint("cache_creation_tokens", { mode: "number" }).notNull().default(0),
+  cacheReadTokens:      bigint("cache_read_tokens", { mode: "number" }).notNull().default(0),
+  totalTokens:          bigint("total_tokens", { mode: "number" }).notNull().default(0),
+  sourceMachine:        text("source_machine"),
+  reportedAt:           timestamp("reported_at").defaultNow(),
+}, (table) => ({
+  uniqDevDate: unique().on(table.developerName, table.reportDate),
+}));
+
+export const insertClaudeCodeUsageSchema = createInsertSchema(claudeCodeUsageReports).omit({ id: true, reportedAt: true });
+export type InsertClaudeCodeUsage = z.infer<typeof insertClaudeCodeUsageSchema>;
+export type ClaudeCodeUsageReport = typeof claudeCodeUsageReports.$inferSelect;
+

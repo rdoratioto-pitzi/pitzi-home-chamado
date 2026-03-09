@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/page-header";
-import { usePricingCategories, PricingCategory } from "@/hooks/use-pricing-categories";
 import {
   DollarSign,
   Search,
@@ -29,6 +28,7 @@ import {
   ExternalLink,
   BarChart3,
 } from "lucide-react";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 const PRICING_API_BASE = "/api/pricing";
 
@@ -48,20 +48,17 @@ interface EligibleDevicesResponse {
 export default function PricingOverviewPage() {
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<string>("");
-  const [selectedStorages, setSelectedStorages] = useState<number[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // Fetch categories from local pricing devices API using shared hook
   const { data: categoriesData } = usePricingCategories();
 
-  // Set default category once categories are loaded
   useEffect(() => {
     if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
       setSelectedCategory(categoriesData[0].id);
     }
   }, [categoriesData, selectedCategory]);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedStorages, setSelectedStorages] = useState<number[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: devicesData, isLoading: isLoadingDevices, refetch, error: devicesError } = useQuery<EligibleDevicesResponse>({
     queryKey: ["pricing-devices", selectedCategory],
@@ -169,7 +166,7 @@ export default function PricingOverviewPage() {
     setLocation(`/pricing/detalhes?${params.toString()}`);
   };
 
-  const categoryName = categoriesData?.find((c: PricingCategory) => c.id === selectedCategory)?.name || "";
+  const categoryName = categoriesData?.find((c) => c.id === selectedCategory)?.name || "";
 
   return (
     <div className="flex flex-col h-full">
@@ -228,7 +225,7 @@ export default function PricingOverviewPage() {
                     <SelectValue placeholder="Selecione a categoria" />
                   </SelectTrigger>
                   <SelectContent>
-                    {categoriesData?.map((cat: PricingCategory) => (
+                    {categoriesData?.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
                       </SelectItem>
