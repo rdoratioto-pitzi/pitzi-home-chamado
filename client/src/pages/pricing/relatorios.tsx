@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
-import { usePricingCategories } from "@/hooks/use-pricing-categories";
 import {
   FileSpreadsheet,
   Download,
@@ -47,6 +46,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 const PRICING_API_BASE = "/api/pricing";
 
@@ -75,33 +75,35 @@ interface EligibleDevicesResponse {
 }
 
 const CHART_COLORS = [
-  "hsl(var(--primary))",
-  "#22c55e",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#06b6d4",
-  "#ec4899",
-  "#84cc16",
+  "#2563eb", // Blue
+  "#dc2626", // Red
+  "#16a34a", // Green
+  "#d97706", // Amber
+  "#7c3aed", // Violet
+  "#0891b2", // Cyan
+  "#db2777", // Pink
+  "#ea580c", // Orange
 ];
 
 export default function PricingReportsPage() {
   const [location] = useLocation();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [months, setMonths] = useState("12");
-  const [isExporting, setIsExporting] = useState(false);
   const { data: categoriesData } = usePricingCategories();
 
-  // Set default category once categories are loaded
   useEffect(() => {
     if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
       setSelectedCategory(categoriesData[0].id);
     }
   }, [categoriesData, selectedCategory]);
+  const [months, setMonths] = useState("12");
+  const [isExporting, setIsExporting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const params = new URLSearchParams(location.split("?")[1] || "");
-  const devicesParam = params.get("devices") || "";
+  // Use window.location.search to get the query string properly
+  const params = new URLSearchParams(window.location.search);
+  const devicesParam = params.get("devices") ? decodeURIComponent(params.get("devices")!) : "";
   const selectedDeviceKeys = devicesParam ? devicesParam.split(",") : [];
 
   const { data: devicesData, isLoading: isLoadingDevices, refetch } = useQuery<EligibleDevicesResponse>({
@@ -130,9 +132,11 @@ export default function PricingReportsPage() {
   });
 
   const selectedDevices = useMemo(() => {
-    if (!devicesData?.items || selectedDeviceKeys.length === 0) return [];
+    if (!devicesData?.items || selectedDeviceKeys.length === 0) {
+      return [];
+    }
     return selectedDeviceKeys.map((key) => {
-      const [brand, model, storage] = key.split("-");
+      const [brand, model, storage] = key.split("|");
       return { brand, model: model?.replace(/_/g, " ") || "", storage: parseInt(storage) || 0 };
     }).filter(d => d.brand && d.model && d.storage);
   }, [devicesData, selectedDeviceKeys]);
@@ -140,7 +144,9 @@ export default function PricingReportsPage() {
   const { data: comparisonData, isLoading: isLoadingComparison } = useQuery<Record<string, AggregatedData[]>>({
     queryKey: ["pricing-comparison", selectedDevices, months],
     queryFn: async () => {
-      if (selectedDevices.length === 0) return {};
+      if (selectedDevices.length === 0) {
+        return {};
+      }
       
       const results: Record<string, AggregatedData[]> = {};
       
@@ -274,6 +280,73 @@ export default function PricingReportsPage() {
     }
   };
 
+  const handleRefreshWithScraping = async () => {
+    if (selectedDevices.length === 0) {
+      toast({
+        title: "Nenhum dispositivo selecionado",
+        description: "Selecione dispositivos para atualizar os dados.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRefreshing(true);
+    try {
+      const devicesToRefresh = selectedDevices.map((d) => ({
+        categoryId: selectedCategory,
+        manufacturerName: d.brand,
+        modelName: d.model,
+        storage: d.storage,
+      }));
+
+      console.log("[DEBUG] Sending refresh request with devices:", devicesToRefresh);
+
+      const response = await fetch(`${PRICING_API_BASE}/devices/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ devices: devicesToRefresh }),
+      });
+
+      console.log("[DEBUG] Refresh response status:", response.status);
+      
+      const responseText = await response.text();
+      console.log("[DEBUG] Refresh response text:", responseText);
+      
+      if (!responseText) {
+        throw new Error("Servidor retornou resposta vazia");
+      }
+      
+      const result = JSON.parse(responseText);
+      
+      if (response.ok) {
+        toast({
+          title: "Atualização concluída",
+          description: result.message,
+        });
+        
+        // Force refetch by invalidating the query cache
+        // First, wait a bit for the server to finish processing
+        setTimeout(() => {
+          // Invalidate the comparison query to force a refetch
+          queryClient.invalidateQueries({ queryKey: ["pricing-comparison", selectedDevices, months] });
+          // Also invalidate the devices query
+          queryClient.invalidateQueries({ queryKey: ["pricing-devices", selectedCategory] });
+        }, 1500);
+      } else {
+        throw new Error(result.error || "Erro ao atualizar");
+      }
+    } catch (error) {
+      console.error("Error refreshing devices:", error);
+      toast({
+        title: "Erro na atualização",
+        description: error instanceof Error ? error.message : "Não foi possível atualizar os dados dos dispositivos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   const isLoading = isLoadingDevices || isLoadingComparison;
   const deviceNames = Object.keys(comparisonData || {});
 
@@ -307,12 +380,12 @@ export default function PricingReportsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => refetch()}
-              disabled={isLoading}
+              onClick={handleRefreshWithScraping}
+              disabled={isLoading || isRefreshing || selectedDevices.length === 0}
               data-testid="button-refresh"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-              Atualizar
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+              {isRefreshing ? "Atualizando..." : "Atualizar (Scrapping)"}
             </Button>
             <Button
               size="sm"

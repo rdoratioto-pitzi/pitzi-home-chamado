@@ -35,6 +35,7 @@ import {
   type PricingDevice, type InsertPricingDevice,
   type PricingPriceHistory, type InsertPricingPriceHistory,
   type PricingAlert, type InsertPricingAlert,
+  type PricingScrapedData, type InsertPricingScrapedData,
   type MetaArea, type InsertMetaArea,
   type Meta, type InsertMeta,
   type MetaCheckin, type InsertMetaCheckin,
@@ -59,20 +60,22 @@ import {
   type GitCommit, type InsertGitCommit,
   type GitPullRequest, type InsertGitPullRequest,
   type GitSecurityAlert, type InsertGitSecurityAlert,
+  type ClaudeCodeUsageReport, type InsertClaudeCodeUsage,
   users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
   taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
   collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules,
-  pricingDevices, pricingPriceHistory, pricingAlerts,
+  pricingDevices, pricingPriceHistory, pricingAlerts, pricingScrapedData,
   metaAreas, metas, metaCheckins,
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
   flowcharts, flowchartVersions, flowchartComments,
   aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates,
   promptsLibrary, promptUserFavorites,
   // Git Analytics
-  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches
+  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches,
+  claudeCodeUsageReports,
  } from "@shared/schema";
  import { db } from "./db";
  import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
@@ -283,6 +286,13 @@ import {
   createPricingAlert(alert: InsertPricingAlert): Promise<PricingAlert>;
   updatePricingAlert(id: string, data: Partial<PricingAlert>): Promise<PricingAlert | undefined>;
   deletePricingAlert(id: string): Promise<boolean>;
+
+  // Pricing Scraped Data (Concurrent Prices)
+  getPricingScrapedData(deviceId: string): Promise<PricingScrapedData[]>;
+  getLatestPricingScrapedData(deviceId: string): Promise<PricingScrapedData | undefined>;
+  createPricingScrapedData(data: InsertPricingScrapedData): Promise<PricingScrapedData>;
+  bulkCreatePricingScrapedData(dataList: InsertPricingScrapedData[]): Promise<PricingScrapedData[]>;
+  deleteOldPricingScrapedData(deviceId: string, keepLatest?: boolean): Promise<boolean>;
 
   // Meta Areas
   getMetaAreas(): Promise<MetaArea[]>;
@@ -1372,6 +1382,47 @@ export class DatabaseStorage implements IStorage {
     if (!db) return false;
     const result = await db.delete(pricingAlerts).where(eq(pricingAlerts.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Pricing Scraped Data (Concurrent Prices)
+  async getPricingScrapedData(deviceId: string): Promise<PricingScrapedData[]> {
+    if (!db) return [];
+    return await db.select().from(pricingScrapedData).where(eq(pricingScrapedData.deviceId, deviceId));
+  }
+  async getLatestPricingScrapedData(deviceId: string): Promise<PricingScrapedData | undefined> {
+    if (!db) return undefined;
+    const [data] = await db.select().from(pricingScrapedData)
+      .where(eq(pricingScrapedData.deviceId, deviceId))
+      .orderBy(desc(pricingScrapedData.scrapedAt))
+      .limit(1);
+    return data;
+  }
+  async createPricingScrapedData(data: InsertPricingScrapedData): Promise<PricingScrapedData> {
+    if (!db) throw new Error("Database not connected");
+    const [created] = await db.insert(pricingScrapedData).values(data).returning();
+    return created;
+  }
+  async bulkCreatePricingScrapedData(dataList: InsertPricingScrapedData[]): Promise<PricingScrapedData[]> {
+    if (!db) throw new Error("Database not connected");
+    const created = await db.insert(pricingScrapedData).values(dataList).returning();
+    return created;
+  }
+  async deleteOldPricingScrapedData(deviceId: string, keepLatest: boolean = true): Promise<boolean> {
+    if (!db) return false;
+    if (keepLatest) {
+      // Keep only the latest record, delete older ones
+      const latest = await this.getLatestPricingScrapedData(deviceId);
+      if (latest) {
+        await db.delete(pricingScrapedData)
+          .where(and(
+            eq(pricingScrapedData.deviceId, deviceId),
+            sql`${pricingScrapedData.id} != ${latest.id}`
+          ));
+      }
+    } else {
+      await db.delete(pricingScrapedData).where(eq(pricingScrapedData.deviceId, deviceId));
+    }
+    return true;
   }
 
   // Meta Areas
@@ -3057,6 +3108,40 @@ export class DatabaseStorage implements IStorage {
         securityAlerts: { total: 0, bySeverity: {} },
       };
     }
+  }
+  // ─── Claude Code Usage ──────────────────────────────────────────────────────
+
+  async upsertClaudeCodeUsage(data: InsertClaudeCodeUsage): Promise<ClaudeCodeUsageReport> {
+    const [row] = await db
+      .insert(claudeCodeUsageReports)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [claudeCodeUsageReports.developerName, claudeCodeUsageReports.reportDate],
+        set: {
+          inputTokens:         data.inputTokens,
+          outputTokens:        data.outputTokens,
+          cacheCreationTokens: data.cacheCreationTokens,
+          cacheReadTokens:     data.cacheReadTokens,
+          totalTokens:         data.totalTokens,
+          sourceMachine:       data.sourceMachine,
+          reportedAt:          sql`NOW()`,
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async getClaudeCodeUsageByPeriod(startDate: Date, endDate: Date): Promise<ClaudeCodeUsageReport[]> {
+    return db
+      .select()
+      .from(claudeCodeUsageReports)
+      .where(
+        and(
+          sql`${claudeCodeUsageReports.reportDate} >= ${startDate.toISOString().split("T")[0]}`,
+          sql`${claudeCodeUsageReports.reportDate} <= ${endDate.toISOString().split("T")[0]}`
+        )
+      )
+      .orderBy(desc(claudeCodeUsageReports.reportDate));
   }
 }
 

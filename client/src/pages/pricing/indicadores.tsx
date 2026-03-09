@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
-import { usePricingCategories } from "@/hooks/use-pricing-categories";
 import {
   Table,
   TableBody,
@@ -33,6 +32,7 @@ import {
   Info,
 } from "lucide-react";
 import { Link } from "wouter";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 interface EligibleDevice {
   categoryId: string;
@@ -58,7 +58,6 @@ export default function IndicadoresPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const { data: categoriesData } = usePricingCategories();
 
-  // Set default category once categories are loaded
   useEffect(() => {
     if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
       setSelectedCategory(categoriesData[0].id);

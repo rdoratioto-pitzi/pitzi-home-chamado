@@ -8,9 +8,9 @@ const pool = new Pool({
 
 (async () => {
   try {
-    const sql = fs.readFileSync('add_translation_columns.sql', 'utf8');
+    const sql = fs.readFileSync('migrations/0011_add_pricing_scraped_data.sql', 'utf8');
     await pool.query(sql);
-    console.log('✅ Migration aplicada com sucesso!');
+    console.log('✅ Migration aplicada com sucesso! (Pricing Scraped Data)');
     await pool.end();
     process.exit(0);
   } catch (error) {
