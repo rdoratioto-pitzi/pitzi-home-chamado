@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
 import { useToast } from "@/hooks/use-toast";
-import { usePricingCategories } from "@/hooks/use-pricing-categories";
 import {
   Search,
   Filter,
@@ -42,6 +41,7 @@ import {
   Square,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 const PRICING_API_BASE = "/api/pricing";
 
@@ -76,15 +76,14 @@ export default function PricingAnalysisPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const { data: categoriesData } = usePricingCategories();
 
-  // Set default category once categories are loaded
   useEffect(() => {
     if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
       setSelectedCategory(categoriesData[0].id);
     }
   }, [categoriesData, selectedCategory]);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
@@ -168,8 +167,8 @@ export default function PricingAnalysisPage() {
     }
   };
 
-  const getDeviceKey = (device: EligibleDevice) => 
-    `${device.manufacturerName}-${device.modelName}-${device.storage}`;
+  const getDeviceKey = (device: EligibleDevice) =>
+    `${device.manufacturerName}|${device.modelName}|${device.storage}`;
 
   const handleSelectDevice = (device: EligibleDevice) => {
     const key = getDeviceKey(device);

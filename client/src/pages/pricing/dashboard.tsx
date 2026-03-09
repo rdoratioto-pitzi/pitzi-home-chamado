@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { usePricingCategories } from "@/hooks/use-pricing-categories";
 import {
   Select,
   SelectContent,
@@ -32,6 +31,7 @@ import {
   Package,
 } from "lucide-react";
 import { Link } from "wouter";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 interface EligibleDevice {
   categoryId: string;
@@ -52,7 +52,6 @@ export default function DashboardPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const { data: categoriesData } = usePricingCategories();
 
-  // Set default category once categories are loaded
   useEffect(() => {
     if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
       setSelectedCategory(categoriesData[0].id);
