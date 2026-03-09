@@ -13,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/page-header";
-import { usePricingCategories } from "@/hooks/use-pricing-categories";
 import {
   Table,
   TableBody,
@@ -32,6 +31,7 @@ import {
   Eye,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 interface EligibleDevice {
   categoryId: string;
@@ -49,7 +49,6 @@ interface EligibleDevicesResponse {
 export default function AlertasPage() {
   const [, setLocation] = useLocation();
   const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const { data: categoriesData } = usePricingCategories();
 
   // Set default category once categories are loaded
@@ -58,6 +57,7 @@ export default function AlertasPage() {
       setSelectedCategory(categoriesData[0].id);
     }
   }, [categoriesData, selectedCategory]);
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
 
   const { data: devicesData, isLoading, refetch } = useQuery<EligibleDevicesResponse>({
     queryKey: ["pricing-devices", selectedCategory],
