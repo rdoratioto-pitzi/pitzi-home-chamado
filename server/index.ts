@@ -251,6 +251,39 @@ app.get("/api/omie-debug/config", async (req, res) => {
   }
 });
 
+// ── Claude Code Usage (autenticado por secret, não por sessão) ──────────────
+app.post("/api/git-analytics/claude-code-usage", async (req, res) => {
+  try {
+    const secret = process.env.CLAUDE_USAGE_SECRET;
+    if (!secret || req.headers["x-claude-usage-secret"] !== secret) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { z } = await import("zod");
+    const { storage } = await import("./storage");
+
+    const bodySchema = z.object({
+      developerName:        z.string().min(1),
+      reportDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      inputTokens:          z.number().int().min(0),
+      outputTokens:         z.number().int().min(0),
+      cacheCreationTokens:  z.number().int().min(0),
+      cacheReadTokens:      z.number().int().min(0),
+      totalTokens:          z.number().int().min(0),
+      sourceMachine:        z.string().optional(),
+    });
+
+    const body = bodySchema.parse(req.body);
+    const report = await storage.upsertClaudeCodeUsage(body);
+
+    console.log(`[claude-usage] ${body.developerName} @ ${body.reportDate}: ${body.totalTokens.toLocaleString()} tokens`);
+    res.json({ ok: true, report });
+  } catch (error: any) {
+    console.error("Claude Code usage report error:", error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Protege tudo depois disso
 app.use((req, res, next) => {
   try {

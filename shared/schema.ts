@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique, bigint, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1470,3 +1470,25 @@ export const estoquesAjustes = pgTable("estoques_ajustes", {
 export const insertEstoquesAjusteSchema = createInsertSchema(estoquesAjustes).omit({ id: true, createdAt: true });
 export type InsertEstoquesAjuste = z.infer<typeof insertEstoquesAjusteSchema>;
 export type EstoquesAjuste = typeof estoquesAjustes.$inferSelect;
+
+// ─── Claude Code Usage Reports ───────────────────────────────────────────────
+// Alimentada via script local (scripts/report-claude-usage.ts) que cada dev roda 1x/dia
+export const claudeCodeUsageReports = pgTable("claude_code_usage_reports", {
+  id:                   varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerName:        text("developer_name").notNull(),
+  reportDate:           date("report_date").notNull(),
+  inputTokens:          bigint("input_tokens", { mode: "number" }).notNull().default(0),
+  outputTokens:         bigint("output_tokens", { mode: "number" }).notNull().default(0),
+  cacheCreationTokens:  bigint("cache_creation_tokens", { mode: "number" }).notNull().default(0),
+  cacheReadTokens:      bigint("cache_read_tokens", { mode: "number" }).notNull().default(0),
+  totalTokens:          bigint("total_tokens", { mode: "number" }).notNull().default(0),
+  sourceMachine:        text("source_machine"),
+  reportedAt:           timestamp("reported_at").defaultNow(),
+}, (table) => ({
+  uniqDevDate: unique().on(table.developerName, table.reportDate),
+}));
+
+export const insertClaudeCodeUsageSchema = createInsertSchema(claudeCodeUsageReports).omit({ id: true, reportedAt: true });
+export type InsertClaudeCodeUsage = z.infer<typeof insertClaudeCodeUsageSchema>;
+export type ClaudeCodeUsageReport = typeof claudeCodeUsageReports.$inferSelect;
+

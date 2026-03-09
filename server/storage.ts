@@ -59,6 +59,7 @@ import {
   type GitCommit, type InsertGitCommit,
   type GitPullRequest, type InsertGitPullRequest,
   type GitSecurityAlert, type InsertGitSecurityAlert,
+  type ClaudeCodeUsageReport, type InsertClaudeCodeUsage,
   users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
@@ -72,7 +73,8 @@ import {
   aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates,
   promptsLibrary, promptUserFavorites,
   // Git Analytics
-  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches
+  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches,
+  claudeCodeUsageReports,
  } from "@shared/schema";
  import { db } from "./db";
  import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
@@ -3057,6 +3059,40 @@ export class DatabaseStorage implements IStorage {
         securityAlerts: { total: 0, bySeverity: {} },
       };
     }
+  }
+  // ─── Claude Code Usage ──────────────────────────────────────────────────────
+
+  async upsertClaudeCodeUsage(data: InsertClaudeCodeUsage): Promise<ClaudeCodeUsageReport> {
+    const [row] = await db
+      .insert(claudeCodeUsageReports)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [claudeCodeUsageReports.developerName, claudeCodeUsageReports.reportDate],
+        set: {
+          inputTokens:         data.inputTokens,
+          outputTokens:        data.outputTokens,
+          cacheCreationTokens: data.cacheCreationTokens,
+          cacheReadTokens:     data.cacheReadTokens,
+          totalTokens:         data.totalTokens,
+          sourceMachine:       data.sourceMachine,
+          reportedAt:          sql`NOW()`,
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async getClaudeCodeUsageByPeriod(startDate: Date, endDate: Date): Promise<ClaudeCodeUsageReport[]> {
+    return db
+      .select()
+      .from(claudeCodeUsageReports)
+      .where(
+        and(
+          sql`${claudeCodeUsageReports.reportDate} >= ${startDate.toISOString().split("T")[0]}`,
+          sql`${claudeCodeUsageReports.reportDate} <= ${endDate.toISOString().split("T")[0]}`
+        )
+      )
+      .orderBy(desc(claudeCodeUsageReports.reportDate));
   }
 }
 
