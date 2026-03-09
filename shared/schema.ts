@@ -688,6 +688,7 @@ export const pricingDevices = pgTable("pricing_devices", {
   specs: text("specs"), // JSON with technical specs
   releaseDate: timestamp("release_date"),
   isActive: boolean("is_active").default(true),
+  lastScrapedAt: timestamp("last_scraped_at"), // Data do último scraping
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -730,6 +731,35 @@ export const pricingAlerts = pgTable("pricing_alerts", {
 export const insertPricingAlertSchema = createInsertSchema(pricingAlerts).omit({ id: true, createdAt: true });
 export type InsertPricingAlert = z.infer<typeof insertPricingAlertSchema>;
 export type PricingAlert = typeof pricingAlerts.$inferSelect;
+
+// ============== PRICING SCRAPED DATA (Concurrent Prices) ==============
+export const pricingScrapedData = pgTable("pricing_scraped_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  deviceId: varchar("device_id").notNull(), // Reference to pricingDevices
+  categoryId: text("category_id").notNull(),
+  manufacturerName: text("manufacturer_name").notNull(),
+  modelName: text("model_name").notNull(),
+  storage: integer("storage").notNull(),
+  // Dados do scraping
+  rawId: text("raw_id"), // ID do scraping na API externa
+  source: text("source").notNull(), // google_shopping, etc
+  productId: text("product_id"),
+  productUrl: text("product_url"),
+  title: text("title"),
+  priceText: text("price_text"),
+  extractedPrice: decimal("extracted_price"),
+  rating: integer("rating"),
+  reviews: integer("reviews"),
+  thumbnail: text("thumbnail"),
+  fromCache: boolean("from_cache").default(false),
+  scrapedAt: timestamp("scraped_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPricingScrapedDataSchema = createInsertSchema(pricingScrapedData).omit({ id: true, createdAt: true });
+export type InsertPricingScrapedData = z.infer<typeof insertPricingScrapedDataSchema>;
+export type PricingScrapedData = typeof pricingScrapedData.$inferSelect;
 
 // ============== HELPER TYPES ==============
 export type LogisticaReversaPedidoWithEventos = LogisticaReversaPedido & {
