@@ -349,12 +349,8 @@ export async function processRecurringMeetings(): Promise<void> {
         const nextDateToCreate = calculateNextRecurrenceDate(task, lastDate);
 
         if (nextDateToCreate) {
-          // Verifica se esta próxima instância deve ser criada agora (ex: dentro das próximas 24 horas)
-          const now = nowInBrasilia();
-          const twentyFourHoursFromNow = addHours(now, 24);
-
-          // Extrai o horário da reunião original para combinar com a próxima data
-          let meetingData = {};
+          // Extrai meetingData para obter horário e configuração de antecedência
+          let meetingData: any = {};
           try {
             if (typeof task.meetingData === "string") {
               meetingData = JSON.parse(task.meetingData);
@@ -364,28 +360,27 @@ export async function processRecurringMeetings(): Promise<void> {
           } catch (e) {
             console.error("[RecurrenceJob] Erro ao fazer parse do meetingData para verificação de horário:", e);
           }
-          const originalTime = (meetingData as any)?.time || "09:00";
+          const originalTime = meetingData?.time || "09:00";
           const [hours, minutes] = originalTime.split(':').map(Number);
 
           // Cria um objeto Date com a próxima data e o horário original da reunião
           let nextInstanceDateTime = setMinutes(setHours(nextDateToCreate, hours), minutes);
-          nextInstanceDateTime = toBrasilia(nextInstanceDateTime); // Garante que está no timezone de Brasília
+          nextInstanceDateTime = toBrasilia(nextInstanceDateTime);
 
-          // Se a próxima instância está dentro da janela de criação (próximas 24h)
-          // e ainda não passou (para evitar criar no passado se o job atrasar)
-          if (isBefore(nextInstanceDateTime, twentyFourHoursFromNow) && isAfter(nextInstanceDateTime, now)) {
+          // Calcula a janela de criação baseada em recurrenceCreateLeadDays (padrão: 1 dia)
+          const leadDays = typeof meetingData?.recurrenceCreateLeadDays === "number"
+            ? meetingData.recurrenceCreateLeadDays
+            : 1;
+          const now = nowInBrasilia();
+          // A instância deve ser criada quando now >= (meetingDate - leadDays)
+          const creationWindowStart = addDays(nextInstanceDateTime, -leadDays);
+
+          // Cria se: janela de criação já chegou E a reunião ainda não passou
+          if (isAfter(now, creationWindowStart) && isAfter(nextInstanceDateTime, now)) {
             await createRecurrenceInstance(task, nextDateToCreate);
             createdCount++;
           } else if (isBefore(nextInstanceDateTime, now)) {
-            // Se a próxima instância já passou, mas não foi criada, loga e avança a lastDate
-            // Isso pode acontecer se o job falhar ou for desativado por um tempo
             console.log(`[RecurrenceJob] Instância ${task.id} para ${format(nextInstanceDateTime, "yyyy-MM-dd HH:mm")} já passou e não foi criada. Avançando lastDate.`);
-            // Atualiza a lastDate para a próxima data esperada para que na próxima execução ele tente a próxima
-            // Isso evita que ele tente criar a mesma instância atrasada repetidamente
-            // TODO: Considerar se queremos criar instâncias "atrasadas" ou apenas pular
-            // Por enquanto, vamos pular e avançar a lastDate
-            // Para isso, precisaríamos de um mecanismo para atualizar a lastDate do pai
-            // ou garantir que o calculateNextRecurrenceDate sempre retorne uma data futura
           }
         }
         

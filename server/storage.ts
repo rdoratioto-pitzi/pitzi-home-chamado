@@ -1152,6 +1152,35 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(taskTemplates).where(eq(taskTemplates.id, id)).returning();
     return result.length > 0;
   }
+  async updateTaskTemplate(id: string, data: Partial<InsertTaskTemplate>): Promise<TaskTemplate | undefined> {
+    if (!db) return undefined;
+    const [t] = await db.update(taskTemplates)
+      .set(data)
+      .where(eq(taskTemplates.id, id))
+      .returning();
+    return t;
+  }
+  async setDefaultTaskTemplate(id: string, type: string): Promise<boolean> {
+    if (!db) return false;
+    // Remove default from all templates of the same type
+    await db.update(taskTemplates)
+      .set({ isDefault: false })
+      .where(eq(taskTemplates.type, type));
+    // Set the selected template as default
+    const result = await db.update(taskTemplates)
+      .set({ isDefault: true })
+      .where(eq(taskTemplates.id, id))
+      .returning();
+    return result.length > 0;
+  }
+  async unsetDefaultTaskTemplate(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.update(taskTemplates)
+      .set({ isDefault: false })
+      .where(eq(taskTemplates.id, id))
+      .returning();
+    return result.length > 0;
+  }
 
   // Logistic Operators
   async getLogisticOperator(id: string): Promise<LogisticOperator | undefined> {
