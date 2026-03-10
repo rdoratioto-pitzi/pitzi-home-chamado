@@ -1,56 +1,57 @@
+# ─── Dependências ───────────────────────────────────────────────
 node_modules
 dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz.env
 
-# Variáveis de ambiente (exclusivo da máquina local - nunca commitar)
+# ─── Variáveis de ambiente ───────────────────────────────────────
 .env
 .env.local
 .env.*.local
 
-# Logs
+# ─── Logs ────────────────────────────────────────────────────────
 *.log
 npm-debug.log*
 server.pid
 
-# OS
+# ─── OS ──────────────────────────────────────────────────────────
+.DS_Store
 Thumbs.db
 
-# IDE
+# ─── IDE ─────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Uploads de usuários (não versionar)
-uploads/
-screenshots/
-
-# Build
+# ─── Build ───────────────────────────────────────────────────────
+server/public
 .next/
 build/
+dist/
 
-# Cache
+# ─── Cache ───────────────────────────────────────────────────────
 .cache/
 .parcel-cache/
+vite.config.ts.*
+
+# ─── Uploads / Assets de usuário (não versionar) ─────────────────
+uploads/
+screenshots/
+attached_assets/
+
+# ─── Temporários ─────────────────────────────────────────────────
+*.patch
+*.tar.gz
+*.bak
 cookies.txt
-*.png
 db.sqlite
 null
 
-# Agentes - Logs e credenciais
+# ─── Agentes ─────────────────────────────────────────────────────
 .agents/.env
 .agents/node_modules/
 .agents/dist/
-.agents/logs/*.log
-.agents/logs/*.json
-
-# Agentes - Logs e credenciais
+.agents/logs/
 agents/.env
-agents/.env.example
 agents/node_modules/
 agents/dist/
-agents/logs/*.log
-agents/logs/*.json
+agents/logs/

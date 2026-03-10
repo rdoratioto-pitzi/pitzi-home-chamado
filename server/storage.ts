@@ -61,7 +61,10 @@ import {
   type GitPullRequest, type InsertGitPullRequest,
   type GitSecurityAlert, type InsertGitSecurityAlert,
   type ClaudeCodeUsageReport, type InsertClaudeCodeUsage,
+  type KanbanLabel, type InsertKanbanLabel,
+  type KanbanCardDependency, type InsertKanbanCardDependency,
   users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
+  kanbanLabels, kanbanCardDependencies,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
   taskAreas, taskAreaMembers,
@@ -143,6 +146,18 @@ import {
   getKanbanComments(cardId: string): Promise<KanbanCommentWithUser[]>;
   createKanbanComment(comment: InsertKanbanComment): Promise<KanbanComment>;
 
+  // Kanban Labels
+  getKanbanLabels(projectId: string): Promise<KanbanLabel[]>;
+  createKanbanLabel(label: InsertKanbanLabel): Promise<KanbanLabel>;
+  updateKanbanLabel(id: string, data: Partial<KanbanLabel>): Promise<KanbanLabel | undefined>;
+  deleteKanbanLabel(id: string): Promise<boolean>;
+
+  // Kanban Card Dependencies
+  getCardDependencies(cardId: string): Promise<{ blockedBy: KanbanCardDependency[]; blocks: KanbanCardDependency[] }>;
+  getProjectBlockedCardIds(projectId: string): Promise<Set<string>>;
+  addCardDependency(data: InsertKanbanCardDependency): Promise<KanbanCardDependency>;
+  removeCardDependency(id: string): Promise<boolean>;
+
   // Objectives
   getObjective(id: string): Promise<Objective | undefined>;
   getObjectives(): Promise<Objective[]>;
@@ -204,7 +219,8 @@ import {
 
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
-  getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string }): Promise<Task[]>;
+  getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string; subTaskParentId?: string }): Promise<Task[]>;
+  getSubTasks(parentId: string): Promise<Task[]>;
   getTasksWithConditions(conditions: SQL | undefined): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task | undefined>;
@@ -789,6 +805,52 @@ export class DatabaseStorage implements IStorage {
     return comment;
   }
 
+  // Kanban Labels
+  async getKanbanLabels(projectId: string): Promise<KanbanLabel[]> {
+    if (!db) return [];
+    return await db.select().from(kanbanLabels).where(eq(kanbanLabels.projectId, projectId));
+  }
+  async createKanbanLabel(label: InsertKanbanLabel): Promise<KanbanLabel> {
+    if (!db) throw new Error("Database not connected");
+    const [created] = await db.insert(kanbanLabels).values(label).returning();
+    return created;
+  }
+  async updateKanbanLabel(id: string, data: Partial<KanbanLabel>): Promise<KanbanLabel | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db.update(kanbanLabels).set(data).where(eq(kanbanLabels.id, id)).returning();
+    return updated;
+  }
+  async deleteKanbanLabel(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(kanbanLabels).where(eq(kanbanLabels.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Kanban Card Dependencies
+  async getCardDependencies(cardId: string): Promise<{ blockedBy: KanbanCardDependency[]; blocks: KanbanCardDependency[] }> {
+    if (!db) return { blockedBy: [], blocks: [] };
+    const [blockedBy, blocks] = await Promise.all([
+      db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.blockedCardId, cardId)),
+      db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.blockingCardId, cardId)),
+    ]);
+    return { blockedBy, blocks };
+  }
+  async getProjectBlockedCardIds(projectId: string): Promise<Set<string>> {
+    if (!db) return new Set();
+    const deps = await db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.projectId, projectId));
+    return new Set(deps.map(d => d.blockedCardId));
+  }
+  async addCardDependency(data: InsertKanbanCardDependency): Promise<KanbanCardDependency> {
+    if (!db) throw new Error("Database not connected");
+    const [dep] = await db.insert(kanbanCardDependencies).values(data).returning();
+    return dep;
+  }
+  async removeCardDependency(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(kanbanCardDependencies).where(eq(kanbanCardDependencies.id, id)).returning();
+    return result.length > 0;
+  }
+
   // Objectives
   async getObjective(id: string): Promise<Objective | undefined> {
     if (!db) return undefined;
@@ -1013,7 +1075,7 @@ export class DatabaseStorage implements IStorage {
     const [t] = await db.select().from(tasks).where(eq(tasks.id, id));
     return t;
   }
-  async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string }): Promise<Task[]> {
+  async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string; subTaskParentId?: string }): Promise<Task[]> {
     if (!db) return [];
     let baseQuery = db.select().from(tasks);
     const conditions = [];
@@ -1026,11 +1088,16 @@ export class DatabaseStorage implements IStorage {
     if (filters?.type) conditions.push(eq(tasks.type, filters.type));
     if (filters?.isRecurring !== undefined) conditions.push(eq(tasks.isRecurring, filters.isRecurring));
     if (filters?.visibility) conditions.push(eq(tasks.visibility, filters.visibility));
+    if (filters?.subTaskParentId) conditions.push(eq(tasks.subTaskParentId, filters.subTaskParentId));
 
     if (conditions.length > 0) {
       return await baseQuery.where(and(...conditions));
     }
     return await baseQuery;
+  }
+  async getSubTasks(parentId: string): Promise<Task[]> {
+    if (!db) return [];
+    return await db.select().from(tasks).where(eq(tasks.subTaskParentId, parentId));
   }
   async getTasksWithConditions(conditions: SQL | undefined): Promise<Task[]> {
     if (!db) return [];
@@ -1150,6 +1217,35 @@ export class DatabaseStorage implements IStorage {
   async deleteTaskTemplate(id: string): Promise<boolean> {
     if (!db) return false;
     const result = await db.delete(taskTemplates).where(eq(taskTemplates.id, id)).returning();
+    return result.length > 0;
+  }
+  async updateTaskTemplate(id: string, data: Partial<InsertTaskTemplate>): Promise<TaskTemplate | undefined> {
+    if (!db) return undefined;
+    const [t] = await db.update(taskTemplates)
+      .set(data)
+      .where(eq(taskTemplates.id, id))
+      .returning();
+    return t;
+  }
+  async setDefaultTaskTemplate(id: string, type: string): Promise<boolean> {
+    if (!db) return false;
+    // Remove default from all templates of the same type
+    await db.update(taskTemplates)
+      .set({ isDefault: false })
+      .where(eq(taskTemplates.type, type));
+    // Set the selected template as default
+    const result = await db.update(taskTemplates)
+      .set({ isDefault: true })
+      .where(eq(taskTemplates.id, id))
+      .returning();
+    return result.length > 0;
+  }
+  async unsetDefaultTaskTemplate(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.update(taskTemplates)
+      .set({ isDefault: false })
+      .where(eq(taskTemplates.id, id))
+      .returning();
     return result.length > 0;
   }
 
@@ -1722,14 +1818,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Flowcharts
-  async getFlowcharts(ownerId?: string): Promise<Flowchart[]> {
+  async getFlowcharts(ownerId?: string, source?: string): Promise<Flowchart[]> {
     if (!db) throw new Error("Database not connected");
-    if (ownerId) {
-      return await db.select().from(flowcharts).where(
-        and(eq(flowcharts.ownerId, ownerId), eq(flowcharts.isTemplate, false))
-      ).orderBy(sql`${flowcharts.updatedAt} DESC`);
-    }
-    return await db.select().from(flowcharts).where(eq(flowcharts.isTemplate, false)).orderBy(sql`${flowcharts.updatedAt} DESC`);
+    const conditions = [eq(flowcharts.isTemplate, false)];
+    if (source) conditions.push(eq(flowcharts.source, source));
+    if (ownerId) conditions.push(eq(flowcharts.ownerId, ownerId));
+    return await db.select().from(flowcharts).where(and(...conditions)).orderBy(sql`${flowcharts.updatedAt} DESC`);
   }
 
   async getFlowchart(id: string): Promise<Flowchart | undefined> {

@@ -49,6 +49,7 @@ export type ModulePermissions = {
   okrs: boolean;
   metas: boolean;
   fluxogramas: boolean;
+  diagramas: boolean;
   logistica: boolean;
   pricing: boolean;
   conhecimento: boolean;
@@ -209,6 +210,8 @@ export const kanbanCards = pgTable("kanban_cards", {
   ticketId: varchar("ticket_id"),
   parentCardId: varchar("parent_card_id"),
   progress: integer("progress").default(0),
+  checklist: text("checklist"),
+  labelIds: text("label_ids"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -226,6 +229,34 @@ export const insertKanbanCardSchema = baseInsertKanbanCardSchema.extend({
 });
 export type InsertKanbanCard = z.infer<typeof insertKanbanCardSchema>;
 export type KanbanCard = typeof kanbanCards.$inferSelect;
+
+// ============== KANBAN LABELS ==============
+export const kanbanLabels = pgTable("kanban_labels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  projectId: varchar("project_id").notNull(),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#6366f1"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKanbanLabelSchema = createInsertSchema(kanbanLabels).omit({ id: true, createdAt: true });
+export type InsertKanbanLabel = z.infer<typeof insertKanbanLabelSchema>;
+export type KanbanLabel = typeof kanbanLabels.$inferSelect;
+
+// ============== KANBAN CARD DEPENDENCIES ==============
+export const kanbanCardDependencies = pgTable("kanban_card_dependencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  projectId: varchar("project_id").notNull(),
+  blockingCardId: varchar("blocking_card_id").notNull(),
+  blockedCardId: varchar("blocked_card_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKanbanCardDependencySchema = createInsertSchema(kanbanCardDependencies).omit({ id: true, createdAt: true });
+export type InsertKanbanCardDependency = z.infer<typeof insertKanbanCardDependencySchema>;
+export type KanbanCardDependency = typeof kanbanCardDependencies.$inferSelect;
 
 // ============== KANBAN COMMENTS ==============
 export const kanbanComments = pgTable("kanban_comments", {
@@ -446,6 +477,9 @@ export const tasks = pgTable("tasks", {
   recurrenceWeekdays: text("recurrence_weekdays"), // JSON array of weekday numbers [1,2,3,4,5] for Mon-Fri
   recurrenceEndDate: timestamp("recurrence_end_date"),
   parentTaskId: varchar("parent_task_id"), // Reference to template/parent for recurring instances
+  subTaskParentId: varchar("sub_task_parent_id"), // Reference to parent task for manual subtask hierarchy
+  estimationHours: integer("estimation_hours"), // Estimated hours for the task
+  progress: integer("progress").default(0), // Progress percentage 0-100
   visibility: text("visibility").notNull().default("private"), // 'private' | 'shared' | 'public'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -981,6 +1015,7 @@ export const flowcharts = pgTable("flowcharts", {
   isTemplate: boolean("is_template").default(false),
   templateCategory: text("template_category"),
   thumbnail: text("thumbnail"),
+  source: text("source").notNull().default("reactflow"), // "reactflow" | "excalidraw"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
