@@ -765,6 +765,11 @@ export function registerTaskRoutes(router: Router) {
   });
 
   // ============== TASK COMMENTS ==============
+  router.get("/api/tasks/:id/subtasks", requireAuth, async (req, res) => {
+    const subtasks = await storage.getSubTasks(getId(req));
+    res.json(subtasks);
+  });
+
   router.get("/api/tasks/:id/comments", requireAuth, async (req, res) => {
     const comments = await storage.getTaskComments(getId(req));
     res.json(comments);

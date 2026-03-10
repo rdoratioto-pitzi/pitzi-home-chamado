@@ -6,13 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Plus, MoreHorizontal, GripVertical, Play, Square, Hash, Search, CheckCircle, Lock, Pencil, LayoutGrid, GanttChart, CalendarDays } from "lucide-react";
+import { Plus, MoreHorizontal, GripVertical, Play, Square, Hash, Search, CheckCircle, Lock, Pencil, LayoutGrid, GanttChart, CalendarDays, List, BarChart2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Project, KanbanColumn, KanbanCard, User } from "@shared/schema";
 import { CardDialog } from "./card-dialog";
 import { ColumnDialog } from "./column-dialog";
 import { GanttView } from "./gantt-view";
 import { CalendarView } from "./calendar-view";
+import { ListView } from "./list-view";
+import { DashboardView } from "./dashboard-view";
+import type { KanbanLabel } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -43,7 +46,7 @@ import {
 import { DraggableCard } from "./draggable-card";
 import { useDroppable } from "@dnd-kit/core";
 
-type ViewMode = "kanban" | "gantt" | "calendar";
+type ViewMode = "kanban" | "gantt" | "calendar" | "lista" | "dashboard";
 
 function KanbanColumnComponent({ 
   column, 
@@ -205,6 +208,18 @@ export default function KanbanPage() {
     enabled: !!projectId,
   });
 
+  const { data: labels = [] } = useQuery<KanbanLabel[]>({
+    queryKey: ["/api/projects", projectId, "labels"],
+    enabled: !!projectId,
+  });
+
+  const { data: blockedCardIdsArr = [] } = useQuery<string[]>({
+    queryKey: ["/api/projects", projectId, "blocked-cards"],
+    enabled: !!projectId,
+  });
+
+  const blockedCardIds = new Set(blockedCardIdsArr);
+
   const moveCardMutation = useMutation({
     mutationFn: async ({ cardId, columnId }: { cardId: string; columnId: string }) => {
       return apiRequest("PATCH", `/api/cards/${cardId}`, { columnId });
@@ -365,6 +380,8 @@ export default function KanbanPage() {
     { id: "kanban" as ViewMode, label: "Kanban", icon: LayoutGrid },
     { id: "gantt" as ViewMode, label: "Gantt", icon: GanttChart },
     { id: "calendar" as ViewMode, label: "Calendário", icon: CalendarDays },
+    { id: "lista" as ViewMode, label: "Lista", icon: List },
+    { id: "dashboard" as ViewMode, label: "Dashboard", icon: BarChart2 },
   ];
 
   return (
@@ -547,6 +564,26 @@ export default function KanbanPage() {
             onEditCard={openEditCardDialog}
             onNewCard={(columnId) => openNewCardDialog(columnId)}
             isReadOnly={project?.status === "completed"}
+          />
+        )}
+
+        {viewMode === "lista" && (
+          <ListView
+            cards={filteredCards}
+            columns={sortedColumns}
+            users={users}
+            labels={labels}
+            blockedCardIds={blockedCardIds}
+            onEditCard={openEditCardDialog}
+          />
+        )}
+
+        {viewMode === "dashboard" && (
+          <DashboardView
+            projectId={projectId || ""}
+            cards={filteredCards}
+            columns={sortedColumns}
+            users={users}
           />
         )}
       </main>
