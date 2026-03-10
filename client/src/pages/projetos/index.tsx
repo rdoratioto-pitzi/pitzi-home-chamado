@@ -73,9 +73,13 @@ export default function ProjetosPage() {
 
   const filteredProjects = useMemo(() =>
     projects.filter((p) => {
+      const q = searchQuery.toLowerCase().trim();
+      // Comparar com nome e descrição sem HTML
+      const descPlain = stripHtml(p.description).toLowerCase();
       const matchesSearch =
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.description ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+        !q ||
+        p.name.toLowerCase().includes(q) ||
+        descPlain.includes(q);
       const matchesStatus = filterStatus === "all" || p.status === filterStatus;
       const matchesOwner = filterOwner === "all" || p.ownerId === filterOwner;
       return matchesSearch && matchesStatus && matchesOwner;
@@ -84,6 +88,15 @@ export default function ProjetosPage() {
   );
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
+
+  // Quando filtro de projeto muda, abre o projeto direto no painel
+  const handleFilterProject = (projectId: string) => {
+    if (projectId === "all") {
+      // não altera a seleção — mantém o painel como está
+    } else {
+      setSelectedProjectId(projectId);
+    }
+  };
 
   const handleNewProject = () => {
     setEditingProject(undefined);
@@ -163,6 +176,37 @@ export default function ProjetosPage() {
                 {owners.map((u) => (
                   <SelectItem key={u.id} value={u.id}>
                     {u.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedProjectId ?? "all"}
+              onValueChange={(val) => {
+                if (val === "all") {
+                  setSelectedProjectId(null);
+                } else {
+                  handleFilterProject(val);
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-project">
+                <SelectValue placeholder="Projeto" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Projetos</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "inline-block w-1.5 h-1.5 rounded-full flex-shrink-0",
+                          statusDotColors[p.status] ?? "bg-slate-400"
+                        )}
+                      />
+                      {p.name}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

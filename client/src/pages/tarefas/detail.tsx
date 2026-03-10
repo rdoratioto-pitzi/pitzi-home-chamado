@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation, useParams } from "wouter";
@@ -63,7 +63,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Task, TaskComment, TaskCommentWithUser, TaskReaction, TaskArea, User as UserType } from "@shared/schema";
-import { getCurrentUser } from "@/lib/permissions";
 
 // Função para remover tags HTML e retornar texto puro
 function stripHtml(html: string | null | undefined): string {
@@ -104,7 +103,13 @@ export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const currentUser = useMemo(() => getCurrentUser(), []);
+
+  // Busca o usuário logado via session (garantido, sem depender de localStorage)
+  const { data: authData } = useQuery<{ authenticated: boolean; user?: { id: string; name: string } }>({
+    queryKey: ["/api/auth/me"],
+  });
+  const sessionUserId = authData?.user?.id;
+
   const [isEditing, setIsEditing] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -132,19 +137,24 @@ export default function TaskDetailPage() {
   });
 
   const createSubtaskMutation = useMutation({
-    mutationFn: async (title: string) =>
-      apiRequest("POST", "/api/tasks", {
+    mutationFn: async (title: string) => {
+      if (!sessionUserId) throw new Error("Usuário não autenticado");
+      return apiRequest("POST", "/api/tasks", {
         title,
         subTaskParentId: id,
         status: "todo",
         priority: "medium",
         type: "task",
         visibility: "shared",
-        createdBy: currentUser?.id ?? "",
-      }),
+        createdBy: sessionUserId,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "subtasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", id] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erro ao criar subtarefa", description: err.message, variant: "destructive" });
     },
   });
 
