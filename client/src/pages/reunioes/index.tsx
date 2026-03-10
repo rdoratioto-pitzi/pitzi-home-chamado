@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/data-table";
 import { cn } from "@/lib/utils";
-import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle, GripVertical, Star, Table, Tag } from "lucide-react";
+import { Plus, Folder, Users, User, Search, Filter, MoreHorizontal, Calendar, CheckCircle2, Circle, Clock, Archive, FileText, Trash2, Edit, LayoutGrid, List, Repeat, X, Video, Globe, MonitorPlay, ChevronLeft, ChevronRight, XCircle, GripVertical, Star, Table, Tag, Copy, ArrowLeft, Flag } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -121,6 +121,8 @@ export default function ReunioesPage() {
     recurrenceType: "daily" as "daily" | "weekly",
     recurrenceWeekdays: [] as number[],
     recurrenceEndDate: "",
+    recurrenceCreateLeadDays: 1 as number, // dias de antecedência para criar instâncias recorrentes
+    templateId: "" as string, // template de origem (se aplicado)
   });
 
   const [agendaImages, setAgendaImages] = useState<string[]>([]);
@@ -500,8 +502,10 @@ export default function ReunioesPage() {
         agendaImages: agendaImages,
         participants: data.meetingData.participants,
         externalParticipants: data.meetingData.externalParticipants,
+        recurrenceCreateLeadDays: data.isRecurring ? data.recurrenceCreateLeadDays : undefined,
+        templateId: data.templateId || undefined,
       };
-      
+
       const payload = {
         title: data.title,
         description: data.description || undefined,
@@ -570,6 +574,19 @@ export default function ReunioesPage() {
     },
   });
 
+  const updateTemplateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { name: string; structure: string } }) => {
+      return apiRequest("PUT", `/api/task-templates/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-templates", "meeting"] });
+      toast({ title: "Template atualizado!" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar template", description: error.message, variant: "destructive" });
+    },
+  });
+
   const deleteTemplateMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", `/api/task-templates/${id}`);
@@ -580,9 +597,48 @@ export default function ReunioesPage() {
     },
   });
 
+  const setDefaultTemplateMutation = useMutation({
+    mutationFn: async ({ id, isDefault }: { id: string; isDefault: boolean }) => {
+      if (isDefault) {
+        return apiRequest("DELETE", `/api/task-templates/${id}/set-default`);
+      }
+      return apiRequest("POST", `/api/task-templates/${id}/set-default`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-templates", "meeting"] });
+      toast({ title: "Template padrão atualizado!" });
+    },
+  });
+
+  const duplicateTemplateMutation = useMutation({
+    mutationFn: async (template: { id: string; name: string; structure: string }) => {
+      return apiRequest("POST", "/api/task-templates", {
+        name: `${template.name} (cópia)`,
+        structure: template.structure,
+        type: "meeting",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-templates", "meeting"] });
+      toast({ title: "Template duplicado!" });
+    },
+  });
+
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [templateStructure, setTemplateStructure] = useState("");
+
+  // Drawer de gerenciamento de templates
+  const [showTemplateDrawer, setShowTemplateDrawer] = useState(false);
+  const [templateDrawerView, setTemplateDrawerView] = useState<"list" | "create" | "edit">("list");
+  const [editingTemplate, setEditingTemplate] = useState<{ id: string; name: string; structure: string } | null>(null);
+  const [drawerTemplateName, setDrawerTemplateName] = useState("");
+  const [drawerTemplateAgenda, setDrawerTemplateAgenda] = useState("");
+  const [drawerTemplateLocation, setDrawerTemplateLocation] = useState("");
+  const [drawerTemplateIsRecurring, setDrawerTemplateIsRecurring] = useState(false);
+  const [drawerTemplateRecurrenceType, setDrawerTemplateRecurrenceType] = useState<"daily" | "weekly">("weekly");
+  const [drawerTemplateWeekdays, setDrawerTemplateWeekdays] = useState<number[]>([]);
+  const [drawerTemplateLeadDays, setDrawerTemplateLeadDays] = useState(1);
   
   // Inline editing state
   const [editingAgendaFor, setEditingAgendaFor] = useState<string | null>(null);
@@ -597,18 +653,28 @@ export default function ReunioesPage() {
       const structure = JSON.parse(template.structure);
       setNewMeeting({
         ...newMeeting,
-        title: structure.title || newMeeting.title,
-        description: structure.description || newMeeting.description,
+        // Aplica título e descrição do template só se o campo estiver vazio
+        title: newMeeting.title || structure.title || "",
+        description: newMeeting.description || structure.description || "",
         meetingData: {
           ...newMeeting.meetingData,
+          // Aplica agenda, local e participantes do template; preserva data e hora já preenchidas
           agenda: structure.agenda || newMeeting.meetingData.agenda,
-          participants: structure.participants || newMeeting.meetingData.participants,
-          externalParticipants: structure.externalParticipants || newMeeting.meetingData.externalParticipants,
+          location: structure.location || newMeeting.meetingData.location,
+          participants: structure.participants?.length > 0 ? structure.participants : newMeeting.meetingData.participants,
+          externalParticipants: structure.externalParticipants?.length > 0 ? structure.externalParticipants : newMeeting.meetingData.externalParticipants,
+          // date e time são preservados — não sobrescreve com template
+          date: newMeeting.meetingData.date,
+          time: newMeeting.meetingData.time,
+          actions: structure.actions?.length > 0 ? structure.actions : newMeeting.meetingData.actions,
         },
-        isRecurring: structure.isRecurring || false,
-        recurrenceType: structure.recurrenceType || "daily",
-        recurrenceWeekdays: structure.recurrenceWeekdays || [],
-        recurrenceEndDate: structure.recurrenceEndDate || "",
+        // Aplica configurações de recorrência do template (sem recurrenceEndDate — é específico de cada instância)
+        isRecurring: structure.isRecurring ?? newMeeting.isRecurring,
+        recurrenceType: structure.recurrenceType || newMeeting.recurrenceType,
+        recurrenceWeekdays: structure.recurrenceWeekdays?.length > 0 ? structure.recurrenceWeekdays : newMeeting.recurrenceWeekdays,
+        recurrenceCreateLeadDays: structure.recurrenceCreateLeadDays ?? newMeeting.recurrenceCreateLeadDays,
+        // recurrenceEndDate NÃO é aplicado do template — cada instância define a sua
+        templateId: template.id,
       });
       toast({ title: `Template "${template.name}" aplicado!` });
     } catch {
@@ -617,16 +683,20 @@ export default function ReunioesPage() {
   };
 
   const handleSaveAsTemplate = () => {
+    // Salva apenas campos persistentes: exclui data, hora e recurrenceEndDate específicos da instância
     const structure = JSON.stringify({
       title: newMeeting.title,
       description: newMeeting.description,
       agenda: newMeeting.meetingData.agenda,
+      location: newMeeting.meetingData.location,
       participants: newMeeting.meetingData.participants,
       externalParticipants: newMeeting.meetingData.externalParticipants,
+      actions: newMeeting.meetingData.actions,
       isRecurring: newMeeting.isRecurring,
       recurrenceType: newMeeting.recurrenceType,
       recurrenceWeekdays: newMeeting.recurrenceWeekdays,
-      recurrenceEndDate: newMeeting.recurrenceEndDate,
+      recurrenceCreateLeadDays: newMeeting.recurrenceCreateLeadDays,
+      // NÃO salva: date, time, recurrenceEndDate (específicos de cada instância)
     });
     createTemplateMutation.mutate({ name: templateName, structure });
     setShowTemplateDialog(false);
@@ -681,6 +751,8 @@ export default function ReunioesPage() {
       recurrenceType: "daily",
       recurrenceWeekdays: [],
       recurrenceEndDate: "",
+      recurrenceCreateLeadDays: 1,
+      templateId: "",
     });
     setAgendaImages([]);
   };
@@ -774,11 +846,120 @@ export default function ReunioesPage() {
   };
 
   const handleOpenMeetingDialog = () => {
-    setNewMeeting({
-      ...newMeeting,
+    const defaultTemplate = (templates as any[]).find((t: any) => t.isDefault);
+    const baseForm = {
+      title: "",
+      description: "",
+      type: "meeting_note" as const,
+      status: "todo",
+      priority: "medium",
       areaId: selectedAreaId || (defaultTag?.id || (areas[0]?.id || "")),
-    });
+      createdBy: currentUserId,
+      assigneeId: "",
+      assigneeIds: [] as string[],
+      dueDate: "",
+      meetingData: {
+        date: "",
+        time: "",
+        location: "",
+        participants: [] as string[],
+        externalParticipants: [] as string[],
+        agenda: "",
+        actions: [] as { description: string; responsible: string; deadline: string }[],
+      },
+      isRecurring: false,
+      recurrenceType: "daily" as "daily" | "weekly",
+      recurrenceWeekdays: [] as number[],
+      recurrenceEndDate: "",
+      recurrenceCreateLeadDays: 1,
+      templateId: "",
+    };
+
+    if (defaultTemplate) {
+      try {
+        const structure = JSON.parse(defaultTemplate.structure);
+        setNewMeeting({
+          ...baseForm,
+          title: structure.title || "",
+          description: structure.description || "",
+          meetingData: {
+            ...baseForm.meetingData,
+            agenda: structure.agenda || "",
+            location: structure.location || "",
+            participants: structure.participants || [],
+            externalParticipants: structure.externalParticipants || [],
+            actions: structure.actions || [],
+          },
+          isRecurring: structure.isRecurring ?? false,
+          recurrenceType: structure.recurrenceType || "daily",
+          recurrenceWeekdays: structure.recurrenceWeekdays || [],
+          recurrenceCreateLeadDays: structure.recurrenceCreateLeadDays ?? 1,
+          templateId: defaultTemplate.id,
+        });
+      } catch {
+        setNewMeeting(baseForm);
+      }
+    } else {
+      setNewMeeting(baseForm);
+    }
     setShowMeetingDialog(true);
+  };
+
+  const handleOpenTemplateDrawer = () => {
+    setTemplateDrawerView("list");
+    setEditingTemplate(null);
+    setShowTemplateDrawer(true);
+  };
+
+  const handleEditTemplate = (template: any) => {
+    try {
+      const structure = JSON.parse(template.structure);
+      setEditingTemplate(template);
+      setDrawerTemplateName(template.name);
+      setDrawerTemplateAgenda(structure.agenda || "");
+      setDrawerTemplateLocation(structure.location || "");
+      setDrawerTemplateIsRecurring(structure.isRecurring || false);
+      setDrawerTemplateRecurrenceType(structure.recurrenceType || "weekly");
+      setDrawerTemplateWeekdays(structure.recurrenceWeekdays || []);
+      setDrawerTemplateLeadDays(structure.recurrenceCreateLeadDays ?? 1);
+    } catch {
+      setDrawerTemplateName(template.name);
+    }
+    setTemplateDrawerView("edit");
+  };
+
+  const handleOpenNewTemplateForm = () => {
+    setEditingTemplate(null);
+    setDrawerTemplateName("");
+    setDrawerTemplateAgenda("");
+    setDrawerTemplateLocation("");
+    setDrawerTemplateIsRecurring(false);
+    setDrawerTemplateRecurrenceType("weekly");
+    setDrawerTemplateWeekdays([]);
+    setDrawerTemplateLeadDays(1);
+    setTemplateDrawerView("create");
+  };
+
+  const handleSaveDrawerTemplate = () => {
+    const structure = JSON.stringify({
+      agenda: drawerTemplateAgenda,
+      location: drawerTemplateLocation,
+      isRecurring: drawerTemplateIsRecurring,
+      recurrenceType: drawerTemplateRecurrenceType,
+      recurrenceWeekdays: drawerTemplateWeekdays,
+      recurrenceCreateLeadDays: drawerTemplateLeadDays,
+    });
+    if (editingTemplate) {
+      updateTemplateMutation.mutate(
+        { id: editingTemplate.id, data: { name: drawerTemplateName, structure } },
+        { onSuccess: () => setTemplateDrawerView("list") }
+      );
+    } else {
+      createTemplateMutation.mutate(
+        { name: drawerTemplateName, structure },
+        { onSuccess: () => setTemplateDrawerView("list") }
+      );
+    }
   };
 
   const handleAddParticipant = (userId: string) => {
@@ -1220,6 +1401,12 @@ export default function ReunioesPage() {
                             <Video className="h-3 w-3 mr-1" />
                             Reunião
                           </Badge>
+                          {meetingData.templateId && (
+                            <Badge variant="secondary" className="text-xs">
+                              <LayoutGrid className="h-3 w-3 mr-1" />
+                              Modelo
+                            </Badge>
+                          )}
                         </div>
                         {meetingData.location && (
                           <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
@@ -1503,58 +1690,10 @@ export default function ReunioesPage() {
             <div className="flex items-center justify-between pr-12">
               <DialogTitle>Nova Reunião</DialogTitle>
               <div className="flex gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <LayoutGrid className="h-4 w-4 mr-1" />
-                      Templates
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    {templates.length === 0 ? (
-                      <DropdownMenuItem disabled>Nenhum template disponível</DropdownMenuItem>
-                    ) : (
-                      templates.map((t: any) => (
-                        <DropdownMenuItem 
-                          key={t.id} 
-                          onClick={() => applyTemplate(t)}
-                          className="flex items-center justify-between"
-                        >
-                          <span>{t.name}</span>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-6 w-6"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <MoreHorizontal className="h-3 w-3" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                              <DropdownMenuItem 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteTemplateMutation.mutate(t.id);
-                                }}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="h-3 w-3 mr-1" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </DropdownMenuItem>
-                      ))
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setShowTemplateDialog(true)}>
-                      <Plus className="h-3 w-3 mr-1" />
-                      Salvar como Template
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <Button variant="outline" size="sm" onClick={handleOpenTemplateDrawer}>
+                  <LayoutGrid className="h-4 w-4 mr-1" />
+                  Templates
+                </Button>
               </div>
             </div>
           </DialogHeader>
@@ -1701,6 +1840,27 @@ export default function ReunioesPage() {
                       onChange={(e) => setNewMeeting({ ...newMeeting, recurrenceEndDate: e.target.value })}
                       data-testid="input-recurrence-end-date"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Criar instância com antecedência de</label>
+                    <Select
+                      value={String(newMeeting.recurrenceCreateLeadDays)}
+                      onValueChange={(v) => setNewMeeting({ ...newMeeting, recurrenceCreateLeadDays: Number(v) })}
+                    >
+                      <SelectTrigger data-testid="select-recurrence-lead-days">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">No mesmo dia</SelectItem>
+                        <SelectItem value="1">1 dia antes</SelectItem>
+                        <SelectItem value="2">2 dias antes</SelectItem>
+                        <SelectItem value="7">1 semana antes</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Define quando o sistema criará a reunião para que os participantes possam preparar a pauta com antecedência.
+                    </p>
                   </div>
                 </div>
               )}
@@ -1879,7 +2039,16 @@ export default function ReunioesPage() {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowTemplateDialog(true)}
+              className="sm:mr-auto"
+            >
+              <FileText className="h-4 w-4 mr-1" />
+              Salvar como Template
+            </Button>
             <Button variant="outline" onClick={() => setShowMeetingDialog(false)}>
               Cancelar
             </Button>
@@ -1909,9 +2078,17 @@ export default function ReunioesPage() {
                 placeholder="Ex: Reunião Diária"
               />
             </div>
-            <p className="text-sm text-muted-foreground">
-              O template irá salvar: título, descrição, agenda, participantes e configurações de recorrência.
-            </p>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">O que será salvo:</p>
+              <ul className="list-disc pl-4 space-y-0.5">
+                <li>Título e descrição</li>
+                <li>Pauta (agenda)</li>
+                <li>Local</li>
+                <li>Participantes</li>
+                <li>Configurações de recorrência</li>
+              </ul>
+              <p className="text-xs mt-2">Data, horário e data de término <strong>não</strong> são salvos — são específicos de cada reunião.</p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowTemplateDialog(false)}>
@@ -1924,6 +2101,224 @@ export default function ReunioesPage() {
               Salvar Template
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Manager Drawer */}
+      <Dialog open={showTemplateDrawer} onOpenChange={setShowTemplateDrawer}>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              {templateDrawerView !== "list" && (
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTemplateDrawerView("list")}>
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              )}
+              <DialogTitle>
+                {templateDrawerView === "list" && "Modelos de Reunião"}
+                {templateDrawerView === "create" && "Novo Modelo"}
+                {templateDrawerView === "edit" && "Editar Modelo"}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto py-2">
+            {templateDrawerView === "list" && (
+              <div className="space-y-2">
+                {(templates as any[]).length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <LayoutGrid className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Nenhum modelo criado ainda</p>
+                  </div>
+                ) : (
+                  (templates as any[]).map((t: any) => {
+                    let structure: any = {};
+                    try { structure = JSON.parse(t.structure); } catch {}
+                    const agendaPreview = structure.agenda ? stripHtml(structure.agenda).slice(0, 80) : "";
+
+                    return (
+                      <div key={t.id} className="group flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => { applyTemplate(t); setShowTemplateDrawer(false); }}>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{t.name}</span>
+                            {t.isDefault && (
+                              <Badge variant="secondary" className="text-xs px-1.5 py-0">Padrão</Badge>
+                            )}
+                            {structure.isRecurring && (
+                              <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                <Repeat className="h-3 w-3 mr-1" />
+                                {structure.recurrenceType === "weekly" ? "Semanal" : "Diária"}
+                              </Badge>
+                            )}
+                          </div>
+                          {agendaPreview && (
+                            <p className="text-xs text-muted-foreground mt-0.5 truncate">{agendaPreview}</p>
+                          )}
+                          {structure.location && (
+                            <p className="text-xs text-muted-foreground mt-0.5">📍 {structure.location}</p>
+                          )}
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => { applyTemplate(t); setShowTemplateDrawer(false); }}>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Usar este modelo
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditTemplate(t)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => duplicateTemplateMutation.mutate(t)}>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Duplicar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setDefaultTemplateMutation.mutate({ id: t.id, isDefault: t.isDefault || false })}
+                            >
+                              <Flag className="h-4 w-4 mr-2" />
+                              {t.isDefault ? "Remover como Padrão" : "Definir como Padrão"}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => deleteTemplateMutation.mutate(t.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            {(templateDrawerView === "create" || templateDrawerView === "edit") && (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Nome do Modelo</label>
+                  <Input
+                    value={drawerTemplateName}
+                    onChange={(e) => setDrawerTemplateName(e.target.value)}
+                    placeholder="Ex: Reunião de Alinhamento"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Local padrão</label>
+                  <Input
+                    value={drawerTemplateLocation}
+                    onChange={(e) => setDrawerTemplateLocation(e.target.value)}
+                    placeholder="Ex: Sala de reunião, Teams, Zoom"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Pauta padrão</label>
+                  <RichTextarea
+                    value={drawerTemplateAgenda}
+                    onChange={setDrawerTemplateAgenda}
+                    placeholder="Tópicos a serem discutidos..."
+                  />
+                </div>
+
+                <div className="space-y-3 border-t pt-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <Repeat className="h-4 w-4" />
+                      Recorrência padrão
+                    </Label>
+                    <Switch
+                      checked={drawerTemplateIsRecurring}
+                      onCheckedChange={setDrawerTemplateIsRecurring}
+                    />
+                  </div>
+                  {drawerTemplateIsRecurring && (
+                    <div className="space-y-3 pl-2">
+                      <div className="flex gap-4">
+                        {(["daily", "weekly"] as const).map((type) => (
+                          <label key={type} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="drawer-recurrence"
+                              value={type}
+                              checked={drawerTemplateRecurrenceType === type}
+                              onChange={() => setDrawerTemplateRecurrenceType(type)}
+                              className="w-4 h-4 text-primary"
+                            />
+                            <span className="text-sm">{type === "daily" ? "Diária" : "Semanal"}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {drawerTemplateRecurrenceType === "weekly" && (
+                        <div className="flex flex-wrap gap-2">
+                          {weekdays.map((day) => (
+                            <label key={day.value} className="flex items-center gap-1.5 cursor-pointer">
+                              <Checkbox
+                                checked={drawerTemplateWeekdays.includes(day.value)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setDrawerTemplateWeekdays([...drawerTemplateWeekdays, day.value].sort());
+                                  } else {
+                                    setDrawerTemplateWeekdays(drawerTemplateWeekdays.filter(d => d !== day.value));
+                                  }
+                                }}
+                              />
+                              <span className="text-sm">{day.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        <label className="text-sm font-medium">Criar instância com antecedência de</label>
+                        <Select
+                          value={String(drawerTemplateLeadDays)}
+                          onValueChange={(v) => setDrawerTemplateLeadDays(Number(v))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">No mesmo dia</SelectItem>
+                            <SelectItem value="1">1 dia antes</SelectItem>
+                            <SelectItem value="2">2 dias antes</SelectItem>
+                            <SelectItem value="7">1 semana antes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t pt-3 flex justify-between">
+            {templateDrawerView === "list" ? (
+              <>
+                <Button variant="outline" onClick={() => setShowTemplateDrawer(false)}>Fechar</Button>
+                <Button onClick={handleOpenNewTemplateForm}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Novo Modelo
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setTemplateDrawerView("list")}>Cancelar</Button>
+                <Button
+                  onClick={handleSaveDrawerTemplate}
+                  disabled={!drawerTemplateName || createTemplateMutation.isPending || updateTemplateMutation.isPending}
+                >
+                  {editingTemplate ? "Salvar Alterações" : "Criar Modelo"}
+                </Button>
+              </>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
