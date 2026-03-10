@@ -157,9 +157,14 @@ function KanbanColumnComponent({
   );
 }
 
-export default function KanbanPage() {
+interface KanbanPageProps {
+  embeddedProjectId?: string;
+}
+
+export function KanbanContent({ embeddedProjectId }: KanbanPageProps) {
   const [, params] = useRoute("/projetos/:id");
-  const projectId = params?.id;
+  const projectId = embeddedProjectId ?? params?.id;
+  const isEmbedded = !!embeddedProjectId;
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -352,7 +357,9 @@ export default function KanbanPage() {
   if (projectLoading || columnsLoading) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader title="Carregando..." breadcrumbs={[{ label: "Projetos", href: "/projetos" }, { label: "..." }]} />
+        {!embeddedProjectId && (
+          <PageHeader title="Carregando..." breadcrumbs={[{ label: "Projetos", href: "/projetos" }, { label: "..." }]} />
+        )}
         <main className="flex-1 p-6">
           <div className="flex gap-4">
             {[...Array(4)].map((_, i) => (
@@ -384,51 +391,56 @@ export default function KanbanPage() {
     { id: "dashboard" as ViewMode, label: "Dashboard", icon: BarChart2 },
   ];
 
+  // Barra de ações da sprint (reutilizada em PageHeader e no modo embarcado)
+  const sprintActions = (
+    <div className="flex items-center gap-3">
+      {project?.status === "completed" ? (
+        <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          Sprint Finalizada (Somente Visualização)
+        </Badge>
+      ) : project?.status === "sprint_active" ? (
+        <Button
+          onClick={() => sprintMutation.mutate("completed")}
+          variant="outline"
+          className="text-red-600 border-red-200 hover:bg-red-50"
+          data-testid="button-finish-sprint"
+        >
+          <Square className="h-4 w-4 mr-2" />
+          Finalizar Sprint
+        </Button>
+      ) : (
+        <Button
+          onClick={() => sprintMutation.mutate("sprint_active")}
+          variant="outline"
+          className="text-green-600 border-green-200 hover:bg-green-50"
+          data-testid="button-start-sprint"
+        >
+          <Play className="h-4 w-4 mr-2" />
+          Iniciar Sprint
+        </Button>
+      )}
+      {viewMode === "kanban" && project?.status !== "completed" && (
+        <Button onClick={() => setIsColumnDialogOpen(true)} variant="outline" data-testid="button-add-column">
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Coluna
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader 
-        title={project?.name || "Projeto"} 
-        breadcrumbs={[
-          { label: "Projetos", href: "/projetos" },
-          { label: project?.name || "Projeto" }
-        ]}
-        actions={
-          <div className="flex items-center gap-3">
-            {project?.status === "completed" ? (
-              <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Sprint Finalizada (Somente Visualização)
-              </Badge>
-            ) : project?.status === "sprint_active" ? (
-              <Button 
-                onClick={() => sprintMutation.mutate("completed")} 
-                variant="outline" 
-                className="text-red-600 border-red-200 hover:bg-red-50"
-                data-testid="button-finish-sprint"
-              >
-                <Square className="h-4 w-4 mr-2" />
-                Finalizar Sprint
-              </Button>
-            ) : (
-              <Button 
-                onClick={() => sprintMutation.mutate("sprint_active")} 
-                variant="outline" 
-                className="text-green-600 border-green-200 hover:bg-green-50"
-                data-testid="button-start-sprint"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Iniciar Sprint
-              </Button>
-            )}
-            {viewMode === "kanban" && project?.status !== "completed" && (
-              <Button onClick={() => setIsColumnDialogOpen(true)} variant="outline" data-testid="button-add-column">
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Coluna
-              </Button>
-            )}
-          </div>
-        }
-      />
+      {!isEmbedded && (
+        <PageHeader
+          title={project?.name || "Projeto"}
+          breadcrumbs={[
+            { label: "Projetos", href: "/projetos" },
+            { label: project?.name || "Projeto" }
+          ]}
+          actions={sprintActions}
+        />
+      )}
 
       <div className="px-6 pt-4 space-y-4">
         <div className="flex flex-wrap items-center gap-4 bg-muted/30 p-3 rounded-lg">
@@ -637,4 +649,9 @@ export default function KanbanPage() {
       </Dialog>
     </div>
   );
+}
+
+// Wrapper padrão para navegação via rota /projetos/:id
+export default function KanbanPage() {
+  return <KanbanContent />;
 }

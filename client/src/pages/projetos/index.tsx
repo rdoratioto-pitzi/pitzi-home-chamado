@@ -1,25 +1,49 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, FolderKanban, Calendar, Users, Edit2 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Plus,
+  Search,
+  FolderKanban,
+  Calendar,
+  Users,
+  Edit2,
+  ChevronRight,
+  LayoutGrid,
+} from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Project, User } from "@shared/schema";
 import { ProjectDialog } from "./project-dialog";
-import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { stripHtml, isEmptyHtml } from "@/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { stripHtml, isEmptyHtml, cn } from "@/lib/utils";
+import { KanbanContent } from "./kanban";
 
 const statusColors: Record<string, string> = {
-  active: "bg-green-500/10 text-green-600 dark:text-green-400",
-  sprint_active: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  planning: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-  on_hold: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
-  completed: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-  archived: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+  active: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800",
+  sprint_active: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+  planning: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800",
+  on_hold: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
+  completed: "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800",
+  archived: "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800",
+};
+
+const statusDotColors: Record<string, string> = {
+  active: "bg-green-500",
+  sprint_active: "bg-blue-500",
+  planning: "bg-indigo-500",
+  on_hold: "bg-yellow-500",
+  completed: "bg-purple-500",
+  archived: "bg-slate-400",
 };
 
 const statusLabels: Record<string, string> = {
@@ -27,15 +51,17 @@ const statusLabels: Record<string, string> = {
   sprint_active: "Em Andamento",
   planning: "Planejamento",
   on_hold: "Pausado",
-  completed: "Sprint Finalizada",
+  completed: "Concluído",
   archived: "Arquivado",
 };
 
 export default function ProjetosPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | undefined>();
+  const [editingProject, setEditingProject] = useState<Project | undefined>();
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterOwner, setFilterOwner] = useState<string>("all");
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -45,31 +71,46 @@ export default function ProjetosPage() {
     queryKey: ["/api/users"],
   });
 
+  const filteredProjects = useMemo(() =>
+    projects.filter((p) => {
+      const matchesSearch =
+        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.description ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = filterStatus === "all" || p.status === filterStatus;
+      const matchesOwner = filterOwner === "all" || p.ownerId === filterOwner;
+      return matchesSearch && matchesStatus && matchesOwner;
+    }),
+    [projects, searchQuery, filterStatus, filterOwner]
+  );
+
+  const selectedProject = projects.find((p) => p.id === selectedProjectId);
+
   const handleNewProject = () => {
-    setSelectedProject(undefined);
+    setEditingProject(undefined);
     setIsDialogOpen(true);
   };
 
   const handleEditProject = (e: React.MouseEvent, project: Project) => {
-    e.preventDefault();
     e.stopPropagation();
-    setSelectedProject(project);
+    setEditingProject(project);
     setIsDialogOpen(true);
   };
 
-  const filteredProjects = projects.filter((project) => {
-    const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = filterStatus === "all" || project.status === filterStatus;
-    return matchesSearch && matchesStatus;
-  });
+  const handleDialogClose = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) setEditingProject(undefined);
+  };
 
-  const activeProjects = projects.filter(p => p.status === "active").length;
+  // Owners únicos para o filtro
+  const owners = useMemo(() =>
+    users.filter((u) => projects.some((p) => p.ownerId === u.id)),
+    [users, projects]
+  );
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader 
-        title="Projetos" 
+      <PageHeader
+        title="Projetos"
         breadcrumbs={[{ label: "Projetos" }]}
         actions={
           <Button onClick={handleNewProject} data-testid="button-new-project">
@@ -79,129 +120,263 @@ export default function ProjetosPage() {
         }
       />
 
-      <main className="flex-1 p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Seus Projetos</h2>
-            <p className="text-muted-foreground">
-              {activeProjects} projeto{activeProjects !== 1 ? "s" : ""} ativo{activeProjects !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative w-full sm:w-auto">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      {/* Layout: Sidebar + Painel Central */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ─── Sidebar de Projetos ─────────────────────────────────────── */}
+        <aside className="w-64 flex-shrink-0 border-r flex flex-col bg-muted/20 overflow-hidden">
+          {/* Busca */}
+          <div className="p-3 border-b">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
-                placeholder="Buscar projetos..."
+                placeholder="Buscar..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-full sm:w-[250px]"
+                className="pl-8 h-8 text-sm"
                 data-testid="input-search-projects"
               />
             </div>
+          </div>
+
+          {/* Filtros */}
+          <div className="p-3 border-b space-y-2">
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[180px]" data-testid="select-filter-status">
+              <SelectTrigger className="h-8 text-xs" data-testid="select-filter-status">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
                 {Object.entries(statusLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={filterOwner} onValueChange={setFilterOwner}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Responsáveis</SelectItem>
+                {owners.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-        </div>
 
-        {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-48" />
-            ))}
+          {/* Contagem */}
+          <div className="px-3 py-2 border-b">
+            <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+              {filteredProjects.length} projeto{filteredProjects.length !== 1 ? "s" : ""}
+            </p>
           </div>
-        ) : filteredProjects.length === 0 ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <FolderKanban className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium">Nenhum projeto encontrado</h3>
-              <p className="text-muted-foreground mt-1">
-                {projects.length === 0 
-                  ? "Crie seu primeiro projeto clicando no botão acima"
-                  : "Tente ajustar sua busca"}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects.map((project) => {
-              const owner = users.find(u => u.id === project.ownerId);
-              return (
-                <Link key={project.id} href={`/projetos/${project.id}`}>
-                  <Card 
-                    className="shadow-sm border-border/60 cursor-pointer transition-all duration-200 hover:shadow-lg hover:border-primary/30 h-full relative group"
-                    data-testid={`card-project-${project.id}`}
-                  >
-                    <div className="absolute top-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm border shadow-sm"
+
+          {/* Lista de Projetos */}
+          <ScrollArea className="flex-1">
+            {isLoading ? (
+              <div className="p-3 space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-12 w-full rounded-md" />
+                ))}
+              </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="p-4 text-center">
+                <FolderKanban className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">
+                  {projects.length === 0
+                    ? "Nenhum projeto ainda"
+                    : "Nenhum resultado"}
+                </p>
+              </div>
+            ) : (
+              <div className="p-2 space-y-0.5">
+                {filteredProjects.map((project) => {
+                  const isSelected = selectedProjectId === project.id;
+                  return (
+                    <button
+                      key={project.id}
+                      onClick={() =>
+                        setSelectedProjectId(isSelected ? null : project.id)
+                      }
+                      className={cn(
+                        "w-full text-left px-3 py-2.5 rounded-md flex items-start gap-2.5 transition-all duration-150 group relative",
+                        isSelected
+                          ? "bg-primary/10 border border-primary/20 text-primary"
+                          : "hover:bg-muted/60 border border-transparent"
+                      )}
+                      data-testid={`sidebar-project-${project.id}`}
+                    >
+                      {/* Indicador de status */}
+                      <span
+                        className={cn(
+                          "mt-1.5 w-2 h-2 rounded-full flex-shrink-0",
+                          statusDotColors[project.status] ?? "bg-slate-400"
+                        )}
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={cn(
+                            "text-sm font-medium truncate leading-snug",
+                            isSelected ? "text-primary" : "text-foreground"
+                          )}
+                        >
+                          {project.name}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {statusLabels[project.status]}
+                        </p>
+                      </div>
+
+                      {/* Botão de editar (hover) */}
+                      <button
                         onClick={(e) => handleEditProject(e, project)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted flex-shrink-0"
+                        title="Editar projeto"
                         data-testid={`button-edit-project-${project.id}`}
                       >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <CardHeader className="pb-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <CardTitle className="text-[18px] font-bold">{project.name}</CardTitle>
-                           <CardDescription className="text-[13px] mt-1 line-clamp-2">
-                             {isEmptyHtml(project.description) ? "Sem descrição" : stripHtml(project.description)}
-                           </CardDescription>
-                        </div>
-                        <Badge variant="outline" className={statusColors[project.status]}>
-                          {statusLabels[project.status]}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <div className="flex items-center gap-1">
-                              <span>
-                                {project.startDate 
-                                  ? new Date(project.startDate).toLocaleDateString("pt-BR") 
-                                  : "Sem data"}
-                              </span>
-                              {project.endDate && (
-                                <>
-                                  <span>-</span>
-                                  <span>{new Date(project.endDate).toLocaleDateString("pt-BR")}</span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Users className="h-4 w-4" />
-                            <span>{owner?.name || "1 membro"}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </main>
+                        <Edit2 className="h-3 w-3 text-muted-foreground" />
+                      </button>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
 
-      <ProjectDialog 
-        open={isDialogOpen} 
-        onOpenChange={setIsDialogOpen} 
-        project={selectedProject} 
+          {/* Footer: novo projeto */}
+          <div className="p-3 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start gap-2 text-xs h-8"
+              onClick={handleNewProject}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Novo Projeto
+            </Button>
+          </div>
+        </aside>
+
+        {/* ─── Painel Central ──────────────────────────────────────────── */}
+        <main className="flex-1 overflow-hidden flex flex-col">
+          {selectedProject ? (
+            <>
+              {/* Mini-header do projeto selecionado */}
+              <div className="flex items-center justify-between px-6 py-3 border-b bg-background flex-shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div
+                    className={cn(
+                      "w-2.5 h-2.5 rounded-full flex-shrink-0",
+                      statusDotColors[selectedProject.status] ?? "bg-slate-400"
+                    )}
+                  />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="font-semibold text-base truncate">
+                        {selectedProject.name}
+                      </h2>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-[10px] h-5 px-2 flex-shrink-0",
+                          statusColors[selectedProject.status]
+                        )}
+                      >
+                        {statusLabels[selectedProject.status]}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5 text-[11px] text-muted-foreground">
+                      {selectedProject.startDate && (
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(selectedProject.startDate).toLocaleDateString("pt-BR")}
+                          {selectedProject.endDate && (
+                            <> — {new Date(selectedProject.endDate).toLocaleDateString("pt-BR")}</>
+                          )}
+                        </span>
+                      )}
+                      {selectedProject.ownerId && (
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {users.find((u) => u.id === selectedProject.ownerId)?.name ?? ""}
+                        </span>
+                      )}
+                      {!isEmptyHtml(selectedProject.description) && (
+                        <span className="truncate max-w-[280px]">
+                          {stripHtml(selectedProject.description)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-shrink-0 gap-1.5 text-xs h-8"
+                  onClick={(e) => handleEditProject(e, selectedProject)}
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                  Editar
+                </Button>
+              </div>
+
+              {/* Kanban embarcado — ocupa o restante da altura */}
+              <div className="flex-1 overflow-hidden">
+                <KanbanContent embeddedProjectId={selectedProject.id} />
+              </div>
+            </>
+          ) : (
+            /* Empty state quando nenhum projeto selecionado */
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center max-w-sm px-4">
+                <div className="relative mx-auto mb-6 w-20 h-20">
+                  <div className="absolute inset-0 bg-primary/10 rounded-2xl rotate-6" />
+                  <div className="absolute inset-0 bg-primary/5 rounded-2xl -rotate-3" />
+                  <div className="relative flex items-center justify-center h-full">
+                    <LayoutGrid className="h-10 w-10 text-primary/60" />
+                  </div>
+                </div>
+                <h3 className="text-lg font-semibold text-foreground">
+                  Selecione um projeto
+                </h3>
+                <p className="text-muted-foreground text-sm mt-2 leading-relaxed">
+                  Escolha um projeto na barra lateral para visualizar e
+                  gerenciar seus cards, sprints e métricas.
+                </p>
+                <div className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
+                  <Button onClick={handleNewProject} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Criar Projeto
+                  </Button>
+                  {filteredProjects.length > 0 && (
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() =>
+                        setSelectedProjectId(filteredProjects[0].id)
+                      }
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                      Abrir Primeiro
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+
+      <ProjectDialog
+        open={isDialogOpen}
+        onOpenChange={handleDialogClose}
+        project={editingProject}
       />
     </div>
   );
