@@ -11,10 +11,11 @@ export function registerFlowchartRoutes(router: Router) {
   router.get("/api/flowcharts", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
-      
+      const source = req.query.source as string | undefined;
+
       // Buscar todos os fluxogramas não-templates
       // O usuário deve ver: seus próprios + públicos + compartilhados com ele
-      const allFlowcharts = await storage.getFlowcharts();
+      const allFlowcharts = await storage.getFlowcharts(undefined, source);
       
       // Filtrar para mostrar apenas:
       // 1. Fluxogramas do usuário atual (ownerId)
@@ -87,8 +88,8 @@ export function registerFlowchartRoutes(router: Router) {
   router.post("/api/flowcharts", requireAuth, async (req, res) => {
     try {
       const { userId } = getSessionUser(req);
-      const { title, description, visibility, nodesData, edgesData, viewport, tenantId } = req.body;
-      
+      const { title, description, visibility, nodesData, edgesData, viewport, tenantId, source } = req.body;
+
       const newFlowchart = await storage.createFlowchart({
         title,
         description,
@@ -99,6 +100,7 @@ export function registerFlowchartRoutes(router: Router) {
         edgesData: edgesData || null,
         viewport: viewport || null,
         isTemplate: false,
+        source: source || 'reactflow',
       });
       
       res.status(201).json(newFlowchart);

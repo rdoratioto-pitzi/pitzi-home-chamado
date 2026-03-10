@@ -49,6 +49,7 @@ export type ModulePermissions = {
   okrs: boolean;
   metas: boolean;
   fluxogramas: boolean;
+  diagramas: boolean;
   logistica: boolean;
   pricing: boolean;
   conhecimento: boolean;
@@ -981,6 +982,7 @@ export const flowcharts = pgTable("flowcharts", {
   isTemplate: boolean("is_template").default(false),
   templateCategory: text("template_category"),
   thumbnail: text("thumbnail"),
+  source: text("source").notNull().default("reactflow"), // "reactflow" | "excalidraw"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

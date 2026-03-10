@@ -1722,14 +1722,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Flowcharts
-  async getFlowcharts(ownerId?: string): Promise<Flowchart[]> {
+  async getFlowcharts(ownerId?: string, source?: string): Promise<Flowchart[]> {
     if (!db) throw new Error("Database not connected");
-    if (ownerId) {
-      return await db.select().from(flowcharts).where(
-        and(eq(flowcharts.ownerId, ownerId), eq(flowcharts.isTemplate, false))
-      ).orderBy(sql`${flowcharts.updatedAt} DESC`);
-    }
-    return await db.select().from(flowcharts).where(eq(flowcharts.isTemplate, false)).orderBy(sql`${flowcharts.updatedAt} DESC`);
+    const conditions = [eq(flowcharts.isTemplate, false)];
+    if (source) conditions.push(eq(flowcharts.source, source));
+    if (ownerId) conditions.push(eq(flowcharts.ownerId, ownerId));
+    return await db.select().from(flowcharts).where(and(...conditions)).orderBy(sql`${flowcharts.updatedAt} DESC`);
   }
 
   async getFlowchart(id: string): Promise<Flowchart | undefined> {
