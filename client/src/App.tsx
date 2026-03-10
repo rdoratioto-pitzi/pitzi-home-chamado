@@ -61,6 +61,8 @@ const BibliotecaFavoritosPage          = lazy(() => import("@/pages/biblioteca/f
 const BibliotecaPromptsPage            = lazy(() => import("@/pages/biblioteca/prompts"));
 const FluxogramasPage                  = lazy(() => import("@/pages/fluxogramas/index"));
 const FlowchartEditorPage              = lazy(() => import("@/pages/fluxogramas/editor"));
+const DiagramasPage                    = lazy(() => import("@/pages/diagramas/index"));
+const DiagramaEditorPage               = lazy(() => import("@/pages/diagramas/editor"));
 const UpdatesPage                      = lazy(() => import("@/pages/updates/index"));
 const GitAnalyticsPage                 = lazy(() => import("@/pages/git-analytics/index"));
 const EstoquesPosicaoPage              = lazy(() => import("@/pages/estoques/posicao"));
@@ -148,6 +150,16 @@ function Router() {
       <Route path="/fluxogramas/:id">
         <ProtectedRoute requiredPermission="fluxogramas">
           <FlowchartEditorPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/diagramas">
+        <ProtectedRoute requiredPermission="diagramas">
+          <DiagramasPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/diagramas/:id">
+        <ProtectedRoute requiredPermission="diagramas">
+          <DiagramaEditorPage />
         </ProtectedRoute>
       </Route>
       <Route path="/metas">
