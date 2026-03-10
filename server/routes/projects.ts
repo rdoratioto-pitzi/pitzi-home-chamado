@@ -6,6 +6,8 @@ import {
   insertKanbanColumnSchema,
   insertKanbanCardSchema,
   insertKanbanCommentSchema,
+  insertKanbanLabelSchema,
+  insertKanbanCardDependencySchema,
 } from "@shared/schema";
 import { getSessionUser, requireAuth } from "../middleware/auth";
 import { sendMentionNotificationEmail } from "../email-service";
@@ -460,5 +462,117 @@ export function registerProjectRoutes(router: Router) {
       }
       res.status(400).json({ error: "Failed to create comment" });
     }
+  });
+
+  // ============ KANBAN LABELS ============
+  router.get("/api/projects/:id/labels", requireAuth, async (req, res) => {
+    const labels = await storage.getKanbanLabels(getId(req));
+    res.json(labels);
+  });
+
+  router.post("/api/projects/:id/labels", requireAuth, async (req, res) => {
+    try {
+      const validated = insertKanbanLabelSchema.parse({
+        ...req.body,
+        projectId: getId(req),
+      });
+      const label = await storage.createKanbanLabel(validated);
+      res.status(201).json(label);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create label" });
+    }
+  });
+
+  router.patch("/api/labels/:id", requireAuth, async (req, res) => {
+    const updated = await storage.updateKanbanLabel(getId(req), req.body);
+    if (!updated) return res.status(404).json({ error: "Label not found" });
+    res.json(updated);
+  });
+
+  router.delete("/api/labels/:id", requireAuth, async (req, res) => {
+    const deleted = await storage.deleteKanbanLabel(getId(req));
+    if (!deleted) return res.status(404).json({ error: "Label not found" });
+    res.status(204).send();
+  });
+
+  // ============ KANBAN CARD DEPENDENCIES ============
+  router.get("/api/cards/:id/dependencies", requireAuth, async (req, res) => {
+    const deps = await storage.getCardDependencies(getId(req));
+    res.json(deps);
+  });
+
+  router.get("/api/projects/:id/blocked-cards", requireAuth, async (req, res) => {
+    const blockedIds = await storage.getProjectBlockedCardIds(getId(req));
+    res.json(Array.from(blockedIds));
+  });
+
+  router.post("/api/cards/:id/dependencies", requireAuth, async (req, res) => {
+    try {
+      const cardId = getId(req);
+      const card = await storage.getKanbanCard(cardId);
+      if (!card) return res.status(404).json({ error: "Card not found" });
+
+      const { blockingCardId, blockedCardId } = req.body;
+      const validated = insertKanbanCardDependencySchema.parse({
+        blockingCardId: blockingCardId ?? cardId,
+        blockedCardId: blockedCardId ?? cardId,
+        projectId: card.projectId,
+      });
+      const dep = await storage.addCardDependency(validated);
+      res.status(201).json(dep);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create dependency" });
+    }
+  });
+
+  router.delete("/api/card-dependencies/:id", requireAuth, async (req, res) => {
+    const deleted = await storage.removeCardDependency(getId(req));
+    if (!deleted) return res.status(404).json({ error: "Dependency not found" });
+    res.status(204).send();
+  });
+
+  // ============ PROJECT METRICS ============
+  router.get("/api/projects/:id/metrics", requireAuth, async (req, res) => {
+    const projectId = getId(req);
+    const [cards, columns] = await Promise.all([
+      storage.getKanbanCards(projectId),
+      storage.getKanbanColumns(projectId),
+    ]);
+
+    const cardsByColumn = columns.map(col => ({
+      columnId: col.id,
+      columnName: col.name,
+      count: cards.filter(c => c.columnId === col.id).length,
+    }));
+
+    const priorityCounts: Record<string, number> = {};
+    for (const card of cards) {
+      priorityCounts[card.priority] = (priorityCounts[card.priority] ?? 0) + 1;
+    }
+    const cardsByPriority = Object.entries(priorityCounts).map(([priority, count]) => ({ priority, count }));
+
+    const assigneeCounts: Record<string, number> = {};
+    for (const card of cards) {
+      if (card.assigneeId) {
+        assigneeCounts[card.assigneeId] = (assigneeCounts[card.assigneeId] ?? 0) + 1;
+      }
+    }
+
+    const now = new Date();
+    const overdue = cards.filter(c => c.dueDate && new Date(c.dueDate) < now).length;
+
+    res.json({
+      totalCards: cards.length,
+      cardsByColumn,
+      cardsByPriority,
+      cardsByAssignee: assigneeCounts,
+      overdue,
+    });
   });
 }
