@@ -360,103 +360,102 @@ export function registerTaskRoutes(router: Router) {
 
   // ============== TASKS ==============
   router.get("/api/tasks", requireAuth, async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
 
-    // TODOS os usuários (incluindo admin) seguem a MESMA regra de segurança:
-    // Admin NÃO tem acesso especial a itens privados de outros usuários
+      // TODOS os usuários (incluindo admin) seguem a MESMA regra de segurança:
+      // Admin NÃO tem acesso especial a itens privados de outros usuários
 
-    // Regras de visibilidade:
-    // - private: Apenas o criador vê
-    // - shared: Criador + usuários em áreas acessíveis
-    // - public: Todos veem
+      // Regras de visibilidade:
+      // - private: Apenas o criador vê
+      // - shared: Criador + usuários em áreas acessíveis
+      // - public: Todos veem
 
-    const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
+      const accessibleAreaIds = await getUserAccessibleAreaIds(userId);
 
-    // Construir query segura
-    const conditions = [];
+      // Construir query segura
+      const conditions = [];
 
-    // Aplicar filtros de query string
-    if (req.query.tagId) conditions.push(eq(tasks.tagId, req.query.tagId as string));
-    if (req.query.status) conditions.push(eq(tasks.status, req.query.status as string));
-    if (req.query.assignee_id) conditions.push(eq(tasks.assigneeId, req.query.assignee_id as string));
-    if (req.query.created_by) conditions.push(eq(tasks.createdBy, req.query.created_by as string));
-    if (req.query.type) conditions.push(eq(tasks.type, req.query.type as string));
+      // Aplicar filtros de query string
+      if (req.query.tagId) conditions.push(eq(tasks.tagId, req.query.tagId as string));
+      if (req.query.status) conditions.push(eq(tasks.status, req.query.status as string));
+      if (req.query.assignee_id) conditions.push(eq(tasks.assigneeId, req.query.assignee_id as string));
+      if (req.query.created_by) conditions.push(eq(tasks.createdBy, req.query.created_by as string));
+      if (req.query.type) conditions.push(eq(tasks.type, req.query.type as string));
 
-    // FILTRO DE SEGURANÇA CRÍTICO:
-    // Usuário (incluindo admin) vê apenas:
-    // 1. Tarefas criadas por ele (todas, incluindo privadas)
-    // 2. Tarefas atribuídas a ele (exceto privadas de outros)
-    // 3. Tarefas compartilhadas (shared) em áreas acessíveis
-    // 4. Tarefas públicas (public) de qualquer área
-    const securityConditions = [
-      // 1. Próprias tarefas (incluindo privadas) - sempre visíveis para o criador
-      eq(tasks.createdBy, userId),
-      
-      // 2. Tarefas atribuídas ao usuário, mas NÃO privadas de outros
-      and(
-        eq(tasks.assigneeId, userId),
-        sql`${tasks.createdBy} = ${userId} OR ${tasks.visibility} != 'private'`
-      ),
-    ];
+      // FILTRO DE SEGURANÇA CRÍTICO:
+      // Usuário (incluindo admin) vê apenas:
+      // 1. Tarefas criadas por ele (todas, incluindo privadas)
+      // 2. Tarefas atribuídas a ele (exceto privadas de outros)
+      // 3. Tarefas compartilhadas (shared) em áreas acessíveis
+      // 4. Tarefas públicas (public) de qualquer área
+      const securityConditions = [
+        // 1. Próprias tarefas (incluindo privadas) - sempre visíveis para o criador
+        eq(tasks.createdBy, userId),
 
-    // 3. TODAS as tarefas em áreas acessíveis (tags compartilhadas onde o usuário é membro)
-    // IMPORTANTE: Se o usuário tem acesso a uma tag, ele deve ver TODAS as reuniões/tarefas
-    // dessa tag, independente da visibilidade da tarefa (private, shared ou public)
-    if (accessibleAreaIds.length > 0) {
-      securityConditions.push(
-        or(...accessibleAreaIds.map(areaId => eq(tasks.tagId, areaId)))
-      );
-    }
+        // 2. Tarefas atribuídas ao usuário, mas NÃO privadas de outros
+        and(
+          eq(tasks.assigneeId, userId),
+          sql`${tasks.createdBy} = ${userId} OR ${tasks.visibility} != 'private'`
+        ),
+      ];
 
-    // 4. Tarefas públicas - todos podem ver
-    securityConditions.push(eq(tasks.visibility, 'public'));
-
-    conditions.push(or(...securityConditions));
-
-    const userTasks = await storage.getTasksWithConditions(and(...(conditions || []))) as Task[];
-
-    // Filtrar por multi-assignee em memória (não é possível fazer no SQL diretamente)
-    // Inclui tarefas onde o usuário está na lista de assigneeIds E tem acesso à tag
-    const multiAssigneeTasks = await storage.getTasksWithConditions(
-      and(
-        sql`${tasks.assigneeIds} IS NOT NULL`,
-        or(
-          sql`${tasks.visibility} != 'private'`,
-          eq(tasks.createdBy, userId)
-        )
-      )
-    ) as Task[];
-
-    const filteredMultiAssignee = multiAssigneeTasks.filter((t: Task) => {
-      if (!t.assigneeIds) return false;
-      // Não incluir tarefas privadas de outros usuários, EXCETO se o usuário tem acesso à tag
-      if (t.visibility === 'private' && t.createdBy !== userId) {
-        // Verificar se o usuário tem acesso à tag da tarefa
-        if (t.tagId && accessibleAreaIds.includes(t.tagId)) {
-          // Usuário tem acesso à tag, pode ver a tarefa
-        } else {
-          return false;
-        }
+      // 3. TODAS as tarefas em áreas acessíveis (tags compartilhadas onde o usuário é membro)
+      // IMPORTANTE: Se o usuário tem acesso a uma tag, ele deve ver TODAS as reuniões/tarefas
+      // dessa tag, independente da visibilidade da tarefa (private, shared ou public)
+      if (accessibleAreaIds.length > 0) {
+        securityConditions.push(
+          or(...accessibleAreaIds.map(areaId => eq(tasks.tagId, areaId)))
+        );
       }
-      try {
-        const ids = typeof t.assigneeIds === 'string' ? JSON.parse(t.assigneeIds) : t.assigneeIds;
-        return Array.isArray(ids) && ids.includes(userId);
-      } catch (e) { return false; }
-    });
 
-    // Combinar resultados sem duplicatas
-    const taskMap = new Map<string, Task>();
-    userTasks.forEach((t: Task) => taskMap.set(t.id, t));
-    multiAssigneeTasks.forEach((t: Task) => taskMap.set(t.id, t));
-    const finalTasks = Array.from(taskMap.values());
+      // 4. Tarefas públicas - todos podem ver
+      securityConditions.push(eq(tasks.visibility, 'public'));
 
-    // Logs de auditoria
-    const ownTasks = finalTasks.filter(t => t.createdBy === userId).length;
-    const assignedTasks = finalTasks.filter(t => t.assigneeId === userId && t.createdBy !== userId).length;
-    const sharedTasks = finalTasks.filter(t => t.visibility === 'shared' && t.createdBy !== userId).length;
-    const publicTasks = finalTasks.filter(t => t.visibility === 'public' && t.createdBy !== userId).length;
+      conditions.push(or(...securityConditions));
 
-    res.json(finalTasks);
+      const userTasks = await storage.getTasksWithConditions(and(...(conditions || []))) as Task[];
+
+      // Filtrar por multi-assignee em memória (não é possível fazer no SQL diretamente)
+      // Inclui tarefas onde o usuário está na lista de assigneeIds E tem acesso à tag
+      const multiAssigneeTasks = await storage.getTasksWithConditions(
+        and(
+          sql`${tasks.assigneeIds} IS NOT NULL`,
+          or(
+            sql`${tasks.visibility} != 'private'`,
+            eq(tasks.createdBy, userId)
+          )
+        )
+      ) as Task[];
+
+      const filteredMultiAssignee = multiAssigneeTasks.filter((t: Task) => {
+        if (!t.assigneeIds) return false;
+        // Não incluir tarefas privadas de outros usuários, EXCETO se o usuário tem acesso à tag
+        if (t.visibility === 'private' && t.createdBy !== userId) {
+          // Verificar se o usuário tem acesso à tag da tarefa
+          if (t.tagId && accessibleAreaIds.includes(t.tagId)) {
+            // Usuário tem acesso à tag, pode ver a tarefa
+          } else {
+            return false;
+          }
+        }
+        try {
+          const ids = typeof t.assigneeIds === 'string' ? JSON.parse(t.assigneeIds) : t.assigneeIds;
+          return Array.isArray(ids) && ids.includes(userId);
+        } catch (e) { return false; }
+      });
+
+      // Combinar resultados sem duplicatas
+      const taskMap = new Map<string, Task>();
+      userTasks.forEach((t: Task) => taskMap.set(t.id, t));
+      multiAssigneeTasks.forEach((t: Task) => taskMap.set(t.id, t));
+      const finalTasks = Array.from(taskMap.values());
+
+      res.json(finalTasks);
+    } catch (error: any) {
+      console.error("Erro ao buscar tarefas:", error);
+      res.status(500).json({ error: "Erro ao buscar tarefas" });
+    }
   });
 
   router.get("/api/tasks/:id", requireAuth, async (req, res) => {
