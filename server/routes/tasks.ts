@@ -921,6 +921,47 @@ export function registerTaskRoutes(router: Router) {
     }
   });
 
+  router.put("/api/task-templates/:id", requireAuth, async (req, res) => {
+    try {
+      const template = await storage.updateTaskTemplate(getId(req), req.body);
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      res.json(template);
+    } catch (error) {
+      console.error("[tasks] Error updating template:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.post("/api/task-templates/:id/set-default", requireAuth, async (req, res) => {
+    try {
+      const template = await storage.getTaskTemplate(getId(req));
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      const success = await storage.setDefaultTaskTemplate(template.id, template.type);
+      if (!success) return res.status(500).json({ error: "Failed to set default template" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[tasks] Error setting default template:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.delete("/api/task-templates/:id/set-default", requireAuth, async (req, res) => {
+    try {
+      const success = await storage.unsetDefaultTaskTemplate(getId(req));
+      if (!success) return res.status(404).json({ error: "Template not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[tasks] Error unsetting default template:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.delete("/api/task-templates/:id", requireAuth, async (req, res) => {
+    const success = await storage.deleteTaskTemplate(getId(req));
+    if (!success) return res.status(404).json({ error: "Template not found" });
+    res.json({ success: true });
+  });
+
   // ============== AREA TASKS (convenient endpoint) ==============
   router.get("/api/task-tags/:id/tasks", requireAuth, async (req, res) => {
     const { userId } = getSessionUser(req);
