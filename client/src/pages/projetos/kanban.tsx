@@ -344,11 +344,11 @@ export function KanbanContent({ embeddedProjectId }: KanbanPageProps) {
   };
 
   const filteredCards = cards.filter(card => {
-    const matchesSearch = card.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const matchesSearch = card.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          card.code.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesPriority = filterPriority === "all" || card.priority === filterPriority;
     const matchesAssignee = filterAssignee === "all" || card.assigneeId === filterAssignee;
-    const matchesStatus = filterStatus === "all" || card.columnId === filterStatus;
+    const matchesStatus = filterStatus === "all" || (card.status || "todo") === filterStatus;
     return matchesSearch && matchesPriority && matchesAssignee && matchesStatus;
   });
 
@@ -503,11 +503,55 @@ export function KanbanContent({ embeddedProjectId }: KanbanPageProps) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os Status</SelectItem>
-              {sortedColumns.map(col => (
-                <SelectItem key={col.id} value={col.id}>{col.name}</SelectItem>
-              ))}
+              <SelectItem value="todo">A Fazer</SelectItem>
+              <SelectItem value="doing">Em Andamento</SelectItem>
+              <SelectItem value="done">Concluído</SelectItem>
             </SelectContent>
           </Select>
+
+          {viewMode === "kanban" && project?.status !== "completed" && (
+            <Button
+              onClick={() => setIsColumnDialogOpen(true)}
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              data-testid="button-add-column"
+            >
+              <Plus className="h-4 w-4" />
+              Nova Coluna
+            </Button>
+          )}
+
+          {isEmbedded && (
+            <div className="ml-auto">
+              {project?.status === "completed" ? (
+                <Badge variant="secondary" className="bg-green-100 text-green-700">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Sprint Finalizada
+                </Badge>
+              ) : project?.status === "sprint_active" ? (
+                <Button
+                  onClick={() => sprintMutation.mutate("completed")}
+                  variant="outline"
+                  size="sm"
+                  className="text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  <Square className="h-3.5 w-3.5 mr-1.5" />
+                  Finalizar Sprint
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => sprintMutation.mutate("sprint_active")}
+                  variant="outline"
+                  size="sm"
+                  className="text-green-600 border-green-200 hover:bg-green-50"
+                >
+                  <Play className="h-3.5 w-3.5 mr-1.5" />
+                  Iniciar Sprint
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

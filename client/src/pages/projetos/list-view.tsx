@@ -17,9 +17,11 @@ import {
   Hash,
   User as UserIcon,
   Calendar,
-  BarChart2,
   Lock,
   CheckSquare,
+  Circle,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import type { KanbanCard, KanbanColumn, User, KanbanLabel } from "@shared/schema";
 
@@ -46,6 +48,12 @@ const priorityLabels: Record<string, string> = {
   normal: "Normal",
 };
 
+const statusGroups = [
+  { key: "todo",  label: "A Fazer",      Icon: Circle,       badgeClass: "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400" },
+  { key: "doing", label: "Em Andamento", Icon: Clock,        badgeClass: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400" },
+  { key: "done",  label: "Concluído",    Icon: CheckCircle2, badgeClass: "bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-400" },
+];
+
 function parseJson<T>(str: unknown, fallback: T): T {
   try { return str ? JSON.parse(str as string) as T : fallback; }
   catch { return fallback; }
@@ -55,17 +63,18 @@ interface CardRowProps {
   card: KanbanCard;
   users: User[];
   labels: KanbanLabel[];
+  columns: KanbanColumn[];
   isBlocked: boolean;
   onClick: () => void;
 }
 
-function CardRow({ card, users, labels, isBlocked, onClick }: CardRowProps) {
+function CardRow({ card, users, labels, columns, isBlocked, onClick }: CardRowProps) {
   const assignee = users.find(u => u.id === card.assigneeId);
+  const column = columns.find(c => c.id === card.columnId);
   const checklist = parseJson<ChecklistItem[]>(card.checklist, []);
   const labelIds = parseJson<string[]>(card.labelIds, []);
   const cardLabels = labels.filter(l => labelIds.includes(l.id));
   const checklistDone = checklist.filter(i => i.done).length;
-  const subtaskCount = 0; // cards de Kanban usam parentCardId
 
   return (
     <TableRow
@@ -80,13 +89,10 @@ function CardRow({ card, users, labels, isBlocked, onClick }: CardRowProps) {
       </TableCell>
 
       {/* Título */}
-      <TableCell>
+      <TableCell className="min-w-[200px]">
         <div className="flex items-center gap-2 min-w-0">
-          {isBlocked && (
-            <Lock className="h-3 w-3 text-red-500 flex-shrink-0" />
-          )}
-          <span className="text-sm font-medium truncate max-w-[280px]">{card.title}</span>
-          {/* Labels coloridas */}
+          {isBlocked && <Lock className="h-3 w-3 text-red-500 flex-shrink-0" />}
+          <span className="text-sm font-medium line-clamp-2">{card.title}</span>
           {cardLabels.length > 0 && (
             <div className="flex gap-0.5 flex-shrink-0">
               {cardLabels.slice(0, 3).map(label => (
@@ -100,6 +106,11 @@ function CardRow({ card, users, labels, isBlocked, onClick }: CardRowProps) {
             </div>
           )}
         </div>
+      </TableCell>
+
+      {/* Coluna Kanban */}
+      <TableCell className="w-[130px]">
+        <span className="text-xs text-muted-foreground truncate">{column?.name ?? "—"}</span>
       </TableCell>
 
       {/* Prioridade */}
@@ -123,7 +134,7 @@ function CardRow({ card, users, labels, isBlocked, onClick }: CardRowProps) {
         )}
       </TableCell>
 
-      {/* Data */}
+      {/* Prazo */}
       <TableCell className="w-[100px]">
         {card.dueDate ? (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -154,7 +165,7 @@ function CardRow({ card, users, labels, isBlocked, onClick }: CardRowProps) {
         )}
       </TableCell>
 
-      {/* Checklist badge */}
+      {/* Checklist */}
       <TableCell className="w-[60px]">
         {checklist.length > 0 && (
           <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
@@ -170,62 +181,59 @@ function CardRow({ card, users, labels, isBlocked, onClick }: CardRowProps) {
 }
 
 export function ListView({ cards, columns, users, labels = [], blockedCardIds = new Set(), onEditCard }: ListViewProps) {
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(
-    Object.fromEntries(columns.map(col => [col.id, true]))
-  );
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    todo: true, doing: true, done: true,
+  });
 
-  const toggleGroup = (colId: string) => {
-    setOpenGroups(prev => ({ ...prev, [colId]: !prev[colId] }));
+  const toggleGroup = (key: string) => {
+    setOpenGroups(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   return (
     <div className="space-y-3 pb-6">
-      {columns.map(column => {
-        const columnCards = cards
-          .filter(c => c.columnId === column.id)
+      {statusGroups.map(({ key, label, Icon, badgeClass }) => {
+        const groupCards = cards
+          .filter(c => (c.status || "todo") === key)
           .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        const isOpen = openGroups[column.id] ?? true;
+        const isOpen = openGroups[key] ?? true;
+        const avgProgress = groupCards.length > 0
+          ? Math.round(groupCards.reduce((acc, c) => acc + (c.progress ?? 0), 0) / groupCards.length)
+          : 0;
 
         return (
-          <div key={column.id} className="border rounded-lg overflow-hidden bg-card">
-            <Collapsible open={isOpen} onOpenChange={() => toggleGroup(column.id)}>
+          <div key={key} className="border rounded-lg overflow-hidden bg-card">
+            <Collapsible open={isOpen} onOpenChange={() => toggleGroup(key)}>
               <CollapsibleTrigger asChild>
                 <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/40 hover:bg-muted/60 cursor-pointer transition-colors border-b">
                   <Button variant="ghost" size="icon" className="h-5 w-5 p-0">
-                    {isOpen ? (
-                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
+                    {isOpen
+                      ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    }
                   </Button>
-                  <span className="text-sm font-semibold">{column.name}</span>
-                  <Badge variant="secondary" className="h-5 text-[10px] ml-1">
-                    {columnCards.length}
+                  <Icon className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-semibold">{label}</span>
+                  <Badge variant="outline" className={`h-5 text-[10px] ml-1 ${badgeClass}`}>
+                    {groupCards.length}
                   </Badge>
-                  {columnCards.length > 0 && (
-                    <div className="ml-auto flex items-center gap-2 text-[10px] text-muted-foreground">
-                      <BarChart2 className="h-3 w-3" />
-                      {columnCards.filter(c => (c.progress ?? 0) > 0).length > 0 && (
-                        <span>
-                          Progresso médio: {Math.round(columnCards.reduce((acc, c) => acc + (c.progress ?? 0), 0) / columnCards.length)}%
-                        </span>
-                      )}
-                    </div>
+                  {avgProgress > 0 && (
+                    <span className="ml-auto text-[10px] text-muted-foreground">
+                      Progresso médio: {avgProgress}%
+                    </span>
                   )}
                 </div>
               </CollapsibleTrigger>
 
               <CollapsibleContent>
-                {columnCards.length > 0 ? (
+                {groupCards.length > 0 ? (
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="w-[90px] text-[10px] uppercase">
-                          <div className="flex items-center gap-1">
-                            <Hash className="h-2.5 w-2.5" /> Código
-                          </div>
+                          <div className="flex items-center gap-1"><Hash className="h-2.5 w-2.5" /> Código</div>
                         </TableHead>
                         <TableHead className="text-[10px] uppercase">Título</TableHead>
+                        <TableHead className="w-[130px] text-[10px] uppercase">Coluna</TableHead>
                         <TableHead className="w-[120px] text-[10px] uppercase">Prioridade</TableHead>
                         <TableHead className="w-[120px] text-[10px] uppercase">Responsável</TableHead>
                         <TableHead className="w-[100px] text-[10px] uppercase">Prazo</TableHead>
@@ -236,12 +244,13 @@ export function ListView({ cards, columns, users, labels = [], blockedCardIds = 
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {columnCards.map(card => (
+                      {groupCards.map(card => (
                         <CardRow
                           key={card.id}
                           card={card}
                           users={users}
                           labels={labels}
+                          columns={columns}
                           isBlocked={blockedCardIds.has(card.id)}
                           onClick={() => onEditCard(card)}
                         />
@@ -250,7 +259,7 @@ export function ListView({ cards, columns, users, labels = [], blockedCardIds = 
                   </Table>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    Nenhum card nesta coluna
+                    Nenhum card com este status
                   </p>
                 )}
               </CollapsibleContent>

@@ -32,10 +32,20 @@ import { Lock, Globe, X, UserPlus, Users, User as UserIcon } from "lucide-react"
 import { format } from "date-fns";
 import type { User, Project, ProjectMember } from "@shared/schema";
 
+const PROJECT_STATUS_OPTIONS = [
+  { value: "active",         label: "Ativo" },
+  { value: "sprint_active",  label: "Sprint Ativo" },
+  { value: "planning",       label: "Planejamento" },
+  { value: "on_hold",        label: "Em Espera" },
+  { value: "completed",      label: "Concluído" },
+  { value: "archived",       label: "Arquivado" },
+] as const;
+
 const formSchema = z.object({
   name: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
   description: z.string().optional(),
   ownerId: z.string().min(1, "Responsável é obrigatório"),
+  status: z.string().default("active"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   visibility: z.enum(["private", "shared", "public"]).default("private"),
@@ -77,6 +87,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSubmit: externalO
       name: "",
       description: "",
       ownerId: "admin",
+      status: "active",
       startDate: "",
       endDate: "",
       visibility: "private",
@@ -94,6 +105,7 @@ export function ProjectDialog({ open, onOpenChange, project, onSubmit: externalO
           name: project.name,
           description: project.description || "",
           ownerId: project.ownerId,
+          status: project.status || "active",
           startDate: project.startDate ? format(new Date(project.startDate), "yyyy-MM-dd") : "",
           endDate: project.endDate ? format(new Date(project.endDate), "yyyy-MM-dd") : "",
           visibility: (project.visibility as "private" | "shared" | "public") || "private",
@@ -133,7 +145,6 @@ export function ProjectDialog({ open, onOpenChange, project, onSubmit: externalO
         ...data,
         startDate: data.startDate ? new Date(data.startDate).toISOString() : null,
         endDate: data.endDate ? new Date(data.endDate).toISOString() : null,
-        status: project?.status || "active",
         memberIds: data.visibility === "shared" ? memberIds : [],
       };
       
@@ -228,6 +239,34 @@ export function ProjectDialog({ open, onOpenChange, project, onSubmit: externalO
                 </FormItem>
               )}
             />
+
+            {/* Status do Projeto — só exibe ao editar */}
+            {project && (
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status do Projeto</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-project-status">
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {PROJECT_STATUS_OPTIONS.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
