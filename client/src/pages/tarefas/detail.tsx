@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLocation, useParams } from "wouter";
@@ -63,6 +63,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import type { Task, TaskComment, TaskCommentWithUser, TaskReaction, TaskArea, User as UserType } from "@shared/schema";
+import { getCurrentUser } from "@/lib/permissions";
 
 // Função para remover tags HTML e retornar texto puro
 function stripHtml(html: string | null | undefined): string {
@@ -103,6 +104,7 @@ export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const currentUser = useMemo(() => getCurrentUser(), []);
   const [isEditing, setIsEditing] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -137,16 +139,22 @@ export default function TaskDetailPage() {
         status: "todo",
         priority: "medium",
         type: "task",
-        visibility: "private",
-        createdBy: "me",
+        visibility: "shared",
+        createdBy: currentUser?.id ?? "",
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "subtasks"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", id] });
+    },
   });
 
   const updateSubtaskStatusMutation = useMutation({
     mutationFn: async ({ subtaskId, status }: { subtaskId: string; status: string }) =>
       apiRequest("PATCH", `/api/tasks/${subtaskId}`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "subtasks"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", id] });
+    },
   });
 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
