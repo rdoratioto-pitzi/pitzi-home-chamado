@@ -6,13 +6,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import { Plus, MoreHorizontal, GripVertical, Play, Square, Hash, Search, CheckCircle, Lock, Pencil, LayoutGrid, GanttChart, CalendarDays } from "lucide-react";
+import { Plus, MoreHorizontal, GripVertical, Play, Square, Hash, Search, CheckCircle, Lock, Pencil, LayoutGrid, GanttChart, CalendarDays, List, BarChart2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Project, KanbanColumn, KanbanCard, User } from "@shared/schema";
 import { CardDialog } from "./card-dialog";
 import { ColumnDialog } from "./column-dialog";
 import { GanttView } from "./gantt-view";
 import { CalendarView } from "./calendar-view";
+import { ListView } from "./list-view";
+import { DashboardView } from "./dashboard-view";
+import type { KanbanLabel } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -43,7 +46,7 @@ import {
 import { DraggableCard } from "./draggable-card";
 import { useDroppable } from "@dnd-kit/core";
 
-type ViewMode = "kanban" | "gantt" | "calendar";
+type ViewMode = "kanban" | "gantt" | "calendar" | "lista" | "dashboard";
 
 function KanbanColumnComponent({ 
   column, 
@@ -154,9 +157,14 @@ function KanbanColumnComponent({
   );
 }
 
-export default function KanbanPage() {
+interface KanbanPageProps {
+  embeddedProjectId?: string;
+}
+
+export function KanbanContent({ embeddedProjectId }: KanbanPageProps) {
   const [, params] = useRoute("/projetos/:id");
-  const projectId = params?.id;
+  const projectId = embeddedProjectId ?? params?.id;
+  const isEmbedded = !!embeddedProjectId;
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [isCardDialogOpen, setIsCardDialogOpen] = useState(false);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -204,6 +212,18 @@ export default function KanbanPage() {
     queryKey: ["/api/projects", projectId, "cards"],
     enabled: !!projectId,
   });
+
+  const { data: labels = [] } = useQuery<KanbanLabel[]>({
+    queryKey: ["/api/projects", projectId, "labels"],
+    enabled: !!projectId,
+  });
+
+  const { data: blockedCardIdsArr = [] } = useQuery<string[]>({
+    queryKey: ["/api/projects", projectId, "blocked-cards"],
+    enabled: !!projectId,
+  });
+
+  const blockedCardIds = new Set(blockedCardIdsArr);
 
   const moveCardMutation = useMutation({
     mutationFn: async ({ cardId, columnId }: { cardId: string; columnId: string }) => {
@@ -337,7 +357,9 @@ export default function KanbanPage() {
   if (projectLoading || columnsLoading) {
     return (
       <div className="flex flex-col min-h-full">
-        <PageHeader title="Carregando..." breadcrumbs={[{ label: "Projetos", href: "/projetos" }, { label: "..." }]} />
+        {!embeddedProjectId && (
+          <PageHeader title="Carregando..." breadcrumbs={[{ label: "Projetos", href: "/projetos" }, { label: "..." }]} />
+        )}
         <main className="flex-1 p-6">
           <div className="flex gap-4">
             {[...Array(4)].map((_, i) => (
@@ -365,53 +387,60 @@ export default function KanbanPage() {
     { id: "kanban" as ViewMode, label: "Kanban", icon: LayoutGrid },
     { id: "gantt" as ViewMode, label: "Gantt", icon: GanttChart },
     { id: "calendar" as ViewMode, label: "Calendário", icon: CalendarDays },
+    { id: "lista" as ViewMode, label: "Lista", icon: List },
+    { id: "dashboard" as ViewMode, label: "Dashboard", icon: BarChart2 },
   ];
+
+  // Barra de ações da sprint (reutilizada em PageHeader e no modo embarcado)
+  const sprintActions = (
+    <div className="flex items-center gap-3">
+      {project?.status === "completed" ? (
+        <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+          <CheckCircle className="h-3 w-3 mr-1" />
+          Sprint Finalizada (Somente Visualização)
+        </Badge>
+      ) : project?.status === "sprint_active" ? (
+        <Button
+          onClick={() => sprintMutation.mutate("completed")}
+          variant="outline"
+          className="text-red-600 border-red-200 hover:bg-red-50"
+          data-testid="button-finish-sprint"
+        >
+          <Square className="h-4 w-4 mr-2" />
+          Finalizar Sprint
+        </Button>
+      ) : (
+        <Button
+          onClick={() => sprintMutation.mutate("sprint_active")}
+          variant="outline"
+          className="text-green-600 border-green-200 hover:bg-green-50"
+          data-testid="button-start-sprint"
+        >
+          <Play className="h-4 w-4 mr-2" />
+          Iniciar Sprint
+        </Button>
+      )}
+      {viewMode === "kanban" && project?.status !== "completed" && (
+        <Button onClick={() => setIsColumnDialogOpen(true)} variant="outline" data-testid="button-add-column">
+          <Plus className="h-4 w-4 mr-2" />
+          Nova Coluna
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader 
-        title={project?.name || "Projeto"} 
-        breadcrumbs={[
-          { label: "Projetos", href: "/projetos" },
-          { label: project?.name || "Projeto" }
-        ]}
-        actions={
-          <div className="flex items-center gap-3">
-            {project?.status === "completed" ? (
-              <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Sprint Finalizada (Somente Visualização)
-              </Badge>
-            ) : project?.status === "sprint_active" ? (
-              <Button 
-                onClick={() => sprintMutation.mutate("completed")} 
-                variant="outline" 
-                className="text-red-600 border-red-200 hover:bg-red-50"
-                data-testid="button-finish-sprint"
-              >
-                <Square className="h-4 w-4 mr-2" />
-                Finalizar Sprint
-              </Button>
-            ) : (
-              <Button 
-                onClick={() => sprintMutation.mutate("sprint_active")} 
-                variant="outline" 
-                className="text-green-600 border-green-200 hover:bg-green-50"
-                data-testid="button-start-sprint"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Iniciar Sprint
-              </Button>
-            )}
-            {viewMode === "kanban" && project?.status !== "completed" && (
-              <Button onClick={() => setIsColumnDialogOpen(true)} variant="outline" data-testid="button-add-column">
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Coluna
-              </Button>
-            )}
-          </div>
-        }
-      />
+      {!isEmbedded && (
+        <PageHeader
+          title={project?.name || "Projeto"}
+          breadcrumbs={[
+            { label: "Projetos", href: "/projetos" },
+            { label: project?.name || "Projeto" }
+          ]}
+          actions={sprintActions}
+        />
+      )}
 
       <div className="px-6 pt-4 space-y-4">
         <div className="flex flex-wrap items-center gap-4 bg-muted/30 p-3 rounded-lg">
@@ -549,6 +578,26 @@ export default function KanbanPage() {
             isReadOnly={project?.status === "completed"}
           />
         )}
+
+        {viewMode === "lista" && (
+          <ListView
+            cards={filteredCards}
+            columns={sortedColumns}
+            users={users}
+            labels={labels}
+            blockedCardIds={blockedCardIds}
+            onEditCard={openEditCardDialog}
+          />
+        )}
+
+        {viewMode === "dashboard" && (
+          <DashboardView
+            projectId={projectId || ""}
+            cards={filteredCards}
+            columns={sortedColumns}
+            users={users}
+          />
+        )}
       </main>
 
       <CardDialog 
@@ -600,4 +649,9 @@ export default function KanbanPage() {
       </Dialog>
     </div>
   );
+}
+
+// Wrapper padrão para navegação via rota /projetos/:id
+export default function KanbanPage() {
+  return <KanbanContent />;
 }

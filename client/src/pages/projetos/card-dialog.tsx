@@ -28,12 +28,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Calendar as CalendarIcon, Tag, User as UserIcon, Clock, Paperclip, MessageSquare, Plus, Trash2, X, FileIcon, Image, Loader2, GitBranch, ListTree } from "lucide-react";
+import { Calendar as CalendarIcon, Tag, User as UserIcon, Clock, Paperclip, MessageSquare, Plus, Trash2, X, FileIcon, Image, Loader2, GitBranch, ListTree, CheckSquare, Palette, Link2, Lock } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import type { User, KanbanCard, KanbanComment, KanbanCommentWithUser } from "@shared/schema";
+import type { User, KanbanCard, KanbanComment, KanbanCommentWithUser, KanbanLabel, KanbanCardDependency } from "@shared/schema";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useState, useRef } from "react";
 import { useUpload } from "@/hooks/use-upload";
 
@@ -67,6 +68,12 @@ interface Attachment {
   path: string;
   size?: number;
   type?: string;
+}
+
+interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
 }
 
 export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, parentCardId, readOnly = false }: CardDialogProps) {
@@ -113,6 +120,18 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   const [availableTags, setAvailableTags] = useState(["Tech", "Design", "Bug", "Feature"]);
   const [newTag, setNewTag] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+  // Checklist state
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [newChecklistItem, setNewChecklistItem] = useState("");
+
+  // Labels state
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+  const [newLabelName, setNewLabelName] = useState("");
+  const [newLabelColor, setNewLabelColor] = useState("#6366f1");
+
+  // Dependencies state
+  const [depBlockingCardId, setDepBlockingCardId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploadFile, isUploading } = useUpload({
     onSuccess: (response) => {
@@ -156,6 +175,49 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
       return res.json();
     },
     enabled: !!cardId,
+  });
+
+  const { data: projectLabels = [] } = useQuery<KanbanLabel[]>({
+    queryKey: ["/api/projects", projectId, "labels"],
+    queryFn: async () => {
+      const res = await fetch(`/api/projects/${projectId}/labels`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!projectId,
+  });
+
+  const { data: cardDependencies } = useQuery<{ blockedBy: KanbanCardDependency[]; blocks: KanbanCardDependency[] }>({
+    queryKey: ["/api/cards", cardId, "dependencies"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cards/${cardId}/dependencies`);
+      if (!res.ok) return { blockedBy: [], blocks: [] };
+      return res.json();
+    },
+    enabled: !!cardId,
+  });
+
+  const createLabelMutation = useMutation({
+    mutationFn: async (data: { name: string; color: string }) =>
+      apiRequest("POST", `/api/projects/${projectId}/labels`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects", projectId, "labels"] });
+      setNewLabelName("");
+    },
+  });
+
+  const addDependencyMutation = useMutation({
+    mutationFn: async (blockingCardId: string) =>
+      apiRequest("POST", `/api/cards/${cardId}/dependencies`, { blockingCardId, blockedCardId: cardId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cards", cardId, "dependencies"] });
+      setDepBlockingCardId("");
+    },
+  });
+
+  const removeDependencyMutation = useMutation({
+    mutationFn: async (depId: string) => apiRequest("DELETE", `/api/card-dependencies/${depId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/cards", cardId, "dependencies"] }),
   });
 
   const form = useForm<FormData>({
@@ -217,6 +279,14 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
         } else {
           setAttachments([]);
         }
+        // Inicializar checklist
+        try {
+          setChecklist(cardData.checklist ? JSON.parse(cardData.checklist as unknown as string) : []);
+        } catch { setChecklist([]); }
+        // Inicializar labels selecionadas
+        try {
+          setSelectedLabelIds(cardData.labelIds ? JSON.parse(cardData.labelIds as unknown as string) : []);
+        } catch { setSelectedLabelIds([]); }
         // Configurar parent card id
         if (cardData.parentCardId) {
           setSelectedParentId(cardData.parentCardId);
@@ -241,6 +311,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
         setAttachments([]);
         setObjectivesImages([]);
         setDevelopmentImages([]);
+        setChecklist([]);
+        setSelectedLabelIds([]);
         setSelectedParentId(parentCardId || null);
       }
     }
@@ -265,6 +337,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
         order: cardData?.order || 0,
         attachments: attachments.map(a => a.path),
         parentCardId: selectedParentId || null,
+        checklist: JSON.stringify(checklist),
+        labelIds: JSON.stringify(selectedLabelIds),
       };
 
       if (cardId) {
@@ -710,6 +784,225 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                         ))}
                       </div>
                     </div>
+                  )}
+
+                  <Separator />
+
+                  {/* CHECKLIST */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium flex items-center gap-2">
+                      <CheckSquare className="h-3 w-3" /> Checklist
+                      {checklist.length > 0 && (
+                        <span className={`ml-auto text-[10px] font-semibold ${checklist.filter(i=>i.done).length === checklist.length ? "text-green-600" : "text-muted-foreground"}`}>
+                          {checklist.filter(i=>i.done).length}/{checklist.length}
+                        </span>
+                      )}
+                    </label>
+                    {checklist.length > 0 && (
+                      <div className="h-1 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-green-500 transition-all"
+                          style={{ width: `${(checklist.filter(i=>i.done).length / checklist.length) * 100}%` }}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1">
+                      {checklist.map(item => (
+                        <div key={item.id} className="flex items-center gap-2 group">
+                          <Checkbox
+                            checked={item.done}
+                            disabled={readOnly}
+                            onCheckedChange={(checked) =>
+                              setChecklist(prev => prev.map(i => i.id === item.id ? { ...i, done: !!checked } : i))
+                            }
+                          />
+                          <span className={`text-xs flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
+                          {!readOnly && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 opacity-0 group-hover:opacity-100"
+                              onClick={() => setChecklist(prev => prev.filter(i => i.id !== item.id))}
+                            >
+                              <X className="h-2.5 w-2.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-1">
+                        <Input
+                          placeholder="Novo item..."
+                          value={newChecklistItem}
+                          onChange={e => setNewChecklistItem(e.target.value)}
+                          className="h-7 text-xs"
+                          onKeyDown={e => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (newChecklistItem.trim()) {
+                                setChecklist(prev => [...prev, { id: crypto.randomUUID(), text: newChecklistItem.trim(), done: false }]);
+                                setNewChecklistItem("");
+                              }
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            if (newChecklistItem.trim()) {
+                              setChecklist(prev => [...prev, { id: crypto.randomUUID(), text: newChecklistItem.trim(), done: false }]);
+                              setNewChecklistItem("");
+                            }
+                          }}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* LABELS */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium flex items-center gap-2">
+                      <Palette className="h-3 w-3" /> Labels
+                    </label>
+                    <div className="flex flex-wrap gap-1">
+                      {projectLabels.map(label => {
+                        const isSelected = selectedLabelIds.includes(label.id);
+                        return (
+                          <button
+                            key={label.id}
+                            type="button"
+                            disabled={readOnly}
+                            onClick={() =>
+                              setSelectedLabelIds(prev =>
+                                isSelected ? prev.filter(id => id !== label.id) : [...prev, label.id]
+                              )
+                            }
+                            className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all ${
+                              isSelected ? "opacity-100 ring-1 ring-offset-1 ring-current" : "opacity-60 hover:opacity-90"
+                            }`}
+                            style={{ backgroundColor: label.color + "22", borderColor: label.color, color: label.color }}
+                          >
+                            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: label.color }} />
+                            {label.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-1 items-center">
+                        <input
+                          type="color"
+                          value={newLabelColor}
+                          onChange={e => setNewLabelColor(e.target.value)}
+                          className="h-7 w-7 rounded border p-0.5 cursor-pointer"
+                        />
+                        <Input
+                          placeholder="Nome da label..."
+                          value={newLabelName}
+                          onChange={e => setNewLabelName(e.target.value)}
+                          className="h-7 text-xs flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          disabled={!newLabelName.trim() || createLabelMutation.isPending}
+                          onClick={() => createLabelMutation.mutate({ name: newLabelName.trim(), color: newLabelColor })}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* DEPENDÊNCIAS */}
+                  {cardId && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium flex items-center gap-2">
+                          <Lock className="h-3 w-3" /> Dependências
+                        </label>
+                        {(cardDependencies?.blockedBy ?? []).length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Bloqueado por:</p>
+                            {cardDependencies!.blockedBy.map(dep => {
+                              const blocker = allProjectCards.find(c => c.id === dep.blockingCardId);
+                              return (
+                                <div key={dep.id} className="flex items-center gap-1 text-xs bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded px-2 py-1">
+                                  <Lock className="h-2.5 w-2.5 text-red-500" />
+                                  <span className="font-mono text-muted-foreground">{blocker?.code}</span>
+                                  <span className="flex-1 truncate">{blocker?.title}</span>
+                                  {!readOnly && (
+                                    <Button type="button" variant="ghost" size="icon" className="h-4 w-4" onClick={() => removeDependencyMutation.mutate(dep.id)}>
+                                      <X className="h-2.5 w-2.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {(cardDependencies?.blocks ?? []).length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Bloqueia:</p>
+                            {cardDependencies!.blocks.map(dep => {
+                              const blocked = allProjectCards.find(c => c.id === dep.blockedCardId);
+                              return (
+                                <div key={dep.id} className="flex items-center gap-1 text-xs bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded px-2 py-1">
+                                  <Link2 className="h-2.5 w-2.5 text-orange-500" />
+                                  <span className="font-mono text-muted-foreground">{blocked?.code}</span>
+                                  <span className="flex-1 truncate">{blocked?.title}</span>
+                                  {!readOnly && (
+                                    <Button type="button" variant="ghost" size="icon" className="h-4 w-4" onClick={() => removeDependencyMutation.mutate(dep.id)}>
+                                      <X className="h-2.5 w-2.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {!readOnly && (
+                          <div className="flex gap-1">
+                            <Select value={depBlockingCardId} onValueChange={setDepBlockingCardId}>
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue placeholder="Bloqueado por..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allProjectCards
+                                  .filter(c => c.id !== cardId && !cardDependencies?.blockedBy.some(d => d.blockingCardId === c.id))
+                                  .map(c => (
+                                    <SelectItem key={c.id} value={c.id} className="text-xs">
+                                      {c.code} — {c.title}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              disabled={!depBlockingCardId || addDependencyMutation.isPending}
+                              onClick={() => addDependencyMutation.mutate(depBlockingCardId)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
 
                   <div className="pt-4 space-y-3">
