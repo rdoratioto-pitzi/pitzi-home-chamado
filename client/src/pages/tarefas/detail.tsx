@@ -31,7 +31,11 @@ import {
   X,
   Download,
   ArrowRight,
+  ListTree,
+  Plus,
+  BarChart2,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -114,6 +118,38 @@ export default function TaskDetailPage() {
   const { data: task, isLoading } = useQuery<Task>({
     queryKey: ["/api/tasks", id],
   });
+
+  const { data: subtasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", id, "subtasks"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks/${id}/subtasks`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const createSubtaskMutation = useMutation({
+    mutationFn: async (title: string) =>
+      apiRequest("POST", "/api/tasks", {
+        title,
+        subTaskParentId: id,
+        status: "todo",
+        priority: "medium",
+        type: "task",
+        visibility: "private",
+        createdBy: "me",
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "subtasks"] }),
+  });
+
+  const updateSubtaskStatusMutation = useMutation({
+    mutationFn: async ({ subtaskId, status }: { subtaskId: string; status: string }) =>
+      apiRequest("PATCH", `/api/tasks/${subtaskId}`, { status }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "subtasks"] }),
+  });
+
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
   const { data: comments = [] } = useQuery<TaskCommentWithUser[]>({
     queryKey: ["/api/tasks", id, "comments"],
@@ -553,7 +589,26 @@ export default function TaskDetailPage() {
                     {new Date(task.dueDate).toLocaleDateString("pt-BR")}
                   </Badge>
                 )}
+                {(task as any).estimationHours && (
+                  <Badge variant="outline">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {(task as any).estimationHours}h estimadas
+                  </Badge>
+                )}
               </div>
+
+              {/* Barra de progresso (subtarefas) */}
+              {subtasks.length > 0 && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Progress
+                    value={(subtasks.filter(s => s.status === "done").length / subtasks.length) * 100}
+                    className="h-1.5 flex-1"
+                  />
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {subtasks.filter(s => s.status === "done").length}/{subtasks.length} subtarefas
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -906,6 +961,103 @@ export default function TaskDetailPage() {
             </div>
           )}
         </Card>
+
+        {/* Seção de Subtarefas */}
+        {task.type !== "meeting_note" && (
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium flex items-center gap-2">
+                <ListTree className="h-4 w-4" />
+                Subtarefas
+                {subtasks.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {subtasks.filter(s => s.status === "done").length}/{subtasks.length}
+                  </Badge>
+                )}
+              </h3>
+            </div>
+
+            {subtasks.length > 0 && (
+              <div className="mb-4">
+                <Progress
+                  value={(subtasks.filter(s => s.status === "done").length / subtasks.length) * 100}
+                  className="h-1.5"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {subtasks.filter(s => s.status === "done").length} de {subtasks.length} concluídas
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2 mb-4">
+              {subtasks.map(subtask => (
+                <div key={subtask.id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/20 group">
+                  <button
+                    onClick={() => updateSubtaskStatusMutation.mutate({
+                      subtaskId: subtask.id,
+                      status: subtask.status === "done" ? "todo" : "done",
+                    })}
+                    className="flex-shrink-0"
+                  >
+                    {subtask.status === "done" ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                  <span className={`text-sm flex-1 ${subtask.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+                    {subtask.title}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] h-5 ${
+                      subtask.priority === "high" ? "border-red-300 text-red-600" :
+                      subtask.priority === "medium" ? "border-yellow-300 text-yellow-600" :
+                      "border-gray-300 text-gray-500"
+                    }`}
+                  >
+                    {subtask.priority === "high" ? "Alta" : subtask.priority === "medium" ? "Média" : "Baixa"}
+                  </Badge>
+                </div>
+              ))}
+              {subtasks.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  Nenhuma subtarefa. Adicione abaixo para dividir esta tarefa.
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nova subtarefa..."
+                value={newSubtaskTitle}
+                onChange={e => setNewSubtaskTitle(e.target.value)}
+                className="h-8 text-sm"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && newSubtaskTitle.trim()) {
+                    e.preventDefault();
+                    createSubtaskMutation.mutate(newSubtaskTitle.trim());
+                    setNewSubtaskTitle("");
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 px-3"
+                disabled={!newSubtaskTitle.trim() || createSubtaskMutation.isPending}
+                onClick={() => {
+                  if (newSubtaskTitle.trim()) {
+                    createSubtaskMutation.mutate(newSubtaskTitle.trim());
+                    setNewSubtaskTitle("");
+                  }
+                }}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </Card>
+        )}
 
         <Card className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
