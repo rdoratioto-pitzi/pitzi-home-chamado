@@ -55,3 +55,7 @@ agents/.env
 agents/node_modules/
 agents/dist/
 agents/logs/
+
+# ─── MCP (Model Context Protocol) ────────────────────────────────
+# Estado interno do Memory MCP — não versionar dados pessoais de sessão
+.mcp-memory.json
