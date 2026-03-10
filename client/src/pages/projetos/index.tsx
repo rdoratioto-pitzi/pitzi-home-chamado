@@ -375,8 +375,8 @@ export default function ProjetosPage() {
                 <KanbanContent embeddedProjectId={selectedProject.id} />
               </div>
             </>
-          ) : (
-            /* Empty state quando nenhum projeto selecionado */
+          ) : filteredProjects.length === 0 ? (
+            /* Empty state — sem projetos */
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center max-w-sm px-4">
                 <div className="relative mx-auto mb-6 w-20 h-20">
@@ -387,30 +387,89 @@ export default function ProjetosPage() {
                   </div>
                 </div>
                 <h3 className="text-lg font-semibold text-foreground">
-                  Selecione um projeto
+                  Nenhum projeto encontrado
                 </h3>
                 <p className="text-muted-foreground text-sm mt-2 leading-relaxed">
-                  Escolha um projeto na barra lateral para visualizar e
-                  gerenciar seus cards, sprints e métricas.
+                  Crie um novo projeto para começar a gerenciar cards e sprints.
                 </p>
-                <div className="mt-6 flex flex-col sm:flex-row gap-2 justify-center">
+                <div className="mt-6 flex justify-center">
                   <Button onClick={handleNewProject} className="gap-2">
                     <Plus className="h-4 w-4" />
                     Criar Projeto
                   </Button>
-                  {filteredProjects.length > 0 && (
-                    <Button
-                      variant="outline"
-                      className="gap-2"
-                      onClick={() =>
-                        setSelectedProjectId(filteredProjects[0].id)
-                      }
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                      Abrir Primeiro
-                    </Button>
-                  )}
                 </div>
+              </div>
+            </div>
+          ) : (
+            /* Overview: grade com todos os projetos filtrados */
+            <div className="flex-1 overflow-auto p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                  {filteredProjects.length} projeto{filteredProjects.length !== 1 ? "s" : ""}
+                </h2>
+                <Button size="sm" onClick={handleNewProject} className="gap-1.5 h-8 text-xs">
+                  <Plus className="h-3.5 w-3.5" />
+                  Novo Projeto
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredProjects.map((project) => {
+                  const owner = users.find((u) => u.id === project.ownerId);
+                  return (
+                    <button
+                      key={project.id}
+                      onClick={() => setSelectedProjectId(project.id)}
+                      className="text-left rounded-lg border bg-card hover:bg-accent/40 hover:border-primary/30 transition-all duration-150 p-4 flex flex-col gap-2 group"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span
+                            className={cn(
+                              "mt-0.5 w-2 h-2 rounded-full flex-shrink-0",
+                              statusDotColors[project.status] ?? "bg-slate-400"
+                            )}
+                          />
+                          <p className="font-semibold text-sm truncate">{project.name}</p>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px] h-5 px-2 flex-shrink-0 whitespace-nowrap",
+                            statusColors[project.status]
+                          )}
+                        >
+                          {statusLabels[project.status]}
+                        </Badge>
+                      </div>
+
+                      {!isEmptyHtml(project.description) && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                          {stripHtml(project.description)}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-3 mt-auto pt-1 text-[11px] text-muted-foreground">
+                        {project.startDate && (
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {new Date(project.startDate).toLocaleDateString("pt-BR")}
+                          </span>
+                        )}
+                        {owner && (
+                          <span className="flex items-center gap-1 ml-auto">
+                            <Users className="h-3 w-3" />
+                            {owner.name.split(" ")[0]}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1 text-[11px] text-primary/70 font-medium group-hover:text-primary transition-colors">
+                        <ChevronRight className="h-3.5 w-3.5" />
+                        Abrir projeto
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
