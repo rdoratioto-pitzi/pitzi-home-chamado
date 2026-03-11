@@ -74,7 +74,12 @@ export function registerIntegrationRoutes(router: Router) {
   const fetchAiEvaluation = async (endpoint: string, query: any) => {
     const params = new URLSearchParams();
     Object.keys(query).forEach(key => {
-      if (query[key]) params.append(key, query[key] as string);
+      const value = query[key];
+      if (Array.isArray(value)) {
+        value.forEach((v: any) => params.append(key, v as string));
+      } else if (value) {
+        params.append(key, value as string);
+      }
     });
     
     // Assume external API follows similar structure: /avaliacoes-ia/{endpoint}
@@ -83,19 +88,24 @@ export function registerIntegrationRoutes(router: Router) {
     const url = `${RS_API_BASE_URL}/avaliacoes-ia/${endpoint}`;
     const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
     
+    console.log(`[BACKEND] Fetching ${endpoint}:`, fullUrl);
+    
     const response = await fetch(fullUrl, {
       method: "GET",
-      headers: { 
-        "Authorization": `Bearer ${RS_API_TOKEN}`, 
-        "Content-Type": "application/json" 
+      headers: {
+        "Authorization": `Bearer ${RS_API_TOKEN}`,
+        "Content-Type": "application/json"
       },
     });
 
+    console.log(`[BACKEND] ${endpoint} response status:`, response.status);
+    
     if (!response.ok) {
       if (response.status === 401) {
         throw new Error("Não autenticado na API externa via backend");
       }
       const text = await response.text();
+      console.log(`[BACKEND] ${endpoint} error response:`, text);
       try {
         const json = JSON.parse(text);
         throw new Error(json.message || json.error || `API error: ${response.status}`);
@@ -103,7 +113,9 @@ export function registerIntegrationRoutes(router: Router) {
         throw new Error(`API error: ${response.status} ${response.statusText}`);
       }
     }
-    return response.json();
+    const data = await response.json();
+    console.log(`[BACKEND] ${endpoint} response data:`, data);
+    return data;
   };
 
   // 1. Resumo de Assertividade
@@ -128,6 +140,17 @@ export function registerIntegrationRoutes(router: Router) {
     }
   });
 
+  // 2.1. Evolução por Categoria
+  router.get("/api/avaliacoes-ia/evolucao-categoria", async (req, res) => {
+    try {
+      const data = await fetchAiEvaluation("evolucao-categoria", req.query);
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Evaluation evolucao-categoria error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar evolução por categoria" });
+    }
+  });
+
   // 3. Acurácia por Dispositivo
   router.get("/api/avaliacoes-ia/dispositivos", async (req, res) => {
     try {
@@ -147,6 +170,40 @@ export function registerIntegrationRoutes(router: Router) {
     } catch (error: any) {
       console.error("AI Evaluation detalhes error:", error);
       res.status(500).json({ error: error.message || "Falha ao buscar detalhes" });
+    }
+  });
+
+  // 5. Acurácia por Categoria
+  router.get("/api/avaliacoes-ia/categorias", async (req, res) => {
+    try {
+      console.log("[API] Calling categorias endpoint with params:", req.query);
+      const data = await fetchAiEvaluation("categorias", req.query);
+      console.log("[API] categorias response:", data);
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Evaluation categorias error:", error);
+      res.status(500).json({
+        error: error.message || "Falha ao buscar categorias",
+        details: "Verifique se o endpoint /categorias existe na API externa",
+        endpoint: "/avaliacoes-ia/categorias"
+      });
+    }
+  });
+
+  // 6. Assertividade por Foto
+  router.get("/api/avaliacoes-ia/assertividade-fotos", async (req, res) => {
+    try {
+      console.log("[API] Calling assertividade-fotos endpoint with params:", req.query);
+      const data = await fetchAiEvaluation("assertividade-fotos", req.query);
+      console.log("[API] assertividade-fotos response:", data);
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Evaluation assertividade-fotos error:", error);
+      res.status(500).json({
+        error: error.message || "Falha ao buscar assertividade por fotos",
+        details: "Verifique se o endpoint /assertividade-fotos existe na API externa",
+        endpoint: "/avaliacoes-ia/assertividade-fotos"
+      });
     }
   });
 }
