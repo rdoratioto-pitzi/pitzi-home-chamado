@@ -1,9 +1,10 @@
+import React from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Hash, Tag as TagIcon, Calendar, User as UserIcon, Lock, CheckSquare } from "lucide-react";
+import { Hash, Tag as TagIcon, Calendar, User as UserIcon, Lock, CheckSquare, Circle, Clock, CheckCircle2 } from "lucide-react";
 import type { KanbanCard, User } from "@shared/schema";
 
 interface ChecklistItem {
@@ -68,6 +69,16 @@ export function DraggableCard({
     catch { return []; }
   })();
 
+  // Status config
+  const statusConfig: Record<string, { icon: React.ElementType; label: string; className: string }> = {
+    todo:  { icon: Circle,       label: "A Fazer",      className: "text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400" },
+    doing: { icon: Clock,        label: "Em Andamento", className: "text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400" },
+    done:  { icon: CheckCircle2, label: "Concluído",    className: "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400" },
+  };
+  const cardStatusKey = (card.status as string) || "todo";
+  const statusInfo = statusConfig[cardStatusKey] ?? statusConfig.todo;
+  const StatusIcon = statusInfo.icon;
+
   // Border color por prioridade
   const borderColorClass =
     card.priority === "muito_urgente" ? "border-l-red-500" :
@@ -107,6 +118,10 @@ export function DraggableCard({
                     </TooltipContent>
                   </Tooltip>
                 )}
+                <Badge className={`text-[10px] h-4 px-1.5 flex items-center gap-0.5 ${statusInfo.className}`}>
+                  <StatusIcon className="h-2.5 w-2.5" />
+                  {statusInfo.label}
+                </Badge>
                 <Badge className={`text-[10px] h-4 px-1.5 uppercase font-bold tracking-wider ${priorityColors[card.priority]}`}>
                   {priorityLabels[card.priority]}
                 </Badge>

@@ -16,6 +16,7 @@ docs/
 ├── governanca/             → Git workflow, PRs, convenções
 ├── modulos/                → Planos e docs de features específicas
 ├── ai-agents/              → Guias de uso dos agentes de IA (Max, Claude, etc.)
+├── MCPs/                   → Model Context Protocol servers — configuração e uso
 └── archive/                → Documentação antiga / legado
 ```
 
@@ -59,6 +60,24 @@ Documentação de planos de implementação e melhorias por módulo:
 | [csat-implementation-plan.md](modulos/csat-implementation-plan.md) | Avaliação de satisfação (CSAT) |
 | [omie-integration.md](modulos/omie-integration.md) | Integração Omie ERP |
 | [authentication-ui-improvements.md](modulos/authentication-ui-improvements.md) | Melhorias de UI na autenticação |
+
+---
+
+## MCPs (Model Context Protocol)
+
+Servidores MCP que ampliam as capacidades do Claude Code — banco de dados, GitHub, busca web, automação e mais:
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| [MCPs/README.md](MCPs/README.md) | Índice, tabela de MCPs e ordem de ativação |
+| [MCPs/01-github.md](MCPs/01-github.md) | GitHub — PRs, issues e branches |
+| [MCPs/05-postgres.md](MCPs/05-postgres.md) | PostgreSQL — inspeção do banco de dados |
+| [MCPs/06-supabase.md](MCPs/06-supabase.md) | Supabase — acesso completo via OAuth |
+| [MCPs/08-memory.md](MCPs/08-memory.md) | Memory — memória persistente entre sessões |
+| [MCPs/10-playwright.md](MCPs/10-playwright.md) | Playwright — testes E2E automatizados |
+| [MCPs/11-sequential-thinking.md](MCPs/11-sequential-thinking.md) | Sequential Thinking — raciocínio estruturado |
+
+> Ver [MCPs/README.md](MCPs/README.md) para a lista completa com 13 servidores.
 
 ---
 

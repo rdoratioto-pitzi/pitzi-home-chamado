@@ -130,6 +130,9 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   const [newLabelName, setNewLabelName] = useState("");
   const [newLabelColor, setNewLabelColor] = useState("#6366f1");
 
+  // Card status state
+  const [cardStatus, setCardStatus] = useState<"todo" | "doing" | "done">("todo");
+
   // Dependencies state
   const [depBlockingCardId, setDepBlockingCardId] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -287,6 +290,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
         try {
           setSelectedLabelIds(cardData.labelIds ? JSON.parse(cardData.labelIds as unknown as string) : []);
         } catch { setSelectedLabelIds([]); }
+        // Inicializar status do card
+        setCardStatus((cardData.status as "todo" | "doing" | "done") || "todo");
         // Configurar parent card id
         if (cardData.parentCardId) {
           setSelectedParentId(cardData.parentCardId);
@@ -313,6 +318,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
         setDevelopmentImages([]);
         setChecklist([]);
         setSelectedLabelIds([]);
+        setCardStatus("todo");
         setSelectedParentId(parentCardId || null);
       }
     }
@@ -339,6 +345,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
         parentCardId: selectedParentId || null,
         checklist: JSON.stringify(checklist),
         labelIds: JSON.stringify(selectedLabelIds),
+        status: cardStatus,
       };
 
       if (cardId) {
@@ -624,6 +631,20 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                       </FormItem>
                     )}
                   />
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Status</label>
+                    <Select value={cardStatus} onValueChange={(v) => setCardStatus(v as "todo" | "doing" | "done")}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todo">⬜ A Fazer</SelectItem>
+                        <SelectItem value="doing">🔵 Em Andamento</SelectItem>
+                        <SelectItem value="done">✅ Concluído</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <FormField
                     control={form.control}

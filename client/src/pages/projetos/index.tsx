@@ -14,7 +14,7 @@ import {
   ChevronRight,
   LayoutGrid,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Project, User } from "@shared/schema";
 import { ProjectDialog } from "./project-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { stripHtml, isEmptyHtml, cn } from "@/lib/utils";
 import { KanbanContent } from "./kanban";
+import { apiRequest } from "@/lib/queryClient";
 
 const statusColors: Record<string, string> = {
   active: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800",
@@ -62,6 +63,7 @@ export default function ProjetosPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterOwner, setFilterOwner] = useState<string>("all");
+  const queryClient = useQueryClient();
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -69,6 +71,14 @@ export default function ProjetosPage() {
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
+  });
+
+  const updateProjectStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      apiRequest("PATCH", `/api/projects/${id}`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    },
   });
 
   const filteredProjects = useMemo(() =>
@@ -416,10 +426,10 @@ export default function ProjetosPage() {
                 {filteredProjects.map((project) => {
                   const owner = users.find((u) => u.id === project.ownerId);
                   return (
-                    <button
+                    <div
                       key={project.id}
+                      className="text-left rounded-lg border bg-card hover:bg-accent/40 hover:border-primary/30 transition-all duration-150 p-4 flex flex-col gap-2 group cursor-pointer"
                       onClick={() => setSelectedProjectId(project.id)}
-                      className="text-left rounded-lg border bg-card hover:bg-accent/40 hover:border-primary/30 transition-all duration-150 p-4 flex flex-col gap-2 group"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
@@ -431,15 +441,34 @@ export default function ProjetosPage() {
                           />
                           <p className="font-semibold text-sm truncate">{project.name}</p>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "text-[10px] h-5 px-2 flex-shrink-0 whitespace-nowrap",
-                            statusColors[project.status]
-                          )}
-                        >
-                          {statusLabels[project.status]}
-                        </Badge>
+                        {/* Dropdown de status rápido */}
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={project.status || "active"}
+                            onValueChange={(newStatus) =>
+                              updateProjectStatusMutation.mutate({ id: project.id, status: newStatus })
+                            }
+                          >
+                            <SelectTrigger
+                              className={cn(
+                                "h-5 text-[10px] px-2 border rounded-full w-auto gap-1 flex-shrink-0 [&>svg]:h-2.5 [&>svg]:w-2.5",
+                                statusColors[project.status]
+                              )}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              {Object.entries(statusLabels).map(([value, label]) => (
+                                <SelectItem key={value} value={value} className="text-xs">
+                                  <span className="flex items-center gap-2">
+                                    <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", statusDotColors[value] ?? "bg-slate-400")} />
+                                    {label}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       {!isEmptyHtml(project.description) && (
@@ -467,7 +496,7 @@ export default function ProjetosPage() {
                         <ChevronRight className="h-3.5 w-3.5" />
                         Abrir projeto
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
