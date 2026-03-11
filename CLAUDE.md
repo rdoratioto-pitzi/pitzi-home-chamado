@@ -1,5 +1,10 @@
 # Renov Home — Contexto para Claude Code
 
+## Início de Sessão — Obrigatório
+**Ao iniciar qualquer sessão neste projeto**, executar imediatamente:
+1. Consultar Memory MCP: `mcp__memory__search_nodes` com query `"Matheus projeto renov"`
+2. Usar o contexto recuperado durante toda a sessão
+
 ## Projeto
 SaaS brasileiro de gestão operacional para empresas de reforma e construção.
 Stack: React 18 + Vite + TanStack Query / Express + Node.js (TypeScript) / PostgreSQL + Drizzle ORM / Tailwind + shadcn/ui.
