@@ -370,7 +370,7 @@ interface DashboardViewProps {
   selectedPeriod: string;
 }
 
-// Componente para exibir produtividade por tokens (OpenRouter)
+// Componente para exibir produtividade por tokens (OpenRouter + Claude Code)
 function DeveloperTokensCard({ selectedPeriod }: { selectedPeriod: string }) {
   // Calcular datas do período selecionado
   const getPeriodDates = () => {
@@ -416,26 +416,60 @@ function DeveloperTokensCard({ selectedPeriod }: { selectedPeriod: string }) {
                 key={idx}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-xs font-medium text-blue-700 dark:text-blue-400">
+                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-xs font-medium text-blue-700 dark:text-blue-400 shrink-0">
                   {dev.developerName.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium truncate">{dev.developerName}</span>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-blue-600 font-medium">{formatTokens(dev.totalTokens)} tokens</span>
-                      {dev.keysCount > 1 && (
-                        <span className="text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded text-xs">
-                          {dev.keysCount} keys
-                        </span>
-                      )}
-                    </div>
+                    <span className="text-blue-600 font-medium text-xs shrink-0">{formatTokens(dev.totalTokens)} total</span>
                   </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className="bg-blue-500 h-2 rounded-full transition-all duration-500 ease-out"
-                      style={{ width: `${maxTokens > 0 ? Math.max((dev.totalTokens / maxTokens) * 100, 2) : 0}%` }}
-                    />
+
+                  {/* Breakdown por provider */}
+                  <div className="flex flex-col gap-0.5 mb-1.5">
+                    {dev.openrouterKeysCount > 0 && (
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                          OpenRouter
+                          <span className="text-amber-600 bg-amber-100 dark:bg-amber-900/30 px-1 py-0.5 rounded leading-none">
+                            {dev.openrouterKeysCount}k
+                          </span>
+                        </span>
+                        <span>{formatTokens(dev.openrouterTokens)}</span>
+                      </div>
+                    )}
+                    {dev.anthropicKeysCount > 0 && (
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />
+                          Claude Code
+                          <span className="text-orange-600 bg-orange-100 dark:bg-orange-900/30 px-1 py-0.5 rounded leading-none">
+                            {dev.anthropicKeysCount}k
+                          </span>
+                        </span>
+                        <span>{dev.anthropicTokens > 0 ? formatTokens(dev.anthropicTokens) : "—"}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Barra de progresso total */}
+                  <div className="w-full bg-muted rounded-full h-1.5 flex overflow-hidden">
+                    {maxTokens > 0 && dev.openrouterTokens > 0 && (
+                      <div
+                        className="bg-blue-500 h-1.5 transition-all duration-500 ease-out"
+                        style={{ width: `${Math.max((dev.openrouterTokens / maxTokens) * 100, 1)}%` }}
+                      />
+                    )}
+                    {maxTokens > 0 && dev.anthropicTokens > 0 && (
+                      <div
+                        className="bg-orange-500 h-1.5 transition-all duration-500 ease-out"
+                        style={{ width: `${Math.max((dev.anthropicTokens / maxTokens) * 100, 1)}%` }}
+                      />
+                    )}
+                    {maxTokens > 0 && dev.totalTokens === 0 && (
+                      <div className="bg-muted-foreground/20 h-1.5 w-full" />
+                    )}
                   </div>
                 </div>
               </div>

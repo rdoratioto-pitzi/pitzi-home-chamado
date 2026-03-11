@@ -35,6 +35,7 @@ import {
   type PricingDevice, type InsertPricingDevice,
   type PricingPriceHistory, type InsertPricingPriceHistory,
   type PricingAlert, type InsertPricingAlert,
+  type PricingScrapedData, type InsertPricingScrapedData,
   type MetaArea, type InsertMetaArea,
   type Meta, type InsertMeta,
   type MetaCheckin, type InsertMetaCheckin,
@@ -59,20 +60,25 @@ import {
   type GitCommit, type InsertGitCommit,
   type GitPullRequest, type InsertGitPullRequest,
   type GitSecurityAlert, type InsertGitSecurityAlert,
+  type ClaudeCodeUsageReport, type InsertClaudeCodeUsage,
+  type KanbanLabel, type InsertKanbanLabel,
+  type KanbanCardDependency, type InsertKanbanCardDependency,
   users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
+  kanbanLabels, kanbanCardDependencies,
   objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
   taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
   collectionRequests, logisticaReversaPedidos, logisticaReversaEventos, slaRules,
-  pricingDevices, pricingPriceHistory, pricingAlerts,
+  pricingDevices, pricingPriceHistory, pricingAlerts, pricingScrapedData,
   metaAreas, metas, metaCheckins,
   knowledgeDocuments, knowledgeDocumentVersions, knowledgeAuditLogs, knowledgeFavorites,
   flowcharts, flowchartVersions, flowchartComments,
   aiConversations, aiMessages, aiSpaces, aiSpaceConversations, notifications, updates,
   promptsLibrary, promptUserFavorites,
   // Git Analytics
-  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches
+  gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches,
+  claudeCodeUsageReports,
  } from "@shared/schema";
  import { db } from "./db";
  import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
@@ -140,6 +146,18 @@ import {
   getKanbanComments(cardId: string): Promise<KanbanCommentWithUser[]>;
   createKanbanComment(comment: InsertKanbanComment): Promise<KanbanComment>;
 
+  // Kanban Labels
+  getKanbanLabels(projectId: string): Promise<KanbanLabel[]>;
+  createKanbanLabel(label: InsertKanbanLabel): Promise<KanbanLabel>;
+  updateKanbanLabel(id: string, data: Partial<KanbanLabel>): Promise<KanbanLabel | undefined>;
+  deleteKanbanLabel(id: string): Promise<boolean>;
+
+  // Kanban Card Dependencies
+  getCardDependencies(cardId: string): Promise<{ blockedBy: KanbanCardDependency[]; blocks: KanbanCardDependency[] }>;
+  getProjectBlockedCardIds(projectId: string): Promise<Set<string>>;
+  addCardDependency(data: InsertKanbanCardDependency): Promise<KanbanCardDependency>;
+  removeCardDependency(id: string): Promise<boolean>;
+
   // Objectives
   getObjective(id: string): Promise<Objective | undefined>;
   getObjectives(): Promise<Objective[]>;
@@ -201,7 +219,8 @@ import {
 
   // Tasks
   getTask(id: string): Promise<Task | undefined>;
-  getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string }): Promise<Task[]>;
+  getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string; subTaskParentId?: string }): Promise<Task[]>;
+  getSubTasks(parentId: string): Promise<Task[]>;
   getTasksWithConditions(conditions: SQL | undefined): Promise<Task[]>;
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task | undefined>;
@@ -283,6 +302,13 @@ import {
   createPricingAlert(alert: InsertPricingAlert): Promise<PricingAlert>;
   updatePricingAlert(id: string, data: Partial<PricingAlert>): Promise<PricingAlert | undefined>;
   deletePricingAlert(id: string): Promise<boolean>;
+
+  // Pricing Scraped Data (Concurrent Prices)
+  getPricingScrapedData(deviceId: string): Promise<PricingScrapedData[]>;
+  getLatestPricingScrapedData(deviceId: string): Promise<PricingScrapedData | undefined>;
+  createPricingScrapedData(data: InsertPricingScrapedData): Promise<PricingScrapedData>;
+  bulkCreatePricingScrapedData(dataList: InsertPricingScrapedData[]): Promise<PricingScrapedData[]>;
+  deleteOldPricingScrapedData(deviceId: string, keepLatest?: boolean): Promise<boolean>;
 
   // Meta Areas
   getMetaAreas(): Promise<MetaArea[]>;
@@ -387,20 +413,6 @@ import {
   markNotificationRead(id: string, userId: string): Promise<Notification | undefined>;
   markAllNotificationsRead(userId: string): Promise<void>;
 
-  // IMEI.info Stats
-  getImeiInfoStats(): Promise<any[]>;
-  getImeiInfoStat(id: string): Promise<any | undefined>;
-  createImeiInfoStats(stats: any): Promise<any>;
-  updateImeiInfoStat(id: string, data: Partial<any>): Promise<any | undefined>;
-  deleteImeiInfoStat(id: string): Promise<boolean>;
-
-  // IMEI.info Alerts
-  getImeiInfoAlerts(): Promise<any[]>;
-  getImeiInfoAlert(id: string): Promise<any | undefined>;
-  createImeiInfoAlert(alert: any): Promise<any>;
-  updateImeiInfoAlert(id: string, data: Partial<any>): Promise<any | undefined>;
-  deleteImeiInfoAlert(id: string): Promise<boolean>;
-
   // Prompts Library
   getPrompts(filters?: { category?: string; search?: string; onlyActive?: boolean }): Promise<PromptLibrary[]>;
   getPrompt(id: string): Promise<PromptLibrary | undefined>;
@@ -453,7 +465,7 @@ export class DatabaseStorage implements IStorage {
       id: "mock-admin-id",
       name: "Matheus",
       email: "Matheus@renovsmart.com.br",
-      password: "ma061184",
+      password: "MOCK_PASSWORD_DO_NOT_USE",
       isAdmin: true,
       perfilAcesso: "diretor",
       status: "active",
@@ -483,7 +495,7 @@ export class DatabaseStorage implements IStorage {
         id: "mock-admin2-id",
         name: "Administrador",
         email: "admin@renov.com.br",
-        password: "admin123",
+        password: "MOCK_PASSWORD_DO_NOT_USE",
         modulePermissions: JSON.stringify({
           chamados: true,
           projetos: true,
@@ -793,6 +805,52 @@ export class DatabaseStorage implements IStorage {
     return comment;
   }
 
+  // Kanban Labels
+  async getKanbanLabels(projectId: string): Promise<KanbanLabel[]> {
+    if (!db) return [];
+    return await db.select().from(kanbanLabels).where(eq(kanbanLabels.projectId, projectId));
+  }
+  async createKanbanLabel(label: InsertKanbanLabel): Promise<KanbanLabel> {
+    if (!db) throw new Error("Database not connected");
+    const [created] = await db.insert(kanbanLabels).values(label).returning();
+    return created;
+  }
+  async updateKanbanLabel(id: string, data: Partial<KanbanLabel>): Promise<KanbanLabel | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db.update(kanbanLabels).set(data).where(eq(kanbanLabels.id, id)).returning();
+    return updated;
+  }
+  async deleteKanbanLabel(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(kanbanLabels).where(eq(kanbanLabels.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Kanban Card Dependencies
+  async getCardDependencies(cardId: string): Promise<{ blockedBy: KanbanCardDependency[]; blocks: KanbanCardDependency[] }> {
+    if (!db) return { blockedBy: [], blocks: [] };
+    const [blockedBy, blocks] = await Promise.all([
+      db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.blockedCardId, cardId)),
+      db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.blockingCardId, cardId)),
+    ]);
+    return { blockedBy, blocks };
+  }
+  async getProjectBlockedCardIds(projectId: string): Promise<Set<string>> {
+    if (!db) return new Set();
+    const deps = await db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.projectId, projectId));
+    return new Set(deps.map(d => d.blockedCardId));
+  }
+  async addCardDependency(data: InsertKanbanCardDependency): Promise<KanbanCardDependency> {
+    if (!db) throw new Error("Database not connected");
+    const [dep] = await db.insert(kanbanCardDependencies).values(data).returning();
+    return dep;
+  }
+  async removeCardDependency(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.delete(kanbanCardDependencies).where(eq(kanbanCardDependencies.id, id)).returning();
+    return result.length > 0;
+  }
+
   // Objectives
   async getObjective(id: string): Promise<Objective | undefined> {
     if (!db) return undefined;
@@ -1017,7 +1075,7 @@ export class DatabaseStorage implements IStorage {
     const [t] = await db.select().from(tasks).where(eq(tasks.id, id));
     return t;
   }
-  async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string }): Promise<Task[]> {
+  async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string; subTaskParentId?: string }): Promise<Task[]> {
     if (!db) return [];
     let baseQuery = db.select().from(tasks);
     const conditions = [];
@@ -1030,11 +1088,16 @@ export class DatabaseStorage implements IStorage {
     if (filters?.type) conditions.push(eq(tasks.type, filters.type));
     if (filters?.isRecurring !== undefined) conditions.push(eq(tasks.isRecurring, filters.isRecurring));
     if (filters?.visibility) conditions.push(eq(tasks.visibility, filters.visibility));
+    if (filters?.subTaskParentId) conditions.push(eq(tasks.subTaskParentId, filters.subTaskParentId));
 
     if (conditions.length > 0) {
       return await baseQuery.where(and(...conditions));
     }
     return await baseQuery;
+  }
+  async getSubTasks(parentId: string): Promise<Task[]> {
+    if (!db) return [];
+    return await db.select().from(tasks).where(eq(tasks.subTaskParentId, parentId));
   }
   async getTasksWithConditions(conditions: SQL | undefined): Promise<Task[]> {
     if (!db) return [];
@@ -1154,6 +1217,35 @@ export class DatabaseStorage implements IStorage {
   async deleteTaskTemplate(id: string): Promise<boolean> {
     if (!db) return false;
     const result = await db.delete(taskTemplates).where(eq(taskTemplates.id, id)).returning();
+    return result.length > 0;
+  }
+  async updateTaskTemplate(id: string, data: Partial<InsertTaskTemplate>): Promise<TaskTemplate | undefined> {
+    if (!db) return undefined;
+    const [t] = await db.update(taskTemplates)
+      .set(data)
+      .where(eq(taskTemplates.id, id))
+      .returning();
+    return t;
+  }
+  async setDefaultTaskTemplate(id: string, type: string): Promise<boolean> {
+    if (!db) return false;
+    // Remove default from all templates of the same type
+    await db.update(taskTemplates)
+      .set({ isDefault: false })
+      .where(eq(taskTemplates.type, type));
+    // Set the selected template as default
+    const result = await db.update(taskTemplates)
+      .set({ isDefault: true })
+      .where(eq(taskTemplates.id, id))
+      .returning();
+    return result.length > 0;
+  }
+  async unsetDefaultTaskTemplate(id: string): Promise<boolean> {
+    if (!db) return false;
+    const result = await db.update(taskTemplates)
+      .set({ isDefault: false })
+      .where(eq(taskTemplates.id, id))
+      .returning();
     return result.length > 0;
   }
 
@@ -1386,6 +1478,47 @@ export class DatabaseStorage implements IStorage {
     if (!db) return false;
     const result = await db.delete(pricingAlerts).where(eq(pricingAlerts.id, id)).returning();
     return result.length > 0;
+  }
+
+  // Pricing Scraped Data (Concurrent Prices)
+  async getPricingScrapedData(deviceId: string): Promise<PricingScrapedData[]> {
+    if (!db) return [];
+    return await db.select().from(pricingScrapedData).where(eq(pricingScrapedData.deviceId, deviceId));
+  }
+  async getLatestPricingScrapedData(deviceId: string): Promise<PricingScrapedData | undefined> {
+    if (!db) return undefined;
+    const [data] = await db.select().from(pricingScrapedData)
+      .where(eq(pricingScrapedData.deviceId, deviceId))
+      .orderBy(desc(pricingScrapedData.scrapedAt))
+      .limit(1);
+    return data;
+  }
+  async createPricingScrapedData(data: InsertPricingScrapedData): Promise<PricingScrapedData> {
+    if (!db) throw new Error("Database not connected");
+    const [created] = await db.insert(pricingScrapedData).values(data).returning();
+    return created;
+  }
+  async bulkCreatePricingScrapedData(dataList: InsertPricingScrapedData[]): Promise<PricingScrapedData[]> {
+    if (!db) throw new Error("Database not connected");
+    const created = await db.insert(pricingScrapedData).values(dataList).returning();
+    return created;
+  }
+  async deleteOldPricingScrapedData(deviceId: string, keepLatest: boolean = true): Promise<boolean> {
+    if (!db) return false;
+    if (keepLatest) {
+      // Keep only the latest record, delete older ones
+      const latest = await this.getLatestPricingScrapedData(deviceId);
+      if (latest) {
+        await db.delete(pricingScrapedData)
+          .where(and(
+            eq(pricingScrapedData.deviceId, deviceId),
+            sql`${pricingScrapedData.id} != ${latest.id}`
+          ));
+      }
+    } else {
+      await db.delete(pricingScrapedData).where(eq(pricingScrapedData.deviceId, deviceId));
+    }
+    return true;
   }
 
   // Meta Areas
@@ -1685,14 +1818,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Flowcharts
-  async getFlowcharts(ownerId?: string): Promise<Flowchart[]> {
+  async getFlowcharts(ownerId?: string, source?: string): Promise<Flowchart[]> {
     if (!db) throw new Error("Database not connected");
-    if (ownerId) {
-      return await db.select().from(flowcharts).where(
-        and(eq(flowcharts.ownerId, ownerId), eq(flowcharts.isTemplate, false))
-      ).orderBy(sql`${flowcharts.updatedAt} DESC`);
-    }
-    return await db.select().from(flowcharts).where(eq(flowcharts.isTemplate, false)).orderBy(sql`${flowcharts.updatedAt} DESC`);
+    const conditions = [eq(flowcharts.isTemplate, false)];
+    if (source) conditions.push(eq(flowcharts.source, source));
+    if (ownerId) conditions.push(eq(flowcharts.ownerId, ownerId));
+    return await db.select().from(flowcharts).where(and(...conditions)).orderBy(sql`${flowcharts.updatedAt} DESC`);
   }
 
   async getFlowchart(id: string): Promise<Flowchart | undefined> {
@@ -1883,7 +2014,6 @@ export class DatabaseStorage implements IStorage {
     if (!db) {
       // Store in memory when database is not available
       this.mockUpdates.unshift(newUpdate);
-      console.log("[storage] Update created in memory (DB unavailable):", newUpdate.id);
       return newUpdate;
     }
     
@@ -1911,7 +2041,6 @@ export class DatabaseStorage implements IStorage {
       const index = this.mockUpdates.findIndex(u => u.id === id);
       if (index !== -1) {
         this.mockUpdates[index] = { ...this.mockUpdates[index], ...updateData };
-        console.log("[storage] Update updated in memory (DB unavailable):", id);
         return this.mockUpdates[index];
       }
       return undefined;
@@ -1937,7 +2066,6 @@ export class DatabaseStorage implements IStorage {
       const index = this.mockUpdates.findIndex(u => u.id === id);
       if (index !== -1) {
         this.mockUpdates.splice(index, 1);
-        console.log("[storage] Update deleted from memory (DB unavailable):", id);
         return true;
       }
       return false;
@@ -1967,25 +2095,11 @@ export class DatabaseStorage implements IStorage {
     if (!db) throw new Error("Database not connected");
     
     try {
-      console.log("[Storage.getPrompts] Iniciando busca com filtros:", filters);
-      
-      // Primeiro, verificar o que existe no banco (debug)
-      const debugResult = await db.execute(sql`
-        SELECT COUNT(*) as total,
-               COUNT(CASE WHEN is_active = true THEN 1 END) as active_true,
-               COUNT(CASE WHEN is_active = false THEN 1 END) as active_false,
-               COUNT(CASE WHEN is_active IS NULL THEN 1 END) as active_null
-        FROM prompts_library
-      `);
-      console.log("[Storage.getPrompts] Debug - Status do banco:", debugResult.rows[0]);
-      
       // Query simples - buscar todos os prompts sem filtro de is_active primeiro
       const result = await db.execute(sql`
         SELECT * FROM prompts_library
         ORDER BY usage_count DESC
       `);
-      
-      console.log(`[Storage.getPrompts] Query sem filtro retornou ${result.rows.length} prompts`);
       
       // Se não há filtros de onlyActive, mostrar todos
       let prompts = result.rows as PromptLibrary[];
@@ -1997,7 +2111,6 @@ export class DatabaseStorage implements IStorage {
           const isActive = (p as any).is_active ?? (p as any).isActive;
           return isActive === true || isActive === 'true' || isActive === 1 || isActive === '1';
         });
-        console.log(`[Storage.getPrompts] Após filtro is_active=true: ${prompts.length}`);
       }
 
       // Map snake_case to camelCase for consistency
@@ -2018,7 +2131,6 @@ export class DatabaseStorage implements IStorage {
       // Aplicar filtros em memória
       if (filters?.category) {
         prompts = prompts.filter(p => p.category === filters.category);
-        console.log(`[Storage.getPrompts] Após filtro de categoria: ${prompts.length}`);
       }
       
       if (filters?.search) {
@@ -2028,10 +2140,7 @@ export class DatabaseStorage implements IStorage {
           p.description?.toLowerCase().includes(searchLower) ||
           p.name?.toLowerCase().includes(searchLower)
         );
-        console.log(`[Storage.getPrompts] Após filtro de busca: ${prompts.length}`);
       }
-      
-      console.log(`[Storage.getPrompts] Retornando ${prompts.length} prompts`);
       
       return prompts;
     } catch (error) {
@@ -2156,28 +2265,17 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // IMEI.info Stats (Mocked as they are missing from schema)
-  async getImeiInfoStats(): Promise<any[]> { return []; }
-  async getImeiInfoStat(id: string): Promise<any | undefined> { return undefined; }
-  async createImeiInfoStats(stats: any): Promise<any> { return stats; }
-  async updateImeiInfoStat(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
-  async deleteImeiInfoStat(id: string): Promise<boolean> { return false; }
-
-  // IMEI.info Alerts (Mocked as they are missing from schema)
-  async getImeiInfoAlerts(): Promise<any[]> { return []; }
-  async getImeiInfoAlert(id: string): Promise<any | undefined> { return undefined; }
-  async createImeiInfoAlert(alert: any): Promise<any> { return alert; }
-  async updateImeiInfoAlert(id: string, data: Partial<any>): Promise<any | undefined> { return undefined; }
-  async deleteImeiInfoAlert(id: string): Promise<boolean> { return false; }
   // ============== GIT ANALYTICS - REPOSITORIES ==============
   
   async getGitRepositories(tenantId?: string): Promise<GitRepository[]> {
     if (!db) return [];
     try {
+      // Filter only active repositories
+      const activeCondition = eq(gitRepositories.isActive, true);
       if (tenantId) {
-        return await db.select().from(gitRepositories).where(eq(gitRepositories.tenantId, tenantId)).orderBy(desc(gitRepositories.createdAt));
+        return await db.select().from(gitRepositories).where(and(eq(gitRepositories.tenantId, tenantId), activeCondition)).orderBy(desc(gitRepositories.createdAt));
       }
-      return await db.select().from(gitRepositories).orderBy(desc(gitRepositories.createdAt));
+      return await db.select().from(gitRepositories).where(activeCondition).orderBy(desc(gitRepositories.createdAt));
     } catch (error) {
       console.error("[storage] getGitRepositories error:", error);
       return [];
@@ -2335,7 +2433,6 @@ export class DatabaseStorage implements IStorage {
           deletions: sql`EXCLUDED.deletions`,
         }
       }).returning();
-      console.log(`[storage] createGitCommitsBatch: upserted ${result.length} commits`);
       return result.length;
     } catch (error: any) {
       console.error("[storage] createGitCommitsBatch error:", error);
@@ -2401,7 +2498,7 @@ export class DatabaseStorage implements IStorage {
     limit?: number;
     offset?: number;
   }): Promise<GitPullRequest[]> {
-    if (!db) return [];
+    if (!db) throw new Error("Database not connected");
     try {
       // Build WHERE conditions
       const conditions: string[] = [];
@@ -2480,7 +2577,7 @@ export class DatabaseStorage implements IStorage {
         ${offsetClause}
       `;
 
-      const result = await db.query(query, params);
+      const result = await db.execute(sql`${sql.raw(query)}`);
       return result.rows as GitPullRequest[];
     } catch (error) {
       console.error("[storage] getGitPullRequests error:", error);
@@ -3105,6 +3202,40 @@ export class DatabaseStorage implements IStorage {
         securityAlerts: { total: 0, bySeverity: {} },
       };
     }
+  }
+  // ─── Claude Code Usage ──────────────────────────────────────────────────────
+
+  async upsertClaudeCodeUsage(data: InsertClaudeCodeUsage): Promise<ClaudeCodeUsageReport> {
+    const [row] = await db
+      .insert(claudeCodeUsageReports)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [claudeCodeUsageReports.developerName, claudeCodeUsageReports.reportDate],
+        set: {
+          inputTokens:         data.inputTokens,
+          outputTokens:        data.outputTokens,
+          cacheCreationTokens: data.cacheCreationTokens,
+          cacheReadTokens:     data.cacheReadTokens,
+          totalTokens:         data.totalTokens,
+          sourceMachine:       data.sourceMachine,
+          reportedAt:          sql`NOW()`,
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async getClaudeCodeUsageByPeriod(startDate: Date, endDate: Date): Promise<ClaudeCodeUsageReport[]> {
+    return db
+      .select()
+      .from(claudeCodeUsageReports)
+      .where(
+        and(
+          sql`${claudeCodeUsageReports.reportDate} >= ${startDate.toISOString().split("T")[0]}`,
+          sql`${claudeCodeUsageReports.reportDate} <= ${endDate.toISOString().split("T")[0]}`
+        )
+      )
+      .orderBy(desc(claudeCodeUsageReports.reportDate));
   }
 }
 

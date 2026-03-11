@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileBrowser } from "@/components/conhecimento/file-browser";
-import { 
-  Search, 
+import { useMetaAreas } from "@/hooks/use-meta-areas";
+import type { KnowledgeDocument } from "@shared/schema";
+import {
+  Search,
   Plus,
   FileText,
   BookOpen,
@@ -29,8 +31,6 @@ const TIPOS = [
   { value: 'faq', label: 'FAQs', icon: HelpCircle, color: 'bg-pink-500' },
 ];
 
-const AREAS = ['TI', 'RH', 'Comercial', 'Financeiro', 'Marketing', 'Operações'];
-
 const STATUS_OPTIONS = [
   { value: 'draft', label: 'Rascunho' },
   { value: 'review', label: 'Em Revisão' },
@@ -44,18 +44,20 @@ export default function BibliotecaPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: documents = [], isLoading } = useQuery({
+  const { data: areas = [] } = useMetaAreas();
+
+  const { data: documents = [], isLoading } = useQuery<KnowledgeDocument[]>({
     queryKey: ['/api/knowledge/documents'],
   });
 
   const filteredDocuments = useMemo(() => {
-    return documents.filter((doc: any) => {
-      const matchesSearch = !searchTerm || 
-        doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.description?.toLowerCase().includes(searchTerm.toLowerCase());
+    return documents.filter((doc) => {
+      const matchesSearch = !searchTerm ||
+        doc.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.conteudo?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesArea = areaFilter === "all" || doc.area === areaFilter;
-      const matchesType = typeFilter === "all" || doc.type === typeFilter;
+      const matchesType = typeFilter === "all" || doc.tipo === typeFilter;
       const matchesStatus = statusFilter === "all" || doc.status === statusFilter;
 
       return matchesSearch && matchesArea && matchesType && matchesStatus;
@@ -88,8 +90,8 @@ export default function BibliotecaPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas as Áreas</SelectItem>
-              {AREAS.map(area => (
-                <SelectItem key={area} value={area}>{area}</SelectItem>
+              {areas.map((area: any) => (
+                <SelectItem key={area.name} value={area.name}>{area.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -130,7 +132,7 @@ export default function BibliotecaPage() {
       {/* Cards de Estatísticas */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         {TIPOS.map((tipo) => {
-          const count = filteredDocuments.filter((doc: any) => doc.type === tipo.value).length;
+          const count = filteredDocuments.filter((doc) => doc.tipo === tipo.value).length;
           return (
             <Card key={tipo.value} className="hover:shadow-md transition-shadow">
               <CardHeader className="p-4 pb-2">
@@ -157,11 +159,11 @@ export default function BibliotecaPage() {
         </div>
         
         <FileBrowser
-          files={filteredDocuments.map((doc: any) => ({
+          files={filteredDocuments.map((doc) => ({
             type: 'file' as const,
-            name: doc.title,
-            description: doc.description || 'Sem descrição',
-            updatedAt: new Date(doc.updatedAt),
+            name: doc.titulo,
+            description: doc.conteudo ? doc.conteudo.substring(0, 100) + (doc.conteudo.length > 100 ? '...' : '') : 'Sem conteúdo',
+            updatedAt: doc.updatedAt ? new Date(doc.updatedAt) : new Date(0),
             path: `/conhecimento/${doc.id}`,
           }))}
           breadcrumbs={[

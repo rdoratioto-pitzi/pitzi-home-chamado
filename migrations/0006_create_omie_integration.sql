@@ -11,9 +11,12 @@ CREATE TABLE IF NOT EXISTS omie_config (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Inserir credenciais padrão (serão substituídas pelas reais)
-INSERT INTO omie_config (app_key, app_secret, is_active) 
-VALUES ('3512564154099', 'e7036f3b188d5b658319e2f97a62fcca', true)
+-- Inserir credenciais padrão (serão substituídas pelas reais via variáveis de ambiente)
+-- Execute manualmente após a migração:
+-- INSERT INTO omie_config (app_key, app_secret, is_active)
+-- VALUES (process.env.OMIE_APP_KEY, process.env.OMIE_APP_SECRET, true)
+INSERT INTO omie_config (app_key, app_secret, is_active)
+VALUES ('PLACEHOLDER_KEY', 'PLACEHOLDER_SECRET', false)
 ON CONFLICT DO NOTHING;
 
 -- Tabela de logs de sincronização

@@ -34,10 +34,10 @@ interface ModuleCard {
 
 const modules: ModuleCard[] = [
   {
-    title: "Macgyver IA",
+    title: "Chat IA",
     description: "Assistente inteligente para ajudar em suas tarefas",
     icon: Bot,
-    href: "/macgyver-ia",
+    href: "/chat-ia",
     color: "text-primary",
     bgColor: "bg-primary/10",
   },
@@ -129,7 +129,7 @@ const modules: ModuleCard[] = [
     href: "/biblioteca",
     color: "text-indigo-600 dark:text-indigo-400",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
-    permissionKey: "biblioteca",
+    permissionKey: "conhecimento",
   },
   {
     title: "Git Analytics",
@@ -138,6 +138,7 @@ const modules: ModuleCard[] = [
     href: "/git-analytics",
     color: "text-indigo-600 dark:text-indigo-400",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
+    permissionKey: "gitAnalytics"
   },
 ];
 
@@ -176,9 +177,9 @@ export default function Home() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className={cn("p-2.5 rounded-lg", module.bgColor)}>
-                      {module.title === "Macgyver IA" ? (
-                        <MacGyverIcon size={24} />
-                      ) : (
+                        {module.title === "Chat IA" ? (
+                          <MacGyverIcon size={24} />
+                        ) : (
                         <module.icon className={cn("h-6 w-6", module.color)} />
                       )}
                     </div>

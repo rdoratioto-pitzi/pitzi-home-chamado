@@ -31,7 +31,11 @@ import {
   X,
   Download,
   ArrowRight,
+  ListTree,
+  Plus,
+  BarChart2,
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -88,6 +92,7 @@ interface MeetingData {
   time?: string;
   location?: string;
   participants?: string[];
+  externalParticipants?: string[];
   agenda?: string;
   discussions?: string;
   decisions?: string[];
@@ -98,6 +103,13 @@ export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+
+  // Busca o usuário logado via session (garantido, sem depender de localStorage)
+  const { data: authData } = useQuery<{ authenticated: boolean; user?: { id: string; name: string } }>({
+    queryKey: ["/api/auth/me"],
+  });
+  const sessionUserId = authData?.user?.id;
+
   const [isEditing, setIsEditing] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -107,10 +119,55 @@ export default function TaskDetailPage() {
   const [showMentionSuggestions, setShowMentionSuggestions] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionPosition, setMentionPosition] = useState(0);
+  const [participantSearchInput, setParticipantSearchInput] = useState("");
+  const [externalParticipantInput, setExternalParticipantInput] = useState("");
 
   const { data: task, isLoading } = useQuery<Task>({
     queryKey: ["/api/tasks", id],
   });
+
+  const { data: subtasks = [] } = useQuery<Task[]>({
+    queryKey: ["/api/tasks", id, "subtasks"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tasks/${id}/subtasks`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const createSubtaskMutation = useMutation({
+    mutationFn: async (title: string) => {
+      if (!sessionUserId) throw new Error("Usuário não autenticado");
+      return apiRequest("POST", "/api/tasks", {
+        title,
+        subTaskParentId: id,
+        status: "todo",
+        priority: "medium",
+        type: "task",
+        visibility: "shared",
+        createdBy: sessionUserId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", id] });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erro ao criar subtarefa", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateSubtaskStatusMutation = useMutation({
+    mutationFn: async ({ subtaskId, status }: { subtaskId: string; status: string }) =>
+      apiRequest("PATCH", `/api/tasks/${subtaskId}`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "subtasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", id] });
+    },
+  });
+
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
   const { data: comments = [] } = useQuery<TaskCommentWithUser[]>({
     queryKey: ["/api/tasks", id, "comments"],
@@ -176,6 +233,52 @@ export default function TaskDetailPage() {
     },
   });
 
+  // Handlers for participant management in edit mode
+  const handleAddParticipant = (userId: string) => {
+    if (!editedMeetingData.participants?.includes(userId)) {
+      setEditedMeetingData({
+        ...editedMeetingData,
+        participants: [...(editedMeetingData.participants || []), userId],
+      });
+    }
+    setParticipantSearchInput("");
+  };
+
+  const handleRemoveParticipant = (userId: string) => {
+    setEditedMeetingData({
+      ...editedMeetingData,
+      participants: (editedMeetingData.participants || []).filter((p) => p !== userId),
+    });
+  };
+
+  const handleAddExternalParticipant = () => {
+    if (externalParticipantInput && externalParticipantInput.includes("@")) {
+      if (!editedMeetingData.externalParticipants?.includes(externalParticipantInput)) {
+        setEditedMeetingData({
+          ...editedMeetingData,
+          externalParticipants: [...(editedMeetingData.externalParticipants || []), externalParticipantInput],
+        });
+      }
+      setExternalParticipantInput("");
+    }
+  };
+
+  const handleRemoveExternalParticipant = (email: string) => {
+    setEditedMeetingData({
+      ...editedMeetingData,
+      externalParticipants: (editedMeetingData.externalParticipants || []).filter((p) => p !== email),
+    });
+  };
+
+  // Filter users for participant search (only active users)
+  const filteredUsers = users
+    .filter((user) => user.status === "active")
+    .filter(
+      (user) =>
+        user.name?.toLowerCase().includes(participantSearchInput.toLowerCase()) ||
+        user.email?.toLowerCase().includes(participantSearchInput.toLowerCase())
+    );
+
   const createCommentMutation = useMutation({
     mutationFn: async (data: { content: string; parentCommentId?: string }) => {
       return apiRequest("POST", `/api/tasks/${id}/comments`, data);
@@ -213,8 +316,6 @@ export default function TaskDetailPage() {
     
     setIsSubmitting(true);
     try {
-      console.log('Enviando comentário:', { content: newComment.trim() });
-      
       const response = await fetch(`/api/tasks/${id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,7 +330,6 @@ export default function TaskDetailPage() {
       }
 
       const comment = await response.json();
-      console.log('Comentário criado:', comment);
       
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", id, "comments"] });
       setNewComment('');
@@ -507,7 +607,26 @@ export default function TaskDetailPage() {
                     {new Date(task.dueDate).toLocaleDateString("pt-BR")}
                   </Badge>
                 )}
+                {(task as any).estimationHours && (
+                  <Badge variant="outline">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {(task as any).estimationHours}h estimadas
+                  </Badge>
+                )}
               </div>
+
+              {/* Barra de progresso (subtarefas) */}
+              {subtasks.length > 0 && (
+                <div className="mt-2 flex items-center gap-2">
+                  <Progress
+                    value={(subtasks.filter(s => s.status === "done").length / subtasks.length) * 100}
+                    className="h-1.5 flex-1"
+                  />
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                    {subtasks.filter(s => s.status === "done").length}/{subtasks.length} subtarefas
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -613,25 +732,114 @@ export default function TaskDetailPage() {
                   )}
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Participantes</label>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Participantes (do sistema)</label>
                   {isEditing ? (
-                    <Input
-                      value={editedMeetingData.participants?.join(", ") || ""}
-                      onChange={(e) => setEditedMeetingData({ 
-                        ...editedMeetingData, 
-                        participants: e.target.value.split(",").map(p => p.trim()).filter(Boolean)
-                      })}
-                      placeholder="Nomes separados por vírgula"
-                      data-testid="input-meeting-participants"
-                    />
+                    <>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {(editedMeetingData.participants || []).map((userId) => {
+                          const user = users.find((u) => u.id === userId);
+                          return (
+                            <Badge key={userId} variant="secondary" className="gap-1">
+                              {user?.name || userId}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveParticipant(userId)}
+                                className="ml-1 hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                      <div className="relative">
+                        <Input
+                          value={participantSearchInput}
+                          onChange={(e) => setParticipantSearchInput(e.target.value)}
+                          placeholder="Buscar participante..."
+                          data-testid="input-participant-search"
+                        />
+                        {participantSearchInput && filteredUsers.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-background border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                            {filteredUsers
+                              .filter((u) => !(editedMeetingData.participants || []).includes(u.id))
+                              .slice(0, 5)
+                              .map((user) => (
+                                <button
+                                  key={user.id}
+                                  type="button"
+                                  className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 text-sm"
+                                  onClick={() => handleAddParticipant(user.id)}
+                                >
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                  <span>{user.name}</span>
+                                  <span className="text-muted-foreground text-xs">({user.email})</span>
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   ) : (
                     <p className="mt-1">
-                      {editedMeetingData.participants?.length 
+                      {editedMeetingData.participants?.length
                         ? editedMeetingData.participants.map(p => {
                             const user = users.find(u => u.id === p);
                             return user?.name || p;
                           }).join(", ")
+                        : "-"
+                      }
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">Participantes externos (email)</label>
+                  {isEditing ? (
+                    <>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {(editedMeetingData.externalParticipants || []).map((email) => (
+                          <Badge key={email} variant="outline" className="gap-1">
+                            {email}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveExternalParticipant(email)}
+                              className="ml-1 hover:text-destructive"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          value={externalParticipantInput}
+                          onChange={(e) => setExternalParticipantInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddExternalParticipant();
+                            }
+                          }}
+                          placeholder="Adicionar email externo..."
+                          data-testid="input-external-participant"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleAddExternalParticipant}
+                          disabled={!externalParticipantInput || !externalParticipantInput.includes("@")}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="mt-1">
+                      {editedMeetingData.externalParticipants?.length
+                        ? editedMeetingData.externalParticipants.join(", ")
                         : "-"
                       }
                     </p>
@@ -772,6 +980,103 @@ export default function TaskDetailPage() {
           )}
         </Card>
 
+        {/* Seção de Subtarefas */}
+        {task.type !== "meeting_note" && (
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium flex items-center gap-2">
+                <ListTree className="h-4 w-4" />
+                Subtarefas
+                {subtasks.length > 0 && (
+                  <Badge variant="secondary" className="ml-1 text-xs">
+                    {subtasks.filter(s => s.status === "done").length}/{subtasks.length}
+                  </Badge>
+                )}
+              </h3>
+            </div>
+
+            {subtasks.length > 0 && (
+              <div className="mb-4">
+                <Progress
+                  value={(subtasks.filter(s => s.status === "done").length / subtasks.length) * 100}
+                  className="h-1.5"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {subtasks.filter(s => s.status === "done").length} de {subtasks.length} concluídas
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-2 mb-4">
+              {subtasks.map(subtask => (
+                <div key={subtask.id} className="flex items-center gap-2 p-2 rounded-lg border bg-muted/20 group">
+                  <button
+                    onClick={() => updateSubtaskStatusMutation.mutate({
+                      subtaskId: subtask.id,
+                      status: subtask.status === "done" ? "todo" : "done",
+                    })}
+                    className="flex-shrink-0"
+                  >
+                    {subtask.status === "done" ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <Circle className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </button>
+                  <span className={`text-sm flex-1 ${subtask.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+                    {subtask.title}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] h-5 ${
+                      subtask.priority === "high" ? "border-red-300 text-red-600" :
+                      subtask.priority === "medium" ? "border-yellow-300 text-yellow-600" :
+                      "border-gray-300 text-gray-500"
+                    }`}
+                  >
+                    {subtask.priority === "high" ? "Alta" : subtask.priority === "medium" ? "Média" : "Baixa"}
+                  </Badge>
+                </div>
+              ))}
+              {subtasks.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  Nenhuma subtarefa. Adicione abaixo para dividir esta tarefa.
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nova subtarefa..."
+                value={newSubtaskTitle}
+                onChange={e => setNewSubtaskTitle(e.target.value)}
+                className="h-8 text-sm"
+                onKeyDown={e => {
+                  if (e.key === "Enter" && newSubtaskTitle.trim()) {
+                    e.preventDefault();
+                    createSubtaskMutation.mutate(newSubtaskTitle.trim());
+                    setNewSubtaskTitle("");
+                  }
+                }}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 px-3"
+                disabled={!newSubtaskTitle.trim() || createSubtaskMutation.isPending}
+                onClick={() => {
+                  if (newSubtaskTitle.trim()) {
+                    createSubtaskMutation.mutate(newSubtaskTitle.trim());
+                    setNewSubtaskTitle("");
+                  }
+                }}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </Card>
+        )}
+
         <Card className="p-6">
           <h3 className="font-medium mb-4 flex items-center gap-2">
             <MessageSquare className="h-4 w-4" />
@@ -837,7 +1142,8 @@ export default function TaskDetailPage() {
                 {showMentionSuggestions && (
                   <div className="absolute z-20 left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-32 overflow-y-auto">
                     {users
-                      .filter(u => u.name.toLowerCase().includes(mentionQuery) || u.email.toLowerCase().includes(mentionQuery))
+                      .filter(u => u.status === "active" && (u.name.toLowerCase().includes(mentionQuery) || u.email.toLowerCase().includes(mentionQuery)))
+                      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
                       .slice(0, 5)
                       .map(user => (
                         <button
@@ -858,7 +1164,7 @@ export default function TaskDetailPage() {
                           <span className="text-muted-foreground text-xs">({user.email})</span>
                         </button>
                       ))}
-                    {users.filter(u => u.name.toLowerCase().includes(mentionQuery)).length === 0 && (
+                    {users.filter(u => u.status === "active" && u.name.toLowerCase().includes(mentionQuery)).length === 0 && (
                       <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado</div>
                     )}
                   </div>

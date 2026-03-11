@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,23 +15,22 @@ import { Separator } from '@/components/ui/separator';
 export default function OmieGeral() {
   // Estados para Clientes
   const [clientesFilters, setClientesFilters] = useState({
-    pagina: 1,
-    registros_por_pagina: 10,
+    nPagina: 1,
+    nRegPorPagina: 10,
     cnpj_cpf: '',
     razao_social: '',
     cidade: '',
     inativo: 'ALL'
   });
   const [clientesData, setClientesData] = useState<any[]>([]);
+  const [clientesResumo, setClientesResumo] = useState<any>(null);
+  const [clientesTotalRegistros, setClientesTotalRegistros] = useState(0);
   const [clientesLoading, setClientesLoading] = useState(false);
 
   // Estados para Categorias
-  const [categoriasFilters, setCategoriasFilters] = useState({
-    nPagina: 1,
-    nRegPorPagina: 50,
-    cTipo: 'ALL'
-  });
+  const [cTipoFiltro, setCTipoFiltro] = useState('ALL');
   const [categoriasData, setCategoriasData] = useState<any[]>([]);
+  const [categoriasResumo, setCategoriasResumo] = useState<any>(null);
   const [categoriasLoading, setCategoriasLoading] = useState(false);
 
   // Estados para Empresa
@@ -40,55 +39,35 @@ export default function OmieGeral() {
 
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Função genérica para chamar API
-  const callOmieApi = async (endpoint: string, call: string, params: any[], category: string) => {
-    try {
-      const { data } = await axios.post('/api/omie/call', {
-        endpoint,
-        call,
-        params,
-        category
-      }, { withCredentials: true });
-
-      if (data.success) {
-        return data.data;
-      }
-      throw new Error(data.error || 'Erro na requisição');
-    } catch (error: any) {
-      throw new Error(error.response?.data?.error || error.message);
-    }
-  };
+  // Carregar dados da empresa ao montar
+  useEffect(() => {
+    handleBuscarEmpresa();
+  }, []);
 
   // Handler Clientes
   const handleBuscarClientes = async () => {
     setClientesLoading(true);
     setMessage(null);
     try {
-      const params = [{
-        pagina: clientesFilters.pagina,
-        registros_por_pagina: clientesFilters.registros_por_pagina,
-        apenas_importado_api: 'N',
-        clientesFiltro: {}
-      }];
+      const body: any = {
+        nPagina: clientesFilters.nPagina,
+        nRegPorPagina: clientesFilters.nRegPorPagina,
+      };
+      if (clientesFilters.cnpj_cpf) body.cnpj_cpf = clientesFilters.cnpj_cpf;
+      if (clientesFilters.razao_social) body.razao_social = clientesFilters.razao_social;
+      if (clientesFilters.cidade) body.cidade = clientesFilters.cidade;
+      if (clientesFilters.inativo !== 'ALL') body.inativo = clientesFilters.inativo;
 
-      if (clientesFilters.cnpj_cpf) {
-        params[0].clientesFiltro.cnpj_cpf = clientesFilters.cnpj_cpf;
-      }
-      if (clientesFilters.razao_social) {
-        params[0].clientesFiltro.razao_social = clientesFilters.razao_social;
-      }
-      if (clientesFilters.cidade) {
-        params[0].clientesFiltro.cidade = clientesFilters.cidade;
-      }
-      if (clientesFilters.inativo !== 'ALL') {
-        params[0].clientesFiltro.inativo = clientesFilters.inativo;
-      }
+      const { data } = await axios.post('/api/omie/geral/clientes', body, { withCredentials: true });
 
-      const result = await callOmieApi('geral/clientes/', 'ListarClientes', params, 'geral');
-      setClientesData(result.clientes_cadastro || []);
-      setMessage({ type: 'success', text: `${result.total_de_registros || 0} cliente(s) encontrado(s)` });
+      if (!data.sucesso) throw new Error(data.error || 'Erro na requisição');
+
+      setClientesData(data.clientes || []);
+      setClientesResumo(data.resumo);
+      setClientesTotalRegistros(data.totalRegistros || 0);
+      setMessage({ type: 'success', text: `${data.totalRegistros || 0} cliente(s) encontrado(s)` });
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: error.response?.data?.error || error.message });
       setClientesData([]);
     } finally {
       setClientesLoading(false);
@@ -100,20 +79,15 @@ export default function OmieGeral() {
     setCategoriasLoading(true);
     setMessage(null);
     try {
-      const params = [{
-        nPagina: categoriasFilters.nPagina,
-        nRegPorPagina: categoriasFilters.nRegPorPagina
-      }];
+      const { data } = await axios.post('/api/omie/geral/categorias', { nPagina: 1, nRegPorPagina: 500 }, { withCredentials: true });
 
-      if (categoriasFilters.cTipo !== 'ALL') {
-        params[0].cTipo = categoriasFilters.cTipo;
-      }
+      if (!data.sucesso) throw new Error(data.error || 'Erro na requisição');
 
-      const result = await callOmieApi('geral/categorias/', 'ListarCategorias', params, 'geral');
-      setCategoriasData(result.categoria_cadastro || []);
-      setMessage({ type: 'success', text: `${result.total_de_registros || 0} categoria(s) encontrada(s)` });
+      setCategoriasData(data.categorias || []);
+      setCategoriasResumo(data.resumo);
+      setMessage({ type: 'success', text: `${data.totalRegistros || 0} categoria(s) encontrada(s)` });
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: error.response?.data?.error || error.message });
       setCategoriasData([]);
     } finally {
       setCategoriasLoading(false);
@@ -123,13 +97,31 @@ export default function OmieGeral() {
   // Handler Dados da Empresa
   const handleBuscarEmpresa = async () => {
     setEmpresaLoading(true);
+    try {
+      const { data } = await axios.get('/api/omie/geral/empresa', { withCredentials: true });
+
+      if (!data.sucesso) throw new Error(data.error || 'Erro na requisição');
+
+      setEmpresaData(data.empresa);
+    } catch (error: any) {
+      // Silencioso no auto-load; apenas mostra mensagem se chamado manualmente
+    } finally {
+      setEmpresaLoading(false);
+    }
+  };
+
+  const handleRecarregarEmpresa = async () => {
+    setEmpresaLoading(true);
     setMessage(null);
     try {
-      const result = await callOmieApi('geral/empresas/', 'ConsultarEmpresa', [{}], 'geral');
-      setEmpresaData(result);
-      setMessage({ type: 'success', text: 'Dados da empresa carregados com sucesso' });
+      const { data } = await axios.get('/api/omie/geral/empresa', { withCredentials: true });
+
+      if (!data.sucesso) throw new Error(data.error || 'Erro na requisição');
+
+      setEmpresaData(data.empresa);
+      setMessage({ type: 'success', text: data.empresa ? 'Dados da empresa carregados com sucesso' : 'Nenhuma empresa encontrada' });
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message });
+      setMessage({ type: 'error', text: error.response?.data?.error || error.message });
       setEmpresaData(null);
     } finally {
       setEmpresaLoading(false);
@@ -148,6 +140,15 @@ export default function OmieGeral() {
     return doc;
   };
 
+  // Filtragem client-side de categorias por tipo
+  const categoriasFiltradas = cTipoFiltro === 'ALL'
+    ? categoriasData
+    : categoriasData.filter(c => c.tipo === (cTipoFiltro === 'REC' ? 'Receita' : 'Despesa'));
+
+  const receitas = categoriasData.filter(c => c.tipo === 'Receita');
+  const despesas = categoriasData.filter(c => c.tipo === 'Despesa');
+  const outros = categoriasData.filter(c => c.tipo === 'Outro');
+
   return (
     <div className="space-y-6 mt-6">
       {message && (
@@ -156,6 +157,120 @@ export default function OmieGeral() {
         </Alert>
       )}
 
+      {/* DADOS DA EMPRESA */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Dados da Empresa
+              </CardTitle>
+              <CardDescription>Informações da empresa cadastrada no Omie</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRecarregarEmpresa} disabled={empresaLoading}>
+              {empresaLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
+              Recarregar
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {empresaLoading ? (
+            <Skeleton className="h-64 w-full" />
+          ) : empresaData ? (
+            <div className="space-y-6">
+              {/* Informações Básicas */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Informações Básicas</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Razão Social</Label>
+                    <p className="text-sm font-medium">{empresaData.razaoSocial || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Nome Fantasia</Label>
+                    <p className="text-sm font-medium">{empresaData.nomeFantasia || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">CNPJ</Label>
+                    <p className="text-sm font-medium font-mono">{empresaData.cnpj || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Inscrição Estadual</Label>
+                    <p className="text-sm font-medium">{empresaData.inscricaoEstadual || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Inscrição Municipal</Label>
+                    <p className="text-sm font-medium">{empresaData.inscricaoMunicipal || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Regime Tributário</Label>
+                    <p className="text-sm font-medium">{empresaData.regimeTributario || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Endereço */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Endereço
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Logradouro</Label>
+                    <p className="text-sm">{empresaData.endereco || '-'}, {empresaData.enderecoNumero || 'S/N'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Complemento</Label>
+                    <p className="text-sm">{empresaData.complemento || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Bairro</Label>
+                    <p className="text-sm">{empresaData.bairro || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Cidade/UF</Label>
+                    <p className="text-sm">{empresaData.cidade || '-'}/{empresaData.estado || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">CEP</Label>
+                    <p className="text-sm font-mono">{empresaData.cep || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Contato */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold">Contato</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Phone className="h-3 w-3" />
+                      Telefone
+                    </Label>
+                    <p className="text-sm">{empresaData.telefone || '-'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Mail className="h-3 w-3" />
+                      Email
+                    </Label>
+                    <p className="text-sm">{empresaData.email || '-'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Nenhum dado de empresa encontrado.</p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* CLIENTES */}
       <Card>
         <CardHeader>
@@ -163,7 +278,7 @@ export default function OmieGeral() {
             <Users className="h-5 w-5" />
             Clientes
           </CardTitle>
-          <CardDescription>Consultar cadastro de clientes</CardDescription>
+          <CardDescription>Consultar cadastro de clientes e fornecedores</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -210,6 +325,14 @@ export default function OmieGeral() {
             Buscar Clientes
           </Button>
 
+          {clientesResumo && (
+            <div className="flex gap-4 text-sm">
+              <span>Total: <strong>{clientesTotalRegistros}</strong></span>
+              <span className="text-green-600">Ativos: <strong>{clientesResumo.totalAtivos}</strong></span>
+              <span className="text-red-500">Inativos: <strong>{clientesResumo.totalInativos}</strong></span>
+            </div>
+          )}
+
           {clientesLoading ? (
             <Skeleton className="h-64 w-full" />
           ) : clientesData.length > 0 ? (
@@ -230,16 +353,20 @@ export default function OmieGeral() {
                 <TableBody>
                   {clientesData.map((cliente, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-medium">{cliente.codigo_cliente_omie}</TableCell>
-                      <TableCell>{cliente.razao_social}</TableCell>
-                      <TableCell>{cliente.nome_fantasia || '-'}</TableCell>
-                      <TableCell className="font-mono text-xs">{formatDocument(cliente.cnpj_cpf)}</TableCell>
+                      <TableCell className="font-medium">{cliente.codigoOmie}</TableCell>
+                      <TableCell>{cliente.razaoSocial}</TableCell>
+                      <TableCell>{cliente.nomeFantasia || '-'}</TableCell>
+                      <TableCell className="font-mono text-xs">{formatDocument(cliente.cnpjCpf)}</TableCell>
                       <TableCell>{cliente.cidade}/{cliente.estado}</TableCell>
-                      <TableCell>{cliente.telefone1_numero ? `(${cliente.telefone1_ddd}) ${cliente.telefone1_numero}` : '-'}</TableCell>
+                      <TableCell>
+                        {cliente.telefoneNumero
+                          ? `(${cliente.telefoneDdd}) ${cliente.telefoneNumero}`
+                          : '-'}
+                      </TableCell>
                       <TableCell className="text-xs">{cliente.email || '-'}</TableCell>
                       <TableCell>
-                        <Badge variant={cliente.inativo === 'S' ? 'destructive' : 'default'}>
-                          {cliente.inativo === 'S' ? 'Inativo' : 'Ativo'}
+                        <Badge variant={cliente.inativo ? 'destructive' : 'default'}>
+                          {cliente.inativo ? 'Inativo' : 'Ativo'}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -258,13 +385,13 @@ export default function OmieGeral() {
             <FolderTree className="h-5 w-5" />
             Categorias
           </CardTitle>
-          <CardDescription>Consultar categorias cadastradas no sistema</CardDescription>
+          <CardDescription>Consultar categorias financeiras cadastradas no sistema</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label>Tipo de Categoria</Label>
-              <Select value={categoriasFilters.cTipo} onValueChange={(v) => setCategoriasFilters(prev => ({ ...prev, cTipo: v }))}>
+              <Select value={cTipoFiltro} onValueChange={setCTipoFiltro}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todas" />
                 </SelectTrigger>
@@ -283,187 +410,66 @@ export default function OmieGeral() {
             </div>
           </div>
 
+          {categoriasResumo && (
+            <div className="flex gap-4 text-sm">
+              <span className="text-blue-600">Receitas: <strong>{categoriasResumo.totalReceitas}</strong></span>
+              <span className="text-orange-500">Despesas: <strong>{categoriasResumo.totalDespesas}</strong></span>
+              {categoriasResumo.totalOutros > 0 && (
+                <span className="text-muted-foreground">Outros: <strong>{categoriasResumo.totalOutros}</strong></span>
+              )}
+            </div>
+          )}
+
           {categoriasLoading ? (
             <Skeleton className="h-64 w-full" />
           ) : categoriasData.length > 0 ? (
-            <>
-              {/* Receitas */}
-              {categoriasData.some(c => c.cTipo === 'REC') && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Badge variant="default">Receitas</Badge>
-                    <span className="text-muted-foreground">({categoriasData.filter(c => c.cTipo === 'REC').length})</span>
-                  </h3>
-                  <div className="border rounded-lg overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Código</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {categoriasData.filter(c => c.cTipo === 'REC').map((cat, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{cat.nCodCategoria}</TableCell>
-                            <TableCell>{cat.cNomeCategoria}</TableCell>
-                            <TableCell>
-                              <Badge variant={cat.cInativo === 'S' ? 'destructive' : 'default'} className="text-xs">
-                                {cat.cInativo === 'S' ? 'Inativa' : 'Ativa'}
-                              </Badge>
-                            </TableCell>
+            (() => {
+              const renderTabela = (lista: any[], titulo: string, variant: 'default' | 'secondary' | 'outline') => (
+                lista.length > 0 && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                      <Badge variant={variant}>{titulo}</Badge>
+                      <span className="text-muted-foreground">({lista.length})</span>
+                    </h3>
+                    <div className="border rounded-lg overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Código</TableHead>
+                            <TableHead>Descrição</TableHead>
+                            <TableHead>Status</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {lista.map((cat, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium font-mono">{cat.codigo}</TableCell>
+                              <TableCell>{cat.descricao}</TableCell>
+                              <TableCell>
+                                <Badge variant={cat.ativa ? 'default' : 'destructive'} className="text-xs">
+                                  {cat.ativa ? 'Ativa' : 'Inativa'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </div>
+                )
+              );
+
+              const showReceitas = cTipoFiltro === 'ALL' || cTipoFiltro === 'REC';
+              const showDespesas = cTipoFiltro === 'ALL' || cTipoFiltro === 'DES';
+
+              return (
+                <div className="space-y-4">
+                  {showReceitas && renderTabela(receitas, 'Receitas', 'default')}
+                  {showDespesas && renderTabela(despesas, 'Despesas', 'secondary')}
+                  {cTipoFiltro === 'ALL' && renderTabela(outros, 'Outros', 'outline')}
                 </div>
-              )}
-
-              {/* Despesas */}
-              {categoriasData.some(c => c.cTipo === 'DES') && (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
-                    <Badge variant="secondary">Despesas</Badge>
-                    <span className="text-muted-foreground">({categoriasData.filter(c => c.cTipo === 'DES').length})</span>
-                  </h3>
-                  <div className="border rounded-lg overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Código</TableHead>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {categoriasData.filter(c => c.cTipo === 'DES').map((cat, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{cat.nCodCategoria}</TableCell>
-                            <TableCell>{cat.cNomeCategoria}</TableCell>
-                            <TableCell>
-                              <Badge variant={cat.cInativo === 'S' ? 'destructive' : 'default'} className="text-xs">
-                                {cat.cInativo === 'S' ? 'Inativa' : 'Ativa'}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-            </>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {/* DADOS DA EMPRESA */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Dados da Empresa
-          </CardTitle>
-          <CardDescription>Informações da empresa cadastrada no Omie</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button onClick={handleBuscarEmpresa} disabled={empresaLoading}>
-            {empresaLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
-            Carregar Dados da Empresa
-          </Button>
-
-          {empresaLoading ? (
-            <Skeleton className="h-96 w-full" />
-          ) : empresaData ? (
-            <div className="space-y-6">
-              {/* Informações Básicas */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold">Informações Básicas</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Razão Social</Label>
-                    <p className="text-sm font-medium">{empresaData.razao_social || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Nome Fantasia</Label>
-                    <p className="text-sm font-medium">{empresaData.nome_fantasia || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">CNPJ</Label>
-                    <p className="text-sm font-medium font-mono">{formatDocument(empresaData.cnpj) || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Inscrição Estadual</Label>
-                    <p className="text-sm font-medium">{empresaData.inscricao_estadual || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Inscrição Municipal</Label>
-                    <p className="text-sm font-medium">{empresaData.inscricao_municipal || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Regime Tributário</Label>
-                    <p className="text-sm font-medium">{empresaData.regime_tributario || '-'}</p>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Endereço */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Endereço
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Logradouro</Label>
-                    <p className="text-sm">{empresaData.endereco || '-'}, {empresaData.numero || 'S/N'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Complemento</Label>
-                    <p className="text-sm">{empresaData.complemento || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Bairro</Label>
-                    <p className="text-sm">{empresaData.bairro || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Cidade/UF</Label>
-                    <p className="text-sm">{empresaData.cidade || '-'}/{empresaData.estado || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">CEP</Label>
-                    <p className="text-sm font-mono">{empresaData.cep || '-'}</p>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Contato */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-semibold">Contato</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      Telefone
-                    </Label>
-                    <p className="text-sm">{empresaData.telefone || '-'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Mail className="h-3 w-3" />
-                      Email
-                    </Label>
-                    <p className="text-sm">{empresaData.email || '-'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+              );
+            })()
           ) : null}
         </CardContent>
       </Card>

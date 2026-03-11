@@ -58,13 +58,9 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 const PRICING_API_BASE = "/api/pricing";
-
-const CATEGORIES = [
-  { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
-  { id: "d686a25d-045d-4b8c-9d7c-35a21d29d31b", name: "Android" },
-];
 
 interface AggregatedData {
   manufacturer: string;
@@ -77,22 +73,30 @@ interface AggregatedData {
   updatedAt: string;
 }
 
-interface SearchResult {
-  id?: string;
-  title?: string;
-  link?: string;
-  source?: string;
-  price?: string;
-  extracted_price?: number;
-  thumbnail?: string;
-  position?: number;
+interface ScrapedPrice {
+  id: string;
+  rawId: string;
+  productId: string;
+  productUrl: string;
+  title: string;
+  source: string;
+  priceText: string;
+  extractedPrice: number;
+  rating?: number;
+  reviews?: number;
+  thumbnail: string;
 }
 
-interface SearchResponse {
-  raw?: {
-    shopping_results?: SearchResult[];
+interface DeviceWithPrices {
+  device: {
+    categoryId: string;
+    manufacturerName: string;
+    modelName: string;
+    storage: number;
   };
-  searchedAt?: string;
+  fromCache: boolean;
+  scrapedAt: string;
+  scrapedData: ScrapedPrice[];
 }
 
 interface InternalPrice {
@@ -103,16 +107,58 @@ interface InternalPrice {
 export default function PricingDetailsPage() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const { data: categoriesData } = usePricingCategories();
   const [months, setMonths] = useState("12");
   const [isExporting, setIsExporting] = useState(false);
+  const [isForceRefreshing, setIsForceRefreshing] = useState(false);
+  
+  // State for URL parameters - updated reactively when location changes
+  const [category, setCategory] = useState(() => {
+    // Initialize from URL on first render
+    const params = new URLSearchParams(window.location.search);
+    return params.get("category") || "";
+  });
+  const [brand, setBrand] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("brand") || "";
+  });
+  const [model, setModel] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("model") || "";
+  });
+  const [storage, setStorage] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("storage") || "";
+  });
+  
+  // Parse URL parameters when location changes
+  // IMPORTANT: useLocation from wouter doesn't include query params, so we use window.location.search
+  useEffect(() => {
+    console.log("[detalhes] useEffect triggered, location:", location);
+    console.log("[detalhes] window.location.search:", window.location.search);
+    
+    // Use window.location.search to get query params (works better with wouter)
+    const params = new URLSearchParams(window.location.search);
+    const urlCategory = params.get("category");
+    const urlBrand = params.get("brand");
+    const urlModel = params.get("model");
+    const urlStorage = params.get("storage");
+    
+    console.log("[detalhes] Parsed params:", { urlCategory, urlBrand, urlModel, urlStorage });
+    
+    setCategory(urlCategory || (categoriesData?.[0]?.id || ""));
+    setBrand(urlBrand || "");
+    setModel(urlModel || "");
+    setStorage(urlStorage || "");
+  }, [location]);
 
-  const params = new URLSearchParams(location.split("?")[1] || "");
-  const category = params.get("category") || CATEGORIES[0].id;
-  const brand = params.get("brand") || "";
-  const model = params.get("model") || "";
-  const storage = params.get("storage") || "";
+  useEffect(() => {
+    if (categoriesData && categoriesData.length > 0 && !category) {
+      setCategory(categoriesData[0].id);
+    }
+  }, [categoriesData, category]);
 
-  const categoryName = CATEGORIES.find((c) => c.id === category)?.name || "";
+  const categoryName = categoriesData?.find((c) => c.id === category)?.name || "";
   const deviceName = `${brand} ${model} ${storage}GB`;
 
   const { data: aggData, isLoading: isLoadingAgg, refetch: refetchAgg } = useQuery<AggregatedData[]>({
@@ -128,17 +174,20 @@ export default function PricingDetailsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: searchData, isLoading: isLoadingSearch, refetch: refetchSearch } = useQuery<SearchResponse>({
-    queryKey: ["pricing-search", category, brand, model, storage],
+  const { data: deviceData, isLoading: isLoadingSearch, refetch: refetchSearch } = useQuery<DeviceWithPrices>({
+    queryKey: ["pricing-device", category, brand, model, storage],
     queryFn: async () => {
-      if (!brand || !model || !storage) return { raw: { shopping_results: [] } };
-      const url = `${PRICING_API_BASE}/search?categoryId=${category}&manufacturer=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}&storage=${storage}&ignoreLastUpdateDate=false`;
+      if (!brand || !model || !storage) throw new Error("Parâmetros inválidos");
+      const url = `${PRICING_API_BASE}/device/${category}/${encodeURIComponent(brand)}/${encodeURIComponent(model)}/${storage}`;
       const response = await fetch(url);
-      if (!response.ok) throw new Error("Erro ao carregar anúncios");
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: "Erro desconhecido" }));
+        throw new Error(error.error || "Erro ao carregar dados do dispositivo");
+      }
       return response.json();
     },
     enabled: !!brand && !!model && !!storage,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutos - o cache de 7 dias é gerenciado pelo servidor
   });
 
   const { data: internalPrice, isLoading: isLoadingPrice } = useQuery<InternalPrice>({
@@ -154,31 +203,127 @@ export default function PricingDetailsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const shoppingResults = searchData?.raw?.shopping_results || [];
+  // State for discarded ads (local only - resets on page refresh)
+  const [discardedAdIds, setDiscardedAdIds] = useState<Set<string>>(new Set());
+
+  // Filter out discarded ads from results
+  const activeShoppingResults = useMemo(() => {
+    return (deviceData?.scrapedData || []).filter(ad => !discardedAdIds.has(ad.id));
+  }, [deviceData?.scrapedData, discardedAdIds]);
+
+  const shoppingResults = activeShoppingResults;
+
+  // Handle discarding an ad
+  const handleDiscardAd = (adId: string) => {
+    setDiscardedAdIds(prev => new Set(Array.from(prev).concat(adId)));
+    toast({
+      title: "Anúncio descartado",
+      description: "O anúncio foi removido da lista. Os valores serão recalculados.",
+    });
+  };
+
+  // Handle restoring all discarded ads
+  const handleRestoreAll = () => {
+    setDiscardedAdIds(new Set());
+    toast({
+      title: "Anúncios restaurados",
+      description: "Todos os anúncios descartados foram restaurados.",
+    });
+  };
+   
+  // Informações do cache
+  const isFromCache = deviceData?.fromCache || false;
+  const scrapedAt = deviceData?.scrapedAt ? new Date(deviceData.scrapedAt).toLocaleString("pt-BR") : "N/A";
+
+  // Calculate prices from active (non-discarded) scraped ads
+  const scrapedPrices = useMemo(() => {
+    const prices = shoppingResults
+      .map(ad => ad.extractedPrice)
+      .filter((price): price is number => typeof price === "number" && !isNaN(price));
+    
+    if (prices.length === 0) return null;
+    
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    
+    return { min, max, avg, count: prices.length };
+  }, [shoppingResults]);
 
   const chartData = useMemo(() => {
-    if (!aggData || aggData.length === 0) return [];
-    return aggData
-      .map((item) => ({
-        date: new Date(item.updatedAt).toLocaleDateString("pt-BR"),
-        avgPrice: Number(item.avgPrice.toFixed(2)),
-        minPrice: Number(item.minPrice.toFixed(2)),
-        maxPrice: Number(item.maxPrice.toFixed(2)),
-        itemsCount: item.itemsCount,
-      }))
-      .sort((a, b) => {
+    let data: {
+      date: string;
+      avgPrice: number;
+      minPrice: number;
+      maxPrice: number;
+      itemsCount: number;
+    }[] = [];
+    
+    if (aggData && aggData.length > 0) {
+      data = aggData
+        .map((item) => ({
+          date: new Date(item.updatedAt).toLocaleDateString("pt-BR"),
+          avgPrice: Number(item.avgPrice.toFixed(2)),
+          minPrice: Number(item.minPrice.toFixed(2)),
+          maxPrice: Number(item.maxPrice.toFixed(2)),
+          itemsCount: item.itemsCount,
+        }));
+    }
+
+    // Sort historical data
+    data.sort((a, b) => {
+      const [dayA, monthA, yearA] = a.date.split("/").map(Number);
+      const [dayB, monthB, yearB] = b.date.split("/").map(Number);
+      return new Date(yearA, monthA - 1, dayA).getTime() - new Date(yearB, monthB - 1, dayB).getTime();
+    });
+
+    // Add/Update with scraped data if available
+    if (scrapedPrices) {
+      // Use scrapedAt date if available, otherwise today
+      const dateStr = deviceData?.scrapedAt 
+        ? new Date(deviceData.scrapedAt).toLocaleDateString("pt-BR")
+        : new Date().toLocaleDateString("pt-BR");
+        
+      const scrapedPoint = {
+        date: dateStr,
+        avgPrice: Number(Number(scrapedPrices.avg).toFixed(2)),
+        minPrice: Number(Number(scrapedPrices.min).toFixed(2)),
+        maxPrice: Number(Number(scrapedPrices.max).toFixed(2)),
+        itemsCount: scrapedPrices.count,
+      };
+
+      const existingIndex = data.findIndex(d => d.date === dateStr);
+      
+      if (existingIndex >= 0) {
+        data[existingIndex] = scrapedPoint;
+      } else {
+        data.push(scrapedPoint);
+      }
+
+      // Re-sort to ensure correct order
+      data.sort((a, b) => {
         const [dayA, monthA, yearA] = a.date.split("/").map(Number);
         const [dayB, monthB, yearB] = b.date.split("/").map(Number);
         return new Date(yearA, monthA - 1, dayA).getTime() - new Date(yearB, monthB - 1, dayB).getTime();
       });
-  }, [aggData]);
+    }
 
-  const latestData = aggData && aggData.length > 0 ? aggData[aggData.length - 1] : null;
-  const previousData = aggData && aggData.length > 1 ? aggData[aggData.length - 2] : null;
+    return data;
+  }, [aggData, scrapedPrices, deviceData]);
+
+  const latestData = chartData && chartData.length > 0 ? chartData[chartData.length - 1] : null;
+  const previousData = chartData && chartData.length > 1 ? chartData[chartData.length - 2] : null;
 
   const priceVariation = useMemo(() => {
     if (!latestData || !previousData) return null;
-    const variation = ((latestData.avgPrice - previousData.avgPrice) / previousData.avgPrice) * 100;
+
+    // Use avgPrice or fallback
+    const currentPrice = latestData.avgPrice;
+    const prevPrice = previousData.avgPrice;
+    
+    if (!prevPrice) return null;
+
+    const variation = ((currentPrice - prevPrice) / prevPrice) * 100;
     return variation;
   }, [latestData, previousData]);
 
@@ -203,8 +348,8 @@ export default function PricingDetailsPage() {
       const adsData = shoppingResults.map((ad, idx) => ({
         "#": idx + 1,
         Loja: ad.source || "N/A",
-        Preço: ad.extracted_price || 0,
-        Link: ad.link || "",
+        Preço: ad.extractedPrice || 0,
+        Link: ad.productUrl || "",
       }));
 
       const wb = XLSX.utils.book_new();
@@ -233,9 +378,55 @@ export default function PricingDetailsPage() {
     }
   };
 
+  const handleForceRefresh = async () => {
+    if (!brand || !model || !storage) return;
+    
+    setIsForceRefreshing(true);
+    try {
+      const url = `${PRICING_API_BASE}/device/refresh`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          categoryId: category,
+          manufacturerName: brand,
+          modelName: model,
+          storage: parseInt(storage, 10),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Erro ao forçar atualização");
+      }
+
+      // Refetch data after force refresh
+      await refetchSearch();
+      await refetchAgg();
+      
+      toast({
+        title: "Atualização concluída",
+        description: "Dados atualizados com sucesso!",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro na atualização",
+        description: "Não foi possível atualizar os dados.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsForceRefreshing(false);
+    }
+  };
+
   const isLoading = isLoadingAgg || isLoadingSearch || isLoadingPrice;
 
+  console.log("[detalhes] Checking product - brand:", brand, "model:", model, "storage:", storage);
+  console.log("[detalhes] !brand:", !brand, "!model:", !model, "!storage:", !storage);
+
   if (!brand || !model || !storage) {
+    console.log("[detalhes] Showing 'Nenhum produto selecionado' message");
     return (
       <div className="flex flex-col h-full">
         <PageHeader
@@ -307,6 +498,17 @@ export default function PricingDetailsPage() {
             <Button
               variant="outline"
               size="sm"
+              onClick={handleForceRefresh}
+              disabled={isForceRefreshing || !brand || !model || !storage}
+              title="Forçar nova busca (ignora cache de 7 dias)"
+              data-testid="button-force-refresh"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isForceRefreshing ? "animate-spin" : ""}`} />
+              {isForceRefreshing ? "Atualizando..." : "Forçar Atualização"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleExportExcel}
               disabled={isExporting || !aggData || aggData.length === 0}
               data-testid="button-export"
@@ -326,17 +528,32 @@ export default function PricingDetailsPage() {
                 </div>
                 <div>
                   <CardTitle className="text-xl">{deviceName}</CardTitle>
-                  <CardDescription className="flex items-center gap-2 mt-1">
+                  <CardDescription className="flex items-center gap-2 mt-1 flex-wrap">
                     <Badge variant="outline">{categoryName}</Badge>
                     <Badge variant="secondary">{storage}GB</Badge>
+                    {deviceData && (
+                      <Badge variant={isFromCache ? "secondary" : "default"} className={isFromCache ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}>
+                        {isFromCache ? (
+                          <>
+                            <Clock className="h-3 w-3 mr-1" />
+                            Cache ({scrapedAt})
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Atualizado ({scrapedAt})
+                          </>
+                        )}
+                      </Badge>
+                    )}
                   </CardDescription>
                 </div>
               </div>
-              {latestData && (
+              {(latestData || scrapedPrices) && (
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">Preço Médio Atual</p>
                   <p className="text-2xl font-bold text-primary">
-                    {formatCurrency(latestData.avgPrice)}
+                    {formatCurrency(scrapedPrices?.avg ?? latestData?.avgPrice ?? 0)}
                   </p>
                   {priceVariation !== null && (
                     <div className={`flex items-center justify-end gap-1 text-sm ${priceVariation < 0 ? "text-green-600" : priceVariation > 0 ? "text-red-600" : "text-muted-foreground"}`}>
@@ -397,7 +614,7 @@ export default function PricingDetailsPage() {
             Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-24" />
             ))
-          ) : latestData ? (
+          ) : (latestData || scrapedPrices) ? (
             <>
               <Card>
                 <CardContent className="pt-6">
@@ -406,8 +623,15 @@ export default function PricingDetailsPage() {
                       <DollarSign className="h-6 w-6 text-blue-500" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Preço Médio</p>
-                      <p className="text-xl font-bold">{formatCurrency(latestData.avgPrice)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {scrapedPrices ? "Preço Médio (Scraping)" : "Preço Médio"}
+                      </p>
+                      <p className="text-xl font-bold">
+                        {formatCurrency(scrapedPrices?.avg ?? latestData?.avgPrice ?? 0)}
+                      </p>
+                      {scrapedPrices && (
+                        <p className="text-xs text-muted-foreground">{scrapedPrices.count} anúncios</p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -419,8 +643,12 @@ export default function PricingDetailsPage() {
                       <TrendingDown className="h-6 w-6 text-green-500" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Preço Mínimo</p>
-                      <p className="text-xl font-bold">{formatCurrency(latestData.minPrice)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {scrapedPrices ? "Preço Mínimo (Scraping)" : "Preço Mínimo"}
+                      </p>
+                      <p className="text-xl font-bold text-green-600">
+                        {formatCurrency(scrapedPrices?.min ?? latestData?.minPrice ?? 0)}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -432,8 +660,12 @@ export default function PricingDetailsPage() {
                       <TrendingUp className="h-6 w-6 text-red-500" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Preço Máximo</p>
-                      <p className="text-xl font-bold">{formatCurrency(latestData.maxPrice)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {scrapedPrices ? "Preço Máximo (Scraping)" : "Preço Máximo"}
+                      </p>
+                      <p className="text-xl font-bold text-red-600">
+                        {formatCurrency(scrapedPrices?.max ?? latestData?.maxPrice ?? 0)}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
@@ -446,7 +678,7 @@ export default function PricingDetailsPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Ofertas Detectadas</p>
-                      <p className="text-xl font-bold">{latestData.itemsCount}</p>
+                      <p className="text-xl font-bold">{scrapedPrices?.count ?? latestData?.itemsCount ?? 0}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -650,13 +882,26 @@ export default function PricingDetailsPage() {
                   <CardTitle className="text-base flex items-center gap-2">
                     <ShoppingCart className="h-5 w-5" />
                     Anúncios Detectados ({shoppingResults.length})
+                    {discardedAdIds.size > 0 && (
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        {discardedAdIds.size} descartado(s)
+                      </Badge>
+                    )}
                   </CardTitle>
-                  {searchData?.searchedAt && (
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Atualizado: {new Date(searchData.searchedAt).toLocaleString("pt-BR")}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {discardedAdIds.size > 0 && (
+                      <Button variant="outline" size="sm" onClick={handleRestoreAll}>
+                        <Eye className="h-4 w-4 mr-1" />
+                        Restaurar ({discardedAdIds.size})
+                      </Button>
+                    )}
+                    {deviceData?.scrapedAt && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Atualizado: {new Date(deviceData.scrapedAt).toLocaleString("pt-BR")}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
@@ -677,16 +922,30 @@ export default function PricingDetailsPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-12">#</TableHead>
-                          <TableHead>Loja</TableHead>
+                          <TableHead className="w-20">Imagem</TableHead>
+                          <TableHead>Produto</TableHead>
                           <TableHead className="text-right">Preço</TableHead>
-                          <TableHead className="w-24 text-right">Link</TableHead>
+                          <TableHead className="w-24 text-right">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {shoppingResults.map((ad, idx) => (
-                          <TableRow key={ad.id || idx} data-testid={`row-ad-${idx}`}>
-                            <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                            <TableCell>
+                          <TableRow key={ad.id || idx} data-testid={`row-ad-${idx}`} className="h-24">
+                            <TableCell className="text-muted-foreground align-middle">{idx + 1}</TableCell>
+                            <TableCell className="align-middle">
+                              {ad.thumbnail ? (
+                                <img
+                                  src={ad.thumbnail}
+                                  alt={ad.title || "Produto"}
+                                  className="w-24 h-24 object-cover rounded border"
+                                />
+                              ) : (
+                                <div className="w-24 h-24 bg-gray-100 rounded border flex items-center justify-center">
+                                  <ShoppingCart className="h-8 w-8 text-gray-400" />
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="align-middle">
                               <div>
                                 <p className="font-medium">{ad.source || "Loja"}</p>
                                 <p className="text-xs text-muted-foreground truncate max-w-[300px]">
@@ -694,22 +953,33 @@ export default function PricingDetailsPage() {
                                 </p>
                               </div>
                             </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {ad.extracted_price ? formatCurrency(ad.extracted_price) : ad.price || "N/A"}
+                            <TableCell className="text-right font-medium align-middle">
+                              {ad.extractedPrice ? formatCurrency(ad.extractedPrice) : ad.priceText || "N/A"}
                             </TableCell>
-                            <TableCell className="text-right">
-                              {ad.link && (
+                            <TableCell className="text-right align-middle">
+                              <div className="flex items-center justify-end gap-1">
+                                {ad.productUrl && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    asChild
+                                    data-testid={`button-link-${idx}`}
+                                  >
+                                    <a href={ad.productUrl} target="_blank" rel="noopener noreferrer">
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  </Button>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  asChild
-                                  data-testid={`button-link-${idx}`}
+                                  onClick={() => handleDiscardAd(ad.id)}
+                                  data-testid={`button-discard-${idx}`}
+                                  title="Descartar este anúncio"
                                 >
-                                  <a href={ad.link} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
+                                  <Trash2 className="h-4 w-4 text-red-500" />
                                 </Button>
-                              )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique, bigint, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -49,6 +49,7 @@ export type ModulePermissions = {
   okrs: boolean;
   metas: boolean;
   fluxogramas: boolean;
+  diagramas: boolean;
   logistica: boolean;
   pricing: boolean;
   conhecimento: boolean;
@@ -209,6 +210,9 @@ export const kanbanCards = pgTable("kanban_cards", {
   ticketId: varchar("ticket_id"),
   parentCardId: varchar("parent_card_id"),
   progress: integer("progress").default(0),
+  checklist: text("checklist"),
+  labelIds: text("label_ids"),
+  status: text("status").notNull().default("todo"), // 'todo' | 'doing' | 'done'
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -226,6 +230,34 @@ export const insertKanbanCardSchema = baseInsertKanbanCardSchema.extend({
 });
 export type InsertKanbanCard = z.infer<typeof insertKanbanCardSchema>;
 export type KanbanCard = typeof kanbanCards.$inferSelect;
+
+// ============== KANBAN LABELS ==============
+export const kanbanLabels = pgTable("kanban_labels", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  projectId: varchar("project_id").notNull(),
+  name: text("name").notNull(),
+  color: text("color").notNull().default("#6366f1"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKanbanLabelSchema = createInsertSchema(kanbanLabels).omit({ id: true, createdAt: true });
+export type InsertKanbanLabel = z.infer<typeof insertKanbanLabelSchema>;
+export type KanbanLabel = typeof kanbanLabels.$inferSelect;
+
+// ============== KANBAN CARD DEPENDENCIES ==============
+export const kanbanCardDependencies = pgTable("kanban_card_dependencies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  projectId: varchar("project_id").notNull(),
+  blockingCardId: varchar("blocking_card_id").notNull(),
+  blockedCardId: varchar("blocked_card_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertKanbanCardDependencySchema = createInsertSchema(kanbanCardDependencies).omit({ id: true, createdAt: true });
+export type InsertKanbanCardDependency = z.infer<typeof insertKanbanCardDependencySchema>;
+export type KanbanCardDependency = typeof kanbanCardDependencies.$inferSelect;
 
 // ============== KANBAN COMMENTS ==============
 export const kanbanComments = pgTable("kanban_comments", {
@@ -446,6 +478,9 @@ export const tasks = pgTable("tasks", {
   recurrenceWeekdays: text("recurrence_weekdays"), // JSON array of weekday numbers [1,2,3,4,5] for Mon-Fri
   recurrenceEndDate: timestamp("recurrence_end_date"),
   parentTaskId: varchar("parent_task_id"), // Reference to template/parent for recurring instances
+  subTaskParentId: varchar("sub_task_parent_id"), // Reference to parent task for manual subtask hierarchy
+  estimationHours: integer("estimation_hours"), // Estimated hours for the task
+  progress: integer("progress").default(0), // Progress percentage 0-100
   visibility: text("visibility").notNull().default("private"), // 'private' | 'shared' | 'public'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -688,6 +723,7 @@ export const pricingDevices = pgTable("pricing_devices", {
   specs: text("specs"), // JSON with technical specs
   releaseDate: timestamp("release_date"),
   isActive: boolean("is_active").default(true),
+  lastScrapedAt: timestamp("last_scraped_at"), // Data do último scraping
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -730,6 +766,35 @@ export const pricingAlerts = pgTable("pricing_alerts", {
 export const insertPricingAlertSchema = createInsertSchema(pricingAlerts).omit({ id: true, createdAt: true });
 export type InsertPricingAlert = z.infer<typeof insertPricingAlertSchema>;
 export type PricingAlert = typeof pricingAlerts.$inferSelect;
+
+// ============== PRICING SCRAPED DATA (Concurrent Prices) ==============
+export const pricingScrapedData = pgTable("pricing_scraped_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  deviceId: varchar("device_id").notNull(), // Reference to pricingDevices
+  categoryId: text("category_id").notNull(),
+  manufacturerName: text("manufacturer_name").notNull(),
+  modelName: text("model_name").notNull(),
+  storage: integer("storage").notNull(),
+  // Dados do scraping
+  rawId: text("raw_id"), // ID do scraping na API externa
+  source: text("source").notNull(), // google_shopping, etc
+  productId: text("product_id"),
+  productUrl: text("product_url"),
+  title: text("title"),
+  priceText: text("price_text"),
+  extractedPrice: decimal("extracted_price"),
+  rating: integer("rating"),
+  reviews: integer("reviews"),
+  thumbnail: text("thumbnail"),
+  fromCache: boolean("from_cache").default(false),
+  scrapedAt: timestamp("scraped_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPricingScrapedDataSchema = createInsertSchema(pricingScrapedData).omit({ id: true, createdAt: true });
+export type InsertPricingScrapedData = z.infer<typeof insertPricingScrapedDataSchema>;
+export type PricingScrapedData = typeof pricingScrapedData.$inferSelect;
 
 // ============== HELPER TYPES ==============
 export type LogisticaReversaPedidoWithEventos = LogisticaReversaPedido & {
@@ -951,6 +1016,7 @@ export const flowcharts = pgTable("flowcharts", {
   isTemplate: boolean("is_template").default(false),
   templateCategory: text("template_category"),
   thumbnail: text("thumbnail"),
+  source: text("source").notNull().default("reactflow"), // "reactflow" | "excalidraw"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1358,3 +1424,137 @@ export const aiPromptExecutions = pgTable("ai_prompt_executions", {
 export const insertAiPromptExecutionSchema = createInsertSchema(aiPromptExecutions);
 export type InsertAiPromptExecution = z.infer<typeof insertAiPromptExecutionSchema>;
 export type AiPromptExecution = typeof aiPromptExecutions.$inferSelect;
+
+// ============== ESTOQUES MODULE ==============
+
+// Enums as constants for frontend usage
+export const CONTAGEM_STATUS = ['em_andamento', 'finalizada', 'em_analise', 'aprovada'] as const;
+export const METODO_LEITURA = ['barcode', 'manual'] as const;
+export const TIPO_DIVERGENCIA = ['falta', 'sobra'] as const;
+export const TIPO_AJUSTE = ['entrada', 'saida', 'transferencia'] as const;
+
+export type ContagemStatus = typeof CONTAGEM_STATUS[number];
+export type MetodoLeitura = typeof METODO_LEITURA[number];
+export type TipoDivergencia = typeof TIPO_DIVERGENCIA[number];
+export type TipoAjuste = typeof TIPO_AJUSTE[number];
+
+// Tabelas
+
+// 1. estoquesContagens (contagens de estoque - cabeçalho)
+export const estoquesContagens = pgTable("estoques_contagens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
+  codigo: text("codigo").notNull().unique(),
+  responsavelId: varchar("responsavel_id").references(() => users.id),
+  status: text("status").notNull().default("em_andamento"),
+  dataInicio: timestamp("data_inicio").defaultNow(),
+  dataFim: timestamp("data_fim"),
+  totalItensContados: integer("total_itens_contados").default(0),
+  totalItensSistema: integer("total_itens_sistema"),
+  divergencia: integer("divergencia"),
+  acuracidade: decimal("acuracidade", { precision: 5, scale: 2 }),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEstoquesContagemSchema = createInsertSchema(estoquesContagens).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEstoquesContagem = z.infer<typeof insertEstoquesContagemSchema>;
+export type EstoquesContagem = typeof estoquesContagens.$inferSelect;
+
+// 2. estoquesContagemItens (itens contados - detalhe)
+export const estoquesContagemItens = pgTable("estoques_contagem_itens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contagemId: varchar("contagem_id").references(() => estoquesContagens.id, { onDelete: "cascade" }),
+  imei: text("imei").notNull(),
+  codigoErp: text("codigo_erp"),
+  modelo: text("modelo"),
+  categoria: text("categoria"),
+  marca: text("marca"),
+  metodoLeitura: text("metodo_leitura").notNull(),
+  contadoEm: timestamp("contado_em").defaultNow(),
+  contadoPor: varchar("contado_por").references(() => users.id),
+}, (table) => ({
+  uniqContagemImei: unique().on(table.contagemId, table.imei),
+}));
+
+export const insertEstoquesContagemItemSchema = createInsertSchema(estoquesContagemItens).omit({ id: true, contadoEm: true });
+export type InsertEstoquesContagemItem = z.infer<typeof insertEstoquesContagemItemSchema>;
+export type EstoquesContagemItem = typeof estoquesContagemItens.$inferSelect;
+
+// 3. estoquesContagemLogs (auditoria)
+export const estoquesContagemLogs = pgTable("estoques_contagem_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contagemId: varchar("contagem_id").references(() => estoquesContagens.id),
+  userId: varchar("user_id").references(() => users.id),
+  acao: text("acao").notNull(),
+  imei: text("imei"),
+  detalhes: jsonb("detalhes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEstoquesContagemLogSchema = createInsertSchema(estoquesContagemLogs).omit({ id: true, createdAt: true });
+export type InsertEstoquesContagemLog = z.infer<typeof insertEstoquesContagemLogSchema>;
+export type EstoquesContagemLog = typeof estoquesContagemLogs.$inferSelect;
+
+// 4. estoquesContagemDivergencias (divergências encontradas)
+export const estoquesContagemDivergencias = pgTable("estoques_contagem_divergencias", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contagemId: varchar("contagem_id").references(() => estoquesContagens.id, { onDelete: "cascade" }),
+  tipo: text("tipo").notNull(),
+  imei: text("imei"),
+  codigoErp: text("codigo_erp"),
+  modelo: text("modelo"),
+  categoria: text("categoria"),
+  marca: text("marca"),
+  ultimaMovimentacao: timestamp("ultima_movimentacao"),
+  possivelCausa: text("possivel_causa"),
+  statusAnalise: text("status_analise").default("pendente"),
+  observacaoAnalise: text("observacao_analise"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEstoquesContagemDivergenciaSchema = createInsertSchema(estoquesContagemDivergencias).omit({ id: true, createdAt: true });
+export type InsertEstoquesContagemDivergencia = z.infer<typeof insertEstoquesContagemDivergenciaSchema>;
+export type EstoquesContagemDivergencia = typeof estoquesContagemDivergencias.$inferSelect;
+
+// 5. estoquesAjustes (ajustes de inventário)
+export const estoquesAjustes = pgTable("estoques_ajustes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contagemId: varchar("contagem_id").references(() => estoquesContagens.id),
+  divergenciaId: varchar("divergencia_id").references(() => estoquesContagemDivergencias.id),
+  tipoAjuste: text("tipo_ajuste").notNull(),
+  imei: text("imei"),
+  codigoErp: text("codigo_erp"),
+  quantidade: integer("quantidade"),
+  justificativa: text("justificativa").notNull(),
+  aprovadoPor: varchar("aprovado_por").references(() => users.id),
+  aprovadoEm: timestamp("aprovado_em"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEstoquesAjusteSchema = createInsertSchema(estoquesAjustes).omit({ id: true, createdAt: true });
+export type InsertEstoquesAjuste = z.infer<typeof insertEstoquesAjusteSchema>;
+export type EstoquesAjuste = typeof estoquesAjustes.$inferSelect;
+
+// ─── Claude Code Usage Reports ───────────────────────────────────────────────
+// Alimentada via script local (scripts/report-claude-usage.ts) que cada dev roda 1x/dia
+export const claudeCodeUsageReports = pgTable("claude_code_usage_reports", {
+  id:                   varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  developerName:        text("developer_name").notNull(),
+  reportDate:           date("report_date").notNull(),
+  inputTokens:          bigint("input_tokens", { mode: "number" }).notNull().default(0),
+  outputTokens:         bigint("output_tokens", { mode: "number" }).notNull().default(0),
+  cacheCreationTokens:  bigint("cache_creation_tokens", { mode: "number" }).notNull().default(0),
+  cacheReadTokens:      bigint("cache_read_tokens", { mode: "number" }).notNull().default(0),
+  totalTokens:          bigint("total_tokens", { mode: "number" }).notNull().default(0),
+  sourceMachine:        text("source_machine"),
+  reportedAt:           timestamp("reported_at").defaultNow(),
+}, (table) => ({
+  uniqDevDate: unique().on(table.developerName, table.reportDate),
+}));
+
+export const insertClaudeCodeUsageSchema = createInsertSchema(claudeCodeUsageReports).omit({ id: true, reportedAt: true });
+export type InsertClaudeCodeUsage = z.infer<typeof insertClaudeCodeUsageSchema>;
+export type ClaudeCodeUsageReport = typeof claudeCodeUsageReports.$inferSelect;
+

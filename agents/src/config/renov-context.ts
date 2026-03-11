@@ -22,5 +22,5 @@ tipo(escopo): título
 Tipos: feat, fix, docs, refactor, test, chore
 
 ## Módulos Existentes
-Chamados, Projetos, Tarefas, Reuniões, OKRs, Logística, Macgyver IA, Conhecimento
+Chamados, Projetos, Tarefas, Reuniões, OKRs, Logística, Chat IA, Conhecimento
 `;

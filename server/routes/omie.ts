@@ -4,6 +4,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
 import { omieService } from "../services/omie.service";
+import { getCachedPosEstoque } from "../services/estoque-pos.service";
 
 export function registerOmieRoutes(router: Router) {
   
@@ -137,6 +138,256 @@ export function registerOmieRoutes(router: Router) {
         request_params: req.body
       });
       
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ─── FINANÇAS ───────────────────────────────────────────────────────────────
+
+  // POST /api/omie/financas/contas-pagar - Listar contas a pagar
+  router.post("/api/omie/financas/contas-pagar", requireAuth, async (req, res) => {
+    try {
+      const { nPagina = 1, nRegPorPagina = 50, dDtVencIni, dDtVencFim, cStatus } = req.body;
+
+      const params: any = { nPagina, nRegPorPagina };
+      if (dDtVencIni) params.dDtVencIni = dDtVencIni;
+      if (dDtVencFim) params.dDtVencFim = dDtVencFim;
+      if (cStatus && cStatus !== 'ALL') params.cStatus = cStatus;
+
+      const data = await omieService.callApi('financas/contapagar/', 'ListarContasPagar', [params]);
+
+      const contas = (data.conta_pagar_cadastro || []).map((c: any) => ({
+        codigoLancamento: c.codigo_lancamento_omie,
+        numeroDocumento: c.numero_documento_fiscal || c.numero_documento || '-',
+        codigoFornecedor: c.codigo_cliente_fornecedor,
+        nomeFornecedor: c.nome_fornecedor || null,
+        dataVencimento: c.data_vencimento,
+        dataPrevisao: c.data_previsao,
+        valorDocumento: c.valor_documento || 0,
+        valorBaixado: c.valor_baixado || 0,
+        saldo: (c.valor_documento || 0) - (c.valor_baixado || 0),
+        statusTitulo: c.status_titulo,
+      }));
+
+      const totalValor = contas.reduce((s: number, c: any) => s + c.valorDocumento, 0);
+      const totalPago = contas.reduce((s: number, c: any) => s + c.valorBaixado, 0);
+      const qtdVencidas = contas.filter((c: any) => c.statusTitulo === 'VENCIDO').length;
+      const qtdPagas = contas.filter((c: any) => c.statusTitulo === 'PAGO').length;
+
+      res.json({
+        sucesso: true,
+        pagina: data.nPagina || data.pagina || 1,
+        totalPaginas: data.nTotPaginas || data.total_de_paginas || 1,
+        totalRegistros: data.nTotRegistros || data.total_de_registros || contas.length,
+        resumo: { totalValor, totalPago, saldoAberto: totalValor - totalPago, qtdVencidas, qtdPagas },
+        contas,
+      });
+    } catch (error: any) {
+      console.error('[OMIE Routes] Error listing contas a pagar:', error.message);
+      res.status(500).json({ sucesso: false, error: error.message });
+    }
+  });
+
+  // POST /api/omie/financas/contas-receber - Listar contas a receber
+  router.post("/api/omie/financas/contas-receber", requireAuth, async (req, res) => {
+    try {
+      const { nPagina = 1, nRegPorPagina = 50, dDtVencIni, dDtVencFim, cStatus } = req.body;
+
+      const params: any = { nPagina, nRegPorPagina };
+      if (dDtVencIni) params.dDtVencIni = dDtVencIni;
+      if (dDtVencFim) params.dDtVencFim = dDtVencFim;
+      if (cStatus && cStatus !== 'ALL') params.cStatus = cStatus;
+
+      const data = await omieService.callApi('financas/contareceber/', 'ListarContasReceber', [params]);
+
+      const contas = (data.conta_receber_cadastro || []).map((c: any) => ({
+        codigoLancamento: c.codigo_lancamento_omie,
+        numeroDocumento: c.numero_documento_fiscal || c.numero_documento || '-',
+        codigoCliente: c.codigo_cliente_fornecedor,
+        nomeCliente: c.nome_cliente || null,
+        dataVencimento: c.data_vencimento,
+        dataPrevisao: c.data_previsao,
+        valorDocumento: c.valor_documento || 0,
+        valorBaixado: c.valor_baixado || 0,
+        saldo: (c.valor_documento || 0) - (c.valor_baixado || 0),
+        statusTitulo: c.status_titulo,
+      }));
+
+      const totalValor = contas.reduce((s: number, c: any) => s + c.valorDocumento, 0);
+      const totalRecebido = contas.reduce((s: number, c: any) => s + c.valorBaixado, 0);
+      const qtdVencidas = contas.filter((c: any) => c.statusTitulo === 'VENCIDO').length;
+      const qtdRecebidas = contas.filter((c: any) => c.statusTitulo === 'RECEBIDO').length;
+
+      res.json({
+        sucesso: true,
+        pagina: data.nPagina || data.pagina || 1,
+        totalPaginas: data.nTotPaginas || data.total_de_paginas || 1,
+        totalRegistros: data.nTotRegistros || data.total_de_registros || contas.length,
+        resumo: { totalValor, totalRecebido, saldoAberto: totalValor - totalRecebido, qtdVencidas, qtdRecebidas },
+        contas,
+      });
+    } catch (error: any) {
+      console.error('[OMIE Routes] Error listing contas a receber:', error.message);
+      res.status(500).json({ sucesso: false, error: error.message });
+    }
+  });
+
+  // POST /api/omie/financas/resumo - Resumo financeiro consolidado
+  router.post("/api/omie/financas/resumo", requireAuth, async (req, res) => {
+    try {
+      const data = await omieService.callApi('financas/resumo/', 'ObterResumoFinancas', [{}]);
+      res.json({ sucesso: true, resumo: data });
+    } catch (error: any) {
+      console.error('[OMIE Routes] Error fetching resumo financas:', error.message);
+      res.status(500).json({ sucesso: false, error: error.message });
+    }
+  });
+
+  // ─── ESTOQUE ─────────────────────────────────────────────────────────────────
+
+  // ─── GERAL ───────────────────────────────────────────────────────────────────
+
+  // POST /api/omie/geral/clientes - Listar clientes/fornecedores
+  router.post("/api/omie/geral/clientes", requireAuth, async (req, res) => {
+    try {
+      const { nPagina = 1, nRegPorPagina = 50, cnpj_cpf, razao_social, cidade, inativo } = req.body;
+
+      const clientesFiltro: any = {};
+      if (cnpj_cpf) clientesFiltro.cnpj_cpf = cnpj_cpf;
+      if (razao_social) clientesFiltro.razao_social = razao_social;
+      if (cidade) clientesFiltro.cidade = cidade;
+      if (inativo && inativo !== 'ALL') clientesFiltro.inativo = inativo;
+
+      const params: any = { pagina: nPagina, registros_por_pagina: nRegPorPagina, apenas_importado_api: 'N' };
+      if (Object.keys(clientesFiltro).length > 0) params.clientesFiltro = clientesFiltro;
+
+      const data = await omieService.callApi('geral/clientes/', 'ListarClientes', [params]);
+
+      const clientes = (data.clientes_cadastro || []).map((c: any) => ({
+        codigoOmie: c.codigo_cliente_omie,
+        codigoIntegracao: c.codigo_cliente_integracao,
+        razaoSocial: c.razao_social,
+        nomeFantasia: c.nome_fantasia || null,
+        cnpjCpf: c.cnpj_cpf,
+        email: c.email || null,
+        telefoneDdd: c.telefone1_ddd || null,
+        telefoneNumero: c.telefone1_numero || null,
+        cidade: c.cidade,
+        estado: c.estado,
+        inativo: c.inativo === 'S',
+      }));
+
+      const totalAtivos = clientes.filter((c: any) => !c.inativo).length;
+      const totalInativos = clientes.filter((c: any) => c.inativo).length;
+
+      res.json({
+        sucesso: true,
+        pagina: data.pagina || 1,
+        totalPaginas: data.total_de_paginas || 1,
+        totalRegistros: data.total_de_registros || clientes.length,
+        resumo: { totalAtivos, totalInativos },
+        clientes,
+      });
+    } catch (error: any) {
+      console.error('[OMIE Routes] Error listing clientes:', error.message);
+      res.status(500).json({ sucesso: false, error: error.message });
+    }
+  });
+
+  // POST /api/omie/geral/categorias - Listar categorias financeiras
+  router.post("/api/omie/geral/categorias", requireAuth, async (req, res) => {
+    try {
+      const { nPagina = 1, nRegPorPagina = 500 } = req.body;
+
+      const data = await omieService.callApi('geral/categorias/', 'ListarCategorias', [{ pagina: nPagina, registros_por_pagina: nRegPorPagina }]);
+
+      const categorias = (data.categoria_cadastro || []).map((c: any) => ({
+        codigo: c.codigo,
+        descricao: c.descricao,
+        tipo: c.conta_receita === 'S' ? 'Receita' : c.conta_despesa === 'S' ? 'Despesa' : 'Outro',
+        ativa: c.conta_inativa !== 'S',
+      }));
+
+      const totalReceitas = categorias.filter((c: any) => c.tipo === 'Receita').length;
+      const totalDespesas = categorias.filter((c: any) => c.tipo === 'Despesa').length;
+      const totalOutros = categorias.filter((c: any) => c.tipo === 'Outro').length;
+
+      res.json({
+        sucesso: true,
+        totalRegistros: data.total_de_registros || categorias.length,
+        resumo: { totalReceitas, totalDespesas, totalOutros },
+        categorias,
+      });
+    } catch (error: any) {
+      console.error('[OMIE Routes] Error listing categorias:', error.message);
+      res.status(500).json({ sucesso: false, error: error.message });
+    }
+  });
+
+  // GET /api/omie/geral/empresa - Dados da empresa
+  router.get("/api/omie/geral/empresa", requireAuth, async (req, res) => {
+    try {
+      const data = await omieService.callApi('geral/empresas/', 'ListarEmpresas', [{ pagina: 1, registros_por_pagina: 1 }]);
+
+      const raw = data.empresas_cadastro?.[0] || null;
+      if (!raw) {
+        return res.json({ sucesso: true, empresa: null });
+      }
+
+      res.json({
+        sucesso: true,
+        empresa: {
+          codigoOmie: raw.codigo_empresa,
+          razaoSocial: raw.razao_social,
+          nomeFantasia: raw.nome_fantasia,
+          cnpj: raw.cnpj,
+          inscricaoEstadual: raw.inscricao_estadual,
+          inscricaoMunicipal: raw.inscricao_municipal,
+          regimeTributario: raw.regime_tributario,
+          endereco: raw.endereco,
+          enderecoNumero: raw.endereco_numero,
+          complemento: raw.complemento,
+          bairro: raw.bairro,
+          cidade: raw.cidade,
+          estado: raw.estado,
+          cep: raw.cep,
+          telefone: raw.telefone || raw.fax_numero,
+          email: raw.email,
+        },
+      });
+    } catch (error: any) {
+      console.error('[OMIE Routes] Error fetching empresa:', error.message);
+      res.status(500).json({ sucesso: false, error: error.message });
+    }
+  });
+
+  // GET /api/omie/estoque/posicao/:codigo - Posição de estoque por código de produto
+  router.get("/api/omie/estoque/posicao/:codigo", requireAuth, async (req, res) => {
+    try {
+      const codigo = String(req.params.codigo);
+      console.log(`[OMIE Routes] GET /api/omie/estoque/posicao/${codigo}`);
+
+      const index = await getCachedPosEstoque();
+      const entries = index.get(codigo.trim().toUpperCase()) ?? index.get(codigo.trim()) ?? [];
+
+      const totalFisico = entries.reduce((s, e) => s + (e.fisico ?? 0), 0);
+      const totalSaldo = entries.reduce((s, e) => s + (e.nSaldo ?? 0), 0);
+      const totalReservado = entries.reduce((s, e) => s + (e.reservado ?? 0), 0);
+
+      res.json({
+        success: true,
+        data: {
+          codigo,
+          descricao: entries[0]?.cDescricao ?? null,
+          totalFisico,
+          totalSaldo,
+          totalReservado,
+          locais: entries,
+          fromCache: true,
+        }
+      });
+    } catch (error: any) {
+      console.error('[OMIE Routes] Error fetching posicao estoque:', error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });

@@ -507,14 +507,18 @@ function CollaboratorsDialog({
   });
 
   const filteredUsers = useMemo(() => {
-    return allUsers.filter(
-      (u: any) =>
-        u.id !== currentUserId &&
-        u.id !== flowchart?.ownerId &&
-        !collaboratorIds.includes(u.id) &&
-        (u.name?.toLowerCase().includes(searchUser.toLowerCase()) ||
-          u.email?.toLowerCase().includes(searchUser.toLowerCase()))
-    ).slice(0, 8);
+    return allUsers
+      .filter(
+        (u: any) =>
+          u.status === "active" &&
+          u.id !== currentUserId &&
+          u.id !== flowchart?.ownerId &&
+          !collaboratorIds.includes(u.id) &&
+          (u.name?.toLowerCase().includes(searchUser.toLowerCase()) ||
+            u.email?.toLowerCase().includes(searchUser.toLowerCase()))
+      )
+      .sort((a: any, b: any) => a.name.localeCompare(b.name, 'pt-BR'))
+      .slice(0, 8);
   }, [allUsers, searchUser, collaboratorIds, currentUserId, flowchart?.ownerId]);
 
   return (
@@ -687,7 +691,7 @@ function FlowchartEditorInner() {
 
   const onConnect: OnConnect = useCallback(
     (params) => {
-      const newEdge = {
+      const newEdge: Edge = {
         ...params,
         id: `edge_${Date.now()}`,
         type: "smoothstep",
@@ -945,8 +949,9 @@ function FlowchartEditorInner() {
   const filteredMentionUsers = useMemo(() => {
     if (!allUsers) return [];
     return allUsers.filter((u: any) =>
-      u.name?.toLowerCase().includes(mentionQuery) ||
-      u.email?.toLowerCase().includes(mentionQuery)
+      u.status === "active" &&
+      (u.name?.toLowerCase().includes(mentionQuery) ||
+      u.email?.toLowerCase().includes(mentionQuery))
     ).slice(0, 5);
   }, [allUsers, mentionQuery]);
 

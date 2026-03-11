@@ -75,7 +75,7 @@ interface OpenRouterModel {
   };
 }
 
-// Modelos restritos para o Macgyver IA - Apenas 3 opções simplificadas
+// Modelos restritos para o Chat IA - Apenas 3 opções simplificadas
 const RESTRICTED_MODELS: OpenRouterModel[] = [
   {
     id: "google/gemini-2.0-flash-001",
@@ -495,14 +495,14 @@ function ModelPickerPopup({
 }
 
 function exportConversationMarkdown(messages: AiMessage[], title: string) {
-  let md = `# ${title || "Conversa Macgyver IA"}\n\n`;
+  let md = `# ${title || "Conversa Chat IA"}\n\n`;
   md += `*Exportado em ${new Date().toLocaleDateString("pt-BR")} as ${new Date().toLocaleTimeString("pt-BR")}*\n\n---\n\n`;
 
   for (const msg of messages) {
     if (msg.role === "user") {
       md += `## Usuario\n\n${msg.content}\n\n`;
     } else {
-      md += `## Macgyver IA\n\n${msg.content}\n\n`;
+      md += `## Chat IA\n\n${msg.content}\n\n`;
     }
     md += `---\n\n`;
   }
@@ -511,7 +511,7 @@ function exportConversationMarkdown(messages: AiMessage[], title: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `macgyver-ia-${(title || "conversa").replace(/\s+/g, "-").toLowerCase()}-${Date.now()}.md`;
+  a.download = `chat-ia-${(title || "conversa").replace(/\s+/g, "-").toLowerCase()}-${Date.now()}.md`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -810,7 +810,7 @@ function RightSidebar({
   );
 }
 
-export default function MacgyverIA() {
+export default function ChatIA() {
   const queryClient = useQueryClient();
   const user = getCurrentUser();
   const userId = user?.id || "default-user";
@@ -1332,7 +1332,7 @@ export default function MacgyverIA() {
             </Button>
             <div className="flex-1 flex items-center justify-center gap-2">
               <MacGyverIcon size={20} />
-              <span className="font-semibold text-sm">{currentConversation?.title || "Macgyver IA"}</span>
+              <span className="font-semibold text-sm">{currentConversation?.title || "Chat IA"}</span>
             </div>
             <div className="flex items-center gap-1">
               {displayMessages.length > 0 && (

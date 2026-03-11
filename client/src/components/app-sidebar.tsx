@@ -26,6 +26,7 @@ import {
   Search,
   FileSpreadsheet,
   LineChart,
+  PieChart,
   TrendingDown,
   Bell,
   BookOpen,
@@ -35,10 +36,14 @@ import {
   Printer,
   Settings2,
   Workflow,
+  PenLine,
   ClipboardList,
   Sparkles,
   GitBranch,
   Warehouse,
+  GitMerge,
+  Clock,
+  Route,
 } from "lucide-react";
 import {
   Sidebar,
@@ -77,7 +82,7 @@ const allMenuItems = [
   },
   {
 title: "Chat IA",
-    url: "/macgyver-ia",
+url: "/chat-ia",
     icon: Bot,
     module: null,
   },
@@ -112,10 +117,10 @@ title: "Chat IA",
     module: "fluxogramas" as keyof ModulePermissions,
   },
   {
-    title: "Estoques",
-    url: "/estoques",
-    icon: Warehouse,
-    module: "estoques" as keyof ModulePermissions,
+    title: "Diagramas",
+    url: "/diagramas",
+    icon: PenLine,
+    module: "diagramas" as keyof ModulePermissions,
   },
 ];
 
@@ -161,6 +166,17 @@ const bibliotecaSubItems = [
   { title: "Prompts", url: "/biblioteca/prompts", icon: Sparkles },
 ];
 
+const estoquesSubItems = [
+  { title: "Dashboard", url: "/estoques/dashboard", icon: PieChart },
+  { title: "Posição Estoques", url: "/estoques/posicao", icon: BarChart3 },
+  { title: "Pipeline", url: "/estoques/pipeline", icon: GitMerge },
+  { title: "Lead Time", url: "/estoques/lead-time", icon: Clock },
+  { title: "Aging Report", url: "/estoques/aging", icon: TrendingDown },
+  { title: "Rastreabilidade", url: "/estoques/rastreabilidade", icon: Route },
+  { title: "Contagem Interna", url: "/estoques/contagem", icon: ClipboardList },
+  { title: "Relatório Contagens", url: "/estoques/relatorio-contagens", icon: FileSpreadsheet },
+];
+
 function getCurrentUser() {
   try {
     // Primeiro tenta buscar do localStorage (novo sistema de auth)
@@ -201,14 +217,23 @@ export function AppSidebar() {
 
   useEffect(() => {
     const handleStorageChange = () => {
-      setCurrentUser(getCurrentUser());
+      const newUser = getCurrentUser();
+      // Only update if user data actually changed to prevent unnecessary re-renders
+      setCurrentUser(prevUser => {
+        if (!prevUser && !newUser) return prevUser;
+        if (prevUser && newUser && prevUser.id === newUser.id
+          && prevUser.isAdmin === newUser.isAdmin
+          && prevUser.modulePermissions === newUser.modulePermissions) return prevUser;
+        return newUser;
+      });
     };
+    // Escuta mudanças de outras abas (evento nativo)
     window.addEventListener("storage", handleStorageChange);
-    // Poll to catch updates within the same tab since sessionStorage doesn't trigger 'storage' event across tabs
-    const interval = setInterval(handleStorageChange, 1000);
+    // Escuta mudanças na mesma aba (evento customizado disparado por saveAuth/clearAuth)
+    window.addEventListener("authChanged", handleStorageChange);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
-      clearInterval(interval);
+      window.removeEventListener("authChanged", handleStorageChange);
     };
   }, []);
 
@@ -217,12 +242,18 @@ export function AppSidebar() {
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
   const [bibliotecaOpen, setBibliotecaOpen] = useState(location.startsWith("/biblioteca"));
+  const [estoquesOpen, setEstoquesOpen] = useState(location.startsWith("/estoques"));
+
+  useEffect(() => {
+    if (location.startsWith("/estoques")) setEstoquesOpen(true);
+  }, [location]);
 
   const isMetasActive = location.startsWith("/metas");
   const isLogisticaActive = location.startsWith("/logistica");
   const isApisActive = location.startsWith("/apis");
   const isPricingActive = location.startsWith("/pricing");
   const isBibliotecaActive = location.startsWith("/biblioteca");
+  const isEstoquesActive = location.startsWith("/estoques");
 
   const permissions = useMemo(() => {
     try {
@@ -233,9 +264,10 @@ export function AppSidebar() {
           tarefas: true,
           okrs: true,
           fluxogramas: true,
+          diagramas: true,
           logistica: true,
           pricing: true,
-          biblioteca: true,
+          conhecimento: true,
           apis: true,
           configuracoes: true,
           estoques: true,
@@ -255,9 +287,10 @@ export function AppSidebar() {
       tarefas: false,
       okrs: false,
       fluxogramas: false,
+      diagramas: false,
       logistica: false,
       pricing: false,
-      biblioteca: false,
+      conhecimento: false,
       apis: false,
       configuracoes: false,
       estoques: false,
@@ -274,9 +307,18 @@ export function AppSidebar() {
   const hasMetasAccess = permissions.okrs === true;
   const hasLogisticaAccess = permissions.logistica === true;
   const hasPricingAccess = permissions.pricing === true;
-  const hasBibliotecaAccess = permissions.biblioteca === true;
+  const hasBibliotecaAccess = permissions.conhecimento === true;
   const hasApisAccess = permissions.apis === true;
   const hasConfiguracoesAccess = permissions.configuracoes === true;
+  
+  // CORREÇÃO: Verificação mais robusta para acesso ao módulo Estoques
+  // Garante que o menu apareça se:
+  // 1. O usuário for admin (tem acesso total)
+  // 2. As permissões incluírem explicitamente estoques: true
+  // 3. O usuário estiver em uma página do módulo Estoques (indicação de acesso)
+  const hasEstoquesPermission = permissions.estoques === true;
+  const isInEstoquesPage = location.startsWith("/estoques");
+  const hasEstoquesAccess = currentUser?.isAdmin === true || currentUser?.isAdmin === "true" || hasEstoquesPermission || isInEstoquesPage;
 
   const handleLogout = async () => {
     try {
@@ -337,6 +379,45 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+
+              {hasEstoquesAccess && (
+                <Collapsible open={estoquesOpen} onOpenChange={setEstoquesOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isEstoquesActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        isActive={isEstoquesActive}
+                        data-testid="link-estoques"
+                      >
+                        <Warehouse className={`h-[20px] w-[20px] ${isEstoquesActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">Estoques</span>
+                        {estoquesOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                        {estoquesSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
 
               {hasMetasAccess && (
                 <Collapsible open={metasOpen} onOpenChange={setMetasOpen}>
@@ -591,7 +672,7 @@ export function UserProfileMenu() {
       setCurrentUser(getCurrentUser());
     };
     window.addEventListener("storage", handleStorageChange);
-    const interval = setInterval(handleStorageChange, 1000);
+    const interval = setInterval(handleStorageChange, 5000);
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       clearInterval(interval);
