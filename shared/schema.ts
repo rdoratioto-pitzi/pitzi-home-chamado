@@ -212,6 +212,7 @@ export const kanbanCards = pgTable("kanban_cards", {
   progress: integer("progress").default(0),
   checklist: text("checklist"),
   labelIds: text("label_ids"),
+  status: text("status").notNull().default("todo"), // 'todo' | 'doing' | 'done'
   createdAt: timestamp("created_at").defaultNow(),
 });
 
