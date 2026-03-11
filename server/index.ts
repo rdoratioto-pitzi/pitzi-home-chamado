@@ -197,11 +197,30 @@ async function autoMigrateSchema() {
         created_at timestamp DEFAULT now(),
         updated_at timestamp DEFAULT now()
       )`,
+      // Tabela de comentários do Kanban
+      `CREATE TABLE IF NOT EXISTS kanban_comments (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar,
+        card_id varchar NOT NULL,
+        user_id varchar NOT NULL,
+        content text NOT NULL,
+        created_at timestamp DEFAULT now()
+      )`,
+      // Migration 0013: Status independente no kanban_cards
+      `ALTER TABLE kanban_cards ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'todo'`,
     ];
+    let applied = 0;
+    let skipped = 0;
     for (const sql of migrations) {
-      try { await pool.query(sql); } catch {}
+      try {
+        await pool.query(sql);
+        applied++;
+      } catch (err: any) {
+        skipped++;
+        console.warn(`[migration] Skipped: ${sql.substring(0, 80)}... → ${err.message}`);
+      }
     }
-    console.log('[migration] Schema check complete.');
+    console.log(`[migration] Schema check complete. Applied: ${applied}, Skipped: ${skipped}`);
   } catch (error: any) {
     console.error('[migration] Error:', error.message);
   }
