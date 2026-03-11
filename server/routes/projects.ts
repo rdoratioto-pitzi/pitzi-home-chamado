@@ -37,25 +37,35 @@ export function registerProjectRoutes(router: Router) {
 
   // ============== PROJECTS ==============
   router.get("/api/projects", requireAuth, async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
-    const projects = await storage.getProjects();
-    if (isAdmin) return res.json(projects);
-    const accessibleIds = await getUserAccessibleProjectIds(userId);
-    const filtered = projects.filter((p) => accessibleIds.includes(p.id));
-    res.json(filtered);
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const projects = await storage.getProjects();
+      if (isAdmin) return res.json(projects);
+      const accessibleIds = await getUserAccessibleProjectIds(userId);
+      const filtered = projects.filter((p) => accessibleIds.includes(p.id));
+      res.json(filtered);
+    } catch (error: any) {
+      console.error("Erro ao buscar projetos:", error);
+      res.status(500).json({ error: "Erro ao buscar projetos" });
+    }
   });
 
   router.get("/api/projects/:id", requireAuth, async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
-    const project = await storage.getProject(getId(req));
-    if (!project) return res.status(404).json({ error: "Project not found" });
-    if (!isAdmin) {
-      const accessibleIds = await getUserAccessibleProjectIds(userId);
-      if (!accessibleIds.includes(project.id)) {
-        return res.status(403).json({ error: "Access denied" });
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const project = await storage.getProject(getId(req));
+      if (!project) return res.status(404).json({ error: "Project not found" });
+      if (!isAdmin) {
+        const accessibleIds = await getUserAccessibleProjectIds(userId);
+        if (!accessibleIds.includes(project.id)) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
+      res.json(project);
+    } catch (error: any) {
+      console.error("Erro ao buscar projeto:", error);
+      res.status(500).json({ error: "Erro ao buscar projeto" });
     }
-    res.json(project);
   });
 
   router.post("/api/projects", requireAuth, async (req, res) => {
@@ -148,21 +158,31 @@ export function registerProjectRoutes(router: Router) {
   });
 
   router.delete("/api/projects/:id", requireAuth, async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
-    const project = await storage.getProject(getId(req));
-    if (!project) return res.status(404).json({ error: "Project not found" });
-    if (!isAdmin && project.ownerId !== userId) {
-      return res.status(403).json({ error: "Access denied" });
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const project = await storage.getProject(getId(req));
+      if (!project) return res.status(404).json({ error: "Project not found" });
+      if (!isAdmin && project.ownerId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const deleted = await storage.deleteProject(getId(req));
+      if (!deleted) return res.status(404).json({ error: "Project not found" });
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Erro ao deletar projeto:", error);
+      res.status(500).json({ error: "Erro ao deletar projeto" });
     }
-    const deleted = await storage.deleteProject(getId(req));
-    if (!deleted) return res.status(404).json({ error: "Project not found" });
-    res.status(204).send();
   });
 
   // Project Members
   router.get("/api/projects/:id/members", requireAuth, async (req, res) => {
-    const members = await storage.getProjectMembers(getId(req));
-    res.json(members);
+    try {
+      const members = await storage.getProjectMembers(getId(req));
+      res.json(members);
+    } catch (error: any) {
+      console.error("Erro ao buscar membros do projeto:", error);
+      res.status(500).json({ error: "Erro ao buscar membros do projeto" });
+    }
   });
 
   router.post("/api/projects/:id/members", requireAuth, async (req, res) => {
@@ -180,49 +200,63 @@ export function registerProjectRoutes(router: Router) {
   });
 
   router.delete("/api/projects/:id/members/:memberId", requireAuth, async (req, res) => {
-    const deleted = await storage.removeProjectMember(req.params.memberId as string);
-    if (!deleted) return res.status(404).json({ error: "Member not found" });
-    res.status(204).send();
+    try {
+      const deleted = await storage.removeProjectMember(req.params.memberId as string);
+      if (!deleted) return res.status(404).json({ error: "Member not found" });
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Erro ao remover membro do projeto:", error);
+      res.status(500).json({ error: "Erro ao remover membro do projeto" });
+    }
   });
 
   // Project Columns
   router.get("/api/projects/:id/columns", requireAuth, async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
-    if (!isAdmin) {
-      const accessibleIds = await getUserAccessibleProjectIds(userId);
-      if (!accessibleIds.includes(getId(req))) {
-        return res.status(403).json({ error: "Access denied" });
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      if (!isAdmin) {
+        const accessibleIds = await getUserAccessibleProjectIds(userId);
+        if (!accessibleIds.includes(getId(req))) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
+      const columns = await storage.getKanbanColumns(getId(req));
+      res.json(columns);
+    } catch (error: any) {
+      console.error("Erro ao buscar colunas do projeto:", error);
+      res.status(500).json({ error: "Erro ao buscar colunas do projeto" });
     }
-    const columns = await storage.getKanbanColumns(getId(req));
-    res.json(columns);
   });
 
   // Project Cards
   router.get("/api/projects/:id/cards", requireAuth, async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
-    if (!isAdmin) {
-      const accessibleIds = await getUserAccessibleProjectIds(userId);
-      if (!accessibleIds.includes(getId(req))) {
-        return res.status(403).json({ error: "Access denied" });
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      if (!isAdmin) {
+        const accessibleIds = await getUserAccessibleProjectIds(userId);
+        if (!accessibleIds.includes(getId(req))) {
+          return res.status(403).json({ error: "Access denied" });
+        }
       }
+      const cards = await storage.getKanbanCards(getId(req));
+
+      const priorityOrder: Record<string, number> = {
+        "muito_urgente": 0,
+        "urgente": 1,
+        "normal": 2
+      };
+
+      cards.sort((a, b) => {
+        const priorityA = priorityOrder[a.priority] ?? 3;
+        const priorityB = priorityOrder[b.priority] ?? 3;
+        return priorityA - priorityB;
+      });
+
+      res.json(cards);
+    } catch (error: any) {
+      console.error("Erro ao buscar cards do projeto:", error);
+      res.status(500).json({ error: "Erro ao buscar cards do projeto" });
     }
-    const cards = await storage.getKanbanCards(getId(req));
-    
-    // Sort cards by priority: muito_urgente > urgente > normal
-    const priorityOrder: Record<string, number> = {
-      "muito_urgente": 0,
-      "urgente": 1,
-      "normal": 2
-    };
-    
-    cards.sort((a, b) => {
-      const priorityA = priorityOrder[a.priority] ?? 3;
-      const priorityB = priorityOrder[b.priority] ?? 3;
-      return priorityA - priorityB;
-    });
-    
-    res.json(cards);
   });
 
   // ============== KANBAN COLUMNS ==============
@@ -266,9 +300,14 @@ export function registerProjectRoutes(router: Router) {
 
   // ============== KANBAN CARDS ==============
   router.get("/api/cards/:id", requireAuth, async (req, res) => {
-    const card = await storage.getKanbanCard(getId(req));
-    if (!card) return res.status(404).json({ error: "Card not found" });
-    res.json(card);
+    try {
+      const card = await storage.getKanbanCard(getId(req));
+      if (!card) return res.status(404).json({ error: "Card not found" });
+      res.json(card);
+    } catch (error: any) {
+      console.error("Erro ao buscar card:", error);
+      res.status(500).json({ error: "Erro ao buscar card" });
+    }
   });
 
   router.post("/api/cards", requireAuth, async (req, res) => {
@@ -394,15 +433,25 @@ export function registerProjectRoutes(router: Router) {
   });
 
   router.delete("/api/cards/:id", requireAuth, async (req, res) => {
-    const deleted = await storage.deleteKanbanCard(getId(req));
-    if (!deleted) return res.status(404).json({ error: "Card not found" });
-    res.status(204).send();
+    try {
+      const deleted = await storage.deleteKanbanCard(getId(req));
+      if (!deleted) return res.status(404).json({ error: "Card not found" });
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Erro ao deletar card:", error);
+      res.status(500).json({ error: "Erro ao deletar card" });
+    }
   });
 
   // Kanban Comments
   router.get("/api/cards/:id/comments", requireAuth, async (req, res) => {
-    const comments = await storage.getKanbanComments(getId(req));
-    res.json(comments);
+    try {
+      const comments = await storage.getKanbanComments(getId(req));
+      res.json(comments);
+    } catch (error: any) {
+      console.error("Erro ao buscar comentários do card:", error);
+      res.status(500).json({ error: "Erro ao buscar comentários do card" });
+    }
   });
 
   router.post("/api/cards/:id/comments", requireAuth, async (req, res) => {
@@ -466,8 +515,13 @@ export function registerProjectRoutes(router: Router) {
 
   // ============ KANBAN LABELS ============
   router.get("/api/projects/:id/labels", requireAuth, async (req, res) => {
-    const labels = await storage.getKanbanLabels(getId(req));
-    res.json(labels);
+    try {
+      const labels = await storage.getKanbanLabels(getId(req));
+      res.json(labels);
+    } catch (error: any) {
+      console.error("Erro ao buscar labels do projeto:", error);
+      res.status(500).json({ error: "Erro ao buscar labels do projeto" });
+    }
   });
 
   router.post("/api/projects/:id/labels", requireAuth, async (req, res) => {
@@ -487,26 +541,46 @@ export function registerProjectRoutes(router: Router) {
   });
 
   router.patch("/api/labels/:id", requireAuth, async (req, res) => {
-    const updated = await storage.updateKanbanLabel(getId(req), req.body);
-    if (!updated) return res.status(404).json({ error: "Label not found" });
-    res.json(updated);
+    try {
+      const updated = await storage.updateKanbanLabel(getId(req), req.body);
+      if (!updated) return res.status(404).json({ error: "Label not found" });
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Erro ao atualizar label:", error);
+      res.status(500).json({ error: "Erro ao atualizar label" });
+    }
   });
 
   router.delete("/api/labels/:id", requireAuth, async (req, res) => {
-    const deleted = await storage.deleteKanbanLabel(getId(req));
-    if (!deleted) return res.status(404).json({ error: "Label not found" });
-    res.status(204).send();
+    try {
+      const deleted = await storage.deleteKanbanLabel(getId(req));
+      if (!deleted) return res.status(404).json({ error: "Label not found" });
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Erro ao deletar label:", error);
+      res.status(500).json({ error: "Erro ao deletar label" });
+    }
   });
 
   // ============ KANBAN CARD DEPENDENCIES ============
   router.get("/api/cards/:id/dependencies", requireAuth, async (req, res) => {
-    const deps = await storage.getCardDependencies(getId(req));
-    res.json(deps);
+    try {
+      const deps = await storage.getCardDependencies(getId(req));
+      res.json(deps);
+    } catch (error: any) {
+      console.error("Erro ao buscar dependências do card:", error);
+      res.status(500).json({ error: "Erro ao buscar dependências do card" });
+    }
   });
 
   router.get("/api/projects/:id/blocked-cards", requireAuth, async (req, res) => {
-    const blockedIds = await storage.getProjectBlockedCardIds(getId(req));
-    res.json(Array.from(blockedIds));
+    try {
+      const blockedIds = await storage.getProjectBlockedCardIds(getId(req));
+      res.json(Array.from(blockedIds));
+    } catch (error: any) {
+      console.error("Erro ao buscar cards bloqueados:", error);
+      res.status(500).json({ error: "Erro ao buscar cards bloqueados" });
+    }
   });
 
   router.post("/api/cards/:id/dependencies", requireAuth, async (req, res) => {
@@ -532,47 +606,57 @@ export function registerProjectRoutes(router: Router) {
   });
 
   router.delete("/api/card-dependencies/:id", requireAuth, async (req, res) => {
-    const deleted = await storage.removeCardDependency(getId(req));
-    if (!deleted) return res.status(404).json({ error: "Dependency not found" });
-    res.status(204).send();
+    try {
+      const deleted = await storage.removeCardDependency(getId(req));
+      if (!deleted) return res.status(404).json({ error: "Dependency not found" });
+      res.status(204).send();
+    } catch (error: any) {
+      console.error("Erro ao remover dependência:", error);
+      res.status(500).json({ error: "Erro ao remover dependência" });
+    }
   });
 
   // ============ PROJECT METRICS ============
   router.get("/api/projects/:id/metrics", requireAuth, async (req, res) => {
-    const projectId = getId(req);
-    const [cards, columns] = await Promise.all([
-      storage.getKanbanCards(projectId),
-      storage.getKanbanColumns(projectId),
-    ]);
+    try {
+      const projectId = getId(req);
+      const [cards, columns] = await Promise.all([
+        storage.getKanbanCards(projectId),
+        storage.getKanbanColumns(projectId),
+      ]);
 
-    const cardsByColumn = columns.map(col => ({
-      columnId: col.id,
-      columnName: col.name,
-      count: cards.filter(c => c.columnId === col.id).length,
-    }));
+      const cardsByColumn = columns.map(col => ({
+        columnId: col.id,
+        columnName: col.name,
+        count: cards.filter(c => c.columnId === col.id).length,
+      }));
 
-    const priorityCounts: Record<string, number> = {};
-    for (const card of cards) {
-      priorityCounts[card.priority] = (priorityCounts[card.priority] ?? 0) + 1;
-    }
-    const cardsByPriority = Object.entries(priorityCounts).map(([priority, count]) => ({ priority, count }));
-
-    const assigneeCounts: Record<string, number> = {};
-    for (const card of cards) {
-      if (card.assigneeId) {
-        assigneeCounts[card.assigneeId] = (assigneeCounts[card.assigneeId] ?? 0) + 1;
+      const priorityCounts: Record<string, number> = {};
+      for (const card of cards) {
+        priorityCounts[card.priority] = (priorityCounts[card.priority] ?? 0) + 1;
       }
+      const cardsByPriority = Object.entries(priorityCounts).map(([priority, count]) => ({ priority, count }));
+
+      const assigneeCounts: Record<string, number> = {};
+      for (const card of cards) {
+        if (card.assigneeId) {
+          assigneeCounts[card.assigneeId] = (assigneeCounts[card.assigneeId] ?? 0) + 1;
+        }
+      }
+
+      const now = new Date();
+      const overdue = cards.filter(c => c.dueDate && new Date(c.dueDate) < now).length;
+
+      res.json({
+        totalCards: cards.length,
+        cardsByColumn,
+        cardsByPriority,
+        cardsByAssignee: assigneeCounts,
+        overdue,
+      });
+    } catch (error: any) {
+      console.error("Erro ao buscar métricas do projeto:", error);
+      res.status(500).json({ error: "Erro ao buscar métricas do projeto" });
     }
-
-    const now = new Date();
-    const overdue = cards.filter(c => c.dueDate && new Date(c.dueDate) < now).length;
-
-    res.json({
-      totalCards: cards.length,
-      cardsByColumn,
-      cardsByPriority,
-      cardsByAssignee: assigneeCounts,
-      overdue,
-    });
   });
 }
