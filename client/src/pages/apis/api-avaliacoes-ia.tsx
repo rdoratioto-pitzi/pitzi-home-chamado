@@ -10,9 +10,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SiPostman } from "react-icons/si";
-import { 
-  Bot, 
-  Search, 
+import {
+  Bot,
+  Search,
   Loader2,
   XCircle,
   CheckCircle,
@@ -27,6 +27,7 @@ import {
   BarChart3,
   Calendar,
   Smartphone,
+  Camera,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -46,18 +47,26 @@ export default function ApiAvaliacoesIaPage() {
   const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
   const [activeEndpoint, setActiveEndpoint] = useState<string | null>(null);
   
-  // Form states
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  // Form states - default to first day of current month to ensure data availability
+  const getFirstDayOfMonth = () => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  };
+  const [startDate, setStartDate] = useState(getFirstDayOfMonth);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [imei, setImei] = useState("");
   const [deviceDescription, setDeviceDescription] = useState("");
   const [statusAssertividade, setStatusAssertividade] = useState("");
+  const [categories, setCategories] = useState("");
+  const [sortBy, setSortBy] = useState("count");
 
   const getQueryParams = () => {
     const params: Record<string, string> = {};
     if (imei) params.imei = imei;
     if (deviceDescription) params.device_description = deviceDescription;
     if (statusAssertividade) params.status_assertividade = statusAssertividade;
+    if (categories) params.categories = categories;
+    if (sortBy) params.sort_by = sortBy;
     return params;
   };
 
@@ -160,9 +169,16 @@ export default function ApiAvaliacoesIaPage() {
       icon: TrendingUp,
     },
     {
+      id: "evolucao-categoria",
+      name: "Evolução por Categoria",
+      description: "Retorna a evolução da acurácia da IA mês a mês, quebrada por categoria de dispositivo.",
+      path: "/avaliacoes-ia/evolucao-categoria",
+      icon: TrendingUp,
+    },
+    {
       id: "dispositivos",
       name: "Acurácia por Dispositivo",
-      description: "Retorna os top 10 dispositivos com maior volume de avaliações e a respectiva acurácia.",
+      description: "Retorna os top 10 dispositivos conforme critério de ordenação (volume, assertividade ou erro).",
       path: "/avaliacoes-ia/dispositivos",
       icon: Smartphone,
     },
@@ -172,6 +188,20 @@ export default function ApiAvaliacoesIaPage() {
       description: "Retorna a lista completa e detalhada de todas as avaliações no período.",
       path: "/avaliacoes-ia/detalhes",
       icon: FileText,
+    },
+    {
+      id: "categorias",
+      name: "Acurácia por Categoria",
+      description: "Retorna o volume de avaliações e a acurácia da IA agrupados por categoria de dispositivo.",
+      path: "/avaliacoes-ia/categorias",
+      icon: BarChart3,
+    },
+    {
+      id: "assertividade-fotos",
+      name: "Assertividade por Foto",
+      description: "Retorna o percentual de assertividade da IA comparado com a avaliação humana, detalhado por mês e tipo de foto.",
+      path: "/avaliacoes-ia/assertividade-fotos",
+      icon: Camera,
     },
   ];
 
@@ -262,6 +292,28 @@ export default function ApiAvaliacoesIaPage() {
                 <option value="">Todos</option>
                 <option value="ACERTOU">ACERTOU</option>
                 <option value="ERROU">ERROU</option>
+              </select>
+            </div>
+            <div className="mt-4">
+              <Label htmlFor="categories">Categorias (Opcional)</Label>
+              <Input
+                id="categories"
+                placeholder="Filtrar por categorias (ex: Smartphone, Tablet)"
+                value={categories}
+                onChange={(e) => setCategories(e.target.value)}
+              />
+            </div>
+            <div className="mt-4">
+              <Label htmlFor="sort-by">Ordenação Dispositivos (Opcional)</Label>
+              <select
+                id="sort-by"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="count">Volume (count)</option>
+                <option value="accuracy_desc">Maior Assertividade</option>
+                <option value="accuracy_asc">Maiores Erros</option>
               </select>
             </div>
           </CardContent>
@@ -371,9 +423,10 @@ export default function ApiAvaliacoesIaPage() {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="resumo">Resumo</TabsTrigger>
                 <TabsTrigger value="evolucao">Evolução</TabsTrigger>
+                <TabsTrigger value="evolucao-categoria">Evol. Categoria</TabsTrigger>
                 <TabsTrigger value="dispositivos">Dispositivos</TabsTrigger>
                 <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
               </TabsList>
@@ -404,6 +457,11 @@ export default function ApiAvaliacoesIaPage() {
                         <span>end_date</span>
                         <span>string</span>
                         <span>Data final (YYYY-MM-DD)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>categories</span>
+                        <span>string</span>
+                        <span>Filtrar por categorias (opcional)</span>
                       </div>
                     </div>
                   </div>
@@ -452,6 +510,11 @@ export default function ApiAvaliacoesIaPage() {
                         <span>string</span>
                         <span>Data final (YYYY-MM-DD)</span>
                       </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>categories</span>
+                        <span>string</span>
+                        <span>Filtrar por categorias (opcional)</span>
+                      </div>
                     </div>
                   </div>
                   <Separator />
@@ -471,12 +534,12 @@ export default function ApiAvaliacoesIaPage() {
                 </div>
               </TabsContent>
 
-              <TabsContent value="dispositivos" className="mt-4">
+              <TabsContent value="evolucao-categoria" className="mt-4">
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-semibold mb-2">GET /api/avaliacoes-ia/dispositivos</h4>
+                    <h4 className="font-semibold mb-2">GET /api/avaliacoes-ia/evolucao-categoria</h4>
                     <p className="text-sm text-muted-foreground mb-4">
-                      Retorna os top 10 dispositivos com maior volume de avaliações e a respectiva acurácia.
+                      Retorna a evolução da acurácia da IA mês a mês, quebrada por categoria de dispositivo.
                     </p>
                   </div>
                   <Separator />
@@ -497,6 +560,75 @@ export default function ApiAvaliacoesIaPage() {
                         <span>end_date</span>
                         <span>string</span>
                         <span>Data final (YYYY-MM-DD)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>categories</span>
+                        <span>string</span>
+                        <span>Filtrar por categorias (opcional)</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h4 className="font-semibold mb-2">Exemplo de Resposta</h4>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+{`[
+  {
+    "Mes": "2024-01",
+    "Categoria": "Smartphone",
+    "Total_Avaliados": 100,
+    "Qtd_Acertos": 85,
+    "Acuracia_Mensal": 85.0
+  },
+  {
+    "Mes": "2024-01",
+    "Categoria": "Tablet",
+    "Total_Avaliados": 30,
+    "Qtd_Acertos": 28,
+    "Acuracia_Mensal": 93.3
+  }
+]`}
+                    </pre>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="dispositivos" className="mt-4">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">GET /api/avaliacoes-ia/dispositivos</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Retorna os top 10 dispositivos conforme critério de ordenação (volume, assertividade ou erro).
+                    </p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h4 className="font-semibold mb-2">Parâmetros de Query</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="grid grid-cols-3 gap-2 font-mono text-xs bg-muted p-2 rounded">
+                        <span className="font-bold">Parâmetro</span>
+                        <span className="font-bold">Tipo</span>
+                        <span className="font-bold">Descrição</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>start_date</span>
+                        <span>string</span>
+                        <span>Data inicial (YYYY-MM-DD)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>end_date</span>
+                        <span>string</span>
+                        <span>Data final (YYYY-MM-DD)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>sort_by</span>
+                        <span>string</span>
+                        <span>Ordenação: 'count', 'accuracy_desc', 'accuracy_asc'</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>categories</span>
+                        <span>string</span>
+                        <span>Filtrar por categorias (opcional)</span>
                       </div>
                     </div>
                   </div>
@@ -559,6 +691,11 @@ export default function ApiAvaliacoesIaPage() {
                         <span>string</span>
                         <span>Filtrar por ACERTOU ou ERROU (opcional)</span>
                       </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>categories</span>
+                        <span>string</span>
+                        <span>Filtrar por categorias (opcional)</span>
+                      </div>
                     </div>
                   </div>
                   <Separator />
@@ -575,6 +712,126 @@ export default function ApiAvaliacoesIaPage() {
     "Is_Match": 1,
     "Data_Avaliacao": "2024-01-15T10:30:00Z",
     "Link_Fotos": "https://app.renovsmart.com.br/..."
+  }
+]`}
+                    </pre>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="categorias" className="mt-4">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">GET /api/avaliacoes-ia/categorias</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Retorna o volume de avaliações e a acurácia da IA agrupados por categoria de dispositivo.
+                    </p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h4 className="font-semibold mb-2">Parâmetros de Query</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="grid grid-cols-3 gap-2 font-mono text-xs bg-muted p-2 rounded">
+                        <span className="font-bold">Parâmetro</span>
+                        <span className="font-bold">Tipo</span>
+                        <span className="font-bold">Descrição</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>start_date</span>
+                        <span>string</span>
+                        <span>Data inicial (YYYY-MM-DD)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>end_date</span>
+                        <span>string</span>
+                        <span>Data final (YYYY-MM-DD)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>categories</span>
+                        <span>string</span>
+                        <span>Filtrar por categorias (opcional)</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h4 className="font-semibold mb-2">Exemplo de Resposta</h4>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+{`[
+  {
+    "Categoria": "Smartphone",
+    "Total_Avaliados": 1500,
+    "Qtd_Acertos": 1275,
+    "Acuracia": 85.0
+  },
+  {
+    "Categoria": "Tablet",
+    "Total_Avaliados": 300,
+    "Qtd_Acertos": 270,
+    "Acuracia": 90.0
+  }
+]`}
+                    </pre>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="assertividade-fotos" className="mt-4">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">GET /api/avaliacoes-ia/assertividade-fotos</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Retorna o percentual de assertividade da IA comparado com a avaliação humana, detalhado por mês e tipo de foto (tela).
+                    </p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h4 className="font-semibold mb-2">Parâmetros de Query</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="grid grid-cols-3 gap-2 font-mono text-xs bg-muted p-2 rounded">
+                        <span className="font-bold">Parâmetro</span>
+                        <span className="font-bold">Tipo</span>
+                        <span className="font-bold">Descrição</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>start_date</span>
+                        <span>string</span>
+                        <span>Data inicial (YYYY-MM-DD)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>end_date</span>
+                        <span>string</span>
+                        <span>Data final (YYYY-MM-DD)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>categories</span>
+                        <span>string</span>
+                        <span>Filtrar por categorias (opcional)</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h4 className="font-semibold mb-2">Exemplo de Resposta</h4>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+{`[
+  {
+    "Mes": "2024-01",
+    "Tipo_Foto": "Tela",
+    "Total_Avaliados": 500,
+    "Acertos_Ambos_Dano": 100,
+    "Acertos_Ambos_Sem_Dano": 350,
+    "Total_Acertos": 450,
+    "Percentual_Assertividade": 90.0
+  },
+  {
+    "Mes": "2024-01",
+    "Tipo_Foto": "Traseira",
+    "Total_Avaliados": 480,
+    "Acertos_Ambos_Dano": 90,
+    "Acertos_Ambos_Sem_Dano": 340,
+    "Total_Acertos": 430,
+    "Percentual_Assertividade": 89.6
   }
 ]`}
                     </pre>
