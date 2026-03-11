@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,13 +41,9 @@ import {
   Square,
 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 const PRICING_API_BASE = "/api/pricing";
-
-const CATEGORIES = [
-  { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
-  { id: "d686a25d-045d-4b8c-9d7c-35a21d29d31b", name: "Android" },
-];
 
 interface EligibleDevice {
   categoryId: string;
@@ -79,7 +75,14 @@ type SortDirection = "asc" | "desc";
 export default function PricingAnalysisPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0].id);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const { data: categoriesData } = usePricingCategories();
+
+  useEffect(() => {
+    if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
+      setSelectedCategory(categoriesData[0].id);
+    }
+  }, [categoriesData, selectedCategory]);
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -164,8 +167,8 @@ export default function PricingAnalysisPage() {
     }
   };
 
-  const getDeviceKey = (device: EligibleDevice) => 
-    `${device.manufacturerName}-${device.modelName}-${device.storage}`;
+  const getDeviceKey = (device: EligibleDevice) =>
+    `${device.manufacturerName}|${device.modelName}|${device.storage}`;
 
   const handleSelectDevice = (device: EligibleDevice) => {
     const key = getDeviceKey(device);
@@ -204,7 +207,7 @@ export default function PricingAnalysisPage() {
         Marca: d.manufacturerName,
         Modelo: d.modelName,
         Capacidade: `${d.storage}GB`,
-        Categoria: CATEGORIES.find((c) => c.id === selectedCategory)?.name || "",
+        Categoria: categoriesData?.find((c) => c.id === selectedCategory)?.name || "",
       }));
 
       const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -308,7 +311,7 @@ export default function PricingAnalysisPage() {
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
-                    {CATEGORIES.map((cat) => (
+                    {categoriesData?.map((cat) => (
                       <SelectItem key={cat.id} value={cat.id}>
                         {cat.name}
                       </SelectItem>

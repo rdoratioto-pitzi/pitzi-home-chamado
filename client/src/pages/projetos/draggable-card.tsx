@@ -1,9 +1,17 @@
+import React from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Hash, Tag as TagIcon, Calendar, User as UserIcon } from "lucide-react";
+import { Hash, Tag as TagIcon, Calendar, User as UserIcon, Lock, CheckSquare, Circle, Clock, CheckCircle2 } from "lucide-react";
 import type { KanbanCard, User } from "@shared/schema";
+
+interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
 
 interface DraggableCardProps {
   card: KanbanCard;
@@ -11,6 +19,7 @@ interface DraggableCardProps {
   isReadOnly: boolean;
   priorityColors: Record<string, string>;
   priorityLabels: Record<string, string>;
+  isBlocked?: boolean;
   onClick: () => void;
 }
 
@@ -26,13 +35,14 @@ function truncateText(text: string, maxLength: number = 100): string {
   return text.substring(0, maxLength) + '...';
 }
 
-export function DraggableCard({ 
-  card, 
-  users, 
-  isReadOnly, 
-  priorityColors, 
-  priorityLabels, 
-  onClick 
+export function DraggableCard({
+  card,
+  users,
+  isReadOnly,
+  priorityColors,
+  priorityLabels,
+  isBlocked = false,
+  onClick
 }: DraggableCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
@@ -46,6 +56,35 @@ export function DraggableCard({
 
   const assignee = users.find(u => u.id === card.assigneeId);
 
+  // Checklist stats
+  const checklist: ChecklistItem[] = (() => {
+    try { return card.checklist ? JSON.parse(card.checklist as unknown as string) : []; }
+    catch { return []; }
+  })();
+  const checklistDone = checklist.filter(i => i.done).length;
+
+  // Labels
+  const labelIds: string[] = (() => {
+    try { return card.labelIds ? JSON.parse(card.labelIds as unknown as string) : []; }
+    catch { return []; }
+  })();
+
+  // Status config
+  const statusConfig: Record<string, { icon: React.ElementType; label: string; className: string }> = {
+    todo:  { icon: Circle,       label: "A Fazer",      className: "text-slate-500 bg-slate-100 dark:bg-slate-800 dark:text-slate-400" },
+    doing: { icon: Clock,        label: "Em Andamento", className: "text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400" },
+    done:  { icon: CheckCircle2, label: "Concluído",    className: "text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400" },
+  };
+  const cardStatusKey = (card.status as string) || "todo";
+  const statusInfo = statusConfig[cardStatusKey] ?? statusConfig.todo;
+  const StatusIcon = statusInfo.icon;
+
+  // Border color por prioridade
+  const borderColorClass =
+    card.priority === "muito_urgente" ? "border-l-red-500" :
+    card.priority === "urgente" ? "border-l-orange-400" :
+    "border-l-blue-400";
+
   return (
     <div
       ref={setNodeRef}
@@ -54,9 +93,9 @@ export function DraggableCard({
       {...attributes}
       className={`${isDragging ? 'opacity-50' : ''} touch-none`}
     >
-      <Card 
+      <Card
         onClick={onClick}
-        className={`cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 border-l-transparent hover:border-l-primary/50 group ${isReadOnly ? 'opacity-80' : 'active:cursor-grabbing'}`}
+        className={`cursor-pointer hover:shadow-md transition-all duration-200 border-l-4 ${borderColorClass} group ${isReadOnly ? 'opacity-80' : 'active:cursor-grabbing'}`}
         data-testid={`card-kanban-${card.id}`}
       >
         <CardContent className="p-3">
@@ -68,9 +107,25 @@ export function DraggableCard({
                   {card.code}
                 </span>
               </div>
-              <Badge className={`text-[10px] h-4 px-1.5 uppercase font-bold tracking-wider ${priorityColors[card.priority]}`}>
-                {priorityLabels[card.priority]}
-              </Badge>
+              <div className="flex items-center gap-1">
+                {isBlocked && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Lock className="h-3 w-3 text-red-500 flex-shrink-0" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      <p className="text-xs">Card bloqueado por dependência</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+                <Badge className={`text-[10px] h-4 px-1.5 flex items-center gap-0.5 ${statusInfo.className}`}>
+                  <StatusIcon className="h-2.5 w-2.5" />
+                  {statusInfo.label}
+                </Badge>
+                <Badge className={`text-[10px] h-4 px-1.5 uppercase font-bold tracking-wider ${priorityColors[card.priority]}`}>
+                  {priorityLabels[card.priority]}
+                </Badge>
+              </div>
             </div>
 
             <div>
@@ -91,6 +146,20 @@ export function DraggableCard({
               )}
             </div>
 
+            {/* Labels coloridas */}
+            {labelIds.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {labelIds.slice(0, 4).map((labelId) => (
+                  <div
+                    key={labelId}
+                    className="h-1.5 w-8 rounded-full opacity-80"
+                    style={{ backgroundColor: "#6366f1" }}
+                    title={labelId}
+                  />
+                ))}
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-muted/50">
               {card.tags?.map((tag, idx) => (
                 <Badge key={idx} variant="secondary" className="text-[10px] h-5 bg-primary/10 text-primary border-none hover:bg-primary/20">
@@ -98,8 +167,16 @@ export function DraggableCard({
                   {tag}
                 </Badge>
               ))}
-              
+
               <div className="flex items-center gap-3 ml-auto">
+                {checklist.length > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <CheckSquare className="h-3 w-3" />
+                    <span className={checklistDone === checklist.length ? "text-green-600 font-medium" : ""}>
+                      {checklistDone}/{checklist.length}
+                    </span>
+                  </div>
+                )}
                 {card.startDate && (
                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
                     <Calendar className="h-3 w-3" />
@@ -116,6 +193,16 @@ export function DraggableCard({
                 )}
               </div>
             </div>
+
+            {/* Barra de progresso */}
+            {(card.progress ?? 0) > 0 && (
+              <Progress value={card.progress ?? 0} className="h-1" />
+            )}
+
+            {/* Progresso do checklist como barra quando não tem progress manual */}
+            {checklist.length > 0 && (card.progress ?? 0) === 0 && (
+              <Progress value={(checklistDone / checklist.length) * 100} className="h-1" />
+            )}
           </div>
         </CardContent>
       </Card>

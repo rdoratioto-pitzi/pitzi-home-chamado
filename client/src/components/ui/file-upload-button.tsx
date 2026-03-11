@@ -216,4 +216,197 @@ const FileUploadButton = React.forwardRef<HTMLDivElement, FileUploadButtonProps>
 
         try {
           await uploadHandler(fileUpload.file, (progress) => {
-, 
+            setFiles((prev) =>
+              prev.map((f) =>
+                f.id === fileId ? { ...f, progress } : f
+              )
+            )
+          })
+
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === fileId ? { ...f, status: "success" as const, progress: 100 } : f
+            )
+          )
+        } catch (error) {
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === fileId
+                ? { ...f, status: "error" as const, error: error instanceof Error ? error.message : "Upload failed" }
+                : f
+            )
+          )
+        }
+      },
+      [files, uploadHandler]
+    )
+
+    // -------------------------------------------------------------------------
+    // Event Handlers
+    // -------------------------------------------------------------------------
+    const handleDragOver = (e: React.DragEvent) => {
+      e.preventDefault()
+      setIsDragging(true)
+      setDragCounter((prev) => prev + 1)
+    }
+
+    const handleDragLeave = (e: React.DragEvent) => {
+      e.preventDefault()
+      setDragCounter((prev) => {
+        const newCount = prev - 1
+        if (newCount === 0) {
+          setIsDragging(false)
+        }
+        return newCount
+      })
+    }
+
+    const handleDrop = (e: React.DragEvent) => {
+      e.preventDefault()
+      setIsDragging(false)
+      setDragCounter(0)
+      
+      const droppedFiles = e.dataTransfer.files
+      if (droppedFiles.length > 0) {
+        processFiles(droppedFiles)
+      }
+    }
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const selectedFiles = e.target.files
+      if (selectedFiles && selectedFiles.length > 0) {
+        processFiles(selectedFiles)
+      }
+      // Reset input value to allow selecting the same file again
+      e.target.value = ""
+    }
+
+    const handleRemoveFile = (fileId: string) => {
+      const updatedFiles = files.filter((f) => f.id !== fileId)
+      setFiles(updatedFiles)
+      onFilesChange?.(updatedFiles)
+    }
+
+    const handleRetry = (fileId: string) => {
+      uploadFile(fileId)
+    }
+
+    // -------------------------------------------------------------------------
+    // Render
+    // -------------------------------------------------------------------------
+    return (
+      <div
+        ref={ref}
+        className={cn("space-y-4", className)}
+      >
+        {/* Dropzone */}
+        <div
+          className={cn(
+            "relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
+            isDragging
+              ? "border-primary bg-primary/5"
+              : "border-muted-foreground/25 hover:border-muted-foreground/50",
+            disabled && "opacity-50 cursor-not-allowed"
+          )}
+          onDragOver={disabled ? undefined : handleDragOver}
+          onDragLeave={disabled ? undefined : handleDragLeave}
+          onDrop={disabled ? undefined : handleDrop}
+          onClick={() => !disabled && inputRef.current?.click()}
+        >
+          <input
+            ref={inputRef}
+            type="file"
+            accept={accept}
+            multiple={multiple}
+            disabled={disabled}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          
+          <div className="flex flex-col items-center gap-2">
+            <Upload className={cn("h-10 w-10 text-muted-foreground", isDragging && "text-primary")} />
+            <div className="text-sm">
+              <span className="font-medium text-foreground">{label}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
+        </div>
+
+        {/* File List */}
+        {files.length > 0 && (
+          <div className="space-y-2">
+            {files.map((fileUpload) => (
+              <Card key={fileUpload.id} className="overflow-hidden">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-3">
+                    {/* Preview or Icon */}
+                    <div className="flex-shrink-0">
+                      {fileUpload.preview ? (
+                        <img
+                          src={fileUpload.preview}
+                          alt={fileUpload.file.name}
+                          className="h-10 w-10 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 flex items-center justify-center bg-muted rounded">
+                          {React.createElement(getFileIcon(fileUpload.file), {
+                            className: "h-5 w-5 text-muted-foreground"
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* File Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{fileUpload.file.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(fileUpload.file.size)}
+                        </p>
+                        {fileUpload.status === "uploading" && (
+                          <Progress value={fileUpload.progress} className="h-1 w-20" />
+                        )}
+                        {fileUpload.status === "error" && fileUpload.error && (
+                          <p className="text-xs text-destructive truncate">{fileUpload.error}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status Icon */}
+                    <div className="flex-shrink-0">
+                      {fileUpload.status === "success" && (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      )}
+                      {fileUpload.status === "error" && (
+                        <button
+                          onClick={() => handleRetry(fileUpload.id)}
+                          className="text-destructive hover:text-destructive/80"
+                          title="Tentar novamente"
+                        >
+                          <AlertCircle className="h-5 w-5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Remove Button */}
+                    {fileUpload.status !== "uploading" && (
+                      <button
+                        onClick={() => handleRemoveFile(fileUpload.id)}
+                        className="flex-shrink-0 text-muted-foreground hover:text-destructive"
+                        title="Remover"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
+)
+
+export { FileUploadButton }

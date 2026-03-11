@@ -97,80 +97,78 @@ export class OmieService {
       param: requestBody.param
     }, null, 2));
     
-    try {
-      console.log('[OMIE Service] Sending request to Omie API...');
-      const startTime = Date.now();
-      
-      const response = await axios.post(fullUrl, requestBody, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 30000,
-        validateStatus: (status) => status < 500
-      });
-      
-      const duration = Date.now() - startTime;
-      
-      console.log('[OMIE Service] Response received:');
-      console.log('- Status:', response.status);
-      console.log('- Duration:', duration, 'ms');
-      console.log('- Data type:', typeof response.data);
-      console.log('- Data keys:', Object.keys(response.data || {}));
-      
-      // Check for SOAP fault
-      if (response.data?.faultstring) {
-        console.error('[OMIE Service] API returned fault:');
-        console.error('- Faultstring:', response.data.faultstring);
-        console.error('- Faultcode:', response.data.faultcode);
-        throw new Error(response.data.faultstring);
+    const MAX_RETRIES = 3;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        console.log(`[OMIE Service] Sending request to Omie API (attempt ${attempt}/${MAX_RETRIES})...`);
+        const startTime = Date.now();
+
+        // Accept all HTTP status codes so we can always inspect the response body
+        const response = await axios.post(fullUrl, requestBody, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 30000,
+          validateStatus: () => true
+        });
+
+        const duration = Date.now() - startTime;
+
+        console.log('[OMIE Service] Response received:');
+        console.log('- Status:', response.status);
+        console.log('- Duration:', duration, 'ms');
+        console.log('- Data type:', typeof response.data);
+        console.log('- Data keys:', Object.keys(response.data || {}));
+        if (response.status >= 400) {
+          console.error('[OMIE Service] Non-2xx response body:', JSON.stringify(response.data));
+        }
+
+        // Check for SOAP fault — not retryable (business error)
+        if (response.data?.faultstring) {
+          console.error('[OMIE Service] API returned fault:', response.data.faultstring);
+          throw new Error(response.data.faultstring);
+        }
+
+        if (response.data?.error) {
+          console.error('[OMIE Service] API returned error:', JSON.stringify(response.data.error));
+          throw new Error(response.data.error.message || JSON.stringify(response.data.error));
+        }
+
+        if (response.data?.status === 'error') {
+          console.error('[OMIE Service] API returned error status:', response.data.message);
+          throw new Error(response.data.message || 'API returned error status');
+        }
+
+        // Surface any unexpected HTTP error with the actual response body
+        if (response.status >= 400) {
+          const bodyMsg = typeof response.data === 'string'
+            ? response.data
+            : JSON.stringify(response.data);
+          console.error(`[OMIE Service] HTTP ${response.status} from Omie:`, bodyMsg);
+          throw new Error(`Omie HTTP ${response.status}: ${bodyMsg}`);
+        }
+
+        console.log('[OMIE Service] API call successful');
+        return response.data;
+
+      } catch (error: any) {
+        console.error(`[OMIE Service] Attempt ${attempt}/${MAX_RETRIES} failed: ${error.message}`);
+
+        // Network/timeout errors are retryable; business logic errors are not
+        const isNetworkError = !error.response && error.request;
+        const isRetryable = isNetworkError;
+
+        if (!isRetryable || attempt === MAX_RETRIES) {
+          throw new Error(error.message);
+        }
+
+        // Exponential backoff before retry: 1s, 2s
+        const delay = attempt * 1000;
+        console.log(`[OMIE Service] Retrying in ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
-      
-      // Check for other error formats
-      if (response.data?.error) {
-        console.error('[OMIE Service] API returned error:');
-        console.error('- Error:', JSON.stringify(response.data.error));
-        throw new Error(response.data.error.message || JSON.stringify(response.data.error));
-      }
-      
-      // Check for status error
-      if (response.data?.status === 'error') {
-        console.error('[OMIE Service] API returned error status:');
-        console.error('- Message:', response.data.message);
-        throw new Error(response.data.message || 'API returned error status');
-      }
-      
-      console.log('[OMIE Service] API call successful');
-      return response.data;
-      
-    } catch (error: any) {
-      console.error('[OMIE Service] =======================================');
-      console.error('[OMIE Service] API call FAILED:');
-      console.error('- Error message:', error.message);
-      
-      if (error.response) {
-        console.error('- Response status:', error.response.status);
-        console.error('- Response statusText:', error.response.statusText);
-        console.error('- Response data:', JSON.stringify(error.response.data, null, 2));
-      } else if (error.request) {
-        console.error('- No response received (request made)');
-        console.error('- Request details:', error.request);
-      }
-      
-      console.error('- Stack:', error.stack);
-      
-      // Extract meaningful error message
-      let errorMessage = error.message;
-      
-      if (error.response?.data?.faultstring) {
-        errorMessage = error.response.data.faultstring;
-      } else if (error.response?.data?.error?.message) {
-        errorMessage = error.response.data.error.message;
-      } else if (error.response?.status === 404) {
-        errorMessage = `Endpoint not found: ${endpoint}. Check if the endpoint URL is correct.`;
-      } else if (error.response?.status === 500) {
-        errorMessage = `Server error from Omie API. Check request parameters.`;
-      }
-      
-      throw new Error(errorMessage);
     }
+
+    throw new Error('Max retries reached calling Omie API');
   }
   
   /**
@@ -214,7 +212,7 @@ export class OmieService {
         {
           headers: { 'Content-Type': 'application/json' },
           timeout: 30000,
-          validateStatus: (status) => status < 500
+          validateStatus: () => true
         }
       );
 

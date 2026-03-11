@@ -41,22 +41,14 @@ async function fixOmieConfig() {
       await pool?.query(`
         INSERT INTO omie_config (app_key, app_secret, is_active)
         VALUES ($1, $2, $3)
-      `, ['3512564154099', 'e7036f3b188d5b658319e2f97a62fcca', true]);
+      `, ['3512564154099', '3bf7b7131fe0f76a23f567387841fbb8', true]);
       
       console.log('[Omie Setup] ✓ Credenciais inseridas com sucesso');
     } else {
       console.log('[Omie Setup] ✓ Configuração existente encontrada');
       console.log('  - App Key:', configCheck.rows[0].app_key?.substring(0, 5) + '...');
       console.log('  - Ativo:', configCheck.rows[0].is_active);
-      
-      // Atualizar credenciais para garantir que estão corretas
-      await pool?.query(`
-        UPDATE omie_config 
-        SET app_key = $1, app_secret = $2, is_active = $3, updated_at = NOW()
-        WHERE id = $4
-      `, ['3512564154099', 'e7036f3b188d5b658319e2f97a62fcca', true, configCheck.rows[0].id]);
-      
-      console.log('[Omie Setup] ✓ Credenciais atualizadas');
+      // Não sobrescrever credenciais salvas pelo usuário
     }
     
     // Verificar tabela de logs
@@ -121,6 +113,90 @@ async function autoMigrateSchema() {
       `ALTER TABLE prompts_library ADD COLUMN IF NOT EXISTS translated_content text`,
       `ALTER TABLE prompts_library ADD COLUMN IF NOT EXISTS translated_at timestamp`,
       `ALTER TABLE prompts_library ADD COLUMN IF NOT EXISTS is_translated boolean DEFAULT false`,
+      // Omie integration tables
+      `CREATE TABLE IF NOT EXISTS omie_config (
+        id SERIAL PRIMARY KEY,
+        app_key VARCHAR(255) NOT NULL,
+        app_secret VARCHAR(255) NOT NULL,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE TABLE IF NOT EXISTS omie_sync_log (
+        id SERIAL PRIMARY KEY,
+        endpoint VARCHAR(255) NOT NULL,
+        category VARCHAR(100),
+        status VARCHAR(50) NOT NULL,
+        total_records INTEGER DEFAULT 0,
+        request_params JSONB,
+        response_data JSONB,
+        error_message TEXT,
+        synced_at TIMESTAMP DEFAULT NOW()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_omie_sync_category ON omie_sync_log(category)`,
+      `CREATE INDEX IF NOT EXISTS idx_omie_sync_status ON omie_sync_log(status)`,
+      `CREATE INDEX IF NOT EXISTS idx_omie_sync_synced_at ON omie_sync_log(synced_at DESC)`,
+      // Migration 0012: Kanban Labels, Checklist, Card Dependencies e Subtarefas em Tasks
+      `ALTER TABLE kanban_cards ADD COLUMN IF NOT EXISTS checklist text`,
+      `ALTER TABLE kanban_cards ADD COLUMN IF NOT EXISTS label_ids text`,
+      `CREATE TABLE IF NOT EXISTS kanban_labels (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar,
+        project_id varchar NOT NULL,
+        name text NOT NULL,
+        color text NOT NULL DEFAULT '#6366f1',
+        created_at timestamp DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS kanban_card_dependencies (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar,
+        project_id varchar NOT NULL,
+        blocking_card_id varchar NOT NULL,
+        blocked_card_id varchar NOT NULL,
+        created_at timestamp DEFAULT now()
+      )`,
+      `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sub_task_parent_id varchar`,
+      `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS estimation_hours integer`,
+      `ALTER TABLE tasks ADD COLUMN IF NOT EXISTS progress integer DEFAULT 0`,
+      // Módulo Diagramas/Fluxogramas (feat-modulo-diagramas)
+      `CREATE TABLE IF NOT EXISTS flowcharts (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar,
+        title text NOT NULL,
+        description text,
+        owner_id varchar NOT NULL,
+        visibility text NOT NULL DEFAULT 'private',
+        nodes_data text,
+        edges_data text,
+        viewport text,
+        permissions text,
+        is_template boolean DEFAULT false,
+        template_category text,
+        thumbnail text,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS flowchart_versions (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar,
+        flowchart_id varchar NOT NULL,
+        nodes_data text,
+        edges_data text,
+        viewport text,
+        created_by varchar NOT NULL,
+        version_label text,
+        created_at timestamp DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS flowchart_comments (
+        id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+        tenant_id varchar,
+        flowchart_id varchar NOT NULL,
+        author_id varchar NOT NULL,
+        content text NOT NULL,
+        parent_comment_id varchar,
+        created_at timestamp DEFAULT now(),
+        updated_at timestamp DEFAULT now()
+      )`,
     ];
     for (const sql of migrations) {
       try { await pool.query(sql); } catch {}
@@ -233,6 +309,39 @@ app.get("/api/omie-debug/config", async (req, res) => {
   } catch (error: any) {
     console.error('[OMIE DEBUG] Error:', error.message);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ── Claude Code Usage (autenticado por secret, não por sessão) ──────────────
+app.post("/api/git-analytics/claude-code-usage", async (req, res) => {
+  try {
+    const secret = process.env.CLAUDE_USAGE_SECRET;
+    if (!secret || req.headers["x-claude-usage-secret"] !== secret) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { z } = await import("zod");
+    const { storage } = await import("./storage");
+
+    const bodySchema = z.object({
+      developerName:        z.string().min(1),
+      reportDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      inputTokens:          z.number().int().min(0),
+      outputTokens:         z.number().int().min(0),
+      cacheCreationTokens:  z.number().int().min(0),
+      cacheReadTokens:      z.number().int().min(0),
+      totalTokens:          z.number().int().min(0),
+      sourceMachine:        z.string().optional(),
+    });
+
+    const body = bodySchema.parse(req.body);
+    const report = await storage.upsertClaudeCodeUsage(body);
+
+    console.log(`[claude-usage] ${body.developerName} @ ${body.reportDate}: ${body.totalTokens.toLocaleString()} tokens`);
+    res.json({ ok: true, report });
+  } catch (error: any) {
+    console.error("Claude Code usage report error:", error);
+    res.status(400).json({ error: error.message });
   }
 });
 
@@ -383,6 +492,15 @@ export const asyncHandler =
 
         // Iniciar cron job de sincronização Git Analytics
         startGitSyncJob();
+
+        // Pré-aquecer cache de posição de estoques em background (não bloqueia startup)
+        import("./services/estoque-pos.service").then(({ getCachedPosEstoque }) => {
+          getCachedPosEstoque().then((idx) => {
+            log(`[EstoquePos] Cache pré-aquecido — ${idx.size} produtos`, "estoque-pos");
+          }).catch((err: any) => {
+            console.error("[EstoquePos] Falha no pré-aquecimento:", err.message);
+          });
+        }).catch(() => {});
 
         // Verificar se a tabela de prompts está vazia e executar sincronização inicial
         // Usando importação dinâmica para evitar erros de módulo na inicialização

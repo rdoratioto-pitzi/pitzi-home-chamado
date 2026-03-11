@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -31,11 +31,7 @@ import {
   Package,
 } from "lucide-react";
 import { Link } from "wouter";
-
-const CATEGORIES = [
-  { id: "d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345", name: "iPhone" },
-  { id: "d686a25d-045d-4b8c-9d7c-35a21d29d31b", name: "Android" },
-];
+import { usePricingCategories } from "@/hooks/use-pricing-categories";
 
 interface EligibleDevice {
   categoryId: string;
@@ -53,7 +49,14 @@ interface EligibleDevicesResponse {
 const COLORS = ["#00A137", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#14B8A6", "#EF4444", "#84CC16"];
 
 export default function DashboardPage() {
-  const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0].id);
+  const [selectedCategory, setSelectedCategory] = useState<string>("");
+  const { data: categoriesData } = usePricingCategories();
+
+  useEffect(() => {
+    if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
+      setSelectedCategory(categoriesData[0].id);
+    }
+  }, [categoriesData, selectedCategory]);
 
   const { data: devicesData, isLoading, refetch } = useQuery<EligibleDevicesResponse>({
     queryKey: ["pricing-devices", selectedCategory],
@@ -69,7 +72,7 @@ export default function DashboardPage() {
 
   const devices = devicesData?.items || [];
 
-  const categoryName = CATEGORIES.find((c) => c.id === selectedCategory)?.name || "Dispositivos";
+  const categoryName = categoriesData?.find((c) => c.id === selectedCategory)?.name || "Dispositivos";
 
   const brandData = devices.reduce((acc, device) => {
     const brand = device.manufacturerName;
@@ -114,7 +117,7 @@ export default function DashboardPage() {
               <SelectValue placeholder="Selecione" />
             </SelectTrigger>
             <SelectContent>
-              {CATEGORIES.map((cat) => (
+              {categoriesData?.map((cat) => (
                 <SelectItem key={cat.id} value={cat.id}>
                   {cat.name}
                 </SelectItem>

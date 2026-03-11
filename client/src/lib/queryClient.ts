@@ -1,14 +1,22 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { clearAuth, getAuthToken } from "./auth";
 
+let _handlingUnauthorized = false;
+
 function handleUnauthorized() {
-  // Limpa dados de autenticação do localStorage
-  clearAuth();
-  
-  // Redireciona para login se não estiver lá
-  if (window.location.pathname !== "/login") {
-    window.location.href = "/login";
+  // Na página de login, um 401 é só "senha errada" — limpa auth mas não
+  // seta a flag nem redireciona. Isso evita que a flag fique presa após
+  // uma tentativa de login frustrada, quebrando o redirecionamento futuro.
+  if (window.location.pathname === "/login") {
+    clearAuth();
+    return;
   }
+
+  if (_handlingUnauthorized) return;
+  _handlingUnauthorized = true;
+
+  clearAuth();
+  window.location.href = "/login";
 }
 
 async function throwIfResNotOk(res: Response) {

@@ -118,7 +118,6 @@ export function BrandSettings() {
       
       const fileUrl = normalizeObjectPath(objectPath);
       
-      console.log("Saving file URL to settings:", key, fileUrl);
       await apiRequest("POST", "/api/settings", { key, value: fileUrl });
       await queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/settings", key] });

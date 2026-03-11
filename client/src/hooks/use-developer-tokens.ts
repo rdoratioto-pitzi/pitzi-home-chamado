@@ -6,6 +6,13 @@ export interface DeveloperTokenUsage {
   totalRequests: number;
   totalSpend: number;
   keysCount: number;
+  // Breakdown por provider
+  openrouterTokens: number;
+  openrouterSpend: number;
+  openrouterKeysCount: number;
+  anthropicTokens: number;
+  anthropicSpend: number;
+  anthropicKeysCount: number;
 }
 
 export function useDeveloperTokens(filters?: {
@@ -16,25 +23,25 @@ export function useDeveloperTokens(filters?: {
     queryKey: ["git-analytics-developer-tokens", filters?.startDate, filters?.endDate],
     queryFn: async (): Promise<DeveloperTokenUsage[]> => {
       const params = new URLSearchParams();
-      
+
       if (filters?.startDate) {
         params.append("startDate", filters.startDate.toISOString());
       }
-      
+
       if (filters?.endDate) {
         params.append("endDate", filters.endDate.toISOString());
       }
-      
+
       const url = `/api/git-analytics/developer-tokens${params.toString() ? `?${params}` : ''}`;
-      
+
       const response = await fetch(url, {
         credentials: "include",
       });
-      
+
       if (!response.ok) {
         throw new Error("Failed to fetch developer tokens");
       }
-      
+
       return response.json();
     },
     staleTime: 1000 * 60 * 5, // Cache por 5 minutos

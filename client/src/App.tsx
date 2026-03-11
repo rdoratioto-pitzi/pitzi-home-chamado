@@ -1,65 +1,83 @@
 // Renov Home - Sistema de Gestão Operacional
-import { useEffect } from "react";
+import React, { lazy, Suspense } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/hooks/use-theme";
-import { SidebarProvider } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
-import { ProtectedRoute } from "@/components/protected-route";
-import NotFound from "@/pages/not-found";
+const SidebarProvider = lazy(() => import("@/components/ui/sidebar").then(m => ({ default: m.SidebarProvider })));
 import { useAuthSync } from "@/hooks/useAuthSync";
-import Home from "@/pages/home";
-import ChamadosPage from "@/pages/chamados/index";
-import CSATAnalytics from "@/pages/chamados/csat-analytics";
-import ProjetosPage from "@/pages/projetos/index";
-import KanbanPage from "@/pages/projetos/kanban";
-import TarefasPage from "@/pages/tarefas/index";
-import TaskDetailPage from "@/pages/tarefas/detail";
-import ReunioesPage from "@/pages/reunioes/index";
-import MeetingDetailPage from "@/pages/reunioes/detail";
-import OKRsPage from "@/pages/okrs/index";
-import LogisticaPage from "@/pages/logistica/index";
-import LogisticsDashboard from "@/pages/logistica/dashboard";
-import OperadoresPage from "@/pages/logistica/operadores";
-import SolicitacoesPage from "@/pages/logistica/solicitacoes";
-import LogisticaReversaPage from "@/pages/logistica/logistica-reversa";
-import SimularFretePage from "@/pages/logistica/simular-frete";
-import ImpressaoEtiquetasPage from "@/pages/logistica/impressao-etiquetas";
-import RomaneiosPage from "@/pages/logistica/romaneios";
-import EficienciaAvaliacoesIaPage from "@/pages/logistica/avaliacoes-ia";
-import ApisPage from "@/pages/apis/index";
-import CorreiosReversaPage from "@/pages/apis/correios-reversa";
-import ApiRsLogisticaPage from "@/pages/apis/api-rs-logistica";
-import ApiAdmLogisticaPage from "@/pages/apis/api-adm-logistica";
-import ApiAvaliacoesIaPage from "@/pages/apis/api-avaliacoes-ia";
-import ApiRelatorioPedidosPage from "@/pages/apis/api-relatorio-pedidos";
-import LoginPage from "@/pages/login";
-import ConfiguracoesPage from "@/pages/configuracoes/index";
-import PricingOverviewPage from "@/pages/pricing/index";
-import PricingAnalysisPage from "@/pages/pricing/analise";
-import PricingDetailsPage from "@/pages/pricing/detalhes";
-import PricingReportsPage from "@/pages/pricing/relatorios";
-import PricingGraficosPage from "@/pages/pricing/graficos";
-import PricingIndicadoresPage from "@/pages/pricing/indicadores";
-import PricingAlertasPage from "@/pages/pricing/alertas";
-import PricingDashboardPage from "@/pages/pricing/dashboard";
-import MetasVisaoGeralPage from "@/pages/metas/index";
-import MetasGestaoPage from "@/pages/metas/gestao";
-import BibliotecaPage from "@/pages/biblioteca/index";
-import BibliotecaNovoPage from "@/pages/biblioteca/novo";
-import BibliotecaDocumentoPage from "@/pages/biblioteca/documento";
-import BibliotecaFavoritosPage from "@/pages/biblioteca/favoritos";
-import BibliotecaPromptsPage from "@/pages/biblioteca/prompts";
-import MacgyverIAPage from "@/pages/macgyver-ia/index";
-import FluxogramasPage from "@/pages/fluxogramas/index";
-import FlowchartEditorPage from "@/pages/fluxogramas/editor";
-import UpdatesPage from "@/pages/updates/index";
-import GitAnalyticsPage from "@/pages/git-analytics/index";
-import EstoquesPage from "@/pages/estoques/index";
-import OmieIntegration from "@/pages/integrations/omie/OmieIntegration";
+
+const AppSidebar    = lazy(() => import("@/components/app-sidebar").then(m => ({ default: m.AppSidebar })));
+const ProtectedRoute = lazy(() => import("@/components/protected-route").then(m => ({ default: m.ProtectedRoute })));
+
+// Lazy-loaded pages — cada módulo só carrega quando a rota é acessada.
+// Isso reduz as requisições iniciais de ~800 para apenas as dependências
+// da página atual (tipicamente < 30 chunks no login).
+const NotFound                         = lazy(() => import("@/pages/not-found"));
+const Home                             = lazy(() => import("@/pages/home"));
+const LoginPage                        = lazy(() => import("@/pages/login"));
+const ChatIAPage                       = lazy(() => import("@/pages/macgyver-ia/index"));
+const ChamadosPage                     = lazy(() => import("@/pages/chamados/index"));
+const CSATAnalytics                    = lazy(() => import("@/pages/chamados/csat-analytics"));
+const ProjetosPage                     = lazy(() => import("@/pages/projetos/index"));
+const KanbanPage                       = lazy(() => import("@/pages/projetos/kanban"));
+const TarefasPage                      = lazy(() => import("@/pages/tarefas/index"));
+const TaskDetailPage                   = lazy(() => import("@/pages/tarefas/detail"));
+const ReunioesPage                     = lazy(() => import("@/pages/reunioes/index"));
+const MeetingDetailPage                = lazy(() => import("@/pages/reunioes/detail"));
+const OKRsPage                         = lazy(() => import("@/pages/okrs/index"));
+const LogisticaPage                    = lazy(() => import("@/pages/logistica/index"));
+const LogisticsDashboard               = lazy(() => import("@/pages/logistica/dashboard"));
+const OperadoresPage                   = lazy(() => import("@/pages/logistica/operadores"));
+const SolicitacoesPage                 = lazy(() => import("@/pages/logistica/solicitacoes"));
+const LogisticaReversaPage             = lazy(() => import("@/pages/logistica/logistica-reversa"));
+const SimularFretePage                 = lazy(() => import("@/pages/logistica/simular-frete"));
+const ImpressaoEtiquetasPage           = lazy(() => import("@/pages/logistica/impressao-etiquetas"));
+const RomaneiosPage                    = lazy(() => import("@/pages/logistica/romaneios"));
+const EficienciaAvaliacoesIaPage       = lazy(() => import("@/pages/logistica/avaliacoes-ia"));
+const ApisPage                         = lazy(() => import("@/pages/apis/index"));
+const CorreiosReversaPage              = lazy(() => import("@/pages/apis/correios-reversa"));
+const ApiRsLogisticaPage               = lazy(() => import("@/pages/apis/api-rs-logistica"));
+const ApiAdmLogisticaPage              = lazy(() => import("@/pages/apis/api-adm-logistica"));
+const ApiAvaliacoesIaPage              = lazy(() => import("@/pages/apis/api-avaliacoes-ia"));
+const ApiRelatorioPedidosPage          = lazy(() => import("@/pages/apis/api-relatorio-pedidos"));
+const ConfiguracoesPage                = lazy(() => import("@/pages/configuracoes/index"));
+const PricingOverviewPage              = lazy(() => import("@/pages/pricing/index"));
+const PricingAnalysisPage              = lazy(() => import("@/pages/pricing/analise"));
+const PricingDetailsPage               = lazy(() => import("@/pages/pricing/detalhes"));
+const PricingReportsPage               = lazy(() => import("@/pages/pricing/relatorios"));
+const PricingGraficosPage              = lazy(() => import("@/pages/pricing/graficos"));
+const PricingIndicadoresPage           = lazy(() => import("@/pages/pricing/indicadores"));
+const PricingAlertasPage               = lazy(() => import("@/pages/pricing/alertas"));
+const PricingDashboardPage             = lazy(() => import("@/pages/pricing/dashboard"));
+const MetasVisaoGeralPage              = lazy(() => import("@/pages/metas/index"));
+const MetasGestaoPage                  = lazy(() => import("@/pages/metas/gestao"));
+const BibliotecaPage                   = lazy(() => import("@/pages/biblioteca/index"));
+const BibliotecaNovoPage               = lazy(() => import("@/pages/biblioteca/novo"));
+const BibliotecaDocumentoPage          = lazy(() => import("@/pages/biblioteca/documento"));
+const BibliotecaFavoritosPage          = lazy(() => import("@/pages/biblioteca/favoritos"));
+const BibliotecaPromptsPage            = lazy(() => import("@/pages/biblioteca/prompts"));
+const FluxogramasPage                  = lazy(() => import("@/pages/fluxogramas/index"));
+const FlowchartEditorPage              = lazy(() => import("@/pages/fluxogramas/editor"));
+const DiagramasPage                    = lazy(() => import("@/pages/diagramas/index"));
+const DiagramaEditorPage               = lazy(() => import("@/pages/diagramas/editor"));
+const UpdatesPage                      = lazy(() => import("@/pages/updates/index"));
+const GitAnalyticsPage                 = lazy(() => import("@/pages/git-analytics/index"));
+const EstoquesPosicaoPage              = lazy(() => import("@/pages/estoques/posicao"));
+const EstoquesContagemPage             = lazy(() => import("@/pages/estoques/contagem"));
+const EstoquesRelatorioContagensPage   = lazy(() => import("@/pages/estoques/relatorio-contagens"));
+const EstoquesRelatorioContagemDetalhePage = lazy(() => import("@/pages/estoques/relatorio-contagens/[id]"));
+const EstoquesDashboardPage            = lazy(() => import("@/pages/estoques/dashboard"));
+const EstoquesPipelinePage             = lazy(() => import("@/pages/estoques/pipeline"));
+const EstoquesLeadTimePage             = lazy(() => import("@/pages/estoques/lead-time"));
+const EstoquesAgingPage                = lazy(() => import("@/pages/estoques/aging"));
+const EstoquesRastreabilidadePage      = lazy(() => import("@/pages/estoques/rastreabilidade"));
+const OmieIntegration                  = lazy(() => import("@/pages/integrations/omie/OmieIntegration"));
+const NovoChamadoPage                  = lazy(() => import("@/pages/chamados/novo"));
+const TicketDetailPage                 = lazy(() => import("@/pages/chamados/[id]"));
+const EstoquesPage                     = lazy(() => import("@/pages/estoques/index"));
 
 function Router() {
   return (
@@ -69,9 +87,9 @@ function Router() {
           <Home />
         </ProtectedRoute>
       </Route>
-      <Route path="/macgyver-ia">
+      <Route path="/chat-ia">
         <ProtectedRoute>
-          <MacgyverIAPage />
+          <ChatIAPage />
         </ProtectedRoute>
       </Route>
       <Route path="/chamados">
@@ -82,6 +100,16 @@ function Router() {
       <Route path="/chamados/csat-analytics">
         <ProtectedRoute requiredPermission="chamados">
           <CSATAnalytics />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/chamados/novo">
+        <ProtectedRoute requiredPermission="chamados">
+          <NovoChamadoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/chamados/:id">
+        <ProtectedRoute requiredPermission="chamados">
+          <TicketDetailPage />
         </ProtectedRoute>
       </Route>
       <Route path="/projetos">
@@ -122,6 +150,16 @@ function Router() {
       <Route path="/fluxogramas/:id">
         <ProtectedRoute requiredPermission="fluxogramas">
           <FlowchartEditorPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/diagramas">
+        <ProtectedRoute requiredPermission="diagramas">
+          <DiagramasPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/diagramas/:id">
+        <ProtectedRoute requiredPermission="diagramas">
+          <DiagramaEditorPage />
         </ProtectedRoute>
       </Route>
       <Route path="/metas">
@@ -284,7 +322,9 @@ function Router() {
           <BibliotecaDocumentoPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/login" component={LoginPage} />
+      <Route path="/login">
+        <LoginPage />
+      </Route>
       <Route path="/configuracoes">
         <ProtectedRoute requiredPermission="configuracoes">
           <ConfiguracoesPage />
@@ -302,7 +342,52 @@ function Router() {
       </Route>
       <Route path="/estoques">
         <ProtectedRoute requiredPermission="estoques">
-          <EstoquesPage />
+          <EstoquesDashboardPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/posicao">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesPosicaoPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/contagem">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesContagemPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/relatorio-contagens">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesRelatorioContagensPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/relatorio-contagens/:id">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesRelatorioContagemDetalhePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/dashboard">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesDashboardPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/pipeline">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesPipelinePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/lead-time">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesLeadTimePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/aging">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesAgingPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/estoques/rastreabilidade">
+        <ProtectedRoute requiredPermission="estoques">
+          <EstoquesRastreabilidadePage />
         </ProtectedRoute>
       </Route>
       <Route path="/integrations/omie">
@@ -316,19 +401,11 @@ function Router() {
 }
 
 function App() {
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const isLoginPage = location === "/login";
-  
-  // Hook para sincronização de autenticação entre abas
-  const { isAuthenticated } = useAuthSync();
 
-  useEffect(() => {
-    // Verifica autenticação usando localStorage (novo sistema)
-    const user = localStorage.getItem("user_data") || sessionStorage.getItem("user");
-    if (!user && !isLoginPage) {
-      setLocation("/login");
-    }
-  }, [location, isLoginPage, setLocation, isAuthenticated]);
+  // Hook para sincronização de autenticação entre abas
+  useAuthSync();
 
   const sidebarStyle = {
     "--sidebar-width": "16rem",
@@ -342,7 +419,9 @@ function App() {
           <TooltipProvider>
             <div className="flex h-screen w-full overflow-hidden">
               <main className="flex-1 overflow-auto">
-                <Router />
+                <Suspense fallback={null}>
+                  <Router />
+                </Suspense>
               </main>
             </div>
             <Toaster />
@@ -356,14 +435,18 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-            <div className="flex h-screen w-full">
-              <AppSidebar />
-              <main className="flex-1 overflow-auto">
-                <Router />
-              </main>
-            </div>
-          </SidebarProvider>
+          <Suspense fallback={null}>
+            <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+              <div className="flex h-screen w-full">
+                <AppSidebar />
+                <main className="flex-1 overflow-auto">
+                  <Suspense fallback={null}>
+                    <Router />
+                  </Suspense>
+                </main>
+              </div>
+            </SidebarProvider>
+          </Suspense>
           <Toaster />
         </TooltipProvider>
       </ThemeProvider>

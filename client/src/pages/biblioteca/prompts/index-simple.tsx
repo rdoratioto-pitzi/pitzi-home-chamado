@@ -21,8 +21,6 @@ export default function PromptsPage() {
 
   const handleViewPrompt = (prompt: PromptLibrary) => {
     setSelectedPrompt(prompt);
-    // Em uma implementação completa, abriria um modal
-    console.log("Prompt selecionado:", prompt.title);
   };
 
   return (

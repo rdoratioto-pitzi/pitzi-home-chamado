@@ -1,116 +1,123 @@
-# Documentação Renov Home
+# Documentação — Renov Home
 
-**🔗 Repositório:** https://github.com/renov-tech/renov-home
+> Documentação central do projeto. Ponto de entrada para devs e assistentes de IA.
 
-> **Para IAs/Assistentes:** Esta é a documentação central do projeto Renov Home. Sempre referencie estes documentos ao iniciar conversas sobre o projeto.
-
----
-
-## 📚 Índice Rápido
-
-### 🚀 Início Rápido
-- **[QUICK-START.md](QUICK-START.md)** - Para novos devs ou novos chats com IA
-
-### 📖 Documentação Core
-- **[00-CONTEXTO.md](00-CONTEXTO.md)** - Empresa, missão, filosofia "Vibe Coding"
-- **[01-ARQUITETURA.md](01-ARQUITETURA.md)** - Stack técnico completo
-- **[02-MODULOS.md](02-MODULOS.md)** - Overview de todos os módulos
-- **[03-GOVERNANCA.md](03-GOVERNANCA.md)** - Git workflow, PRs, code review
-- **[04-APIS-INTEGRACAO.md](04-APIS-INTEGRACAO.md)** - Integrações externas
-
-### 🧩 Módulos Específicos
-- **[Tickets](modulos/tickets.md)** - Sistema de suporte técnico
-- **[Projects](modulos/projects.md)** - Gestão de projetos Kanban
-- **[Meetings](modulos/meetings.md)** ⚠️ *Bug conhecido: recurring meetings*
-- **[Macgyver AI](modulos/macgyver-ai.md)** 🚧 *Em desenvolvimento ativo - PRIORIDADE*
-- **[Logistics](modulos/logistics.md)** - Rastreamento operacional
-- **[Pricing](modulos/pricing.md)** - Monitoramento de preços
-- **[Knowledge Base](modulos/knowledge-base.md)** - Base de conhecimento
-- **[Business Intelligence](modulos/business-intelligence.md)** - Dashboards e métricas
-
-### 📋 Recursos Adicionais
-- **[CHANGELOG.md](CHANGELOG.md)** - Histórico de mudanças
-- **[ROADMAP.md](ROADMAP.md)** - Planejamento futuro
+**Repositório:** https://github.com/Renov-BD/Renov.Home
+**Stack:** React + Vite · Express/Node.js · PostgreSQL · Drizzle ORM · Tailwind + shadcn/ui
 
 ---
 
-## 🎯 Como Usar Esta Documentação
+## Estrutura
 
-### Para Desenvolvedores
-1. Leia primeiro [QUICK-START.md](QUICK-START.md)
-2. Consulte [01-ARQUITETURA.md](01-ARQUITETURA.md) para entender o stack
-3. Para trabalhar em um módulo específico, veja `/docs/modulos/[nome-modulo].md`
-
-### Para IAs/Assistentes (Claude, ChatGPT, etc.)
-```markdown
-📋 Template de Início de Chat:
-
-Projeto: Renov Home
-📂 Docs: /docs/README.md
-🔗 Repo: github.com/renov-tech/renov-home
-🎯 Objetivo: [descrever tarefa específica]
+```
+docs/
+├── QUICK-START.md          → Contexto essencial em 5 minutos
+├── arquitetura/            → Stack, módulos, contexto e integrações
+├── governanca/             → Git workflow, PRs, convenções
+├── modulos/                → Planos e docs de features específicas
+├── ai-agents/              → Guias de uso dos agentes de IA (Max, Claude, etc.)
+├── MCPs/                   → Model Context Protocol servers — configuração e uso
+└── archive/                → Documentação antiga / legado
 ```
 
-**Sempre:**
-- Referencie esta documentação antes de responder
-- Stack completo em: [01-ARQUITETURA.md](01-ARQUITETURA.md)
-- Para módulos específicos: [/docs/modulos/](modulos/)
-- Repositório conectado via GitHub
+---
+
+## Início Rápido
+
+1. **[QUICK-START.md](QUICK-START.md)** — comece aqui (devs e IAs)
+2. **[arquitetura/01-arquitetura.md](arquitetura/01-arquitetura.md)** — stack técnico completo
+3. **[arquitetura/02-modulos.md](arquitetura/02-modulos.md)** — visão geral de todos os módulos
 
 ---
 
-## 📌 Informações Essenciais
+## Arquitetura
 
-### Stack Principal
-- **Frontend:** React 18 + TypeScript
-- **Backend:** Express.js + Node.js
-- **Database:** PostgreSQL
-- **Deploy:** GitHub Codespaces (em transição)
-- **Control:** Git/GitHub com branch protection
-
-### Time Core
-| Nome | Papel | Responsabilidade Principal |
-|------|-------|---------------------------|
-| Matheus | CEO/Tech Lead | Estratégia, produto, inovação |
-| Marcelo | CTO | Arquitetura, code review (aprovador) |
-| Átila | Senior Developer | Features, infraestrutura |
-| Juan | Intern Developer | Dashboards Python, tasks |
-
-### Workflow Git
-- **Branch principal:** `main` (protegida)
-- **Desenvolvimento:** `develop`
-- **Features:** `feature/nome-feature`
-- **PRs obrigatórios** com aprovação do Marcelo
+| Arquivo | Conteúdo |
+|---------|----------|
+| [00-contexto.md](arquitetura/00-contexto.md) | Empresa, missão, filosofia "Vibe Coding" |
+| [01-arquitetura.md](arquitetura/01-arquitetura.md) | Stack técnico e estrutura de pastas |
+| [02-modulos.md](arquitetura/02-modulos.md) | Overview de todos os módulos do sistema |
+| [04-apis-integracao.md](arquitetura/04-apis-integracao.md) | Integrações externas (Omie, Correios, OpenRouter...) |
 
 ---
 
-## 🆘 Precisa de Ajuda?
+## Governança
 
-### Dúvidas Comuns
-- **Como funciona o módulo X?** → `/docs/modulos/[nome-modulo].md`
-- **Qual a stack usada?** → [01-ARQUITETURA.md](01-ARQUITETURA.md)
-- **Como é o processo de desenvolvimento?** → [03-GOVERNANCA.md](03-GOVERNANCA.md)
-- **Quais integrações temos?** → [04-APIS-INTEGRACAO.md](04-APIS-INTEGRACAO.md)
-
-### Contato
-- **Issues técnicas:** GitHub Issues no repositório
-- **Dúvidas gerais:** Time interno
+| Arquivo | Conteúdo |
+|---------|----------|
+| [03-governanca.md](governanca/03-governanca.md) | Processo de PRs, code review, filosofia |
+| [git-workflow.md](governanca/git-workflow.md) | Branches, commits, regras críticas |
 
 ---
 
-## 📝 Manutenção desta Documentação
+## Módulos / Features
 
-**Quando atualizar:**
-- ✅ Ao adicionar novo módulo
-- ✅ Ao mudar stack/tecnologia
-- ✅ Ao implementar nova integração
-- ✅ Ao descobrir bugs importantes
-- ✅ Ao finalizar features relevantes
+Documentação de planos de implementação e melhorias por módulo:
 
-**Responsável:** Toda a equipe (revisor principal: Marcelo)
+| Arquivo | Módulo |
+|---------|--------|
+| [reunioes-implementation-plan.md](modulos/reunioes-implementation-plan.md) | Reuniões recorrentes e templates |
+| [csat-implementation-plan.md](modulos/csat-implementation-plan.md) | Avaliação de satisfação (CSAT) |
+| [omie-integration.md](modulos/omie-integration.md) | Integração Omie ERP |
+| [authentication-ui-improvements.md](modulos/authentication-ui-improvements.md) | Melhorias de UI na autenticação |
 
 ---
 
-**Última atualização:** Fevereiro 2026  
-**Versão Renov Home:** 2.x  
-**Status:** 🚧 Documentação em construção ativa
+## MCPs (Model Context Protocol)
+
+Servidores MCP que ampliam as capacidades do Claude Code — banco de dados, GitHub, busca web, automação e mais:
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| [MCPs/README.md](MCPs/README.md) | Índice, tabela de MCPs e ordem de ativação |
+| [MCPs/01-github.md](MCPs/01-github.md) | GitHub — PRs, issues e branches |
+| [MCPs/05-postgres.md](MCPs/05-postgres.md) | PostgreSQL — inspeção do banco de dados |
+| [MCPs/06-supabase.md](MCPs/06-supabase.md) | Supabase — acesso completo via OAuth |
+| [MCPs/08-memory.md](MCPs/08-memory.md) | Memory — memória persistente entre sessões |
+| [MCPs/10-playwright.md](MCPs/10-playwright.md) | Playwright — testes E2E automatizados |
+| [MCPs/11-sequential-thinking.md](MCPs/11-sequential-thinking.md) | Sequential Thinking — raciocínio estruturado |
+
+> Ver [MCPs/README.md](MCPs/README.md) para a lista completa com 13 servidores.
+
+---
+
+## Agentes de IA
+
+Guias para uso dos agentes autônomos de desenvolvimento:
+
+| Arquivo | Conteúdo |
+|---------|----------|
+| [ai-agents/README.md](ai-agents/README.md) | Visão geral do sistema de agentes |
+| [ai-agents/guia-uso-diario.md](ai-agents/guia-uso-diario.md) | Workflow diário: criar planos e executar |
+| [ai-agents/troubleshooting.md](ai-agents/troubleshooting.md) | Problemas comuns e soluções |
+| [ai-agents/feedback-aprendizados.md](ai-agents/feedback-aprendizados.md) | Erros anteriores e lições aprendidas |
+| [ai-agents/heartbeat.md](ai-agents/heartbeat.md) | Status e health check dos agentes |
+| [ai-agents/openclaw-prompts/](ai-agents/openclaw-prompts/) | Templates de prompts para OpenClaw |
+
+---
+
+## Informações Essenciais
+
+### Stack
+- **Frontend:** React 18 + TypeScript + Vite + TanStack Query
+- **Backend:** Express.js + Node.js (TypeScript)
+- **Database:** PostgreSQL via Drizzle ORM
+- **UI:** Tailwind CSS + shadcn/ui
+- **Timezone:** America/Sao_Paulo
+
+### Time
+| Nome | Papel |
+|------|-------|
+| Matheus | CEO / Tech Lead |
+| Marcelo | CTO / Code Review |
+| Átila | Senior Developer |
+| Juan | Developer |
+
+### Branches
+- `main` — produção (protegida)
+- `develop` — base de desenvolvimento
+- `feature/nome` — features
+
+---
+
+**Última atualização:** Março 2026

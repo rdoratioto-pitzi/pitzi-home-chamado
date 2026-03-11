@@ -1,9 +1,14 @@
 import { createRoot } from "react-dom/client";
 import { useEffect } from "react";
 import { useQuery, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import axios from 'axios';
 import App from "./App";
 import "./index.css";
 import { queryClient } from "./lib/queryClient";
+
+// Configuração global do axios — garante envio de cookies em todos os requests
+axios.defaults.withCredentials = true;
+axios.defaults.baseURL = '';
 
 function FaviconManager() {
   const { data: faviconSetting } = useQuery<{ value: string }>({

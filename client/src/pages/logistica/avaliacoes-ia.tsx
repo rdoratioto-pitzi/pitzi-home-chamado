@@ -159,7 +159,6 @@ export default function EficienciaAvaliacoesIaPage() {
         start_date: dateRange.start,
         end_date: dateRange.end
       });
-
       // 1. Fetch Categories
       const catsResponse = await fetch(`${API_BASE_URL}/categorias?${commonParams.toString()}`);
       if (catsResponse.ok) {
