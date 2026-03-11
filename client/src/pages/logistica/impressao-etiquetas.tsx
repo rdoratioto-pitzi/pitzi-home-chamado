@@ -337,8 +337,11 @@ export default function ImpressaoEtiquetasPage() {
     mutationFn: async () => {
       if (!deviceData) throw new Error("Dados incompletos");
       
+      // Extract primary IMEI to satisfy validation (15 digits)
+      const validImei = deviceData.imei.split("/")[0].trim();
+
       const response = await apiRequest("POST", "/api/etiquetas/imprimir", {
-        imei: deviceData.imei,
+        imei: validImei,
         deviceDescription: deviceData.deviceDescription,
         deviceErpCode: deviceData.deviceErpCode,
         triador: deviceData.triador,
