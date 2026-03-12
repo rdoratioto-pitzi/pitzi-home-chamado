@@ -1,14 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
-import { Bell, Volume2, BellRing, Mail } from "lucide-react";
+import { Bell, Volume2, BellRing, Mail, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
   useNotificationPreferences,
@@ -23,31 +22,94 @@ interface NotificationSetting {
   enabled: boolean;
 }
 
+const DEFAULT_SETTINGS: NotificationSetting[] = [
+  { id: "ticket_new", label: "Novo chamado", description: "Quando um novo chamado é criado", enabled: true },
+  { id: "ticket_assigned", label: "Chamado atribuído", description: "Quando você é atribuído a um chamado", enabled: true },
+  { id: "ticket_status", label: "Mudança de status (Chamado)", description: "Quando o status de um chamado muda", enabled: true },
+  { id: "ticket_comment", label: "Novo comentário", description: "Quando há um novo comentário em seus chamados ou cards", enabled: true },
+  { id: "mention", label: "Menções (@usuário)", description: "Quando alguém menciona você em um comentário", enabled: true },
+  { id: "task_assigned", label: "Tarefa atribuída", description: "Quando uma tarefa é atribuída a você", enabled: true },
+  { id: "project_card_assigned", label: "Card de projeto atribuído", description: "Quando você é definido como responsável ou relator de um card", enabled: true },
+  { id: "project_card_status", label: "Mudança de status (Card)", description: "Quando o status de um card de projeto muda", enabled: true },
+  { id: "project_update", label: "Atualização de projeto", description: "Quando há atualizações em projetos que você participa", enabled: true },
+  { id: "meeting_invite", label: "Convite para reunião", description: "Quando você é convidado para uma nova reunião", enabled: true },
+  { id: "flowchart_collaborator", label: "Colaborador em fluxograma", description: "Quando você é adicionado como colaborador em um fluxograma", enabled: true },
+  { id: "okr_update", label: "Atualização de OKR", description: "Quando há progresso nos OKRs que você acompanha", enabled: true },
+  { id: "shipment_update", label: "Status de envio", description: "Quando o status de um envio é atualizado", enabled: true },
+];
+
 export function NotificationsSettings() {
   const { toast } = useToast();
   const { prefs, setPrefs } = useNotificationPreferences();
-  
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  
-  const [settings, setSettings] = useState<NotificationSetting[]>([
-    { id: "ticket_new", label: "Novo chamado", description: "Quando um novo chamado é criado", enabled: true },
-    { id: "ticket_assigned", label: "Chamado atribuído", description: "Quando você é atribuído a um chamado", enabled: true },
-    { id: "ticket_status", label: "Mudança de status", description: "Quando o status de um chamado muda", enabled: true },
-    { id: "ticket_comment", label: "Novo comentário", description: "Quando há um novo comentário em seus chamados", enabled: true },
-    { id: "mention", label: "Menções (@usuário)", description: "Quando alguém menciona você em um comentário", enabled: true },
-    { id: "task_assigned", label: "Tarefa atribuída", description: "Quando uma tarefa é atribuída a você", enabled: true },
-    { id: "project_card_assigned", label: "Card de projeto atribuído", description: "Quando você é definido como responsável ou relator de um card", enabled: true },
-    { id: "meeting_invite", label: "Convite para reunião", description: "Quando você é convidado para uma nova reunião", enabled: true },
-    { id: "flowchart_collaborator", label: "Colaborador em fluxograma", description: "Quando você é adicionado como colaborador em um fluxograma", enabled: true },
-    { id: "project_update", label: "Atualização de projeto", description: "Quando há atualizações em projetos que você participa", enabled: false },
-    { id: "okr_update", label: "Atualização de OKR", description: "Quando há progresso nos OKRs que você acompanha", enabled: true },
-    { id: "shipment_update", label: "Status de envio", description: "Quando o status de um envio é atualizado", enabled: true },
-  ]);
+  const queryClient = useQueryClient();
+
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [settings, setSettings] = useState<NotificationSetting[]>(DEFAULT_SETTINGS);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Carregar preferências do backend
+  const { data: serverPrefs, isLoading } = useQuery({
+    queryKey: ["/api/notifications/preferences"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/notifications/preferences");
+      return res.json();
+    },
+  });
+
+  // Aplicar preferências do servidor quando carregadas
+  useEffect(() => {
+    if (serverPrefs) {
+      setEmailEnabled(serverPrefs.emailNotificationsEnabled ?? true);
+      if (serverPrefs.emailPreferences) {
+        setSettings((prev) =>
+          prev.map((s) => ({
+            ...s,
+            enabled: serverPrefs.emailPreferences[s.id] ?? s.enabled,
+          }))
+        );
+      }
+    }
+  }, [serverPrefs]);
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const emailPreferences: Record<string, boolean> = {};
+      settings.forEach((s) => {
+        emailPreferences[s.id] = s.enabled;
+      });
+      return apiRequest("PUT", "/api/notifications/preferences", {
+        emailNotificationsEnabled: emailEnabled,
+        pushNotificationsEnabled: prefs.pushEnabled,
+        emailPreferences,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications/preferences"] });
+      setHasChanges(false);
+      toast({
+        title: "Configurações salvas",
+        description: "Suas preferências de notificação foram atualizadas.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar as configurações.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const toggleSetting = (id: string) => {
-    setSettings(prev => 
-      prev.map(s => s.id === id ? { ...s, enabled: !s.enabled } : s)
+    setSettings((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s))
     );
+    setHasChanges(true);
+  };
+
+  const handleToggleEmail = (checked: boolean) => {
+    setEmailEnabled(checked);
+    setHasChanges(true);
   };
 
   const handleTogglePush = async () => {
@@ -69,35 +131,14 @@ export function NotificationsSettings() {
     playNotificationSound(prefs.soundVolume);
   };
 
-  const queryClient = useQueryClient();
-  
-  const saveMutation = useMutation({
-    mutationFn: async (data: { key: string; value: string }) => {
-      return apiRequest("POST", "/api/settings", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
-    },
-  });
-
-  const handleSave = async () => {
-    try {
-      await saveMutation.mutateAsync({
-        key: "notifications",
-        value: JSON.stringify({ emailNotifications, settings }),
-      });
-      toast({
-        title: "Configurações salvas",
-        description: "Suas preferências de notificação foram atualizadas.",
-      });
-    } catch {
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar as configurações.",
-        variant: "destructive",
-      });
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Carregando preferências...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -119,7 +160,7 @@ export function NotificationsSettings() {
                 Toca um som sutil quando você recebe uma nova notificação
               </p>
             </div>
-            <Switch 
+            <Switch
               checked={prefs.soundEnabled}
               onCheckedChange={(checked) => setPrefs({ soundEnabled: checked })}
               data-testid="switch-sound-notifications"
@@ -158,7 +199,7 @@ export function NotificationsSettings() {
                 Receba alertas nativos do sistema operacional, mesmo com a aba minimizada
               </p>
             </div>
-            <Switch 
+            <Switch
               checked={prefs.pushEnabled}
               onCheckedChange={handleTogglePush}
               data-testid="switch-push-notifications"
@@ -177,23 +218,23 @@ export function NotificationsSettings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Notificações por Email
+            Notificações por E-mail
           </CardTitle>
           <CardDescription>
-            Configure quais notificações você deseja receber por email
+            Configure quais notificações você deseja receber por e-mail
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="font-medium">Habilitar notificações por email</Label>
+              <Label className="font-medium">Habilitar notificações por e-mail</Label>
               <p className="text-sm text-muted-foreground">
-                Receba atualizações importantes por email
+                Receba atualizações importantes por e-mail
               </p>
             </div>
-            <Switch 
-              checked={emailNotifications}
-              onCheckedChange={setEmailNotifications}
+            <Switch
+              checked={emailEnabled}
+              onCheckedChange={handleToggleEmail}
               data-testid="switch-email-notifications"
             />
           </div>
@@ -208,53 +249,29 @@ export function NotificationsSettings() {
                   <Label className="font-medium">{setting.label}</Label>
                   <p className="text-sm text-muted-foreground">{setting.description}</p>
                 </div>
-                <Switch 
+                <Switch
                   checked={setting.enabled}
                   onCheckedChange={() => toggleSetting(setting.id)}
-                  disabled={!emailNotifications}
+                  disabled={!emailEnabled}
                   data-testid={`switch-${setting.id}`}
                 />
               </div>
             ))}
           </div>
-        </CardContent>
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Integrações</CardTitle>
-          <CardDescription>
-            Configure webhooks e integrações com outros serviços
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="webhook-url">Webhook URL</Label>
-            <Input 
-              id="webhook-url"
-              placeholder="https://..."
-              data-testid="input-webhook-url"
-            />
-            <p className="text-xs text-muted-foreground">
-              Receba notificações em um endpoint personalizado
-            </p>
+          <div className="pt-2">
+            <Button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+              data-testid="button-save-notifications"
+            >
+              {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar Preferências de E-mail
+            </Button>
+            {hasChanges && (
+              <span className="ml-3 text-sm text-amber-600">Alterações não salvas</span>
+            )}
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="slack-webhook">Slack Webhook</Label>
-            <Input 
-              id="slack-webhook"
-              placeholder="https://hooks.slack.com/services/..."
-              data-testid="input-slack-webhook"
-            />
-            <p className="text-xs text-muted-foreground">
-              Envie notificações para um canal do Slack
-            </p>
-          </div>
-
-          <Button onClick={handleSave} data-testid="button-save-notifications">
-            Salvar Configurações
-          </Button>
         </CardContent>
       </Card>
     </div>
