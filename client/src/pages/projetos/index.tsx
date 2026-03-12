@@ -73,7 +73,7 @@ export default function ProjetosPage() {
   const [editingProject, setEditingProject] = useState<Project | undefined>();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("active");
+  const [filterStatus, setFilterStatus] = useState<string>("sprint_active");
   const [filterOwner, setFilterOwner] = useState<string>("all");
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const queryClient = useQueryClient();
