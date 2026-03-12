@@ -42,6 +42,7 @@ const CorreiosReversaPage              = lazy(() => import("@/pages/apis/correio
 const ApiRsLogisticaPage               = lazy(() => import("@/pages/apis/api-rs-logistica"));
 const ApiAdmLogisticaPage              = lazy(() => import("@/pages/apis/api-adm-logistica"));
 const ApiAvaliacoesIaPage              = lazy(() => import("@/pages/apis/api-avaliacoes-ia"));
+const ApiEstoquePage                   = lazy(() => import("@/pages/apis/api-estoque"));
 const ApiRelatorioPedidosPage          = lazy(() => import("@/pages/apis/api-relatorio-pedidos"));
 const ConfiguracoesPage                = lazy(() => import("@/pages/configuracoes/index"));
 const PricingOverviewPage              = lazy(() => import("@/pages/pricing/index"));
@@ -250,6 +251,11 @@ function Router() {
       <Route path="/apis/avaliacoes-ia">
         <ProtectedRoute requiredPermission="apis">
           <ApiAvaliacoesIaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/apis/estoque">
+        <ProtectedRoute requiredPermission="apis">
+          <ApiEstoquePage />
         </ProtectedRoute>
       </Route>
       <Route path="/pricing">
