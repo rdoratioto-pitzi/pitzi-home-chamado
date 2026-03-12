@@ -10,7 +10,13 @@ import {
   insertKanbanCardDependencySchema,
 } from "@shared/schema";
 import { getSessionUser, requireAuth } from "../middleware/auth";
-import { sendMentionNotificationEmail } from "../email-service";
+import {
+  sendMentionNotificationEmail,
+  sendCardStatusChangedEmail,
+  sendCardAssignedEmail,
+  sendProjectMemberAddedEmail,
+  sendCardCommentEmail,
+} from "../email-service";
 
 export function registerProjectRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
@@ -187,12 +193,22 @@ export function registerProjectRoutes(router: Router) {
 
   router.post("/api/projects/:id/members", requireAuth, async (req, res) => {
     try {
+      const { userId: sessionUserId } = getSessionUser(req);
       const { userId: uid, role } = req.body;
       const member = await storage.addProjectMember({
         projectId: getId(req),
         userId: uid,
         role: role || "member",
       });
+
+      // E-mail: membro adicionado ao projeto
+      const project = await storage.getProject(getId(req));
+      const newMember = await storage.getUser(uid);
+      const addedBy = await storage.getUser(sessionUserId);
+      if (project && newMember && addedBy) {
+        sendProjectMemberAddedEmail(project, newMember, addedBy).catch(console.error);
+      }
+
       res.status(201).json(member);
     } catch (error) {
       res.status(400).json({ error: "Failed to add member" });
@@ -377,13 +393,33 @@ export function registerProjectRoutes(router: Router) {
       if (!card) return res.status(404).json({ error: "Card not found" });
 
       const updatedBy = req.body.updatedBy || oldCard?.reporterId;
+      const updater = updatedBy ? await storage.getUser(updatedBy) : null;
+
+      // E-mail + notificação: mudança de status do card
+      if (validated.status && oldCard && validated.status !== oldCard.status) {
+        const project = await storage.getProject(card.projectId);
+        const cardAssignee = card.assigneeId ? await storage.getUser(card.assigneeId) : null;
+        const cardReporter = card.reporterId ? await storage.getUser(card.reporterId) : null;
+        if (project && updater) {
+          sendCardStatusChangedEmail(
+            card,
+            project,
+            oldCard.status,
+            validated.status,
+            updater,
+            cardAssignee || null,
+            cardReporter || null
+          ).catch(console.error);
+        }
+      }
+
+      // E-mail + notificação: atribuição de card
       if (
         validated.assigneeId &&
         card.assigneeId &&
         card.assigneeId !== oldCard?.assigneeId &&
         card.assigneeId !== updatedBy
       ) {
-        const updater = updatedBy ? await storage.getUser(updatedBy) : null;
         storage
           .createNotification({
             userId: card.assigneeId,
@@ -397,6 +433,13 @@ export function registerProjectRoutes(router: Router) {
             linkUrl: `/projetos/${card.projectId}`,
           })
           .catch(console.error);
+
+        // E-mail de atribuição de card
+        const project = await storage.getProject(card.projectId);
+        const newAssignee = await storage.getUser(card.assigneeId);
+        if (project && newAssignee && updater) {
+          sendCardAssignedEmail(card, project, newAssignee, updater).catch(console.error);
+        }
       }
       if (
         validated.reporterId &&
@@ -405,7 +448,6 @@ export function registerProjectRoutes(router: Router) {
         card.reporterId !== updatedBy &&
         card.reporterId !== card.assigneeId
       ) {
-        const updater = updatedBy ? await storage.getUser(updatedBy) : null;
         storage
           .createNotification({
             userId: card.reporterId,
@@ -464,12 +506,31 @@ export function registerProjectRoutes(router: Router) {
       });
       const comment = await storage.createKanbanComment(validated);
 
+      // Buscar card e autor para notificações
+      const card = await storage.getKanbanCard(getId(req));
+      const author = await storage.getUser(validated.userId);
+
+      // E-mail para assignee/reporter do card (não-menção)
+      if (card && author) {
+        const project = await storage.getProject(card.projectId);
+        const cardAssignee = card.assigneeId ? await storage.getUser(card.assigneeId) : null;
+        const cardReporter = card.reporterId ? await storage.getUser(card.reporterId) : null;
+        if (project) {
+          sendCardCommentEmail(
+            card,
+            project,
+            validated.content,
+            author,
+            cardAssignee || null,
+            cardReporter || null
+          ).catch(console.error);
+        }
+      }
+
       // Process @mentions and send notifications
       const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
       if (mentionMatches) {
-        const card = await storage.getKanbanCard(getId(req));
         const users = await storage.getUsers();
-        const author = await storage.getUser(validated.userId);
 
         for (const mention of mentionMatches) {
           const mentionedName = mention.slice(1).trim();

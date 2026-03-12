@@ -19,11 +19,12 @@ export function registerNotificationRoutes(router: Router): void {
   router.put("/api/notifications/preferences", requireAuth, async (req, res) => {
     try {
       const { userId } = getSessionUser(req);
-      const { emailNotificationsEnabled, pushNotificationsEnabled } = req.body;
+      const { emailNotificationsEnabled, pushNotificationsEnabled, emailPreferences } = req.body;
       const preferences = await storage.updateNotificationPreferences(
         userId,
         emailNotificationsEnabled,
-        pushNotificationsEnabled
+        pushNotificationsEnabled,
+        emailPreferences
       );
       res.json(preferences);
     } catch (error: any) {
