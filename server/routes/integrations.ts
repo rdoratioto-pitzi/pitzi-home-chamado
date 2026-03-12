@@ -206,4 +206,65 @@ export function registerIntegrationRoutes(router: Router) {
       });
     }
   });
+
+  // ============== ESTOQUE API INTEGRATION ==============
+
+  // Helper method for Estoque API calls
+  const fetchEstoque = async (query: any) => {
+    const params = new URLSearchParams();
+    Object.keys(query).forEach(key => {
+      const value = query[key];
+      if (Array.isArray(value)) {
+        value.forEach((v: any) => params.append(key, v as string));
+      } else if (value) {
+        params.append(key, value as string);
+      }
+    });
+    
+    const url = `${RS_API_BASE_URL}/estoques`;
+    const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
+    
+    console.log(`[BACKEND] Fetching estoques:`, fullUrl);
+    
+    const response = await fetch(fullUrl, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${RS_API_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+    });
+
+    console.log(`[BACKEND] estoques response status:`, response.status);
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Não autenticado na API externa via backend");
+      }
+      if (response.status === 403) {
+        throw new Error("Token de acesso inválido");
+      }
+      const text = await response.text();
+      console.log(`[BACKEND] estoques error response:`, text);
+      try {
+        const json = JSON.parse(text);
+        throw new Error(json.message || json.error || `API error: ${response.status}`);
+      } catch (e) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+    }
+    const data = await response.json();
+    console.log(`[BACKEND] estoques response data:`, data);
+    return data;
+  };
+
+  // Get Estoques
+  router.get("/api/estoques", async (req, res) => {
+    try {
+      const data = await fetchEstoque(req.query);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Estoque API error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar estoques" });
+    }
+  });
 }

@@ -49,6 +49,8 @@ import {
   type AiSpaceConversation, type InsertAiSpaceConversation,
   type Update, type InsertUpdate,
   type Notification, type InsertNotification,
+  type NotificationPreferencesRow, type InsertNotificationPreferences,
+  notificationPreferences,
   type ProjectMember, type InsertProjectMember,
   type Flowchart, type InsertFlowchart,
   type FlowchartVersion, type InsertFlowchartVersion,
@@ -86,7 +88,23 @@ import {
  export type NotificationPreferences = {
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
+  emailPreferences?: Record<string, boolean>;
  };
+
+ export type EmailNotificationType =
+   | "ticket_new"
+   | "ticket_assigned"
+   | "ticket_status"
+   | "ticket_comment"
+   | "mention"
+   | "task_assigned"
+   | "project_card_assigned"
+   | "project_card_status"
+   | "project_update"
+   | "meeting_invite"
+   | "flowchart_collaborator"
+   | "okr_update"
+   | "shipment_update";
  
  export interface IStorage {
   // Users
@@ -406,8 +424,10 @@ import {
   updateNotificationPreferences(
     userId: string,
     emailNotificationsEnabled?: boolean,
-    pushNotificationsEnabled?: boolean
+    pushNotificationsEnabled?: boolean,
+    emailPreferences?: Record<string, boolean>
   ): Promise<NotificationPreferences>;
+  shouldSendEmail(userId: string, notificationType: EmailNotificationType): Promise<boolean>;
   deleteNotification(id: string, userId: string): Promise<boolean>;
   clearNotifications(userId: string): Promise<void>;
   markNotificationRead(id: string, userId: string): Promise<Notification | undefined>;
@@ -1921,12 +1941,74 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Notification Preferences (Mocked as they are missing from schema)
+  // Notification Preferences
   async getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined> {
-    return { emailNotificationsEnabled: true, pushNotificationsEnabled: true };
+    if (!db) return { emailNotificationsEnabled: true, pushNotificationsEnabled: true };
+    try {
+      const [row] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+      if (!row) return { emailNotificationsEnabled: true, pushNotificationsEnabled: true };
+      const emailPrefs = row.emailPreferences ? JSON.parse(row.emailPreferences) : {};
+      return {
+        emailNotificationsEnabled: row.emailEnabled ?? true,
+        pushNotificationsEnabled: row.pushEnabled ?? true,
+        emailPreferences: emailPrefs,
+      };
+    } catch (e) {
+      console.error("[storage] Error fetching notification preferences:", e);
+      return { emailNotificationsEnabled: true, pushNotificationsEnabled: true };
+    }
   }
-  async updateNotificationPreferences(userId: string, email?: boolean, push?: boolean): Promise<NotificationPreferences> {
-    return { emailNotificationsEnabled: email ?? true, pushNotificationsEnabled: push ?? true };
+
+  async updateNotificationPreferences(
+    userId: string,
+    email?: boolean,
+    push?: boolean,
+    emailPrefs?: Record<string, boolean>
+  ): Promise<NotificationPreferences> {
+    if (!db) return { emailNotificationsEnabled: email ?? true, pushNotificationsEnabled: push ?? true, emailPreferences: emailPrefs };
+    try {
+      const [existing] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+      const updateData: Record<string, unknown> = { updatedAt: new Date() };
+      if (email !== undefined) updateData.emailEnabled = email;
+      if (push !== undefined) updateData.pushEnabled = push;
+      if (emailPrefs !== undefined) updateData.emailPreferences = JSON.stringify(emailPrefs);
+
+      if (existing) {
+        const [updated] = await db.update(notificationPreferences)
+          .set(updateData)
+          .where(eq(notificationPreferences.userId, userId))
+          .returning();
+        const parsedPrefs = updated.emailPreferences ? JSON.parse(updated.emailPreferences) : {};
+        return {
+          emailNotificationsEnabled: updated.emailEnabled ?? true,
+          pushNotificationsEnabled: updated.pushEnabled ?? true,
+          emailPreferences: parsedPrefs,
+        };
+      } else {
+        const [created] = await db.insert(notificationPreferences).values({
+          userId,
+          emailEnabled: email ?? true,
+          pushEnabled: push ?? true,
+          emailPreferences: emailPrefs ? JSON.stringify(emailPrefs) : undefined,
+        }).returning();
+        const parsedPrefs = created.emailPreferences ? JSON.parse(created.emailPreferences) : {};
+        return {
+          emailNotificationsEnabled: created.emailEnabled ?? true,
+          pushNotificationsEnabled: created.pushEnabled ?? true,
+          emailPreferences: parsedPrefs,
+        };
+      }
+    } catch (e) {
+      console.error("[storage] Error updating notification preferences:", e);
+      return { emailNotificationsEnabled: email ?? true, pushNotificationsEnabled: push ?? true, emailPreferences: emailPrefs };
+    }
+  }
+
+  async shouldSendEmail(userId: string, notificationType: EmailNotificationType): Promise<boolean> {
+    const prefs = await this.getNotificationPreferences(userId);
+    if (!prefs || !prefs.emailNotificationsEnabled) return false;
+    if (prefs.emailPreferences && prefs.emailPreferences[notificationType] === false) return false;
+    return true;
   }
   async deleteNotification(id: string, userId: string): Promise<boolean> {
     if (!db) return false;
