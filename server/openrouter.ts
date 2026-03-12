@@ -1,5 +1,6 @@
 import { storage } from "./storage";
 import { getExternalDataContext, needsExternalData } from "./external-data";
+import { detectPricingQuery, scrapeMercadoLivre, formatPricingContext } from "./firecrawl-service";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
@@ -317,6 +318,23 @@ export async function* streamChatCompletion(
       } catch (error) {
         console.error("[External Data] Error fetching external data:", error);
         // Continue without external data - the AI will handle it gracefully
+      }
+    }
+
+    // Check if we need pricing data from Firecrawl
+    if (detectPricingQuery(userQuery)) {
+      try {
+        console.log("[Firecrawl] Detected pricing query, fetching market data...");
+        const pricingResult = await scrapeMercadoLivre(userQuery);
+        if (pricingResult) {
+          console.log("[Firecrawl] Successfully fetched pricing data");
+          apiMessages.push({
+            role: "system",
+            content: `DADOS DE PREÇOS COLETADOS AGORA DO MERCADO LIVRE:\n${formatPricingContext(pricingResult)}\n\nUse esses dados reais de mercado para responder a pergunta do usuário sobre preços. Calcule trade-in com 25% de margem operacional quando solicitado.`
+          });
+        }
+      } catch (error) {
+        console.error("[Firecrawl] Error fetching pricing data:", error);
       }
     }
   }
