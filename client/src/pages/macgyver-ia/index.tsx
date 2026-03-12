@@ -44,6 +44,7 @@ import {
   Upload,
   MoreHorizontal,
   Tag,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -186,6 +187,13 @@ const SLASH_COMMANDS: SlashCommand[] = [
     description: "Crie prompts otimizados para outras IAs",
     icon: BrainCircuit,
     prompt: "Me ajude a criar um prompt otimizado. Descreva o que voce precisa que uma IA faca e eu vou criar um prompt estruturado e eficiente, usando tecnicas como chain-of-thought, few-shot examples e instrucoes claras."
+  },
+  {
+    command: "/precos",
+    label: "Pesquisar Preços",
+    description: "Busca preços de smartphones no Mercado Livre via Firecrawl",
+    icon: DollarSign,
+    prompt: "Pesquise os preços atuais de [PRODUTO] usado no Mercado Livre. Informe: total de anúncios, preço mínimo, médio e máximo. Calcule o preço sugerido de trade-in para a Renov com 25% de margem operacional."
   },
 ];
 
