@@ -147,6 +147,7 @@ const apisSubItems = [
   { title: "Adm. Logística", url: "/apis/adm-logistica", icon: Settings2 },
   { title: "Relatório Pedidos", url: "/apis/relatorio-pedidos", icon: FileText },
   { title: "Avaliações IA", url: "/apis/avaliacoes-ia", icon: Bot },
+  { title: "Estoque", url: "/apis/estoque", icon: Package },
 ];
 
 const pricingSubItems = [
