@@ -28,7 +28,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Calendar as CalendarIcon, Tag, User as UserIcon, Clock, Paperclip, MessageSquare, Plus, Trash2, X, FileIcon, Image, Loader2, GitBranch, ListTree, CheckSquare, Palette, Link2, Lock } from "lucide-react";
+import { Calendar as CalendarIcon, Tag, User as UserIcon, Clock, Paperclip, MessageSquare, Plus, Trash2, X, FileIcon, Image, Loader2, GitBranch, ListTree, CheckSquare, Palette, Link2, Lock, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -477,6 +478,85 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                     )}
                   />
 
+                  {/* CHECKLIST — entre Objetivos e Desenvolvimento */}
+                  <div className="space-y-3 border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                      <h4 className="text-sm font-semibold">Checklist</h4>
+                      {checklist.length > 0 && (
+                        <span className={`ml-auto text-xs font-semibold ${checklist.filter(i=>i.done).length === checklist.length ? "text-green-600" : "text-muted-foreground"}`}>
+                          {checklist.filter(i=>i.done).length}/{checklist.length}
+                        </span>
+                      )}
+                    </div>
+                    {checklist.length > 0 && (
+                      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-green-500 transition-all"
+                          style={{ width: `${(checklist.filter(i=>i.done).length / checklist.length) * 100}%` }}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      {checklist.map(item => (
+                        <div key={item.id} className="flex items-center gap-2 group">
+                          <Checkbox
+                            checked={item.done}
+                            disabled={readOnly}
+                            onCheckedChange={(checked) =>
+                              setChecklist(prev => prev.map(i => i.id === item.id ? { ...i, done: !!checked } : i))
+                            }
+                          />
+                          <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
+                          {!readOnly && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5 opacity-0 group-hover:opacity-100"
+                              onClick={() => setChecklist(prev => prev.filter(i => i.id !== item.id))}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {!readOnly && (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Novo item..."
+                          value={newChecklistItem}
+                          onChange={e => setNewChecklistItem(e.target.value)}
+                          className="h-8 text-sm"
+                          onKeyDown={e => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              if (newChecklistItem.trim()) {
+                                setChecklist(prev => [...prev, { id: crypto.randomUUID(), text: newChecklistItem.trim(), done: false }]);
+                                setNewChecklistItem("");
+                              }
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-3"
+                          onClick={() => {
+                            if (newChecklistItem.trim()) {
+                              setChecklist(prev => [...prev, { id: crypto.randomUUID(), text: newChecklistItem.trim(), done: false }]);
+                              setNewChecklistItem("");
+                            }
+                          }}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
                   <FormField
                     control={form.control}
                     name="development"
@@ -785,11 +865,13 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                   </div>
 
                   {cardId && subtasks.length > 0 && (
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium flex items-center gap-2">
-                        <ListTree className="h-3 w-3" /> Subtarefas ({subtasks.length})
-                      </label>
-                      <div className="space-y-1">
+                    <Collapsible defaultOpen={subtasks.length <= 3}>
+                      <CollapsibleTrigger className="flex items-center gap-2 w-full text-xs font-medium hover:bg-muted/50 rounded px-1 py-1 transition-colors [&[data-state=open]>svg.chevron]:rotate-180">
+                        <ListTree className="h-3 w-3" />
+                        Subtarefas ({subtasks.length})
+                        <ChevronDown className="chevron h-3 w-3 ml-auto transition-transform duration-200" />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-1 mt-2">
                         {subtasks.map(sub => (
                           <div
                             key={sub.id}
@@ -803,89 +885,9 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                             <span className="flex-1 truncate">{sub.title}</span>
                           </div>
                         ))}
-                      </div>
-                    </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   )}
-
-                  <Separator />
-
-                  {/* CHECKLIST */}
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium flex items-center gap-2">
-                      <CheckSquare className="h-3 w-3" /> Checklist
-                      {checklist.length > 0 && (
-                        <span className={`ml-auto text-[10px] font-semibold ${checklist.filter(i=>i.done).length === checklist.length ? "text-green-600" : "text-muted-foreground"}`}>
-                          {checklist.filter(i=>i.done).length}/{checklist.length}
-                        </span>
-                      )}
-                    </label>
-                    {checklist.length > 0 && (
-                      <div className="h-1 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-green-500 transition-all"
-                          style={{ width: `${(checklist.filter(i=>i.done).length / checklist.length) * 100}%` }}
-                        />
-                      </div>
-                    )}
-                    <div className="space-y-1">
-                      {checklist.map(item => (
-                        <div key={item.id} className="flex items-center gap-2 group">
-                          <Checkbox
-                            checked={item.done}
-                            disabled={readOnly}
-                            onCheckedChange={(checked) =>
-                              setChecklist(prev => prev.map(i => i.id === item.id ? { ...i, done: !!checked } : i))
-                            }
-                          />
-                          <span className={`text-xs flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>{item.text}</span>
-                          {!readOnly && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-4 w-4 opacity-0 group-hover:opacity-100"
-                              onClick={() => setChecklist(prev => prev.filter(i => i.id !== item.id))}
-                            >
-                              <X className="h-2.5 w-2.5" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {!readOnly && (
-                      <div className="flex gap-1">
-                        <Input
-                          placeholder="Novo item..."
-                          value={newChecklistItem}
-                          onChange={e => setNewChecklistItem(e.target.value)}
-                          className="h-7 text-xs"
-                          onKeyDown={e => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              if (newChecklistItem.trim()) {
-                                setChecklist(prev => [...prev, { id: crypto.randomUUID(), text: newChecklistItem.trim(), done: false }]);
-                                setNewChecklistItem("");
-                              }
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            if (newChecklistItem.trim()) {
-                              setChecklist(prev => [...prev, { id: crypto.randomUUID(), text: newChecklistItem.trim(), done: false }]);
-                              setNewChecklistItem("");
-                            }
-                          }}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
 
                   <Separator />
 
@@ -950,79 +952,83 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                   {cardId && (
                     <>
                       <Separator />
-                      <div className="space-y-2">
-                        <label className="text-xs font-medium flex items-center gap-2">
-                          <Lock className="h-3 w-3" /> Dependências
-                        </label>
-                        {(cardDependencies?.blockedBy ?? []).length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Bloqueado por:</p>
-                            {cardDependencies!.blockedBy.map(dep => {
-                              const blocker = allProjectCards.find(c => c.id === dep.blockingCardId);
-                              return (
-                                <div key={dep.id} className="flex items-center gap-1 text-xs bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded px-2 py-1">
-                                  <Lock className="h-2.5 w-2.5 text-red-500" />
-                                  <span className="font-mono text-muted-foreground">{blocker?.code}</span>
-                                  <span className="flex-1 truncate">{blocker?.title}</span>
-                                  {!readOnly && (
-                                    <Button type="button" variant="ghost" size="icon" className="h-4 w-4" onClick={() => removeDependencyMutation.mutate(dep.id)}>
-                                      <X className="h-2.5 w-2.5" />
-                                    </Button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {(cardDependencies?.blocks ?? []).length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Bloqueia:</p>
-                            {cardDependencies!.blocks.map(dep => {
-                              const blocked = allProjectCards.find(c => c.id === dep.blockedCardId);
-                              return (
-                                <div key={dep.id} className="flex items-center gap-1 text-xs bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded px-2 py-1">
-                                  <Link2 className="h-2.5 w-2.5 text-orange-500" />
-                                  <span className="font-mono text-muted-foreground">{blocked?.code}</span>
-                                  <span className="flex-1 truncate">{blocked?.title}</span>
-                                  {!readOnly && (
-                                    <Button type="button" variant="ghost" size="icon" className="h-4 w-4" onClick={() => removeDependencyMutation.mutate(dep.id)}>
-                                      <X className="h-2.5 w-2.5" />
-                                    </Button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                        {!readOnly && (
-                          <div className="flex gap-1">
-                            <Select value={depBlockingCardId} onValueChange={setDepBlockingCardId}>
-                              <SelectTrigger className="h-7 text-xs">
-                                <SelectValue placeholder="Bloqueado por..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {allProjectCards
-                                  .filter(c => c.id !== cardId && !cardDependencies?.blockedBy.some(d => d.blockingCardId === c.id))
-                                  .map(c => (
-                                    <SelectItem key={c.id} value={c.id} className="text-xs">
-                                      {c.code} — {c.title}
-                                    </SelectItem>
-                                  ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-7 w-7"
-                              disabled={!depBlockingCardId || addDependencyMutation.isPending}
-                              onClick={() => addDependencyMutation.mutate(depBlockingCardId)}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
+                      <Collapsible defaultOpen={((cardDependencies?.blockedBy ?? []).length + (cardDependencies?.blocks ?? []).length) <= 2}>
+                        <CollapsibleTrigger className="flex items-center gap-2 w-full text-xs font-medium hover:bg-muted/50 rounded px-1 py-1 transition-colors [&[data-state=open]>svg.chevron]:rotate-180">
+                          <Lock className="h-3 w-3" />
+                          Dependências ({(cardDependencies?.blockedBy ?? []).length + (cardDependencies?.blocks ?? []).length})
+                          <ChevronDown className="chevron h-3 w-3 ml-auto transition-transform duration-200" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-2 mt-2">
+                          {(cardDependencies?.blockedBy ?? []).length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Bloqueado por:</p>
+                              {cardDependencies!.blockedBy.map(dep => {
+                                const blocker = allProjectCards.find(c => c.id === dep.blockingCardId);
+                                return (
+                                  <div key={dep.id} className="flex items-center gap-1 text-xs bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded px-2 py-1">
+                                    <Lock className="h-2.5 w-2.5 text-red-500" />
+                                    <span className="font-mono text-muted-foreground">{blocker?.code}</span>
+                                    <span className="flex-1 truncate">{blocker?.title}</span>
+                                    {!readOnly && (
+                                      <Button type="button" variant="ghost" size="icon" className="h-4 w-4" onClick={() => removeDependencyMutation.mutate(dep.id)}>
+                                        <X className="h-2.5 w-2.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {(cardDependencies?.blocks ?? []).length > 0 && (
+                            <div className="space-y-1">
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Bloqueia:</p>
+                              {cardDependencies!.blocks.map(dep => {
+                                const blocked = allProjectCards.find(c => c.id === dep.blockedCardId);
+                                return (
+                                  <div key={dep.id} className="flex items-center gap-1 text-xs bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded px-2 py-1">
+                                    <Link2 className="h-2.5 w-2.5 text-orange-500" />
+                                    <span className="font-mono text-muted-foreground">{blocked?.code}</span>
+                                    <span className="flex-1 truncate">{blocked?.title}</span>
+                                    {!readOnly && (
+                                      <Button type="button" variant="ghost" size="icon" className="h-4 w-4" onClick={() => removeDependencyMutation.mutate(dep.id)}>
+                                        <X className="h-2.5 w-2.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {!readOnly && (
+                            <div className="flex gap-1">
+                              <Select value={depBlockingCardId} onValueChange={setDepBlockingCardId}>
+                                <SelectTrigger className="h-7 text-xs">
+                                  <SelectValue placeholder="Bloqueado por..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allProjectCards
+                                    .filter(c => c.id !== cardId && !cardDependencies?.blockedBy.some(d => d.blockingCardId === c.id))
+                                    .map(c => (
+                                      <SelectItem key={c.id} value={c.id} className="text-xs">
+                                        {c.code} — {c.title}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                disabled={!depBlockingCardId || addDependencyMutation.isPending}
+                                onClick={() => addDependencyMutation.mutate(depBlockingCardId)}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          )}
+                        </CollapsibleContent>
+                      </Collapsible>
                     </>
                   )}
 

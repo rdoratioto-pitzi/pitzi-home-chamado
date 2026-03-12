@@ -758,8 +758,15 @@ export function registerTaskRoutes(router: Router) {
         return res.status(403).json({ error: "Access denied to delete this task" });
       }
     }
-    const deleted = await storage.deleteTask(getId(req));
-    if (!deleted) return res.status(404).json({ error: "Task not found" });
+    const scope = (req.query.scope as string) || "single";
+    if (scope === "all") {
+      await storage.deleteTaskRecurrenceSeries(getId(req));
+    } else if (scope === "future") {
+      await storage.deleteTaskRecurrenceFuture(getId(req));
+    } else {
+      const deleted = await storage.deleteTask(getId(req));
+      if (!deleted) return res.status(404).json({ error: "Task not found" });
+    }
     res.status(204).send();
   });
 
