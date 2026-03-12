@@ -1097,6 +1097,37 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 
+// ============== NOTIFICATION PREFERENCES ==============
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  tenantId: varchar("tenant_id"),
+  emailEnabled: boolean("email_enabled").default(true),
+  pushEnabled: boolean("push_enabled").default(true),
+  // Preferências granulares por tipo de notificação (JSON)
+  emailPreferences: text("email_preferences").default(JSON.stringify({
+    ticket_new: true,
+    ticket_assigned: true,
+    ticket_status: true,
+    ticket_comment: true,
+    mention: true,
+    task_assigned: true,
+    project_card_assigned: true,
+    project_card_status: true,
+    project_update: true,
+    meeting_invite: true,
+    flowchart_collaborator: true,
+    okr_update: true,
+    shipment_update: true,
+  })),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+export type NotificationPreferencesRow = typeof notificationPreferences.$inferSelect;
+
 // ============== AI SPACES (Espaços) ==============
 export const aiSpaces = pgTable("ai_spaces", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
