@@ -107,37 +107,69 @@ export default function ImpressaoEtiquetasPage() {
   }, []);
 
   const searchDeviceMutation = useMutation({
-    mutationFn: async (searchImei: string) => {
-      const [recebimentosRes, triagemRes] = await Promise.all([
-        fetch(`/api/integrations/adm-logistica/recebimentos?imei=${searchImei}`),
-        fetch(`/api/integrations/adm-logistica/triagem?imei=${searchImei}`),
-      ]);
-
-      if (!recebimentosRes.ok) {
-        throw new Error("Falha ao buscar dados de recebimentos");
+    mutationFn: async (searchTerm: string) => {
+      // Determine if searching by IMEI or Serial Number
+      // IMEI is strictly 15 digits numeric
+      const isImei = /^\d{15}$/.test(searchTerm);
+      
+      let triagemUrl = `/api/integrations/adm-logistica/triagem?imei=${searchTerm}`;
+      
+      if (!isImei) {
+        // If not strictly an IMEI, assume it's a Serial Number
+        triagemUrl = `/api/integrations/adm-logistica/triagem?serial_number=${searchTerm}`;
       }
 
-      const recebimentosData = await recebimentosRes.json();
-      const triagemData = triagemRes.ok ? await triagemRes.json() : [];
+      const triagemRes = await fetch(triagemUrl);
 
-      return { recebimentos: recebimentosData, triagem: triagemData };
+      if (!triagemRes.ok) {
+        throw new Error("Falha ao buscar dados de triagem");
+      }
+
+      const triagemData = await triagemRes.json();
+      
+      // If IMEI search returned empty, and input was 15 digits numeric, 
+      // it might be a Serial Number that looks like an IMEI. 
+      // Try fallback search by serial_number if data is empty.
+      let finalTriagemData = triagemData;
+
+      const triList = Array.isArray(triagemData) ? triagemData : (triagemData?.data || []);
+      if (triList.length === 0 && isImei) {
+         // Fallback: search by serial_number
+         const triResFallback = await fetch(`/api/integrations/adm-logistica/triagem?serial_number=${searchTerm}`);
+         
+         if (triResFallback.ok) {
+           finalTriagemData = await triResFallback.json();
+         }
+      }
+
+      return { triagem: finalTriagemData };
     },
-    onSuccess: ({ recebimentos, triagem }) => {
-      const recList = Array.isArray(recebimentos) ? recebimentos : (recebimentos?.data || []);
+    onSuccess: ({ triagem }) => {
       const triList = Array.isArray(triagem) ? triagem : (triagem?.data || []);
 
-      if (recList && recList.length > 0) {
-        const rec = recList[0];
+      if (triList && triList.length > 0) {
+        const tri = triList[0];
 
-        const modelo = rec["Modelo"] || "";
-        const marca = rec["Marca"] || "";
-        const codigoErp = rec["Código ERP"] || rec["Codigo ERP"] || "";
-        const imei1 = rec["IMEI"] || imei;
-        const imei2 = rec["IMEI2"] || "";
+        // Mapping from Triagem API response
+        const modelo = tri["Modelo"] || "";
+        const marca = tri["Marca"] || "";
+        const codigoErp = tri["Código ERP"] || tri["Codigo ERP"] || "";
+        const imei1 = tri["IMEI"] || "";
+        const imei2 = tri["IMEI2"] || "";
+        const serialNumber = tri["Serial Number"] || tri["Numero de Serie"] || tri["Serial"] || "";
 
-        let displayImei = imei1;
+        // If IMEI is missing (e.g. console), use Serial Number
+        let primaryIdentifier = imei1;
+        if (!primaryIdentifier && serialNumber) {
+          primaryIdentifier = serialNumber;
+        }
+        // Fallback to input if everything is missing but we found a record? 
+        // Best to keep empty to fail gracefully or show partial data.
+        if (!primaryIdentifier) primaryIdentifier = imei; 
+
+        let displayImei = primaryIdentifier;
         if (imei2 && imei2.trim() !== "") {
-          displayImei = `${imei1} / ${imei2}`;
+          displayImei = `${primaryIdentifier} / ${imei2}`;
         }
 
         let grading = "??";
@@ -146,16 +178,13 @@ export default function ImpressaoEtiquetasPage() {
         }
 
         let triador = "Aguardando Triagem";
-        if (triList && triList.length > 0) {
-          const tri = triList[0];
-          const rawTriador = tri["Responsável pela triagem"] || tri["Responsavel pela triagem"];
-          if (rawTriador && rawTriador.trim() !== "") {
-            triador = rawTriador
-              .toLowerCase()
-              .split(" ")
-              .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ");
-          }
+        const rawTriador = tri["Responsável pela triagem"] || tri["Responsavel pela triagem"];
+        if (rawTriador && rawTriador.trim() !== "") {
+          triador = rawTriador
+            .toLowerCase()
+            .split(" ")
+            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ");
         }
 
         const newDeviceData: DeviceData = {
@@ -337,8 +366,11 @@ export default function ImpressaoEtiquetasPage() {
     mutationFn: async () => {
       if (!deviceData) throw new Error("Dados incompletos");
       
+      // Extract primary IMEI to satisfy validation (15 digits)
+      const validImei = deviceData.imei.split("/")[0].trim();
+
       const response = await apiRequest("POST", "/api/etiquetas/imprimir", {
-        imei: deviceData.imei,
+        imei: validImei,
         deviceDescription: deviceData.deviceDescription,
         deviceErpCode: deviceData.deviceErpCode,
         triador: deviceData.triador,
@@ -359,15 +391,15 @@ export default function ImpressaoEtiquetasPage() {
     },
   });
 
-  const handleSearch = (searchImei?: string) => {
-    const imeiToSearch = searchImei || imei;
-    if (!imeiToSearch || imeiToSearch.length !== 15 || !/^\d{15}$/.test(imeiToSearch)) {
-      setError("IMEI inválido. Deve conter exatamente 15 dígitos numéricos.");
+  const handleSearch = (searchTerm?: string) => {
+    const termToSearch = searchTerm || imei;
+    if (!termToSearch || termToSearch.length < 3) {
+      setError("Termo de busca muito curto.");
       return;
     }
     
     setError(null);
-    searchDeviceMutation.mutate(imeiToSearch);
+    searchDeviceMutation.mutate(termToSearch);
   };
 
   const handleDownload = () => {
@@ -398,10 +430,12 @@ export default function ImpressaoEtiquetasPage() {
   };
 
   const handleImeiChange = (value: string) => {
-    const cleanValue = value.replace(/\D/g, "").slice(0, 15);
-    setImei(cleanValue);
-    if (cleanValue.length === 15) {
-      handleSearch(cleanValue);
+    // Remove restricao absoluta de numeros e tamanho fixo para permitir serial numbers
+    // const cleanValue = value.replace(/\D/g, "").slice(0, 15);
+    setImei(value);
+    // Auto-search se for IMEI valido (15 digitos)
+    if (/^\d{15}$/.test(value)) {
+      handleSearch(value);
     }
   };
 
@@ -450,14 +484,14 @@ export default function ImpressaoEtiquetasPage() {
                       value={imei}
                       onChange={(e) => handleImeiChange(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      placeholder="Digite ou escaneie o IMEI (15 dígitos)"
-                      maxLength={15}
+                      placeholder="Digite ou escaneie o IMEI ou Serial Number"
+                      maxLength={50}
                       className="font-mono text-lg"
                       data-testid="input-imei"
                     />
                     <Button 
                       onClick={() => handleSearch()}
-                      disabled={searchDeviceMutation.isPending || imei.length !== 15}
+                      disabled={searchDeviceMutation.isPending || imei.length < 3}
                       data-testid="button-buscar"
                     >
                       {searchDeviceMutation.isPending ? (
@@ -468,7 +502,7 @@ export default function ImpressaoEtiquetasPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {imei.length}/15 dígitos — A etiqueta aparecerá automaticamente ao completar o IMEI
+                    A etiqueta aparecerá automaticamente ao completar o IMEI (15 dígitos) ou pressione Enter para buscar
                   </p>
                 </div>
               </div>

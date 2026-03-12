@@ -95,6 +95,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
+  // Permitir acesso ao endpoint de barcode sem autenticação (usado em tags img)
+  if (req.method === "GET" && req.path.startsWith("/api/etiquetas/barcode/")) {
+    return next();
+  }
+
   if (!req.session?.userId) {
     return res.status(401).json({ error: "Não autenticado" });
   }
