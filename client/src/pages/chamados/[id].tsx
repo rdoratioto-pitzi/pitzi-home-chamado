@@ -35,7 +35,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ArrowLeft, Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Edit2, Check, X, HelpCircle, Loader2, Save } from "lucide-react";
+import { ArrowLeft, Send, Clock, Calendar, MessageSquare, CheckCircle, XCircle, Edit2, Check, X, HelpCircle, Loader2, Save, Maximize2, Video, FileText, FileSpreadsheet, File, Download } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogTrigger,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import type { Ticket, TicketCommentWithUser, User, Setting } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -173,10 +180,9 @@ export default function TicketDetailPage() {
   const currentUser = getCurrentUser();
   const [comment, setComment] = useState("");
   const [commentImages, setCommentImages] = useState<string[]>([]);
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
   const [editedAttachments, setEditedAttachments] = useState<string[]>([]);
-  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // Fetch ticket
   const { data: ticket, isLoading: ticketLoading } = useQuery<Ticket>({
@@ -304,6 +310,9 @@ export default function TicketDetailPage() {
     }
   }, [ticket, editForm]);
 
+  // Error handling for media preview
+  const [mediaError, setMediaError] = useState<Record<number, boolean>>({});
+
   // Mutations
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<Ticket>) => {
@@ -314,7 +323,7 @@ export default function TicketDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/tickets", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
       toast({ title: "Chamado atualizado com sucesso!" });
-      setIsEditingDetails(false);
+      setIsEditing(false);
     },
     onError: () => {
       toast({ title: "Erro ao atualizar chamado", variant: "destructive" });
@@ -340,16 +349,22 @@ export default function TicketDetailPage() {
     },
   });
 
-  const handleSaveDescription = () => {
-    updateMutation.mutate({
-      description: editedDescription,
-      attachments: editedAttachments.length > 0 ? JSON.stringify(editedAttachments) : null,
-    });
-    setIsEditingDescription(false);
-  };
-
-  const handleSaveDetails = (data: EditFormData) => {
-    updateMutation.mutate(data);
+  const handleSave = (data?: EditFormData) => {
+    if (data) {
+      // Save details form
+      updateMutation.mutate({
+        ...data,
+        description: editedDescription,
+        attachments: editedAttachments.length > 0 ? JSON.stringify(editedAttachments) : null,
+      });
+    } else {
+      // Save just description/attachments
+      updateMutation.mutate({
+        description: editedDescription,
+        attachments: editedAttachments.length > 0 ? JSON.stringify(editedAttachments) : null,
+      });
+    }
+    setIsEditing(false);
   };
 
   const handleAddComment = () => {
@@ -422,11 +437,11 @@ export default function TicketDetailPage() {
             Criado em {formatDateTime(ticket.createdAt)}
           </p>
         </div>
-        <Button 
-          variant={isEditingDetails ? "default" : "outline"}
-          onClick={() => setIsEditingDetails(!isEditingDetails)}
+        <Button
+          variant={isEditing ? "default" : "outline"}
+          onClick={() => setIsEditing(!isEditing)}
         >
-          {isEditingDetails ? (
+          {isEditing ? (
             <>
               <X className="w-4 h-4 mr-2" />
               Cancelar
@@ -449,9 +464,9 @@ export default function TicketDetailPage() {
               <CardTitle className="text-lg">Informações do Chamado</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {isEditingDetails ? (
+              {isEditing ? (
                 <Form {...editForm}>
-                  <form onSubmit={editForm.handleSubmit(handleSaveDetails)} className="space-y-4">
+                  <form onSubmit={editForm.handleSubmit(handleSave)} className="space-y-4">
                     <FormField
                       control={editForm.control}
                       name="title"
@@ -625,6 +640,19 @@ export default function TicketDetailPage() {
                         )}
                       />
                     </div>
+                    
+                    {/* Description and Attachments in Edit Mode */}
+                    <div className="space-y-3 pt-4 border-t">
+                      <FormLabel>Descrição</FormLabel>
+                      <RichTextarea
+                        value={editedDescription}
+                        onChange={setEditedDescription}
+                        images={editedAttachments}
+                        onImagesChange={setEditedAttachments}
+                        className="min-h-[200px]"
+                      />
+                    </div>
+                    
                     <Button type="submit" disabled={updateMutation.isPending}>
                       {updateMutation.isPending ? (
                         <>
@@ -651,39 +679,130 @@ export default function TicketDetailPage() {
                     <Badge variant="outline">{locations.find(l => l.value === ticket.location)?.label || ticket.location}</Badge>
                     <Badge variant="outline">{priorityLabels[ticket.priority as keyof typeof priorityLabels]}</Badge>
                   </div>
-                  {isEditingDescription ? (
-                    <div className="space-y-3">
-                      <RichTextarea
-                        value={editedDescription}
-                        onChange={setEditedDescription}
-                        images={editedAttachments}
-                        onImagesChange={setEditedAttachments}
-                        className="min-h-[200px]"
-                      />
-                      <div className="flex gap-2">
-                        <Button size="sm" onClick={handleSaveDescription} disabled={updateMutation.isPending}>
-                          <Check className="w-4 h-4 mr-1" />
-                          Salvar
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setIsEditingDescription(false)}>
-                          <X className="w-4 h-4 mr-1" />
-                          Cancelar
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="relative">
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <RichContent content={ticket.description || "Sem descrição"} />
-                      </div>
-                      <Button 
-                        size="sm" 
-                        variant="ghost" 
-                        className="absolute top-0 right-0"
-                        onClick={() => setIsEditingDescription(true)}
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </Button>
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <RichContent content={ticket.description || "Sem descrição"} />
+                  </div>
+                  
+                  {/* Attachments Display */}
+                  {ticket.attachments && !isEditing && (
+                    <div className="space-y-2 mt-4">
+                      <h4 className="text-sm font-medium flex items-center gap-2">
+                        <FileText className="w-4 h-4" />
+                        Anexos
+                      </h4>
+                      {(() => {
+                        try {
+                          const attachments = JSON.parse(ticket.attachments);
+                          if (Array.isArray(attachments) && attachments.length > 0) {
+                            return (
+                              <div className="grid grid-cols-2 gap-2">
+                                {attachments.map((url: string, i: number) => {
+                                  if (!url || typeof url !== 'string') return null;
+                                  const isVideo = url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
+                                  const isImage = url.startsWith("data:image/") || url.endsWith(".jpg") || url.endsWith(".jpeg") || url.endsWith(".png") || url.endsWith(".gif") || url.endsWith(".webp");
+                                  const isPdf = url.startsWith("data:application/pdf") || url.endsWith(".pdf");
+                                  const isExcel = url.startsWith("data:application/vnd.ms-excel") || url.startsWith("data:application/vnd.openxmlformats-officedocument.spreadsheet") || url.startsWith("data:text/csv") || url.endsWith(".xlsx") || url.endsWith(".xls") || url.endsWith(".csv");
+                                  
+                                  if (isImage || isVideo) {
+                                    return (
+                                      <Dialog key={i}>
+                                        <DialogTrigger asChild>
+                                          <div className="relative group rounded-md overflow-hidden border aspect-video bg-muted/50 flex items-center justify-center cursor-pointer" data-testid={`attachment-media-${i}`}>
+                                            {mediaError[i] ? (
+                                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                                <FileText className="h-8 w-8" />
+                                                <span className="text-xs">Erro ao carregar</span>
+                                              </div>
+                                            ) : isVideo ? (
+                                              <video
+                                                src={url}
+                                                className="max-w-full max-h-full object-contain"
+                                                onError={() => setMediaError(prev => ({ ...prev, [i]: true }))}
+                                              />
+                                            ) : (
+                                              <img
+                                                src={url}
+                                                alt="Anexo"
+                                                className="max-w-full max-h-full object-contain"
+                                                onError={() => setMediaError(prev => ({ ...prev, [i]: true }))}
+                                              />
+                                            )}
+                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                              {isVideo ? <Video className="h-6 w-6 text-white" /> : <Maximize2 className="h-6 w-6 text-white" />}
+                                            </div>
+                                            {isVideo && !mediaError[i] && (
+                                              <div className="absolute top-2 left-2 bg-black/60 text-white p-1 rounded-md">
+                                                <Video className="h-3 w-3" />
+                                              </div>
+                                            )}
+                                          </div>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                                          <VisuallyHidden>
+                                            <DialogTitle>Visualização de {isVideo ? "Vídeo" : "Imagem"}</DialogTitle>
+                                          </VisuallyHidden>
+                                          {mediaError[i] ? (
+                                            <div className="flex flex-col items-center gap-4 text-white">
+                                              <FileText className="h-16 w-16" />
+                                              <span>Erro ao carregar mídia</span>
+                                            </div>
+                                          ) : isVideo ? (
+                                            <video
+                                              src={url}
+                                              controls
+                                              autoPlay
+                                              className="max-w-full max-h-full"
+                                              onError={() => setMediaError(prev => ({ ...prev, [i]: true }))}
+                                            />
+                                          ) : (
+                                            <img
+                                              src={url}
+                                              alt="Preview"
+                                              className="max-w-full max-h-full object-contain"
+                                              onError={() => setMediaError(prev => ({ ...prev, [i]: true }))}
+                                            />
+                                          )}
+                                        </DialogContent>
+                                      </Dialog>
+                                    );
+                                  }
+
+                                  const getFileName = () => {
+                                    const mimeMatch = url.match(/^data:([^;]+);/);
+                                    if (mimeMatch) {
+                                      const ext = mimeMatch[1].split('/')[1];
+                                      return `arquivo_${i + 1}.${ext}`;
+                                    }
+                                    return `arquivo_${i + 1}`;
+                                  };
+
+                                  const getFileIcon = () => {
+                                    if (isPdf) return <FileText className="h-8 w-8 text-red-500" />;
+                                    if (isExcel) return <FileSpreadsheet className="h-8 w-8 text-green-600" />;
+                                    return <File className="h-8 w-8 text-blue-500" />;
+                                  };
+
+                                  return (
+                                    <a
+                                      key={i}
+                                      href={url}
+                                      download={getFileName()}
+                                      className="flex items-center gap-2 p-3 border rounded-md hover:bg-muted/50 transition-colors"
+                                    >
+                                      {getFileIcon()}
+                                      <span className="text-sm truncate flex-1">{getFileName()}</span>
+                                      <Download className="h-4 w-4 text-muted-foreground" />
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            );
+                          }
+                          return null;
+                        } catch {
+                          return null;
+                        }
+                      })()}
                     </div>
                   )}
                 </>
