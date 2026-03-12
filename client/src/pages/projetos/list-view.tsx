@@ -22,6 +22,7 @@ import {
   Circle,
   Clock,
   CheckCircle2,
+  Plus,
 } from "lucide-react";
 import type { KanbanCard, KanbanColumn, User, KanbanLabel } from "@shared/schema";
 
@@ -34,6 +35,7 @@ interface ListViewProps {
   labels?: KanbanLabel[];
   blockedCardIds?: Set<string>;
   onEditCard: (card: KanbanCard) => void;
+  onAddCard?: (columnId: string) => void;
 }
 
 const priorityColors: Record<string, string> = {
@@ -180,7 +182,7 @@ function CardRow({ card, users, labels, columns, isBlocked, onClick }: CardRowPr
   );
 }
 
-export function ListView({ cards, columns, users, labels = [], blockedCardIds = new Set(), onEditCard }: ListViewProps) {
+export function ListView({ cards, columns, users, labels = [], blockedCardIds = new Set(), onEditCard, onAddCard }: ListViewProps) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     todo: true, doing: true, done: true,
   });
@@ -261,6 +263,19 @@ export function ListView({ cards, columns, users, labels = [], blockedCardIds = 
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Nenhum card com este status
                   </p>
+                )}
+                {onAddCard && columns.length > 0 && (
+                  <div className="px-4 py-2 border-t">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start gap-2 text-xs text-muted-foreground h-8 hover:text-foreground"
+                      onClick={() => onAddCard(columns[0].id)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Novo Card
+                    </Button>
+                  </div>
                 )}
               </CollapsibleContent>
             </Collapsible>
