@@ -28,7 +28,7 @@ export function registerLabelRoutes(router: Router) {
 
   // Zod schema for label data validation
   const labelDataSchema = z.object({
-    imei: z.string().length(15).regex(/^\d{15}$/, "IMEI deve ter exatamente 15 dígitos numéricos"),
+    imei: z.string().min(1).max(50),
     deviceDescription: z.string().min(1).max(200),
     deviceErpCode: z.string().min(1).max(50),
     triador: z.string().min(1).max(100),
@@ -97,9 +97,9 @@ export function registerLabelRoutes(router: Router) {
     try {
       const { imei } = req.params;
 
-      // Validate IMEI format
-      if (!imei || !/^\d{15}$/.test(imei)) {
-        return res.status(400).json({ error: "IMEI inválido. Deve ter exatamente 15 dígitos." });
+      // Validate input (allow Serial Numbers too - min 1 char, max 50 chars)
+      if (!imei || imei.length < 1 || imei.length > 50) {
+        return res.status(400).json({ error: "Código inválido. Deve ter entre 1 e 50 caracteres." });
       }
 
       // Generate barcode as PNG buffer
