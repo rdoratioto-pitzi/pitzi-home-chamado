@@ -5,7 +5,7 @@
 import { Router } from "express";
 import { requireAuth, requireAdmin, getSessionUser } from "../middleware/auth";
 import { omieService } from "../services/omie.service";
-import ExcelJS from "exceljs";
+import * as XLSX from "xlsx";
 import { db } from "../db";
 import {
   estoquesContagens,
@@ -601,29 +601,11 @@ export function registerEstoqueRoutes(router: Router) {
         return res.status(404).json({ error: "Nenhum produto encontrado" });
       }
 
-      // Criar workbook Excel
-      const workbook = new ExcelJS.Workbook();
-      workbook.creator = "Renov Home";
-      workbook.created = new Date();
+      // Criar workbook Excel com xlsx
+      const workbook = XLSX.utils.book_new();
 
-      const worksheet = workbook.addWorksheet("Posição de Estoques");
-
-      // Adicionar cabeçalhos
-      worksheet.columns = [
-        { header: "Código ERP", key: "codigoErp", width: 15 },
-        { header: "Descrição", key: "descricao", width: 40 },
-        { header: "Categoria", key: "categoria", width: 20 },
-        { header: "Marca", key: "marca", width: 20 },
-        { header: "Modelo", key: "modelo", width: 30 },
-        { header: "Estoque Disponível", key: "estoqueDisponivel", width: 18 },
-        { header: "Custo Unitário (R$)", key: "custoUnitario", width: 18 },
-        { header: "Custo Total (R$)", key: "custoTotal", width: 18 },
-        { header: "Valor Venda (R$)", key: "valorVenda", width: 18 },
-        { header: "Markup (%)", key: "markup", width: 12 }
-      ];
-
-      // Adicionar dados — join com posição de estoque real
-      produtosArray.forEach((p: any) => {
+      // Preparar dados
+      const data = produtosArray.map((p: any) => {
         const locais = posEstoqueIndex.get(p.codigo) ?? [];
         const qtde = locais.reduce((s: number, l: any) => s + (l.nSaldo ?? 0), 0);
         const custo = locais.length > 0 ? (locais[0].nCMC ?? 0) : 0;
@@ -631,35 +613,37 @@ export function registerEstoqueRoutes(router: Router) {
         const custoTotal = qtde * custo;
         const markup = custo > 0 ? ((venda - custo) / custo) * 100 : 0;
 
-        worksheet.addRow({
-          codigoErp: p.codigo || '',
-          descricao: p.descricao || '',
-          categoria: p.descricao_familia || p.categoria || '',
-          marca: p.marca || '',
-          modelo: p.descricao || '',
-          estoqueDisponivel: qtde,
-          custoUnitario: custo,
-          custoTotal,
-          valorVenda: venda,
-          markup: markup.toFixed(2)
-        });
+        return {
+          "Código ERP": p.codigo || '',
+          "Descrição": p.descricao || '',
+          "Categoria": p.descricao_familia || p.categoria || '',
+          "Marca": p.marca || '',
+          "Modelo": p.descricao || '',
+          "Estoque Disponível": qtde,
+          "Custo Unitário (R$)": custo,
+          "Custo Total (R$)": custoTotal,
+          "Valor Venda (R$)": venda,
+          "Markup (%)": markup.toFixed(2)
+        };
       });
-      
-      // Formatar cabeçalhos
-      worksheet.getRow(1).font = { bold: true };
-      worksheet.getRow(1).fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF366092" }
-      };
-      worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
-      
+
+      const worksheet = XLSX.utils.json_to_sheet(data);
+
+      // Ajustar larguras das colunas
+      const colWidths = [
+        { wch: 15 }, { wch: 40 }, { wch: 20 }, { wch: 20 }, { wch: 30 },
+        { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 }
+      ];
+      worksheet['!cols'] = colWidths;
+
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Posição de Estoques");
+
       // Configurar resposta
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", "attachment; filename=posicao-estoques.xlsx");
-      
-      await workbook.xlsx.write(res);
-      res.end();
+
+      const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+      res.end(buffer);
       
       console.log('[Estoque Routes] Excel exported successfully');
     } catch (error: any) {
@@ -921,120 +905,93 @@ export function registerEstoqueRoutes(router: Router) {
         .from(estoquesAjustes)
         .where(eq(estoquesAjustes.contagemId, id));
 
-      const workbook = new ExcelJS.Workbook();
-      workbook.creator = "Renov Home";
-      workbook.created = new Date();
+      const workbook = XLSX.utils.book_new();
 
       // Aba 1: Resumo Geral
-      const wsResumo = workbook.addWorksheet("Resumo Geral");
-      wsResumo.columns = [
-        { header: "Campo", key: "campo", width: 25 },
-        { header: "Valor", key: "valor", width: 30 },
+      const resumoData = [
+        { Campo: "Código", Valor: contagem.codigo },
+        { Campo: "Status", Valor: contagem.status },
+        { Campo: "Data Início", Valor: contagem.dataInicio ? new Date(contagem.dataInicio).toLocaleString("pt-BR") : "" },
+        { Campo: "Data Fim", Valor: contagem.dataFim ? new Date(contagem.dataFim).toLocaleString("pt-BR") : "" },
+        { Campo: "Total Itens Contados", Valor: contagem.totalItensContados ?? 0 },
+        { Campo: "Total Itens Sistema", Valor: contagem.totalItensSistema ?? "N/A" },
+        { Campo: "Acuracidade", Valor: contagem.acuracidade ? `${contagem.acuracidade}%` : "N/A" },
       ];
-      wsResumo.addRows([
-        { campo: "Código", valor: contagem.codigo },
-        { campo: "Status", valor: contagem.status },
-        { campo: "Data Início", valor: contagem.dataInicio ? new Date(contagem.dataInicio).toLocaleString("pt-BR") : "" },
-        { campo: "Data Fim", valor: contagem.dataFim ? new Date(contagem.dataFim).toLocaleString("pt-BR") : "" },
-        { campo: "Total Itens Contados", valor: contagem.totalItensContados ?? 0 },
-        { campo: "Total Itens Sistema", valor: contagem.totalItensSistema ?? "N/A" },
-        { campo: "Acuracidade", valor: contagem.acuracidade ? `${contagem.acuracidade}%` : "N/A" },
-      ]);
-      wsResumo.getRow(1).font = { bold: true };
+      const wsResumo = XLSX.utils.json_to_sheet(resumoData);
+      wsResumo['!cols'] = [{ wch: 25 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(workbook, wsResumo, "Resumo Geral");
 
       // Aba 2: Por Categoria
-      const wsCategoria = workbook.addWorksheet("Por Categoria");
-      wsCategoria.columns = [
-        { header: "Categoria", key: "categoria", width: 25 },
-        { header: "Qtd Contada", key: "qtde", width: 15 },
-      ];
       const categoriaMap: Record<string, number> = {};
       itens.forEach((item) => {
         const cat = item.categoria || "Sem Categoria";
         categoriaMap[cat] = (categoriaMap[cat] || 0) + 1;
       });
-      Object.entries(categoriaMap).forEach(([cat, qtde]) => {
-        wsCategoria.addRow({ categoria: cat, qtde });
-      });
-      wsCategoria.getRow(1).font = { bold: true };
+      const categoriaData = Object.entries(categoriaMap).map(([cat, qtde]) => ({ Categoria: cat, "Qtd Contada": qtde }));
+      const wsCategoria = XLSX.utils.json_to_sheet(categoriaData);
+      wsCategoria['!cols'] = [{ wch: 25 }, { wch: 15 }];
+      XLSX.utils.book_append_sheet(workbook, wsCategoria, "Por Categoria");
 
       // Aba 3: Por Item
-      const wsItens = workbook.addWorksheet("Por Item");
-      wsItens.columns = [
-        { header: "IMEI", key: "imei", width: 20 },
-        { header: "Código ERP", key: "codigoErp", width: 15 },
-        { header: "Modelo", key: "modelo", width: 30 },
-        { header: "Categoria", key: "categoria", width: 20 },
-        { header: "Marca", key: "marca", width: 15 },
-        { header: "Método", key: "metodo", width: 12 },
-        { header: "Contado Em", key: "contadoEm", width: 20 },
-      ];
-      itens.forEach((item) => {
-        wsItens.addRow({
-          imei: item.imei,
-          codigoErp: item.codigoErp || "",
-          modelo: item.modelo || "",
-          categoria: item.categoria || "",
-          marca: item.marca || "",
-          metodo: item.metodoLeitura,
-          contadoEm: item.contadoEm ? new Date(item.contadoEm).toLocaleString("pt-BR") : "",
-        });
-      });
-      wsItens.getRow(1).font = { bold: true };
+      const itensData = itens.map((item) => ({
+        IMEI: item.imei,
+        "Código ERP": item.codigoErp || "",
+        Modelo: item.modelo || "",
+        Categoria: item.categoria || "",
+        Marca: item.marca || "",
+        Método: item.metodoLeitura,
+        "Contado Em": item.contadoEm ? new Date(item.contadoEm).toLocaleString("pt-BR") : "",
+      }));
+      const wsItens = XLSX.utils.json_to_sheet(itensData);
+      wsItens['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(workbook, wsItens, "Por Item");
 
       // Aba 4: Divergências - Faltas
-      const wsFaltas = workbook.addWorksheet("Divergências - Faltas");
-      const divCols = [
-        { header: "IMEI", key: "imei", width: 20 },
-        { header: "Código ERP", key: "codigoErp", width: 15 },
-        { header: "Modelo", key: "modelo", width: 30 },
-        { header: "Categoria", key: "categoria", width: 20 },
-        { header: "Status Análise", key: "statusAnalise", width: 18 },
-      ];
-      wsFaltas.columns = divCols;
-      divergencias
+      const faltasHeader = { IMEI: "", "Código ERP": "", Modelo: "", Categoria: "", "Status Análise": "" };
+      const faltasData = divergencias
         .filter((d) => d.tipo === "falta")
-        .forEach((d) => {
-          wsFaltas.addRow({ imei: d.imei || "", codigoErp: d.codigoErp || "", modelo: d.modelo || "", categoria: d.categoria || "", statusAnalise: d.statusAnalise || "pendente" });
-        });
-      wsFaltas.getRow(1).font = { bold: true };
+        .map((d) => ({
+          IMEI: d.imei || "",
+          "Código ERP": d.codigoErp || "",
+          Modelo: d.modelo || "",
+          Categoria: d.categoria || "",
+          "Status Análise": d.statusAnalise || "pendente",
+        }));
+      const wsFaltas = XLSX.utils.json_to_sheet(faltasData.length > 0 ? faltasData : [faltasHeader]);
+      wsFaltas['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 20 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(workbook, wsFaltas, "Divergências - Faltas");
 
       // Aba 5: Divergências - Sobras
-      const wsSobras = workbook.addWorksheet("Divergências - Sobras");
-      wsSobras.columns = divCols;
-      divergencias
+      const sobrasHeader = { IMEI: "", "Código ERP": "", Modelo: "", Categoria: "", "Status Análise": "" };
+      const sobrasData = divergencias
         .filter((d) => d.tipo === "sobra")
-        .forEach((d) => {
-          wsSobras.addRow({ imei: d.imei || "", codigoErp: d.codigoErp || "", modelo: d.modelo || "", categoria: d.categoria || "", statusAnalise: d.statusAnalise || "pendente" });
-        });
-      wsSobras.getRow(1).font = { bold: true };
+        .map((d) => ({
+          IMEI: d.imei || "",
+          "Código ERP": d.codigoErp || "",
+          Modelo: d.modelo || "",
+          Categoria: d.categoria || "",
+          "Status Análise": d.statusAnalise || "pendente",
+        }));
+      const wsSobras = XLSX.utils.json_to_sheet(sobrasData.length > 0 ? sobrasData : [sobrasHeader]);
+      wsSobras['!cols'] = [{ wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 20 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(workbook, wsSobras, "Divergências - Sobras");
 
       // Aba 6: Ajustes Realizados
-      const wsAjustes = workbook.addWorksheet("Ajustes Realizados");
-      wsAjustes.columns = [
-        { header: "Tipo Ajuste", key: "tipoAjuste", width: 18 },
-        { header: "IMEI", key: "imei", width: 20 },
-        { header: "Código ERP", key: "codigoErp", width: 15 },
-        { header: "Quantidade", key: "quantidade", width: 12 },
-        { header: "Justificativa", key: "justificativa", width: 50 },
-        { header: "Criado Em", key: "createdAt", width: 20 },
-      ];
-      ajustes.forEach((a) => {
-        wsAjustes.addRow({
-          tipoAjuste: a.tipoAjuste,
-          imei: a.imei || "",
-          codigoErp: a.codigoErp || "",
-          quantidade: a.quantidade ?? "",
-          justificativa: a.justificativa,
-          createdAt: a.createdAt ? new Date(a.createdAt).toLocaleString("pt-BR") : "",
-        });
-      });
-      wsAjustes.getRow(1).font = { bold: true };
+      const ajustesData = ajustes.map((a) => ({
+        "Tipo Ajuste": a.tipoAjuste,
+        IMEI: a.imei || "",
+        "Código ERP": a.codigoErp || "",
+        Quantidade: a.quantidade ?? "",
+        Justificativa: a.justificativa,
+        "Criado Em": a.createdAt ? new Date(a.createdAt).toLocaleString("pt-BR") : "",
+      }));
+      const wsAjustes = XLSX.utils.json_to_sheet(ajustesData);
+      wsAjustes['!cols'] = [{ wch: 18 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 50 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(workbook, wsAjustes, "Ajustes Realizados");
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=contagem-${contagem.codigo}.xlsx`);
-      await workbook.xlsx.write(res);
-      res.end();
+      res.end(XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }));
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
