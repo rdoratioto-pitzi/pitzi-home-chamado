@@ -21,6 +21,7 @@ import { registerMetaRoutes } from "./metas";
 import { registerFlowchartRoutes } from "./flowcharts";
 import { registerOmieRoutes } from "./omie";
 import { registerEstoqueRoutes } from "./estoques";
+import { registerDevToolsRoutes } from "./dev-tools";
 
 export function registerModularRoutes(app: Router) {
   const router = Router();
@@ -47,6 +48,7 @@ export function registerModularRoutes(app: Router) {
   registerFlowchartRoutes(router);
   registerOmieRoutes(router);
   registerEstoqueRoutes(router);
+  registerDevToolsRoutes(router);
   
   app.use(router);
 }
