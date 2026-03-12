@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { streamChatCompletion, generateTitle, fetchOpenRouterModels } from "../openrouter";
 import { requireAuth } from "../middleware/auth";
+import { scrapeMercadoLivre } from "../firecrawl-service";
 // Removed import { Message, Attachment } from "../openrouter"; as they are not explicitly exported types
 
 export function registerAIRoutes(app: Router) {
@@ -42,6 +43,25 @@ export function registerAIRoutes(app: Router) {
     } catch (error: any) {
       console.error("Error generating title:", error);
       res.status(500).json({ error: error.message || "Failed to generate title" });
+    }
+  });
+
+  // GET /api/firecrawl/test - Test Firecrawl pricing scraper
+  app.get("/api/firecrawl/test", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const query = req.query.query as string;
+      if (!query) {
+        return res.status(400).json({ error: "query parameter is required" });
+      }
+      console.log(`[Firecrawl Test] Testing with query: "${query}"`);
+      const result = await scrapeMercadoLivre(query);
+      if (!result) {
+        return res.status(404).json({ error: "Nenhum resultado encontrado ou erro na API Firecrawl" });
+      }
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error testing Firecrawl:", error);
+      res.status(500).json({ error: error.message || "Failed to test Firecrawl" });
     }
   });
 
