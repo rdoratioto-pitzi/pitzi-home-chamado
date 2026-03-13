@@ -57,5 +57,7 @@ agents/dist/
 agents/logs/
 
 # ─── MCP (Model Context Protocol) ────────────────────────────────
+# Configuração MCP contém referências a secrets — NUNCA versionar
+.mcp.json
 # Estado interno do Memory MCP — não versionar dados pessoais de sessão
 .mcp-memory.json

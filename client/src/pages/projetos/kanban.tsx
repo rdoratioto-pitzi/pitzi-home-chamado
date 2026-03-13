@@ -631,6 +631,7 @@ export function KanbanContent({ embeddedProjectId }: KanbanPageProps) {
             labels={labels}
             blockedCardIds={blockedCardIds}
             onEditCard={openEditCardDialog}
+            onAddCard={project?.status !== "completed" ? (columnId) => openNewCardDialog(columnId) : undefined}
           />
         )}
 

@@ -13,11 +13,23 @@ import {
   Edit2,
   ChevronRight,
   LayoutGrid,
+  Trash2,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Project, User } from "@shared/schema";
 import { ProjectDialog } from "./project-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 import {
   Select,
   SelectContent,
@@ -61,9 +73,11 @@ export default function ProjetosPage() {
   const [editingProject, setEditingProject] = useState<Project | undefined>();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("sprint_active");
   const [filterOwner, setFilterOwner] = useState<string>("all");
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -78,6 +92,21 @@ export default function ProjetosPage() {
       apiRequest("PATCH", `/api/projects/${id}`, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/projects/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
+      if (deletingProject && selectedProjectId === deletingProject.id) {
+        setSelectedProjectId(null);
+      }
+      setDeletingProject(null);
+      toast({ title: "Projeto excluído com sucesso!" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao excluir projeto", variant: "destructive" });
     },
   });
 
@@ -287,15 +316,28 @@ export default function ProjetosPage() {
                         </p>
                       </div>
 
-                      {/* Botão de editar (hover) */}
-                      <button
-                        onClick={(e) => handleEditProject(e, project)}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted flex-shrink-0"
-                        title="Editar projeto"
-                        data-testid={`button-edit-project-${project.id}`}
-                      >
-                        <Edit2 className="h-3 w-3 text-muted-foreground" />
-                      </button>
+                      {/* Botões de ação (hover) */}
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 flex-shrink-0">
+                        <button
+                          onClick={(e) => handleEditProject(e, project)}
+                          className="p-0.5 rounded hover:bg-muted"
+                          title="Editar projeto"
+                          data-testid={`button-edit-project-${project.id}`}
+                        >
+                          <Edit2 className="h-3 w-3 text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingProject(project);
+                          }}
+                          className="p-0.5 rounded hover:bg-destructive/10"
+                          title="Excluir projeto"
+                          data-testid={`button-delete-project-${project.id}`}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </button>
+                      </div>
                     </button>
                   );
                 })}
@@ -510,6 +552,26 @@ export default function ProjetosPage() {
         onOpenChange={handleDialogClose}
         project={editingProject}
       />
+
+      <AlertDialog open={!!deletingProject} onOpenChange={(open) => !open && setDeletingProject(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Projeto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir o projeto "{deletingProject?.name}"? Todos os cards, colunas e labels serão removidos. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deletingProject && deleteProjectMutation.mutate(deletingProject.id)}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

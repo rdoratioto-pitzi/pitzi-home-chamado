@@ -47,6 +47,17 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import type { TaskArea, Task } from "@shared/schema";
@@ -550,13 +561,17 @@ export default function ReunioesPage() {
   });
 
   const deleteMeetingMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/tasks/${id}`);
+    mutationFn: async ({ id, scope }: { id: string; scope: string }) => {
+      return apiRequest("DELETE", `/api/tasks/${id}?scope=${scope}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
       queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedAreaId] });
+      setDeletingMeeting(null);
       toast({ title: "Reunião excluída!" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao excluir reunião", variant: "destructive" });
     },
   });
 
@@ -647,6 +662,10 @@ export default function ReunioesPage() {
   // Presentation mode state
   const [presentationMode, setPresentationMode] = useState(false);
   const [currentPresentationIndex, setCurrentPresentationIndex] = useState(0);
+
+  // Delete meeting dialog state
+  const [deletingMeeting, setDeletingMeeting] = useState<Task | null>(null);
+  const [deleteScope, setDeleteScope] = useState<string>("single");
 
   const applyTemplate = (template: { id: string; name: string; structure: string }) => {
     try {
@@ -1228,21 +1247,6 @@ export default function ReunioesPage() {
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
-            <Button 
-              size="icon" 
-              variant={presentationMode ? "secondary" : "ghost"}
-              onClick={() => {
-                if (!presentationMode && filteredMeetings.length > 0) {
-                  setCurrentPresentationIndex(0);
-                }
-                setPresentationMode(!presentationMode);
-              }}
-              disabled={filteredMeetings.length === 0}
-              title="Modo Apresentação"
-              data-testid="button-presentation-mode"
-            >
-              <MonitorPlay className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
@@ -1352,6 +1356,15 @@ export default function ReunioesPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={(e) => {
                             e.stopPropagation();
+                            const idx = filteredMeetings.findIndex(m => m.id === meeting.id);
+                            setCurrentPresentationIndex(idx >= 0 ? idx : 0);
+                            setPresentationMode(true);
+                          }}>
+                            <MonitorPlay className="h-4 w-4 mr-2" />
+                            Modo Apresentação
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
                             navigate(`/reunioes/${meeting.id}`);
                           }}>
                             <Edit className="h-4 w-4 mr-2" />
@@ -1359,7 +1372,8 @@ export default function ReunioesPage() {
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive" onClick={(e) => {
                             e.stopPropagation();
-                            deleteMeetingMutation.mutate(meeting.id);
+                            setDeletingMeeting(meeting);
+                            setDeleteScope("single");
                           }}>
                             <Trash2 className="h-4 w-4 mr-2" />
                             Excluir
@@ -1500,16 +1514,26 @@ export default function ReunioesPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={(e) => {
                             e.stopPropagation();
+                            const idx = filteredMeetings.findIndex(m => m.id === meeting.id);
+                            setCurrentPresentationIndex(idx >= 0 ? idx : 0);
+                            setPresentationMode(true);
+                          }}>
+                            <MonitorPlay className="h-4 w-4 mr-2" />
+                            Modo Apresentação
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
                             navigate(`/reunioes/${meeting.id}`);
                           }}>
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
+                          <DropdownMenuItem
                             className="text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteMeetingMutation.mutate(meeting.id);
+                              setDeletingMeeting(meeting);
+                              setDeleteScope("single");
                             }}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
@@ -2321,6 +2345,45 @@ export default function ReunioesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Meeting Dialog */}
+      <AlertDialog open={!!deletingMeeting} onOpenChange={(open) => !open && setDeletingMeeting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Reunião</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Tem certeza que deseja excluir a reunião "{deletingMeeting?.title}"?</p>
+                {(deletingMeeting?.isRecurring || deletingMeeting?.parentTaskId) && (
+                  <RadioGroup value={deleteScope} onValueChange={setDeleteScope} className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="single" id="delete-single" />
+                      <Label htmlFor="delete-single" className="text-sm font-normal cursor-pointer">Apenas esta reunião</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="future" id="delete-future" />
+                      <Label htmlFor="delete-future" className="text-sm font-normal cursor-pointer">Esta e todas as futuras</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="all" id="delete-all" />
+                      <Label htmlFor="delete-all" className="text-sm font-normal cursor-pointer">Todas as reuniões da série</Label>
+                    </div>
+                  </RadioGroup>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deletingMeeting && deleteMeetingMutation.mutate({ id: deletingMeeting.id, scope: deleteScope })}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Presentation Mode Dialog */}
       {presentationMode && filteredMeetings.length > 0 && (
