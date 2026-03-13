@@ -725,6 +725,18 @@ export class DatabaseStorage implements IStorage {
   }
   async deleteProject(id: string): Promise<boolean> {
     if (!db) return false;
+    // Cascade: delete dependencies, cards, columns, labels, members
+    const cards = await db.select({ id: kanbanCards.id }).from(kanbanCards).where(eq(kanbanCards.projectId, id));
+    if (cards.length > 0) {
+      for (const card of cards) {
+        await db.delete(kanbanCardDependencies).where(
+          or(eq(kanbanCardDependencies.blockingCardId, card.id), eq(kanbanCardDependencies.blockedCardId, card.id))
+        );
+      }
+      await db.delete(kanbanCards).where(eq(kanbanCards.projectId, id));
+    }
+    await db.delete(kanbanColumns).where(eq(kanbanColumns.projectId, id));
+    await db.delete(kanbanLabels).where(eq(kanbanLabels.projectId, id));
     await db.delete(projectMembers).where(eq(projectMembers.projectId, id));
     const result = await db.delete(projects).where(eq(projects.id, id)).returning();
     return result.length > 0;
@@ -1137,6 +1149,49 @@ export class DatabaseStorage implements IStorage {
     if (!db) return false;
     const result = await db.delete(tasks).where(eq(tasks.id, id)).returning();
     return result.length > 0;
+  }
+  async deleteTaskRecurrenceSeries(taskId: string): Promise<number> {
+    if (!db) return 0;
+    const task = await this.getTask(taskId);
+    if (!task) return 0;
+    // Find the parent ID: if this task IS the parent, use its id; otherwise use its parentTaskId
+    const parentId = task.isRecurring ? task.id : task.parentTaskId;
+    if (!parentId) {
+      // Not part of a series — just delete this one
+      await db.delete(tasks).where(eq(tasks.id, taskId));
+      return 1;
+    }
+    // Delete all children + parent
+    const children = await db.delete(tasks).where(eq(tasks.parentTaskId, parentId)).returning();
+    const parent = await db.delete(tasks).where(eq(tasks.id, parentId)).returning();
+    return children.length + parent.length;
+  }
+  async deleteTaskRecurrenceFuture(taskId: string): Promise<number> {
+    if (!db) return 0;
+    const task = await this.getTask(taskId);
+    if (!task) return 0;
+    const parentId = task.isRecurring ? task.id : task.parentTaskId;
+    if (!parentId) {
+      await db.delete(tasks).where(eq(tasks.id, taskId));
+      return 1;
+    }
+    // Delete this task + all future siblings (dueDate >= this task's dueDate)
+    const refDate = task.dueDate ?? task.createdAt;
+    let deleted = 0;
+    if (refDate) {
+      const futureChildren = await db.delete(tasks).where(
+        and(eq(tasks.parentTaskId, parentId), gt(tasks.dueDate, refDate))
+      ).returning();
+      deleted += futureChildren.length;
+    }
+    // Delete the current task itself
+    await db.delete(tasks).where(eq(tasks.id, taskId));
+    deleted += 1;
+    // If we're deleting the parent, also stop recurrence
+    if (task.isRecurring) {
+      // Parent deleted — all future children already deleted above
+    }
+    return deleted;
   }
 
   // Task Comments
