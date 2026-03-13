@@ -75,6 +75,7 @@ const EstoquesPipelinePage             = lazy(() => import("@/pages/estoques/pip
 const EstoquesLeadTimePage             = lazy(() => import("@/pages/estoques/lead-time"));
 const EstoquesAgingPage                = lazy(() => import("@/pages/estoques/aging"));
 const EstoquesRastreabilidadePage      = lazy(() => import("@/pages/estoques/rastreabilidade"));
+const SQLRunnerPage                    = lazy(() => import("@/pages/dev/sql-runner"));
 const OmieIntegration                  = lazy(() => import("@/pages/integrations/omie/OmieIntegration"));
 const NovoChamadoPage                  = lazy(() => import("@/pages/chamados/novo"));
 const TicketDetailPage                 = lazy(() => import("@/pages/chamados/[id]"));
@@ -339,6 +340,11 @@ function Router() {
       <Route path="/updates">
         <ProtectedRoute>
           <UpdatesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/dev/sql">
+        <ProtectedRoute>
+          <SQLRunnerPage />
         </ProtectedRoute>
       </Route>
       <Route path="/git-analytics">
