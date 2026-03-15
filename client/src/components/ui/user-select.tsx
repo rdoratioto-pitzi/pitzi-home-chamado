@@ -114,7 +114,7 @@ export function UserSelect({
             <CommandGroup>
               {showAutoOption && (
                 <CommandItem
-                  value="auto"
+                  value="atribuição automática auto"
                   onSelect={() => handleSelect("auto")}
                   className="cursor-pointer"
                 >
@@ -133,7 +133,7 @@ export function UserSelect({
               {activeUsers.map((user) => (
                 <CommandItem
                   key={user.id}
-                  value={user.id}
+                  value={`${user.name} ${user.email} ${user.id}`}
                   onSelect={() => handleSelect(user.id)}
                   className="cursor-pointer"
                 >
