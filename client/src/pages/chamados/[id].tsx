@@ -181,7 +181,7 @@ export default function TicketDetailPage() {
   const [comment, setComment] = useState("");
   const [commentImages, setCommentImages] = useState<string[]>([]);
   const [editedDescription, setEditedDescription] = useState("");
-  const [editedAttachments, setEditedAttachments] = useState<string[]>([]);
+  const [editedAttachments, setEditedAttachments] = useState<{ name: string; url: string }[]>([]);
   const [isEditing, setIsEditing] = useState(false);
 
   // Fetch ticket
@@ -303,7 +303,15 @@ export default function TicketDetailPage() {
       });
       setEditedDescription(ticket.description || "");
       try {
-        setEditedAttachments(ticket.attachments ? JSON.parse(ticket.attachments) : []);
+        const rawAttachments = ticket.attachments ? JSON.parse(ticket.attachments) : [];
+        // Convert old format (string URLs) to new format (objects with name and url)
+        const attachments = rawAttachments.map((a: string | { name: string; url: string }, i: number) => {
+          if (typeof a === 'string') {
+            return { name: `Arquivo_${i + 1}`, url: a };
+          }
+          return a;
+        });
+        setEditedAttachments(attachments);
       } catch {
         setEditedAttachments([]);
       }
@@ -325,8 +333,9 @@ export default function TicketDetailPage() {
       toast({ title: "Chamado atualizado com sucesso!" });
       setIsEditing(false);
     },
-    onError: () => {
-      toast({ title: "Erro ao atualizar chamado", variant: "destructive" });
+    onError: (error: { message?: string; error?: string }) => {
+      const errorMessage = error?.message || error?.error || "Erro ao atualizar chamado";
+      toast({ title: errorMessage, variant: "destructive" });
     },
   });
 
@@ -351,10 +360,23 @@ export default function TicketDetailPage() {
 
   const handleSave = (data?: EditFormData) => {
     if (data) {
+      // Validação client-side: verificar se tem responsável antes de mudar para resolved/closed/blocked
+      const finalAssigneeId = data.assigneeId || ticket?.assigneeId;
+      if (!finalAssigneeId && ["resolved", "closed", "blocked"].includes(data.status)) {
+        toast({
+          title: "Atenção",
+          description: "Não é possível alterar o status para '" +
+            (data.status === "resolved" ? "Resolvido" : data.status === "closed" ? "Fechado" : "Bloqueado") +
+            "' sem um responsável atribuído ao chamado.",
+          variant: "destructive",
+        });
+        return;
+      }
       // Save details form
       updateMutation.mutate({
         ...data,
         description: editedDescription,
+        // editedAttachments is already an array of objects with name and url
         attachments: editedAttachments.length > 0 ? JSON.stringify(editedAttachments) : null,
       });
     } else {
@@ -647,8 +669,8 @@ export default function TicketDetailPage() {
                       <RichTextarea
                         value={editedDescription}
                         onChange={setEditedDescription}
-                        images={editedAttachments}
-                        onImagesChange={setEditedAttachments}
+                        images={editedAttachments.map(a => a.url)}
+                        onImagesChange={(urls) => setEditedAttachments(urls.map((url, i) => ({ name: `Arquivo_${i + 1}`, url })))}
                         className="min-h-[200px]"
                       />
                     </div>
@@ -696,7 +718,10 @@ export default function TicketDetailPage() {
                           if (Array.isArray(attachments) && attachments.length > 0) {
                             return (
                               <div className="grid grid-cols-2 gap-2">
-                                {attachments.map((url: string, i: number) => {
+                                {attachments.map((attachment: string | { name: string; url: string }, i: number) => {
+                                  // Handle both old format (string URL) and new format (object with name and url)
+                                  const url = typeof attachment === 'string' ? attachment : attachment.url;
+                                  const fileName = typeof attachment === 'object' && attachment.name ? attachment.name : null;
                                   if (!url || typeof url !== 'string') return null;
                                   const isVideo = url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
                                   const isImage = url.startsWith("data:image/") || url.endsWith(".jpg") || url.endsWith(".jpeg") || url.endsWith(".png") || url.endsWith(".gif") || url.endsWith(".webp");
@@ -768,6 +793,9 @@ export default function TicketDetailPage() {
                                   }
 
                                   const getFileName = () => {
+                                    // If we have the actual filename from the object format, use it
+                                    if (fileName) return fileName;
+                                    // Otherwise, extract from URL (backwards compatibility)
                                     const mimeMatch = url.match(/^data:([^;]+);/);
                                     if (mimeMatch) {
                                       const ext = mimeMatch[1].split('/')[1];

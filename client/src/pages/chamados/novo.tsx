@@ -161,7 +161,7 @@ export default function NovoChamadoPage() {
       }
       const payload: Record<string, unknown> = {
         ...data,
-        attachments: attachments.length > 0 ? JSON.stringify(attachments.map(a => a.url)) : null,
+        attachments: attachments.length > 0 ? JSON.stringify(attachments) : null,
         requesterId: currentUser.id,
         status: "open",
         code: "",

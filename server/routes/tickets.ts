@@ -126,6 +126,16 @@ export function registerTicketRoutes(router: Router) {
       }
 
       if (req.body.status && req.body.status !== oldTicket.status) {
+        // Validar que o ticket tem responsável antes de mudar para resolved, closed ou blocked
+        const finalAssigneeId = req.body.assigneeId || oldTicket.assigneeId;
+        if (!finalAssigneeId && ["resolved", "closed", "blocked"].includes(req.body.status)) {
+          return res.status(400).json({
+            error: "Não é possível alterar o status para '" +
+              (req.body.status === "resolved" ? "Resolvido" : req.body.status === "closed" ? "Fechado" : "Bloqueado") +
+              "' sem um responsável atribuído ao chamado."
+          });
+        }
+        
         if (req.body.status === "resolved" && !oldTicket.dataResolucao) {
           updateData.dataResolucao = new Date();
         }
