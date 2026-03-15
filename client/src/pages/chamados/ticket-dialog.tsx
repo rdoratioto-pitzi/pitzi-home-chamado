@@ -161,7 +161,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
      mutationFn: async (data: FormData) => {
        const payload: Record<string, unknown> = {
          ...data,
-         attachments: attachments.length > 0 ? JSON.stringify(attachments.map(a => a.url)) : null,
+         attachments: attachments.length > 0 ? JSON.stringify(attachments) : null,
          requesterId: currentUser?.id || "admin",
          status: "open",
          code: "",
