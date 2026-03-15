@@ -130,10 +130,10 @@ const getTimeOpenInfo = (createdAt: Date | string | null): { text: string; color
 
 export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
   const [comment, setComment] = useState("");
-  const [commentImages, setCommentImages] = useState<string[]>([]);
+  const [commentImages, setCommentImages] = useState<{ name: string; url: string }[]>([]);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editedDescription, setEditedDescription] = useState("");
-  const [editedAttachments, setEditedAttachments] = useState<string[]>([]);
+  const [editedAttachments, setEditedAttachments] = useState<{ name: string; url: string }[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -155,7 +155,14 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
       setEditedDescription(ticket.description || '');
       // Extrair imagens do HTML da descrição + anexos existentes
       const htmlImages = extractImagesFromHtml(ticket.description || '');
-      const attachmentImages = ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : [];
+      const rawAttachments = ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : [];
+      // Convert old format (string URLs) to new format (objects with name and url)
+      const attachmentImages = rawAttachments.map((a: string | { name: string; url: string }, i: number) => {
+        if (typeof a === 'string') {
+          return { name: `Arquivo_${i + 1}`, url: a };
+        }
+        return a;
+      });
       setEditedAttachments([...htmlImages, ...attachmentImages]);
       setIsEditingDescription(false);
     }
@@ -186,9 +193,29 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
         description: "As informações do chamado foram atualizadas.",
       });
     },
+    onError: (error: any) => {
+      const errorMessage = error?.message || error?.error || "Erro ao atualizar chamado";
+      toast({
+        title: "Erro",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
   });
 
   const handleStatusChange = (status: string) => {
+    // Validação client-side: verificar se tem responsável antes de mudar para resolved/closed/blocked
+    const finalAssigneeId = ticket?.assigneeId;
+    if (!finalAssigneeId && ["resolved", "closed", "blocked"].includes(status)) {
+      toast({
+        title: "Atenção",
+        description: "Não é possível alterar o status para '" +
+          (status === "resolved" ? "Resolvido" : status === "closed" ? "Fechado" : "Bloqueado") +
+          "' sem um responsável atribuído ao chamado.",
+        variant: "destructive",
+      });
+      return;
+    }
     updateMutation.mutate({ status });
   };
 
@@ -407,8 +434,8 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                 <RichTextarea
                   value={editedDescription}
                   onChange={setEditedDescription}
-                  images={editedAttachments}
-                  onImagesChange={setEditedAttachments}
+                  images={editedAttachments.map(a => a.url)}
+                  onImagesChange={(urls) => setEditedAttachments(urls.map((url, i) => ({ name: `Arquivo_${i + 1}`, url })))}
                   placeholder="Edite a descrição do chamado..."
                 />
                 <div className="flex gap-2 justify-end">
@@ -454,7 +481,10 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                   try {
                     const attachments = JSON.parse(ticket.attachments);
                     if (Array.isArray(attachments)) {
-                      return attachments.map((url: string, i: number) => {
+                      return attachments.map((attachment: string | { name: string; url: string }, i: number) => {
+                        // Handle both old format (string URL) and new format (object with name and url)
+                        const url = typeof attachment === 'string' ? attachment : attachment.url;
+                        const fileName = typeof attachment === 'object' && attachment.name ? attachment.name : null;
                         // Garantir que url não seja null/undefined antes de usar startsWith/endsWith
                         if (!url || typeof url !== 'string') return null;
                         const isVideo = url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
@@ -497,6 +527,9 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                         }
 
                         const getFileName = () => {
+                          // If we have the actual filename from the object format, use it
+                          if (fileName) return fileName;
+                          // Otherwise, extract from URL (backwards compatibility)
                           const mimeMatch = url.match(/^data:([^;]+);/);
                           if (mimeMatch) {
                             const extMap: Record<string, string> = { "application/pdf": "pdf", "application/vnd.ms-excel": "xls", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx", "text/csv": "csv", "application/msword": "doc", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx" };
@@ -758,7 +791,9 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                             try {
                               const attachments = JSON.parse(c.attachments);
                               if (Array.isArray(attachments)) {
-                                return attachments.map((url, i) => {
+                                return attachments.map((attachment: string | { name: string; url: string }, i: number) => {
+                                  // Handle both old format (string URL) and new format (object with name and url)
+                                  const url = typeof attachment === 'string' ? attachment : attachment.url;
                                   // Garantir que url não seja null/undefined antes de usar startsWith/endsWith
                                   if (!url || typeof url !== 'string') return null;
                                   const isVideo = url.startsWith("data:video/") || url.endsWith(".mp4") || url.endsWith(".webm") || url.endsWith(".ogg");
@@ -826,8 +861,8 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             placeholder="Adicione um comentário..."
             value={comment}
             onChange={setComment}
-            images={commentImages}
-            onImagesChange={setCommentImages}
+            images={commentImages.map(c => c.url)}
+            onImagesChange={(urls) => setCommentImages(urls.map((url, i) => ({ name: `Arquivo_${i + 1}`, url })))}
             className="min-h-[100px]"
           />
           <Button
