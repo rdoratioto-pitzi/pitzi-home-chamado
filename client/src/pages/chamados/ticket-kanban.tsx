@@ -42,8 +42,9 @@ export function TicketKanban({ tickets, users, onTicketClick }: TicketKanbanProp
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
     },
-    onError: () => {
-      toast({ title: "Erro ao mover chamado", variant: "destructive" });
+    onError: (error: { message?: string; error?: string }) => {
+      const errorMessage = error?.message || error?.error || "Erro ao mover chamado";
+      toast({ title: errorMessage, variant: "destructive" });
     },
   });
 
@@ -60,6 +61,17 @@ export function TicketKanban({ tickets, users, onTicketClick }: TicketKanbanProp
     const ticketId = e.dataTransfer.getData("ticketId");
     const ticket = tickets.find((t) => t.id === ticketId);
     if (ticket && ticket.status !== status) {
+      // Validação client-side: verificar se tem responsável antes de mudar para resolved/closed/blocked
+      if (!ticket.assigneeId && ["resolved", "closed", "blocked"].includes(status)) {
+        toast({
+          title: "Atenção",
+          description: "Não é possível alterar o status para '" +
+            (status === "resolved" ? "Resolvido" : status === "closed" ? "Fechado" : "Bloqueado") +
+            "' sem um responsável atribuído ao chamado.",
+          variant: "destructive",
+        });
+        return;
+      }
       updateMutation.mutate({ id: ticketId, status });
     }
   };

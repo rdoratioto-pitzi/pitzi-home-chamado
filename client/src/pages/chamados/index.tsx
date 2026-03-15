@@ -1062,8 +1062,8 @@ export default function ChamadosPage() {
                         <TableRow
                           key={ticket.id}
                           className="cursor-pointer hover:bg-muted/30 transition-colors"
-                          onClick={() => setLocation(`/chamados/${ticket.id}`)}
                           data-testid={`row-ticket-${ticket.id}`}
+                          onClick={() => setLocation(`/chamados/${ticket.id}`)}
                         >
                           <TableCell>
                             <Badge variant="outline" className="font-mono text-[11px] font-bold">
