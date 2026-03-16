@@ -115,6 +115,25 @@ export const refreshTokens = pgTable("refresh_tokens", {
 - Client: interceptor no fetch — 401 → tenta refresh → falha → redireciona para login
 - `rememberMe`: quando `true`, refresh token dura 7d; quando `false`, dura 24h. Access token sempre 2h
 
+### Rotas públicas (sem JWT)
+
+As seguintes rotas devem ser isentas do middleware auth no Hono:
+- `POST /api/auth/login`
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `POST /api/auth/forgot-password`
+- `GET /api/auth/me` (retorna user se autenticado, null se não)
+- `GET /api/settings/(logo_url_light|logo_url_dark|favicon_url)`
+- `GET /api/etiquetas/barcode/:id`
+- `GET /api/health`
+
+### Dados do usuário pós-login
+
+Com cookies `httpOnly`, o client não consegue decodificar o JWT. O fluxo para obter dados do usuário:
+1. `POST /api/auth/login` → Set-Cookie headers + **response body com dados do usuário** (`{ id, name, email, tenantId, role, modulePermissions }`)
+2. Para verificações subsequentes (reload da página), o client chama `GET /api/auth/me` que retorna os mesmos dados
+3. O client armazena esses dados em estado React (context/store), não em localStorage
+
 ## 5. Uploads — Cloudflare R2
 
 ### Fluxo
@@ -156,6 +175,10 @@ bucket_name = "renov-home-attachments"
 ### Key format
 `{tenantId}/{tipo}/{uuid}-{filename}` — ex: `tenant-1/devices/a1b2c3-foto.jpg`
 
+### Substituição das rotas Replit Object Storage
+
+As rotas atuais em `server/replit_integrations/object_storage/routes.ts` (`POST /api/uploads/request-url`, `PUT /api/uploads/local-put/:filename`, `GET /objects/*`) são **substituídas** pelas novas rotas R2 acima. O client (`ObjectUploader.tsx`) deve apontar para os novos endpoints. O diretório `server/replit_integrations/` inteiro é removido.
+
 ### Migração de arquivos existentes
 Script one-time: lê do Replit Object Storage (via `@google-cloud/storage` SDK, conectando ao sidecar GCS) → copia para R2 → atualiza referências no banco. Volume pequeno (poucos arquivos, < 5MB cada). Script idempotente com retry.
 
@@ -184,7 +207,7 @@ worker/
 │   │   ├── auth.ts           # JWT validation
 │   │   ├── cors.ts           # CORS config
 │   │   └── error-handler.ts  # Error middleware
-│   ├── routes/               # ~20 módulos (ver lista abaixo)
+│   ├── routes/               # 23 módulos (ver lista abaixo)
 │   │   ├── auth.ts
 │   │   ├── tickets.ts
 │   │   ├── estoques.ts
@@ -205,7 +228,7 @@ worker/
 
 **Migrar (23 módulos):** auth, users, tickets, tasks, projects, shipments, estoques, omie, ai, integrations, settings, notifications, knowledge, okrs, metas, pricing, flowcharts, labels, slas, cep, updates, dev-tools, git-analytics
 
-**Nota sobre auth refactor:** existem ~90 ocorrências de `getSessionUser`/`req.session?.userId` em ~14 route handlers. Cada uma deve ser substituída por `c.get("user")`. Trabalho mecânico mas volumoso — tratar como work item explícito na Fase 2.
+**Nota sobre auth refactor:** existem ~90 ocorrências de `getSessionUser`/`req.session?.userId` em ~12 route files, mais ~10 em `server/auth.ts` e middleware (total ~100). Cada uma deve ser substituída por `c.get("user")`. Trabalho mecânico mas volumoso — tratar como work item explícito na Fase 2.
 
 ### Database driver
 - De: `pg` (node-postgres) com Pool persistente (criado uma vez no boot)
@@ -252,7 +275,7 @@ O client atual usa `localStorage` + `Authorization: Bearer` header (via `client/
 Nota: URLs hardcoded para `dash.renovsmart.com.br` em `client/src/pages/apis/` são endpoints de outro serviço (Renov Dash) e não são afetados pela migração.
 
 ### Deploy
-- Build: `npm run build:client` → `dist/public/`
+- Build: `npm run build:client` → `dist/public/` (script novo a criar — o atual `npm run build` faz front+back junto)
 - Conectar repo GitHub → auto-deploy `develop` (preview) e `main` (produção)
 
 ### O que NÃO muda
@@ -289,6 +312,7 @@ CORS_ORIGIN = "https://home-next.renovsmart.com.br"
 - `JWT_REFRESH_SECRET` — chave de assinatura do refresh token
 - `SMTP_USER`, `SMTP_PASS`, `SMTP_HOST`, `SMTP_PORT`
 - `OPENROUTER_API_KEY`
+- `GITHUB_TOKEN` (necessário a partir da Fase 5 para git-sync job)
 
 ### Pipeline de deploy
 
@@ -325,7 +349,7 @@ GitHub push
 - Deploy em `home-dev` — validar fluxo completo
 
 ### Fase 2 — Migração de rotas
-- Migrar as 24 rotas Express → Hono (rota por rota)
+- Migrar as 23 rotas Express → Hono (rota por rota)
 - Substituir Replit Object Storage → R2 (presigned URLs)
 - Adaptar client: API base URL, interceptor JWT
 - Remover plugins Replit do Vite
@@ -346,7 +370,7 @@ GitHub push
 ### Fase 5 — Pós-migração
 - Reativar cron jobs via Cloudflare Cron Triggers:
   - `recurrence.job` — reuniões recorrentes (a cada 15min) — **essencial**
-  - `git-sync.job` — sync de commits GitHub (a cada 6h) — nice-to-have (**requer rewrite completo**: usa `child_process`/filesystem para `git log`, incompatível com Workers; precisa migrar para GitHub API)
+  - `git-sync.job` — sync de commits GitHub (a cada 6h) — nice-to-have (já usa GitHub REST API via `fetch()`, mas precisa adaptação: importa `db` como singleton e usa `process.env.GITHUB_TOKEN` — ajustar para receber DB via contexto e secret via env binding)
   - `prompts-sync.job` — sync de prompts IA (diário às 03:00) — nice-to-have
 - Rate limiting via Cloudflare KV (login: 5/15min, forgot-password: 3/hora)
 - Monitoramento e alertas
