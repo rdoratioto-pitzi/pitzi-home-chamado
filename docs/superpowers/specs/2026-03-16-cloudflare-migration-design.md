@@ -203,9 +203,7 @@ worker/
 
 ### Rotas a migrar vs. excluir
 
-**Migrar (21 módulos):** auth, users, tickets, tasks, projects, shipments, estoques, omie, ai, integrations, settings, notifications, knowledge, okrs, metas, pricing, flowcharts, labels, slas, cep, updates
-
-**Excluir (2 módulos):** dev-tools (development-only), git-analytics (depende de cron git-sync)
+**Migrar (23 módulos):** auth, users, tickets, tasks, projects, shipments, estoques, omie, ai, integrations, settings, notifications, knowledge, okrs, metas, pricing, flowcharts, labels, slas, cep, updates, dev-tools, git-analytics
 
 **Nota sobre auth refactor:** existem ~90 ocorrências de `getSessionUser`/`req.session?.userId` em ~14 route handlers. Cada uma deve ser substituída por `c.get("user")`. Trabalho mecânico mas volumoso — tratar como work item explícito na Fase 2.
 
