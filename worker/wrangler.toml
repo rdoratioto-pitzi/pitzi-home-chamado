@@ -1,3 +1,4 @@
+account_id = "bfd46eef1d57c99e94fd8106ee6a8870"
 name = "renov-home-api"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
