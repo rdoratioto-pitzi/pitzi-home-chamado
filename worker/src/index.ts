@@ -5,6 +5,7 @@ import { createCorsMiddleware } from "./middleware/cors";
 import { authMiddleware } from "./middleware/auth";
 import { errorHandler } from "./middleware/error-handler";
 import { auth } from "./routes/auth";
+import { settings } from "./routes/settings";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -77,5 +78,6 @@ app.get("/api/health", async (c) => {
 
 // Mount routes
 app.route("/", auth);
+app.route("/", settings);
 
 export default app;
