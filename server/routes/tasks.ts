@@ -770,6 +770,15 @@ export function registerTaskRoutes(router: Router) {
     res.status(204).send();
   });
 
+  // Remove recorrência de uma instância específica sem excluir o registro
+  router.patch("/api/tasks/:id/remove-recurrence", requireAuth, async (req, res) => {
+    const task = await storage.getTask(getId(req));
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    const updated = await storage.removeTaskRecurrence(getId(req));
+    if (!updated) return res.status(404).json({ error: "Task not found" });
+    res.json(updated);
+  });
+
   // ============== TASK COMMENTS ==============
   router.get("/api/tasks/:id/subtasks", requireAuth, async (req, res) => {
     const subtasks = await storage.getSubTasks(getId(req));
