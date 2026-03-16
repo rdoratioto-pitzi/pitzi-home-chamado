@@ -4,6 +4,7 @@ import { createDb, type Database } from "./lib/db";
 import { createCorsMiddleware } from "./middleware/cors";
 import { authMiddleware } from "./middleware/auth";
 import { errorHandler } from "./middleware/error-handler";
+import { auth } from "./routes/auth";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -73,5 +74,8 @@ app.get("/api/health", async (c) => {
     return c.json({ status: "error", db: "disconnected", timestamp: new Date().toISOString() }, 500);
   }
 });
+
+// Mount routes
+app.route("/", auth);
 
 export default app;
