@@ -70,7 +70,7 @@ settings.post("/api/settings", requireAdmin, async (c) => {
     .where(tenantFilter)
     .limit(1);
 
-  return c.json(setting, 201);
+  return c.json(setting, existing ? 200 : 201);
 });
 
 export { settings };
