@@ -115,24 +115,34 @@ export const refreshTokens = pgTable("refresh_tokens", {
 - Client: interceptor no fetch — 401 → tenta refresh → falha → redireciona para login
 - `rememberMe`: quando `true`, refresh token dura 7d; quando `false`, dura 24h. Access token sempre 2h
 
-### Rotas públicas (sem JWT)
+### Rotas públicas (sem access JWT obrigatório)
 
-As seguintes rotas devem ser isentas do middleware auth no Hono:
+As seguintes rotas devem ser isentas do middleware de access JWT no Hono:
+
+**Totalmente abertas (sem auth):**
 - `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `POST /api/auth/logout`
-- `POST /api/auth/forgot-password`
-- `GET /api/auth/me` (retorna user se autenticado, null se não)
+- `POST /api/auth/forgot-password` — endpoint de forgot-password **deve hashear a senha temporária** com PBKDF2 antes de salvar (hoje salva plaintext)
 - `GET /api/settings/(logo_url_light|logo_url_dark|favicon_url)`
 - `GET /api/etiquetas/barcode/:id`
 - `GET /api/health`
 
+**Requerem refresh cookie (não access JWT):**
+- `POST /api/auth/refresh` — valida refresh token cookie, emite novo access JWT
+- `POST /api/auth/logout` — valida refresh token cookie, deleta do banco, limpa cookies
+
+**Opcionalmente autenticada:**
+- `GET /api/auth/me` — retorna user se autenticado, `null` se não
+
+**Auth por secret (não JWT):**
+- `POST /api/git-analytics/claude-code-usage` — autenticada via header `X-Claude-Usage-Secret`
+
 ### Dados do usuário pós-login
 
 Com cookies `httpOnly`, o client não consegue decodificar o JWT. O fluxo para obter dados do usuário:
-1. `POST /api/auth/login` → Set-Cookie headers + **response body com dados do usuário** (`{ id, name, email, tenantId, role, modulePermissions }`)
-2. Para verificações subsequentes (reload da página), o client chama `GET /api/auth/me` que retorna os mesmos dados
+1. `POST /api/auth/login` → Set-Cookie headers + **response body**: `{ success: true, user: { id, name, email, tenantId, role, isAdmin, modulePermissions, status } }` (sem `token` — cookies são automáticos)
+2. Para verificações subsequentes (reload da página), o client chama `GET /api/auth/me` que retorna os mesmos dados do `user`
 3. O client armazena esses dados em estado React (context/store), não em localStorage
+4. `client/src/lib/permissions.ts` (`getCurrentUser()`) deve ser atualizado para ler do React context em vez de localStorage
 
 ## 5. Uploads — Cloudflare R2
 
@@ -234,7 +244,11 @@ worker/
 - De: `pg` (node-postgres) com Pool persistente (criado uma vez no boot)
 - Para: `@neondatabase/serverless` — driver HTTP otimizado para serverless
 - Drizzle ORM continua funcionando, só troca o driver: `drizzle(neon(env.DATABASE_URL))`
-- **Mudança arquitetural:** DB client criado por request a partir do `env` do Worker (não mais singleton). O `storage.ts` (3.379 linhas) precisa receber o Drizzle instance como parâmetro ou via contexto Hono, em vez de importar de um módulo global. Abordagem: criar factory `getStorage(db)` que retorna o objeto storage com todas as funções.
+- **Mudança arquitetural:** DB client criado por request a partir do `env` do Worker (não mais singleton). Módulos afetados:
+  - `storage.ts` (3.379 linhas) — factory `getStorage(db)` que retorna o objeto storage
+  - `omie.service.ts` — usa `pool.query()` direto (6 ocorrências), precisa receber db instance
+  - `translate-prompts.service.ts` — cria seu próprio `new Pool()`, precisa receber db do contexto
+  - Auto-migrations em `server/index.ts` (20+ raw SQL statements no boot) — extrair para Drizzle migrations ou script separado, não rodar por request
 
 ### O que NÃO muda
 - `shared/schema.ts` — schema Drizzle intocado
@@ -246,7 +260,7 @@ worker/
 
 | Lib | Uso | Risco | Fallback |
 |---|---|---|---|
-| `nodemailer` | Email (tickets, tarefas, password reset) | Alto — depende de `net`/`tls` para SMTP | Migrar para API HTTP (Resend, Mailgun) ou Cloudflare Email Workers |
+| `nodemailer` | Email — 2 instâncias: `server/email-service.ts` (principal) e `server/ai/services/email.service.ts` (AI) | Alto — depende de `net`/`tls` para SMTP | Migrar para API HTTP (Resend, Mailgun) ou Cloudflare Email Workers |
 | `xlsx` | Export de planilhas | Médio — usa `fs`/`Buffer` | Testar com `nodejs_compat`; fallback: gerar CSV |
 | `bwip-js` | Geração de barcodes (etiquetas) | Alto — usa canvas nativo | Testar; fallback: barcode via API externa |
 | `xml2js` | Parsing XML (Correios, Omie) | Baixo — pure JS | Deve funcionar |
@@ -260,17 +274,18 @@ worker/
 | API base URL | `/api/` (mesmo domínio) | `https://homeapi.renovsmart.com.br/api/` via `VITE_API_BASE_URL` |
 | Auth | Cookie de sessão | Cookie JWT (mesmo root domain) |
 | Uploads | Presigned URL Replit | Presigned URL R2 (mesma lib Uppy) |
-| Vite plugins | `@replit/vite-plugin-*` (3 plugins — 1 ativo, 2 condicionais ao `REPL_ID`) | Removidos |
+| Vite plugins | `@replit/vite-plugin-*` — `runtimeErrorOverlay` (sempre ativo), `cartographer` e `devBanner` (condicionais ao `REPL_ID`) | Todos os 3 removidos |
 
 ### Refactor do auth no client (work item significativo)
 
 O client atual usa `localStorage` + `Authorization: Bearer` header (via `client/src/lib/auth.ts` e `client/src/lib/queryClient.ts`). A migração para cookies `httpOnly` exige:
 
-1. **Remover `client/src/lib/auth.ts`** — não há mais tokens em localStorage
-2. **Remover injeção de `Authorization: Bearer`** do `fetchWithAuth()` e `apiRequest()` em `queryClient.ts` — cookies são enviados automaticamente pelo browser
-3. **Adicionar `credentials: "include"`** em todas as requests fetch (necessário para CORS cross-subdomain)
-4. **Reescrever interceptor 401**: request falha → chama `POST /api/auth/refresh` → retry → falha → redireciona para `/login`
-5. **Atualizar `login.tsx`**: response do login não retorna mais token no body, apenas Set-Cookie headers
+1. **Remover `client/src/lib/auth.ts`** — não há mais tokens em localStorage (inclui `saveAuth`, `getAuthToken`, `getAuthUser`, `clearAuth`, `migrateFromSessionStorage`)
+2. **Atualizar `client/src/lib/permissions.ts`** — `getCurrentUser()` e `UserPermissions` não devem mais importar de `auth.ts`; ler do React context
+3. **Remover injeção de `Authorization: Bearer`** do `fetchWithAuth()` e `apiRequest()` e `getQueryFn()` em `queryClient.ts` — cookies são enviados automaticamente pelo browser
+4. **Manter `credentials: "include"`** — já existe no código atual, necessário para CORS cross-subdomain
+5. **Reescrever interceptor 401**: request falha → chama `POST /api/auth/refresh` → retry → falha → redireciona para `/login`
+6. **Atualizar `login.tsx`**: parar de chamar `saveAuth({ token, user })` — cookies vêm via Set-Cookie; salvar `user` no React context. Nota: `login.tsx` usa `fetchWithAuth` para o login, que será substituído por `fetch` direto com `credentials: "include"`
 
 Nota: URLs hardcoded para `dash.renovsmart.com.br` em `client/src/pages/apis/` são endpoints de outro serviço (Renov Dash) e não são afetados pela migração.
 
@@ -308,10 +323,13 @@ CORS_ORIGIN = "https://home-next.renovsmart.com.br"
 
 ### Secrets (via `wrangler secret put`)
 - `DATABASE_URL` — Neon connection string (diferente por ambiente)
-- `JWT_SECRET` — chave de assinatura do access token
-- `JWT_REFRESH_SECRET` — chave de assinatura do refresh token
-- `SMTP_USER`, `SMTP_PASS`, `SMTP_HOST`, `SMTP_PORT`
+- `JWT_SECRET` — chave de assinatura do access token (algoritmo: **HS256**)
+- `JWT_REFRESH_SECRET` — chave de assinatura do refresh token (algoritmo: **HS256**)
+- `SMTP_USER`, `SMTP_PASS`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM`
 - `OPENROUTER_API_KEY`
+- `CORREIOS_USUARIO`, `CORREIOS_SENHA`, `CORREIOS_CARTAO_POSTAGEM`, `CORREIOS_COD_ADMINISTRATIVO`, `CORREIOS_TOKEN`, `CORREIOS_HOMOLOGACAO` — integração Correios
+- `FIRECRAWL_API_KEY` — web scraping service
+- `CLAUDE_USAGE_SECRET` — auth para endpoint `/api/git-analytics/claude-code-usage`
 - `GITHUB_TOKEN` (necessário a partir da Fase 5 para git-sync job)
 
 ### Pipeline de deploy
@@ -369,9 +387,9 @@ GitHub push
 
 ### Fase 5 — Pós-migração
 - Reativar cron jobs via Cloudflare Cron Triggers:
-  - `recurrence.job` — reuniões recorrentes (a cada 15min) — **essencial**
+  - `recurrence.job` — reuniões recorrentes (a cada hora, minuto :15 — cron `15 * * * *`) — **essencial**. Também faz warm do cache Omie (`getCachedProdutos()`), que deve ser preservado
   - `git-sync.job` — sync de commits GitHub (a cada 6h) — nice-to-have (já usa GitHub REST API via `fetch()`, mas precisa adaptação: importa `db` como singleton e usa `process.env.GITHUB_TOKEN` — ajustar para receber DB via contexto e secret via env binding)
-  - `prompts-sync.job` — sync de prompts IA (diário às 03:00) — nice-to-have
+  - `prompts-sync.job` — sync de prompts IA (diário às 03:00) — nice-to-have (**requer rewrite completo**: usa `child_process.execSync` para `git clone` em `/tmp/`, incompatível com Workers; precisa migrar para GitHub Contents API)
 - Rate limiting via Cloudflare KV (login: 5/15min, forgot-password: 3/hora)
 - Monitoramento e alertas
 - Remover fallback plaintext de senhas (após confirmar que todas foram migradas)
@@ -390,3 +408,7 @@ Em qualquer fase, `home.renovsmart.com.br` continua no Replit. Zero downtime, ze
 | CORS entre Pages e Worker | Baixa | Mesmo root domain; cookies com `domain=.renovsmart.com.br` |
 | Cookie collision com Replit | Baixa | JWT cookies usam nomes distintos (`access_token`, `refresh_token`) vs. session cookie Replit (`renov.sid`). Sem conflito |
 | nodemailer em Workers | Alta | Testar com `nodejs_compat`; fallback: API HTTP (Resend/Mailgun) ou Cloudflare Email Workers |
+| CPU timeout (30s limit) | Baixa | Operações longas (Omie sync, exports grandes) podem exceder limite. Monitorar; se necessário, usar Cloudflare Queues para offload |
+| Body size limit (free plan: 1MB) | Média | Express atual permite 50MB. Validar payloads grandes (dev-tools SQL, knowledge docs). Se necessário, usar Workers Paid ($5/mês, 100MB limit) |
+| Cache warming sem boot event | Média | Omie cache (`getCachedProdutos`, `getCachedPosEstoque`) hoje roda no boot. Em Workers, usar cache on-first-request ou Cron Trigger dedicado |
+| Logging sem persistência | Baixa | Workers logs são real-time apenas (`wrangler tail`). Fase 5: integrar Cloudflare Logpush para persistência |
