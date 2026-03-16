@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "WebSearch",
+      "WebFetch(domain:developers.cloudflare.com)"
+    ]
+  }
+}
