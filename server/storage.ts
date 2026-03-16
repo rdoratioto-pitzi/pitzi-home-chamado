@@ -243,6 +243,7 @@ import {
   createTask(task: InsertTask): Promise<Task>;
   updateTask(id: string, data: Partial<Task>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<boolean>;
+  removeTaskRecurrence(id: string): Promise<Task | undefined>;
 
   // Task Comments
   getTaskComments(taskId: string): Promise<TaskCommentWithUser[]>;
@@ -1192,6 +1193,26 @@ export class DatabaseStorage implements IStorage {
       // Parent deleted — all future children already deleted above
     }
     return deleted;
+  }
+
+  /**
+   * Remove apenas o vínculo de recorrência de uma instância específica,
+   * sem excluir o registro da reunião. A instância se torna uma reunião avulsa.
+   */
+  async removeTaskRecurrence(id: string): Promise<Task | undefined> {
+    if (!db) return undefined;
+    const [updated] = await db
+      .update(tasks)
+      .set({
+        parentTaskId: null,
+        isRecurring: false,
+        recurrenceType: null,
+        recurrenceWeekdays: null,
+        recurrenceEndDate: null,
+      })
+      .where(eq(tasks.id, id))
+      .returning();
+    return updated;
   }
 
   // Task Comments
