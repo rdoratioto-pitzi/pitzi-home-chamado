@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { fetchWithAuth } from "@/lib/queryClient";
 import { RenovLogo } from "@/components/renov-logo";
 import { Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
 import { PasswordRequirements } from "@/components/auth/password-requirements";
@@ -120,7 +120,10 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      const response = await apiRequest("POST", "/api/auth/login", data);
+      const response = await fetchWithAuth("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify(data)
+      });
       const result = await response.json();
       
       if (result.success) {
@@ -149,7 +152,7 @@ export default function LoginPage() {
     } catch (error: any) {
       toast({
         title: "Erro no login",
-        description: "Email ou senha incorretos",
+        description: error.message || "Email ou senha incorretos",
         variant: "destructive"
       });
     } finally {
@@ -162,7 +165,10 @@ export default function LoginPage() {
     
     setForgotPasswordLoading(true);
     try {
-      const response = await apiRequest("POST", "/api/auth/forgot-password", data);
+      const response = await fetchWithAuth("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify(data)
+      });
       const result = await response.json();
 
       if (result.success) {
@@ -178,7 +184,7 @@ export default function LoginPage() {
     } catch (error: any) {
       toast({
         title: "Erro",
-        description: "Erro ao processar a solicitação. Tente novamente.",
+        description: error.message || "Erro ao processar a solicitação. Tente novamente.",
         variant: "destructive",
       });
     } finally {
