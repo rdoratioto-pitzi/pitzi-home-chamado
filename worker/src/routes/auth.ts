@@ -37,13 +37,13 @@ auth.post("/api/auth/login", async (c) => {
     return c.json({ success: false, message: "Credenciais invalidas" }, 401);
   }
 
-  const { valid, needsRehash } = await verifyPassword(body.password, user.password);
-  if (!valid) {
+  if (user.status !== "active") {
     return c.json({ success: false, message: "Credenciais invalidas" }, 401);
   }
 
-  if (user.status !== "active") {
-    return c.json({ success: false, message: "Sua conta esta inativa. Entre em contato com o administrador." }, 401);
+  const { valid, needsRehash } = await verifyPassword(body.password, user.password);
+  if (!valid) {
+    return c.json({ success: false, message: "Credenciais invalidas" }, 401);
   }
 
   // Lazy migration: rehash plaintext password
@@ -228,8 +228,6 @@ auth.post("/api/auth/forgot-password", async (c) => {
   await db.update(users).set({ password: hashedTemp }).where(eq(users.id, user.id));
 
   // TODO Phase 2: send email with temporaryPassword via email service
-  // For now, log it (remove in production)
-  console.log(`[forgot-password] Temp password for ${user.email}: ${temporaryPassword}`);
 
   return c.json({ success: true, message: successMsg });
 });
