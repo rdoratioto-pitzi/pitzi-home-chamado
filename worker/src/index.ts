@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { sql } from "drizzle-orm";
+import { createDb, type Database } from "./lib/db";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -32,6 +34,7 @@ export type AuthUser = {
 
 type Variables = {
   user: AuthUser;
+  db: Database;
 };
 
 export type AppEnv = {
@@ -41,8 +44,20 @@ export type AppEnv = {
 
 const app = new Hono<AppEnv>();
 
-app.get("/api/health", (c) => {
-  return c.json({ status: "ok", timestamp: new Date().toISOString() });
+app.use("*", async (c, next) => {
+  const db = createDb(c.env.DATABASE_URL);
+  c.set("db", db);
+  await next();
+});
+
+app.get("/api/health", async (c) => {
+  try {
+    const db = c.get("db");
+    await db.execute(sql`SELECT 1`);
+    return c.json({ status: "ok", db: "connected", timestamp: new Date().toISOString() });
+  } catch (error) {
+    return c.json({ status: "error", db: "disconnected", timestamp: new Date().toISOString() }, 500);
+  }
 });
 
 export default app;
