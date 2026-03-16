@@ -143,7 +143,7 @@ function findNextWeekday(fromDate: Date, weekdays: number[]): Date {
  */
 async function createRecurrenceInstance(parentTask: any, nextDate: Date): Promise<any> {
   // Extrai meetingData do pai
-  let meetingData = {};
+  let meetingData: any = {};
   try {
     if (typeof parentTask.meetingData === "string") {
       meetingData = JSON.parse(parentTask.meetingData);
@@ -153,15 +153,32 @@ async function createRecurrenceInstance(parentTask: any, nextDate: Date): Promis
   } catch (e) {
     console.error("[RecurrenceJob] Erro ao fazer parse do meetingData:", e);
   }
-  
-  // Preserva data e horário da reunião original
-  const originalMeetingData = meetingData as any;
-  const originalDate = originalMeetingData?.date || "";
-  const originalTime = originalMeetingData?.time || "09:00";
-  
+
+  const originalTime = meetingData?.time || "09:00";
+
   // Formata a próxima data no formato YYYY-MM-DD
   const nextDateStr = format(nextDate, "yyyy-MM-dd");
-  
+
+  // Bug 3: se a reunião pai foi criada a partir de um template, usa o template
+  // para popular a pauta da nova instância (em vez de copiar o conteúdo editado do pai)
+  let agendaForInstance = meetingData?.agenda || "";
+  const templateId = meetingData?.templateId;
+  if (templateId) {
+    try {
+      const template = await storage.getTaskTemplate(templateId);
+      if (template?.structure) {
+        const templateStructure = typeof template.structure === "string"
+          ? JSON.parse(template.structure)
+          : template.structure;
+        if (templateStructure?.agenda !== undefined) {
+          agendaForInstance = templateStructure.agenda;
+        }
+      }
+    } catch (e) {
+      console.error("[RecurrenceJob] Erro ao buscar template para instância:", e);
+    }
+  }
+
   // Cria a nova instância
   const newTask = {
     title: parentTask.title,
@@ -175,14 +192,18 @@ async function createRecurrenceInstance(parentTask: any, nextDate: Date): Promis
     dueDate: nextDate, // Usa a data de recorrência
     createdBy: parentTask.createdBy,
     meetingData: JSON.stringify({
-      ...originalMeetingData,
+      // Preserva metadados do template e configurações
+      templateId: meetingData?.templateId,
+      location: meetingData?.location || "",
+      recurrenceCreateLeadDays: meetingData?.recurrenceCreateLeadDays,
       date: nextDateStr,
       time: originalTime,
       // Mantém os mesmos participantes
-      participants: originalMeetingData?.participants || [],
-      externalParticipants: originalMeetingData?.externalParticipants || [],
-      agenda: originalMeetingData?.agenda || "",
-      actions: originalMeetingData?.actions || [],
+      participants: meetingData?.participants || [],
+      externalParticipants: meetingData?.externalParticipants || [],
+      // Pauta: do template (se houver) ou vazia — não copia o conteúdo da reunião anterior
+      agenda: agendaForInstance,
+      actions: [],
     }),
     order: parentTask.order || 0,
     // Configurações de recorrência
@@ -375,10 +396,19 @@ export async function processRecurringMeetings(): Promise<void> {
           // A instância deve ser criada quando now >= (meetingDate - leadDays)
           const creationWindowStart = addDays(nextInstanceDateTime, -leadDays);
 
-          // Cria se: janela de criação já chegou E a reunião ainda não passou
-          if (isAfter(now, creationWindowStart) && isAfter(nextInstanceDateTime, now)) {
+          // Bug 1: verifica se já existe uma instância filha para esta data (evita duplicação)
+          const nextDateDayStr = format(nextDateToCreate, "yyyy-MM-dd");
+          const alreadyExists = childInstances.some((inst) => {
+            if (!inst.dueDate) return false;
+            return format(new Date(inst.dueDate), "yyyy-MM-dd") === nextDateDayStr;
+          });
+
+          // Cria se: janela de criação já chegou E a reunião ainda não passou E não existe ainda
+          if (isAfter(now, creationWindowStart) && isAfter(nextInstanceDateTime, now) && !alreadyExists) {
             await createRecurrenceInstance(task, nextDateToCreate);
             createdCount++;
+          } else if (alreadyExists) {
+            console.log(`[RecurrenceJob] Instância para ${nextDateDayStr} já existe, pulando.`);
           } else if (isBefore(nextInstanceDateTime, now)) {
             console.log(`[RecurrenceJob] Instância ${task.id} para ${format(nextInstanceDateTime, "yyyy-MM-dd HH:mm")} já passou e não foi criada. Avançando lastDate.`);
           }

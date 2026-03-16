@@ -575,6 +575,21 @@ export default function ReunioesPage() {
     },
   });
 
+  const removeRecurrenceMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("PATCH", `/api/tasks/${id}/remove-recurrence`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/tasks", selectedAreaId] });
+      setRemovingRecurrenceMeeting(null);
+      toast({ title: "Recorrência removida. A reunião foi mantida como avulsa." });
+    },
+    onError: () => {
+      toast({ title: "Erro ao remover recorrência", variant: "destructive" });
+    },
+  });
+
   // Template mutations
   const createTemplateMutation = useMutation({
     mutationFn: async (data: { name: string; structure: string }) => {
@@ -666,6 +681,9 @@ export default function ReunioesPage() {
   // Delete meeting dialog state
   const [deletingMeeting, setDeletingMeeting] = useState<Task | null>(null);
   const [deleteScope, setDeleteScope] = useState<string>("single");
+
+  // Remove recurrence dialog state
+  const [removingRecurrenceMeeting, setRemovingRecurrenceMeeting] = useState<Task | null>(null);
 
   const applyTemplate = (template: { id: string; name: string; structure: string }) => {
     try {
@@ -1370,6 +1388,19 @@ export default function ReunioesPage() {
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
+                          {(meeting.isRecurring || meeting.parentTaskId) && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                setRemovingRecurrenceMeeting(meeting);
+                              }}>
+                                <Repeat className="h-4 w-4 mr-2" />
+                                Remover recorrência
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem className="text-destructive" onClick={(e) => {
                             e.stopPropagation();
                             setDeletingMeeting(meeting);
@@ -1385,7 +1416,7 @@ export default function ReunioesPage() {
                 }
 
                 return (
-                  <Card 
+                  <Card
                     key={meeting.id}
                     className="p-4 hover-elevate cursor-pointer"
                     onClick={() => navigate(`/reunioes/${meeting.id}`)}
@@ -1528,6 +1559,19 @@ export default function ReunioesPage() {
                             <Edit className="h-4 w-4 mr-2" />
                             Editar
                           </DropdownMenuItem>
+                          {(meeting.isRecurring || meeting.parentTaskId) && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                setRemovingRecurrenceMeeting(meeting);
+                              }}>
+                                <Repeat className="h-4 w-4 mr-2" />
+                                Remover recorrência
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={(e) => {
@@ -2380,6 +2424,26 @@ export default function ReunioesPage() {
               onClick={() => deletingMeeting && deleteMeetingMutation.mutate({ id: deletingMeeting.id, scope: deleteScope })}
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Remove Recurrence Dialog */}
+      <AlertDialog open={!!removingRecurrenceMeeting} onOpenChange={(open) => !open && setRemovingRecurrenceMeeting(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover recorrência</AlertDialogTitle>
+            <AlertDialogDescription>
+              A recorrência da reunião "{removingRecurrenceMeeting?.title}" será removida. O registro da reunião será mantido como uma reunião avulsa, sem vínculo com a série. Esta ação não afeta as outras instâncias da série.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => removingRecurrenceMeeting && removeRecurrenceMutation.mutate(removingRecurrenceMeeting.id)}
+            >
+              Remover recorrência
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
