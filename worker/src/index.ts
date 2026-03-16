@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import { sql } from "drizzle-orm";
 import { createDb, type Database } from "./lib/db";
+import { createCorsMiddleware } from "./middleware/cors";
+import { authMiddleware } from "./middleware/auth";
+import { errorHandler } from "./middleware/error-handler";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -44,18 +47,29 @@ export type AppEnv = {
 
 const app = new Hono<AppEnv>();
 
+// Error handler
+app.onError(errorHandler);
+
+// CORS
+app.use("*", createCorsMiddleware());
+
+// Per-request DB
 app.use("*", async (c, next) => {
   const db = createDb(c.env.DATABASE_URL);
   c.set("db", db);
   await next();
 });
 
+// Auth
+app.use("/api/*", authMiddleware);
+
+// Health check
 app.get("/api/health", async (c) => {
   try {
     const db = c.get("db");
     await db.execute(sql`SELECT 1`);
     return c.json({ status: "ok", db: "connected", timestamp: new Date().toISOString() });
-  } catch (error) {
+  } catch {
     return c.json({ status: "error", db: "disconnected", timestamp: new Date().toISOString() }, 500);
   }
 });
