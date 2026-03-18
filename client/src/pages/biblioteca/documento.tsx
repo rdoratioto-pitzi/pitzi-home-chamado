@@ -32,7 +32,7 @@ import {
   Download
 } from "lucide-react";
 import type { KnowledgeDocument, KnowledgeDocumentVersion, KnowledgeAuditLog, User as UserType } from "@shared/schema";
-import { getCurrentUser, isAdmin } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -71,8 +71,8 @@ export default function DocumentoPage() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const user = getCurrentUser();
-  const userIsAdmin = isAdmin();
+  const { user } = useAuth();
+  const userIsAdmin = user?.isAdmin === true;
   const { data: areas = [] } = useMetaAreas();
 
   const [showRejectDialog, setShowRejectDialog] = useState(false);

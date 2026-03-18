@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { CiclosCards } from "./components/ciclos-cards";
 import { MetricasTabela } from "./components/metricas-tabela";
 import { TendenciaChart } from "./components/tendencia-chart";
@@ -53,7 +53,7 @@ async function fetchTendencia(): Promise<TendenciaData[]> {
 }
 
 export default function LeadTimePage() {
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const isAdmin = user?.isAdmin === true;
 
   const [periodo, setPeriodo] = useState("30d");
