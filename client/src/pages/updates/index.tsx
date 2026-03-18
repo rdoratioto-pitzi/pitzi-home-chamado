@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 
 interface Update {
     id: string;
@@ -52,17 +53,10 @@ const categoryConfig = {
     },
 };
 
-function getCurrentUser() {
-    try {
-        const userStr = sessionStorage.getItem("user");
-        return userStr ? JSON.parse(userStr) : null;
-    } catch { return null; }
-}
-
 export default function UpdatesPage() {
     const { toast } = useToast();
-    const currentUser = getCurrentUser();
-    const isAdmin = currentUser?.isAdmin === true || currentUser?.isAdmin === "true" || currentUser?.perfilAcesso === "diretor";
+    const { user: currentUser } = useAuth();
+    const isAdmin = currentUser?.isAdmin || currentUser?.perfilAcesso === "diretor";
 
     const [open, setOpen] = useState(false);
     const [editingUpdate, setEditingUpdate] = useState<Update | null>(null);
