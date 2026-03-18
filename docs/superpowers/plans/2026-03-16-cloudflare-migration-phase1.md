@@ -65,9 +65,6 @@
     "rootDir": "src",
     "lib": ["ESNext"],
     "types": ["@cloudflare/workers-types"],
-    "paths": {
-      "@shared/*": ["../shared/*"]
-    },
     "jsx": "react-jsx",
     "jsxImportSource": "hono/jsx"
   },
@@ -192,7 +189,7 @@ git commit -m "feat(worker): scaffold Hono worker project with health check"
 ```typescript
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import * as schema from "../../shared/schema";
+import * as schema from "../../../shared/schema";
 
 export function createDb(databaseUrl: string) {
   const sql = neon(databaseUrl);
@@ -899,7 +896,7 @@ git commit -m "feat(worker): wire CORS, auth, DB, and error handler middleware"
 import { Hono } from "hono";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { users, refreshTokens } from "../../shared/schema";
+import { users, refreshTokens } from "../../../shared/schema";
 import { hashPassword, verifyPassword, sha256 } from "../lib/crypto";
 import {
   signAccessToken,
@@ -1206,7 +1203,7 @@ git commit -m "feat(worker): implement JWT auth routes (login, me, refresh, logo
 import { Hono } from "hono";
 import { z } from "zod";
 import { eq, and } from "drizzle-orm";
-import { settings as settingsTable } from "../../shared/schema";
+import { settings as settingsTable } from "../../../shared/schema";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../index";
 
@@ -1293,11 +1290,9 @@ app.route("/", settings);
 
 - [ ] **Step 3: Verify settings table exists in schema**
 
-Check `shared/schema.ts` for the `settings` table definition. If it doesn't export `settings` directly, look for the actual table name and adjust the import.
+Check `shared/schema.ts` for the `settings` table definition — confirmed export is `settings` (line ~399). Table has `tenantId: varchar("tenant_id")` (nullable).
 
-Run: `grep -n "export const settings" shared/schema.ts` or `grep -n "pgTable.*settings" shared/schema.ts`
-
-Adjust the import in `worker/src/routes/settings.ts` to match the actual export name.
+**Known limitation:** `key` column has a global `unique()` constraint, meaning two tenants cannot have the same key. The multi-tenant INSERT will fail on duplicate keys across tenants. This is a pre-existing schema issue — fix in a future migration by changing to `unique(key, tenant_id)` composite constraint. For Phase 1 PoC, this is acceptable since multi-tenant writes are rare.
 
 - [ ] **Step 4: Test locally**
 
@@ -1363,8 +1358,9 @@ In Cloudflare Dashboard:
 
 Or via wrangler — add to `wrangler.toml` under `[env.dev]`:
 ```toml
-[env.dev.routes]
-pattern = "homeapi-dev.renovsmart.com.br/*"
+[[env.dev.routes]]
+pattern = "homeapi-dev.renovsmart.com.br"
+custom_domain = true
 ```
 
 - [ ] **Step 5: Test deployed health check**

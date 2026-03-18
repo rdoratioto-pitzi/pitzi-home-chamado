@@ -1,0 +1,105 @@
+import type { MiddlewareHandler } from "hono";
+import type { AppEnv } from "../index";
+import { verifyAccessToken, getAccessTokenFromCookie } from "../lib/jwt";
+
+/** Routes that require NO authentication at all */
+const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
+  { method: "POST", path: "/api/auth/login" },
+  { method: "POST", path: "/api/auth/forgot-password" },
+  { method: "POST", path: "/api/auth/refresh" },
+  { method: "POST", path: "/api/auth/logout" },
+  { method: "GET", path: "/api/health" },
+  { method: "GET", path: /^\/api\/settings\/(logo_url_light|logo_url_dark|favicon_url)$/ },
+  { method: "GET", path: /^\/api\/etiquetas\/barcode\// },
+];
+
+/** Routes with optional auth (return null user if not authenticated) */
+const OPTIONAL_AUTH_ROUTES = [
+  { method: "GET", path: "/api/auth/me" },
+];
+
+/** Routes authenticated by secret header instead of JWT */
+const SECRET_AUTH_ROUTES = [
+  { method: "POST", path: "/api/git-analytics/claude-code-usage" },
+];
+
+function matchesRoute(
+  method: string,
+  path: string,
+  routes: Array<{ method: string; path: string | RegExp }>,
+): boolean {
+  return routes.some((r) => {
+    if (r.method !== method) return false;
+    if (typeof r.path === "string") return path === r.path;
+    return r.path.test(path);
+  });
+}
+
+export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const method = c.req.method;
+  const path = c.req.path;
+
+  // Skip non-API routes
+  if (!path.startsWith("/api/")) {
+    return next();
+  }
+
+  // Public routes — no auth needed
+  if (matchesRoute(method, path, PUBLIC_ROUTES)) {
+    return next();
+  }
+
+  // Secret-authenticated routes
+  if (matchesRoute(method, path, SECRET_AUTH_ROUTES)) {
+    const secret = c.req.header("X-Claude-Usage-Secret");
+    if (secret !== c.env.CLAUDE_USAGE_SECRET) {
+      return c.json({ error: "Nao autorizado" }, 401);
+    }
+    return next();
+  }
+
+  // Try to extract and verify access token
+  const token = getAccessTokenFromCookie(c);
+
+  // Optional auth routes — proceed even without token
+  if (matchesRoute(method, path, OPTIONAL_AUTH_ROUTES)) {
+    if (token) {
+      const payload = await verifyAccessToken(token, c.env.JWT_SECRET);
+      if (payload) {
+        c.set("user", {
+          userId: payload.userId,
+          tenantId: payload.tenantId,
+          role: payload.role,
+        });
+      }
+    }
+    return next();
+  }
+
+  // All other routes — require valid access token
+  if (!token) {
+    return c.json({ error: "Nao autenticado" }, 401);
+  }
+
+  const payload = await verifyAccessToken(token, c.env.JWT_SECRET);
+  if (!payload) {
+    return c.json({ error: "Token expirado ou invalido" }, 401);
+  }
+
+  c.set("user", {
+    userId: payload.userId,
+    tenantId: payload.tenantId,
+    role: payload.role,
+  });
+
+  return next();
+};
+
+/** Middleware to require admin role */
+export const requireAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const user = c.get("user");
+  if (!user || user.role !== "admin") {
+    return c.json({ error: "Acesso negado" }, 403);
+  }
+  return next();
+};
