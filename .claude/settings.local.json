@@ -31,7 +31,9 @@
       "Bash(TSBIN=\"C:/Users/marce/OneDrive/Codefi SLU/Clientes/Renov/src/Renov.Home/worker/node_modules/typescript/bin/tsc\" && TSCONFIG=\"C:/Users/marce/OneDrive/Codefi SLU/Clientes/Renov/src/Renov.Home/worker/tsconfig.json\" && \"/c/nvm4w/nodejs/node.exe\" \"$TSBIN\" --noEmit --project \"$TSCONFIG\" 2>&1; echo \"Exit: $?\")",
       "mcp__plugin_neon_neon__list_projects",
       "Bash(curl:*)",
-      "WebFetch(domain:homeapi-dev.renovsmart.com.br)"
+      "WebFetch(domain:homeapi-dev.renovsmart.com.br)",
+      "Bash(wc:*)",
+      "Bash(grep:*)"
     ]
   }
 }
