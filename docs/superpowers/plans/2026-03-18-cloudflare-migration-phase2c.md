@@ -954,6 +954,131 @@ import {
 
 const tickets = new Hono<AppEnv>();
 
+// IMPORTANT: Static paths MUST be registered BEFORE parameterized paths
+// to avoid Hono matching "csat" as an :id parameter.
+
+// GET /api/tickets/csat/analytics (admin only, checked in-route)
+// Registered before /api/tickets/:id to avoid route shadowing
+tickets.get("/api/tickets/csat/analytics", async (c) => {
+  const user = c.get("user");
+  if (user.role !== "admin") {
+    return c.json({ error: "Apenas administradores podem acessar analytics" }, 403);
+  }
+
+  const storage = getStorage(c.get("db"));
+  const allTickets = await storage.getTickets();
+  const users = await storage.getUsers();
+
+  const ticketsWithCSAT = allTickets.filter(
+    (t) => t.satisfactionRating !== null && t.satisfactionRating !== undefined
+  );
+
+  const totalTickets = allTickets.filter(
+    (t) => t.status === "resolved" || t.status === "closed"
+  ).length;
+  const totalEvaluations = ticketsWithCSAT.length;
+  const evaluationRate =
+    totalTickets > 0 ? (totalEvaluations / totalTickets) * 100 : 0;
+  const averageRating =
+    ticketsWithCSAT.length > 0
+      ? ticketsWithCSAT.reduce((sum, t) => sum + (t.satisfactionRating || 0), 0) /
+        ticketsWithCSAT.length
+      : 0;
+
+  const ratingDistribution = [1, 2, 3, 4, 5].map((rating) => ({
+    rating,
+    count: ticketsWithCSAT.filter((t) => t.satisfactionRating === rating).length,
+    percentage:
+      ticketsWithCSAT.length > 0
+        ? (ticketsWithCSAT.filter((t) => t.satisfactionRating === rating).length /
+            ticketsWithCSAT.length) *
+          100
+        : 0,
+  }));
+
+  const responsibleStats = users
+    .map((u) => {
+      const uTickets = ticketsWithCSAT.filter((t) => t.assigneeId === u.id);
+      const avg =
+        uTickets.length > 0
+          ? uTickets.reduce((s, t) => s + (t.satisfactionRating || 0), 0) /
+            uTickets.length
+          : 0;
+      return {
+        userId: u.id,
+        userName: u.name,
+        totalEvaluations: uTickets.length,
+        averageRating: Math.round(avg * 10) / 10,
+        ratings: [1, 2, 3, 4, 5].map(
+          (r) => uTickets.filter((t) => t.satisfactionRating === r).length
+        ),
+      };
+    })
+    .filter((s) => s.totalEvaluations > 0)
+    .sort((a, b) => b.averageRating - a.averageRating);
+
+  const negativeComments = ticketsWithCSAT
+    .filter((t) => (t.satisfactionRating || 0) <= 2 && t.satisfactionComment)
+    .map((t) => ({
+      ticketId: t.id,
+      ticketCode: t.code,
+      ticketTitle: t.title,
+      rating: t.satisfactionRating,
+      comment: t.satisfactionComment,
+      createdAt: t.satisfactionCreatedAt,
+      assigneeId: t.assigneeId,
+    }))
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    )
+    .slice(0, 10);
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const recentEvaluations = ticketsWithCSAT
+    .filter(
+      (t) =>
+        t.satisfactionCreatedAt &&
+        new Date(t.satisfactionCreatedAt) >= thirtyDaysAgo
+    )
+    .sort(
+      (a, b) =>
+        new Date(a.satisfactionCreatedAt || 0).getTime() -
+        new Date(b.satisfactionCreatedAt || 0).getTime()
+    );
+
+  const trendByDay: Record<string, { sum: number; count: number }> = {};
+  recentEvaluations.forEach((t) => {
+    const day = t.satisfactionCreatedAt
+      ? new Date(t.satisfactionCreatedAt).toISOString().split("T")[0]
+      : "unknown";
+    if (!trendByDay[day]) trendByDay[day] = { sum: 0, count: 0 };
+    trendByDay[day].sum += t.satisfactionRating || 0;
+    trendByDay[day].count++;
+  });
+  const trend = Object.entries(trendByDay)
+    .map(([date, data]) => ({
+      date,
+      rating: Math.round((data.sum / data.count) * 10) / 10,
+      count: data.count,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return c.json({
+    overview: {
+      totalTickets,
+      totalEvaluations,
+      evaluationRate: Math.round(evaluationRate * 100) / 100,
+      averageRating: Math.round(averageRating * 100) / 100,
+    },
+    ratingDistribution,
+    topResponsibles: responsibleStats.slice(0, 5),
+    negativeComments,
+    trend,
+  });
+});
+
 // GET /api/tickets
 tickets.get("/api/tickets", async (c) => {
   const user = c.get("user");
@@ -1349,128 +1474,7 @@ tickets.get("/api/ticket-responsaveis/find/:categoria/:tipo", async (c) => {
   return c.json({ responsavelId });
 });
 
-// ============== CSAT ==============
-
-// GET /api/tickets/csat/analytics (admin only, checked in-route)
-tickets.get("/api/tickets/csat/analytics", async (c) => {
-  const user = c.get("user");
-  if (user.role !== "admin") {
-    return c.json({ error: "Apenas administradores podem acessar analytics" }, 403);
-  }
-
-  const storage = getStorage(c.get("db"));
-  const allTickets = await storage.getTickets();
-  const users = await storage.getUsers();
-
-  const ticketsWithCSAT = allTickets.filter(
-    (t) => t.satisfactionRating !== null && t.satisfactionRating !== undefined
-  );
-
-  const totalTickets = allTickets.filter(
-    (t) => t.status === "resolved" || t.status === "closed"
-  ).length;
-  const totalEvaluations = ticketsWithCSAT.length;
-  const evaluationRate =
-    totalTickets > 0 ? (totalEvaluations / totalTickets) * 100 : 0;
-  const averageRating =
-    ticketsWithCSAT.length > 0
-      ? ticketsWithCSAT.reduce((sum, t) => sum + (t.satisfactionRating || 0), 0) /
-        ticketsWithCSAT.length
-      : 0;
-
-  const ratingDistribution = [1, 2, 3, 4, 5].map((rating) => ({
-    rating,
-    count: ticketsWithCSAT.filter((t) => t.satisfactionRating === rating).length,
-    percentage:
-      ticketsWithCSAT.length > 0
-        ? (ticketsWithCSAT.filter((t) => t.satisfactionRating === rating).length /
-            ticketsWithCSAT.length) *
-          100
-        : 0,
-  }));
-
-  const responsibleStats = users
-    .map((u) => {
-      const uTickets = ticketsWithCSAT.filter((t) => t.assigneeId === u.id);
-      const avg =
-        uTickets.length > 0
-          ? uTickets.reduce((s, t) => s + (t.satisfactionRating || 0), 0) /
-            uTickets.length
-          : 0;
-      return {
-        userId: u.id,
-        userName: u.name,
-        totalEvaluations: uTickets.length,
-        averageRating: Math.round(avg * 10) / 10,
-        ratings: [1, 2, 3, 4, 5].map(
-          (r) => uTickets.filter((t) => t.satisfactionRating === r).length
-        ),
-      };
-    })
-    .filter((s) => s.totalEvaluations > 0)
-    .sort((a, b) => b.averageRating - a.averageRating);
-
-  const negativeComments = ticketsWithCSAT
-    .filter((t) => (t.satisfactionRating || 0) <= 2 && t.satisfactionComment)
-    .map((t) => ({
-      ticketId: t.id,
-      ticketCode: t.code,
-      ticketTitle: t.title,
-      rating: t.satisfactionRating,
-      comment: t.satisfactionComment,
-      createdAt: t.satisfactionCreatedAt,
-      assigneeId: t.assigneeId,
-    }))
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-    )
-    .slice(0, 10);
-
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const recentEvaluations = ticketsWithCSAT
-    .filter(
-      (t) =>
-        t.satisfactionCreatedAt &&
-        new Date(t.satisfactionCreatedAt) >= thirtyDaysAgo
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.satisfactionCreatedAt || 0).getTime() -
-        new Date(b.satisfactionCreatedAt || 0).getTime()
-    );
-
-  const trendByDay: Record<string, { sum: number; count: number }> = {};
-  recentEvaluations.forEach((t) => {
-    const day = t.satisfactionCreatedAt
-      ? new Date(t.satisfactionCreatedAt).toISOString().split("T")[0]
-      : "unknown";
-    if (!trendByDay[day]) trendByDay[day] = { sum: 0, count: 0 };
-    trendByDay[day].sum += t.satisfactionRating || 0;
-    trendByDay[day].count++;
-  });
-  const trend = Object.entries(trendByDay)
-    .map(([date, data]) => ({
-      date,
-      rating: Math.round((data.sum / data.count) * 10) / 10,
-      count: data.count,
-    }))
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  return c.json({
-    overview: {
-      totalTickets,
-      totalEvaluations,
-      evaluationRate: Math.round(evaluationRate * 100) / 100,
-      averageRating: Math.round(averageRating * 100) / 100,
-    },
-    ratingDistribution,
-    topResponsibles: responsibleStats.slice(0, 5),
-    negativeComments,
-    trend,
-  });
-});
+// ============== CSAT — Satisfaction Rating ==============
 
 // PATCH /api/tickets/:id/satisfaction
 tickets.patch("/api/tickets/:id/satisfaction", async (c) => {
@@ -2414,9 +2418,11 @@ gitAnalytics.post("/api/git-analytics/github-webhook", async (c) => {
       const storage = getStorage(c.get("db"));
       const repo = await storage.getGitRepositoryByFullName(fullName);
       if (repo && repo.syncEnabled) {
-        // Fire-and-forget sync
-        syncRepository(deps, repo.id).catch((err) =>
-          console.error(`[Webhook] Sync failed for ${fullName}:`, err)
+        // Use waitUntil to keep worker alive during sync
+        c.executionCtx.waitUntil(
+          syncRepository(deps, repo.id).catch((err) =>
+            console.error(`[Webhook] Sync failed for ${fullName}:`, err)
+          )
         );
       }
     }
