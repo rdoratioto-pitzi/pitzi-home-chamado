@@ -24,11 +24,13 @@ Skill que garante aderencia rigorosa ao Git Workflow do Renov.Home em todas as e
 Ao iniciar qualquer sessao de desenvolvimento, executar IMEDIATAMENTE:
 
 ### 1. Verificar branch atual
+
 ```bash
 git branch --show-current
 ```
 
 ### 2. Validar estado
+
 - Se estiver em `main`: **ALERTA** — nunca trabalhar em main. Trocar para develop.
 - Se estiver em `develop`: OK para criar nova branch a partir daqui.
 - Se estiver em branch de feature/fix: Verificar se foi criada a partir de develop:
@@ -38,11 +40,13 @@ git branch --show-current
   ```
 
 ### 3. Garantir develop atualizado
+
 ```bash
 git fetch origin develop
 ```
 
 ### 4. Reportar estado ao usuario
+
 ```
 Estado Git:
 - Branch atual: [nome]
@@ -57,16 +61,17 @@ Estado Git:
 
 Formato UNICO aceito: `tipo/descricao-curta`
 
-| Tipo | Quando usar | Exemplo |
-|------|------------|---------|
-| `feat/` | Nova funcionalidade | `feat/csv-export` |
-| `fix/` | Correcao de bug | `fix/auth-token` |
+| Tipo        | Quando usar                       | Exemplo                    |
+| ----------- | --------------------------------- | -------------------------- |
+| `feat/`     | Nova funcionalidade               | `feat/csv-export`          |
+| `fix/`      | Correcao de bug                   | `fix/auth-token`           |
 | `refactor/` | Refatoracao sem mudanca funcional | `refactor/storage-cleanup` |
-| `docs/` | Apenas documentacao | `docs/api-reference` |
-| `test/` | Testes | `test/estoque-e2e` |
-| `chore/` | Manutencao, deps, configs | `chore/upgrade-deps` |
+| `docs/`     | Apenas documentacao               | `docs/api-reference`       |
+| `test/`     | Testes                            | `test/estoque-e2e`         |
+| `chore/`    | Manutencao, deps, configs         | `chore/upgrade-deps`       |
 
 Se houver ticket Linear/GitHub, incluir o numero:
+
 - `feat/REN-123-curva-abc`
 - `fix/REN-456-filtro-duplicado`
 
@@ -103,20 +108,21 @@ tipo(escopo): descricao em portugues
 
 ### Tipos de commit
 
-| Tipo | Descricao |
-|------|-----------|
-| `feat` | Nova funcionalidade |
-| `fix` | Correcao de bug |
-| `refactor` | Refatoracao |
-| `docs` | Documentacao |
-| `test` | Testes |
-| `chore` | Manutencao |
-| `style` | Formatacao (sem mudanca de logica) |
-| `perf` | Melhoria de performance |
+| Tipo       | Descricao                          |
+| ---------- | ---------------------------------- |
+| `feat`     | Nova funcionalidade                |
+| `fix`      | Correcao de bug                    |
+| `refactor` | Refatoracao                        |
+| `docs`     | Documentacao                       |
+| `test`     | Testes                             |
+| `chore`    | Manutencao                         |
+| `style`    | Formatacao (sem mudanca de logica) |
+| `perf`     | Melhoria de performance            |
 
 ### Escopo
 
 O escopo deve refletir o modulo afetado:
+
 - `estoques`, `tickets`, `pricing`, `auth`, `reunioes`, `dashboard`
 - `omie`, `fiscal`, `relatorios`, `dispositivos`, `triagem`
 - `ui`, `api`, `db`, `config`
@@ -153,6 +159,7 @@ fix(estoques): corrige problema  (qual problema?)
 ### Validacao pre-commit
 
 Antes de cada commit, verificar:
+
 1. Nenhum `console.log` esquecido nos arquivos modificados
 2. Nenhum arquivo `.env` sendo commitado
 3. TypeScript valido: `npm run check`
@@ -171,11 +178,13 @@ git diff --cached --name-only | grep -E "\.env"
 ### Titulo do PR
 
 Mesmo formato do commit principal:
+
 ```
 tipo(escopo): descricao concisa em portugues
 ```
 
 Exemplos:
+
 - `feat(estoques): implementa curva ABC por categoria`
 - `fix(tickets): corrige filtro de status duplicado`
 
@@ -183,20 +192,25 @@ Exemplos:
 
 ```markdown
 ## O que foi feito
+
 - [Bullet point descrevendo cada alteracao significativa]
 
 ## Issue relacionada
+
 Closes #XX / REN-XX
 
 ## Como testar
+
 1. Acessar http://localhost:5050
 2. [Passos de reproducao]
 3. [Resultado esperado]
 
 ## Screenshots (se aplicavel)
+
 [Antes/depois para mudancas visuais]
 
 ## Checklist
+
 - [ ] Branch criada a partir de `develop`
 - [ ] Testado localmente em http://localhost:5050
 - [ ] Sem `console.log` esquecidos
@@ -204,13 +218,13 @@ Closes #XX / REN-XX
 - [ ] Titulo segue Conventional Commits
 - [ ] UI em PT-BR
 - [ ] Multi-tenant (tenantId) respeitado
-- [ ] Reviewer: @marcelorenov adicionado
+- [ ] Reviewer: @marcelo-maciel adicionado
 ```
 
 ### Regras do PR
 
 1. **Base SEMPRE `develop`** — nunca `main`
-2. **Reviewer obrigatorio: `marcelorenov`** (CTO Marcelo)
+2. **Reviewer obrigatorio: `marcelo-maciel`** (CTO Marcelo)
 3. **Sem merge sem aprovacao** do Marcelo
 4. Titulo em PT-BR seguindo Conventional Commits
 
@@ -220,20 +234,20 @@ Closes #XX / REN-XX
 gh pr create --base develop \
   --title "tipo(escopo): descricao" \
   --body "[corpo seguindo template acima]" \
-  --reviewer marcelorenov
+  --reviewer marcelo-maciel
 ```
 
 ## Validacao Continua
 
 A cada operacao git durante a sessao, validar:
 
-| Momento | Validacao |
-|---------|-----------|
-| Inicio de sessao | Branch atual, origem, estado |
-| Antes de criar branch | Estou em develop? develop esta atualizado? |
-| Antes de commit | console.log? .env? TypeScript? Formato da msg? |
-| Antes de push | Branch tem nome valido? Commits seguem padrao? |
-| Antes de PR | Base e develop? Reviewer marcelorenov? Template preenchido? |
+| Momento               | Validacao                                                     |
+| --------------------- | ------------------------------------------------------------- |
+| Inicio de sessao      | Branch atual, origem, estado                                  |
+| Antes de criar branch | Estou em develop? develop esta atualizado?                    |
+| Antes de commit       | console.log? .env? TypeScript? Formato da msg?                |
+| Antes de push         | Branch tem nome valido? Commits seguem padrao?                |
+| Antes de PR           | Base e develop? Reviewer marcelo-maciel? Template preenchido? |
 
 ## Alertas e Bloqueios
 
@@ -248,6 +262,7 @@ Correcao: [como corrigir]
 ```
 
 Violacoes criticas (bloquear sempre):
+
 - Push em `main` ou `develop`
 - Branch criada a partir de `main`
 - PR com base em `main`
