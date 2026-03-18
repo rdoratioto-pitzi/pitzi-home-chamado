@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/hooks/use-theme";
 const SidebarProvider = lazy(() => import("@/components/ui/sidebar").then(m => ({ default: m.SidebarProvider })));
 import { useAuthSync } from "@/hooks/useAuthSync";
+import { AuthProvider } from "@/contexts/auth-context";
 
 const AppSidebar    = lazy(() => import("@/components/app-sidebar").then(m => ({ default: m.AppSidebar })));
 const ProtectedRoute = lazy(() => import("@/components/protected-route").then(m => ({ default: m.ProtectedRoute })));
@@ -412,7 +413,7 @@ function Router() {
   );
 }
 
-function App() {
+function AppContent() {
   const [location] = useLocation();
   const isLoginPage = location === "/login";
 
@@ -426,42 +427,48 @@ function App() {
 
   if (isLoginPage) {
     return (
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <TooltipProvider>
-            <div className="flex h-screen w-full overflow-hidden">
+      <ThemeProvider>
+        <TooltipProvider>
+          <div className="flex h-screen w-full overflow-hidden">
+            <main className="flex-1 overflow-auto">
+              <Suspense fallback={null}>
+                <Router />
+              </Suspense>
+            </main>
+          </div>
+          <Toaster />
+        </TooltipProvider>
+      </ThemeProvider>
+    );
+  }
+
+  return (
+    <ThemeProvider>
+      <TooltipProvider>
+        <Suspense fallback={null}>
+          <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+            <div className="flex h-screen w-full">
+              <AppSidebar />
               <main className="flex-1 overflow-auto">
                 <Suspense fallback={null}>
                   <Router />
                 </Suspense>
               </main>
             </div>
-            <Toaster />
-          </TooltipProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
-    );
-  }
+          </SidebarProvider>
+        </Suspense>
+        <Toaster />
+      </TooltipProvider>
+    </ThemeProvider>
+  );
+}
 
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <Suspense fallback={null}>
-            <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-              <div className="flex h-screen w-full">
-                <AppSidebar />
-                <main className="flex-1 overflow-auto">
-                  <Suspense fallback={null}>
-                    <Router />
-                  </Suspense>
-                </main>
-              </div>
-            </SidebarProvider>
-          </Suspense>
-          <Toaster />
-        </TooltipProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
