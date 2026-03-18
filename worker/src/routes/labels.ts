@@ -1,7 +1,7 @@
 // worker/src/routes/labels.ts
 import { Hono } from "hono";
 import { z } from "zod";
-import * as bwipjs from "bwip-js";
+import { toBuffer } from "bwip-js/node";
 import type { AppEnv } from "../index";
 
 const labels = new Hono<AppEnv>();
@@ -14,7 +14,7 @@ const labelDataSchema = z.object({
 });
 
 async function generateBarcodeBuffer(imei: string): Promise<Buffer> {
-  return bwipjs.toBuffer({
+  return toBuffer({
     bcid: "code128",
     text: imei,
     scale: 2,
@@ -73,7 +73,7 @@ labels.get("/api/etiquetas/barcode/:imei", async (c) => {
     return c.json({ error: "Código inválido. Deve ter entre 1 e 50 caracteres." }, 400);
   }
 
-  const pngBuffer = await bwipjs.toBuffer({
+  const pngBuffer = await toBuffer({
     bcid: "code128",
     text: imei,
     scale: 2,

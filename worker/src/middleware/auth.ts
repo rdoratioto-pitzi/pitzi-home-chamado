@@ -11,6 +11,13 @@ const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "GET", path: "/api/health" },
   { method: "GET", path: /^\/api\/settings\/(logo_url_light|logo_url_dark|favicon_url)$/ },
   { method: "GET", path: /^\/api\/etiquetas\/barcode\// },
+  // Phase 2B public routes
+  { method: "GET", path: "/api/slas" },
+  { method: "GET", path: /^\/api\/slas\/[^/]+$/ },
+  { method: "GET", path: "/api/updates" },
+  { method: "GET", path: /^\/api\/cep\// },
+  { method: "POST", path: "/api/etiquetas/gerar-png" },
+  { method: "POST", path: "/api/etiquetas/imprimir" },
 ];
 
 /** Routes with optional auth (return null user if not authenticated) */

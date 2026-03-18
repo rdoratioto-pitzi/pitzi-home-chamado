@@ -6,6 +6,15 @@ import { authMiddleware } from "./middleware/auth";
 import { errorHandler } from "./middleware/error-handler";
 import { auth } from "./routes/auth";
 import { settings } from "./routes/settings";
+import { notifications } from "./routes/notifications";
+import { slas } from "./routes/slas";
+import { updates } from "./routes/updates";
+import { flowcharts } from "./routes/flowcharts";
+import { cep } from "./routes/cep";
+import { users } from "./routes/users";
+import { labels } from "./routes/labels";
+import { devTools } from "./routes/dev-tools";
+import { ai } from "./routes/ai";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -34,6 +43,7 @@ type Bindings = {
   SENDPULSE_CLIENT_SECRET: string;
   SENDPULSE_FROM_EMAIL: string;
   SENDPULSE_FROM_NAME: string;
+  DEV_TOOLS_TOKEN: string;
 };
 
 export type AuthUser = {
@@ -84,5 +94,14 @@ app.get("/api/health", async (c) => {
 // Mount routes
 app.route("/", auth);
 app.route("/", settings);
+app.route("/", notifications);
+app.route("/", slas);
+app.route("/", updates);
+app.route("/", flowcharts);
+app.route("/", cep);
+app.route("/", users);
+app.route("/", labels);
+app.route("/", devTools);
+app.route("/", ai);
 
 export default app;
