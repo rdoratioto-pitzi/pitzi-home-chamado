@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import {
   MessageSquare,
   Send,
@@ -820,7 +820,7 @@ function RightSidebar({
 
 export default function ChatIA() {
   const queryClient = useQueryClient();
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const userId = user?.id || "default-user";
 
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);

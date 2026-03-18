@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -94,7 +94,7 @@ export default function ReunioesPage() {
   const [viewMode, setViewMode] = useState<"table" | "grid" | "list">("table");
   const [showTagsSidebar, setShowTagsSidebar] = useState(true);
 
-  const currentUser = getCurrentUser();
+  const { user: currentUser } = useAuth();
   const currentUserId = currentUser?.id || "";
 
   const [newArea, setNewArea] = useState({

@@ -14,6 +14,7 @@ export interface UserPermissions {
   updates: boolean;
   gitAnalytics: boolean;
   estoques: boolean;
+  diagramas: boolean;
 }
 
 export interface CurrentUser {
@@ -23,6 +24,9 @@ export interface CurrentUser {
   isAdmin?: boolean;
   modulePermissions?: string;
   status?: string;
+  tenantId?: string | null;
+  perfilAcesso?: string;
+  [key: string]: unknown;
 }
 
 /**
@@ -73,6 +77,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     updates: false,
     gitAnalytics: false,
     estoques: false,
+    diagramas: false,
   };
 
   if (!user) return defaultPerms;
@@ -94,6 +99,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       updates: true,
       gitAnalytics: true,
       estoques: true,
+      diagramas: true,
     };
   }
 

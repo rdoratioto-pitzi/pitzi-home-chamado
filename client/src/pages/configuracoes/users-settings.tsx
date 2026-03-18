@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getCurrentUser, isAdmin as checkIsAdmin } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { useMetaAreas } from "@/hooks/use-meta-areas";
 import {
   Table,
@@ -102,21 +102,11 @@ export function UsersSettings() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [currentUserIsAdmin, setCurrentUserIsAdmin] = useState(false);
+  const { user: authUser } = useAuth();
+  const currentUserIsAdmin = authUser?.isAdmin === true;
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: areas = [] } = useMetaAreas();
-
-  useEffect(() => {
-    const checkAdminStatus = () => {
-      const user = getCurrentUser();
-      setCurrentUserIsAdmin(user?.isAdmin === true);
-    };
-    checkAdminStatus();
-    // Listen for storage events (login/update)
-    window.addEventListener("storage", checkAdminStatus);
-    return () => window.removeEventListener("storage", checkAdminStatus);
-  }, []);
 
   const [sortConfig, setSortConfig] = useState<{ key: keyof User; direction: "asc" | "desc" }>({
     key: "status",
