@@ -1,21 +1,25 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { clearAuth, getAuthToken } from "./auth";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 let _handlingUnauthorized = false;
 
-function handleUnauthorized() {
-  // Na página de login, um 401 é só "senha errada" — limpa auth mas não
-  // seta a flag nem redireciona. Isso evita que a flag fique presa após
-  // uma tentativa de login frustrada, quebrando o redirecionamento futuro.
-  if (window.location.pathname === "/login") {
-    clearAuth();
-    return;
+async function tryRefreshToken(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
+}
 
+function handleUnauthorized() {
+  if (window.location.pathname === "/login") return;
   if (_handlingUnauthorized) return;
   _handlingUnauthorized = true;
-
-  clearAuth();
   window.location.href = "/login";
 }
 
@@ -30,37 +34,39 @@ async function throwIfResNotOk(res: Response) {
 }
 
 /**
- * Wrapper para fetch que inclui token de autenticação automaticamente
- * @param url - URL da requisição
- * @param options - Opções do fetch
- * @returns Response da requisição
+ * Wrapper para fetch que envia cookies automaticamente.
+ * Substitui o antigo fetchWithAuth (que injetava Bearer token).
  */
 export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
-  const token = getAuthToken();
-  
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string> || {}),
   };
-  
-  // Adiciona Content-Type apenas se houver body e não for FormData
+
   if (options.body && !(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
-  
-  // Adiciona token de autorização se disponível
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  
-  const response = await fetch(url, {
+
+  const fullUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
+
+  let response = await fetch(fullUrl, {
     ...options,
     credentials: "include",
     headers,
   });
 
-  // Trata resposta não autorizada
-  if (response.status === 401) {
-    handleUnauthorized();
+  // On 401, try refresh token once, then retry
+  if (response.status === 401 && !url.includes("/api/auth/")) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      response = await fetch(fullUrl, {
+        ...options,
+        credentials: "include",
+        headers,
+      });
+    }
+    if (response.status === 401) {
+      handleUnauthorized();
+    }
   }
 
   return response;
@@ -69,26 +75,35 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown,
 ): Promise<Response> {
-  const token = getAuthToken();
-  
   const headers: Record<string, string> = {};
-  
+
   if (data) {
     headers["Content-Type"] = "application/json";
   }
-  
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-  
-  const res = await fetch(url, {
+
+  const fullUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
+
+  let res = await fetch(fullUrl, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
+
+  // On 401, try refresh then retry
+  if (res.status === 401 && !url.includes("/api/auth/")) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      res = await fetch(fullUrl, {
+        method,
+        headers,
+        body: data ? JSON.stringify(data) : undefined,
+        credentials: "include",
+      });
+    }
+  }
 
   await throwIfResNotOk(res);
   return res;
@@ -100,25 +115,27 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const token = getAuthToken();
-    
-    const headers: Record<string, string> = {};
-    
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-    
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+    const fullUrl = url.startsWith("http") ? url : `${API_BASE}${url}`;
+
+    let res = await fetch(fullUrl, {
       credentials: "include",
-      headers,
     });
+
+    // On 401, try refresh then retry
+    if (res.status === 401 && !url.includes("/api/auth/")) {
+      const refreshed = await tryRefreshToken();
+      if (refreshed) {
+        res = await fetch(fullUrl, { credentials: "include" });
+      }
+    }
 
     if (res.status === 401) {
       if (unauthorizedBehavior === "returnNull") {
         return null;
       }
       handleUnauthorized();
-      throw new Error("401: Não autenticado");
+      throw new Error("401: Nao autenticado");
     }
 
     await throwIfResNotOk(res);
