@@ -36,7 +36,13 @@
       "Bash(grep:*)",
       "Skill(renov-git-workflow)",
       "Bash(npx tsc:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npx wrangler:*)",
+      "Bash(mkdir -p worker/src/services)",
+      "Bash(cp server/external-data.ts worker/src/services/external-data.ts)",
+      "Bash(cp server/firecrawl-service.ts worker/src/services/firecrawl.service.ts)",
+      "Bash(cp server/openrouter.ts worker/src/services/openrouter.ts)"
     ]
   }
 }
