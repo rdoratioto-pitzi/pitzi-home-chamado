@@ -19,7 +19,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
-import { getCurrentUser, getUserPermissions, type UserPermissions } from "@/lib/permissions";
+import { getUserPermissions, type UserPermissions } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { useMemo } from "react";
 
 interface ModuleCard {
@@ -143,7 +144,7 @@ const modules: ModuleCard[] = [
 ];
 
 export default function Home() {
-  const currentUser = getCurrentUser();
+  const { user: currentUser } = useAuth();
   const permissions = getUserPermissions(currentUser);
 
   const visibleModules = useMemo(() => {

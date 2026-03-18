@@ -22,13 +22,7 @@ import {
   requestPushPermission,
   sendBrowserNotification,
 } from "@/hooks/use-notification-preferences";
-
-function getCurrentUser() {
-  // Verifica localStorage primeiro (novo sistema), depois sessionStorage (compatibilidade)
-  const stored = localStorage.getItem("user_data") || sessionStorage.getItem("user");
-  if (!stored) return null;
-  try { return JSON.parse(stored); } catch { return null; }
-}
+import { useAuth } from "@/contexts/auth-context";
 
 function timeAgo(date: string | Date) {
   const now = new Date();
@@ -59,7 +53,7 @@ function ModuleIcon({ module }: { module: string }) {
 }
 
 export function NotificationBell() {
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
   const { prefs, setPrefs } = useNotificationPreferences();

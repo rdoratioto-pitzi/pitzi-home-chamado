@@ -17,7 +17,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentUser, type CurrentUser } from "@/lib/permissions";
+import { type CurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { ErrorBoundary } from "@/components/error-boundary";
 
 const FILTERS_STORAGE_KEY = "estoques_posicao_filters";
@@ -205,7 +206,7 @@ export default function EstoquesPosicaoPage() {
   }, [filters]);
   
   // Obter usuário atual do sistema de autenticação
-  const user = getCurrentUser();
+  const { user } = useAuth();
   
   // Verificar acesso
   const hasAccess = hasEstoqueAccess(user);

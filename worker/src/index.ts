@@ -29,6 +29,11 @@ type Bindings = {
   FIRECRAWL_API_KEY: string;
   CLAUDE_USAGE_SECRET: string;
   GITHUB_TOKEN: string;
+  // SendPulse (Phase 2A — replaces nodemailer)
+  SENDPULSE_CLIENT_ID: string;
+  SENDPULSE_CLIENT_SECRET: string;
+  SENDPULSE_FROM_EMAIL: string;
+  SENDPULSE_FROM_NAME: string;
 };
 
 export type AuthUser = {

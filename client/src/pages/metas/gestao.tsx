@@ -68,6 +68,7 @@ import {
   Archive,
 } from "lucide-react";
 import type { Meta, MetaArea, MetaCheckin, User } from "@shared/schema";
+import { useAuth } from "@/contexts/auth-context";
 
 const statusColors: Record<string, string> = {
   on_track: "bg-green-500/10 text-green-600 dark:text-green-400",
@@ -113,14 +114,6 @@ function generateMonthOptions() {
     });
   }
   return options;
-}
-
-function getCurrentUser() {
-  try {
-    const userStr = sessionStorage.getItem("user");
-    if (userStr) return JSON.parse(userStr);
-  } catch (e) {}
-  return null;
 }
 
 // Componente separado para renderizar card de meta (solve hooks issue)
@@ -315,6 +308,7 @@ function MetaCardGestao({
 
 export default function GestaoMetasPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
   const [activeTab, setActiveTab] = useState("todas");
   const [searchTerm, setSearchTerm] = useState("");
@@ -369,7 +363,6 @@ export default function GestaoMetasPage() {
   };
 
   const monthOptions = getMonthOptions();
-  const currentUser = getCurrentUser();
 
   const { data: metas = [], isLoading: metasLoading } = useQuery<Meta[]>({
     queryKey: ["/api/metas", { month: selectedMonth }],

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { FunilCards } from "./components/funil-cards";
 import { DesviosCards } from "./components/desvios-cards";
 import { TabelaEtapa } from "./components/tabela-etapa";
@@ -45,7 +45,7 @@ function formatCurrency(val: number) {
 }
 
 export default function PipelinePage() {
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const isAdmin = user?.isAdmin === true;
 
   const [etapaAberta, setEtapaAberta] = useState<string | null>(null);
