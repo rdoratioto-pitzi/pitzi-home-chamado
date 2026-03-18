@@ -24,7 +24,7 @@ import {
   FileType,
   Loader2
 } from "lucide-react";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -71,7 +71,7 @@ interface Attachment {
 export default function NovoDocumentoPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const user = getCurrentUser();
+  const { user } = useAuth();
   const { data: areas = [] } = useMetaAreas();
 
   const [area, setArea] = useState("");

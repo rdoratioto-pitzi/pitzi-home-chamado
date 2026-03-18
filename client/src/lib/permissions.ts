@@ -14,6 +14,7 @@ export interface UserPermissions {
   updates: boolean;
   gitAnalytics: boolean;
   estoques: boolean;
+  diagramas: boolean;
 }
 
 export interface CurrentUser {
@@ -23,34 +24,17 @@ export interface CurrentUser {
   isAdmin?: boolean;
   modulePermissions?: string;
   status?: string;
+  tenantId?: string | null;
+  perfilAcesso?: string;
+  [key: string]: unknown;
 }
 
+/**
+ * @deprecated Use useAuth().user instead. Will be removed after all callers migrate.
+ * Returns null — localStorage/sessionStorage auth was removed in Phase 2A (cookie-based auth).
+ */
 export function getCurrentUser(): CurrentUser | null {
-  try {
-    // Primeiro tenta buscar do localStorage (novo sistema de auth)
-    const userStr = localStorage.getItem("user_data");
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      // Padroniza verificação de isAdmin
-      if (user) {
-        const adminValue = user.isAdmin ?? user.is_admin;
-        user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
-      }
-      return user;
-    }
-    
-    // Fallback para sessionStorage (compatibilidade com sistema antigo)
-    const sessionUserStr = sessionStorage.getItem("user");
-    if (!sessionUserStr) return null;
-    const user = JSON.parse(sessionUserStr);
-    if (user) {
-      const adminValue = user.isAdmin ?? user.is_admin;
-      user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
-    }
-    return user;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export function getUserPermissions(user: CurrentUser | null): UserPermissions {
@@ -70,6 +54,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     updates: false,
     gitAnalytics: false,
     estoques: false,
+    diagramas: false,
   };
 
   if (!user) return defaultPerms;
@@ -91,6 +76,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       updates: true,
       gitAnalytics: true,
       estoques: true,
+      diagramas: true,
     };
   }
 
@@ -104,6 +90,9 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
   }
 }
 
+/**
+ * @deprecated Use useAuth().user with getUserPermissions() instead. Will be removed after all callers migrate.
+ */
 export function hasModulePermission(moduleKey: keyof UserPermissions): boolean {
   const user = getCurrentUser();
   if (!user) return false;

@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { BuscaDispositivo } from "./components/busca-dispositivo";
 import { InfoDispositivo } from "./components/info-dispositivo";
 import { Timeline, type TimelineEvento } from "./components/timeline";
@@ -66,7 +66,7 @@ async function fetchTimeline(imei: string): Promise<RastreabilidadeData> {
 // ── componente principal ──────────────────────────────────────────────────────
 
 export default function RastreabilidadePage() {
-  const user    = getCurrentUser();
+  const { user } = useAuth();
   const isAdmin = user?.isAdmin === true;
 
   const [imeiSelecionado, setImeiSelecionado] = useState<string | null>(null);

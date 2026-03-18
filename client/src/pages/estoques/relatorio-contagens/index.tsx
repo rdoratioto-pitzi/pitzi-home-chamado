@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 
 interface ContagemListItem {
   id: string;
@@ -45,7 +45,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function EstoquesRelatorioContagensPage() {
   const [, navigate] = useLocation();
-  const user = getCurrentUser();
+  const { user } = useAuth();
 
   const { data: contagens = [], isLoading } = useQuery({
     queryKey: ["contagens-lista"],

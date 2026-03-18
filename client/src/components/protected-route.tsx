@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { getCurrentUser, getUserPermissions, type UserPermissions } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
+import { getUserPermissions, type UserPermissions } from "@/lib/permissions";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -9,12 +10,13 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, requiredPermission }: ProtectedRouteProps) {
   const [, setLocation] = useLocation();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const user = getCurrentUser();
-    
-    if (!user) {
+    if (isLoading) return;
+
+    if (!isAuthenticated || !user) {
       setLocation("/login");
       return;
     }
@@ -35,9 +37,9 @@ export function ProtectedRoute({ children, requiredPermission }: ProtectedRouteP
     } else {
       setLocation("/");
     }
-  }, [requiredPermission, setLocation]);
+  }, [requiredPermission, setLocation, user, isAuthenticated, isLoading]);
 
-  if (hasAccess === null) {
+  if (isLoading || hasAccess === null) {
     return null;
   }
 

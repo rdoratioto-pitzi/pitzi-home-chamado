@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { RenovLogo } from "@/components/renov-logo";
 import { Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
@@ -82,6 +83,7 @@ const logoVariants = {
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const auth = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
@@ -129,13 +131,8 @@ export default function LoginPage() {
       if (result.success) {
         setLoginSuccess(true);
         
-        // Store user data and token in localStorage for multi-tab persistence
-        // Import saveAuth from auth library
-        const { saveAuth } = await import("@/lib/auth");
-        saveAuth({
-          token: result.token || `session_${result.user.id}_${Date.now()}`,
-          user: result.user
-        });
+        // Store user in auth context (cookie-based session)
+        auth.login(result.user);
         
         // Show success animation before redirect
         setTimeout(() => {
