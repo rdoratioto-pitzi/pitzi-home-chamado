@@ -31,33 +31,10 @@ export interface CurrentUser {
 
 /**
  * @deprecated Use useAuth().user instead. Will be removed after all callers migrate.
+ * Returns null — localStorage/sessionStorage auth was removed in Phase 2A (cookie-based auth).
  */
 export function getCurrentUser(): CurrentUser | null {
-  try {
-    // Primeiro tenta buscar do localStorage (novo sistema de auth)
-    const userStr = localStorage.getItem("user_data");
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      // Padroniza verificação de isAdmin
-      if (user) {
-        const adminValue = user.isAdmin ?? user.is_admin;
-        user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
-      }
-      return user;
-    }
-    
-    // Fallback para sessionStorage (compatibilidade com sistema antigo)
-    const sessionUserStr = sessionStorage.getItem("user");
-    if (!sessionUserStr) return null;
-    const user = JSON.parse(sessionUserStr);
-    if (user) {
-      const adminValue = user.isAdmin ?? user.is_admin;
-      user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
-    }
-    return user;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 export function getUserPermissions(user: CurrentUser | null): UserPermissions {

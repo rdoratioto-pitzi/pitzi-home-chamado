@@ -33,7 +33,10 @@
       "Bash(curl:*)",
       "WebFetch(domain:homeapi-dev.renovsmart.com.br)",
       "Bash(wc:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Skill(renov-git-workflow)",
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

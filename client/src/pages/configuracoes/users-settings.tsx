@@ -102,7 +102,7 @@ export function UsersSettings() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const { user: authUser } = useAuth();
+  const { user: authUser, updateUser } = useAuth();
   const currentUserIsAdmin = authUser?.isAdmin === true;
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -223,21 +223,14 @@ export function UsersSettings() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       
-      // Se o usuário editado for o próprio usuário logado, atualiza o sessionStorage
-      const currentUser = JSON.parse(sessionStorage.getItem("user") || "{}");
-      if (editingUser && editingUser.id === currentUser.id) {
-        // O backend retorna o usuário atualizado
-        const updatedUser = { 
-          ...currentUser, 
+      // Se o usuário editado for o próprio usuário logado, atualiza o contexto de auth
+      if (editingUser && authUser && editingUser.id === authUser.id) {
+        updateUser({
           ...data,
-          // Garante que modulePermissions seja tratado corretamente
-          modulePermissions: typeof data.modulePermissions === 'string' 
-            ? data.modulePermissions 
-            : JSON.stringify(data.modulePermissions)
-        };
-        sessionStorage.setItem("user", JSON.stringify(updatedUser));
-        // Dispara evento para o sidebar atualizar
-        window.dispatchEvent(new Event("storage"));
+          modulePermissions: typeof data.modulePermissions === 'string'
+            ? data.modulePermissions
+            : JSON.stringify(data.modulePermissions),
+        });
       }
 
       toast({ 
