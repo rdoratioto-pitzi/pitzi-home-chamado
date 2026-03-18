@@ -25,6 +25,9 @@ export interface CurrentUser {
   status?: string;
 }
 
+/**
+ * @deprecated Use useAuth().user instead. Will be removed after all callers migrate.
+ */
 export function getCurrentUser(): CurrentUser | null {
   try {
     // Primeiro tenta buscar do localStorage (novo sistema de auth)
@@ -104,6 +107,9 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
   }
 }
 
+/**
+ * @deprecated Use useAuth().user with getUserPermissions() instead. Will be removed after all callers migrate.
+ */
 export function hasModulePermission(moduleKey: keyof UserPermissions): boolean {
   const user = getCurrentUser();
   if (!user) return false;
