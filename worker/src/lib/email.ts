@@ -29,10 +29,10 @@ import {
 // ============== TYPES ==============
 
 export interface EmailEnv {
-  SENDPULSE_API_USER_ID: string;
-  SENDPULSE_API_SECRET: string;
-  SENDPULSE_SENDER_NAME: string;
-  SENDPULSE_SENDER_EMAIL: string;
+  SENDPULSE_CLIENT_ID: string;
+  SENDPULSE_CLIENT_SECRET: string;
+  SENDPULSE_FROM_NAME: string;
+  SENDPULSE_FROM_EMAIL: string;
   APP_URL: string;
 }
 
@@ -50,6 +50,10 @@ interface SendMailOptions {
 
 // ============== SENDPULSE TRANSPORT ==============
 
+// In Workers, global state persists across requests within the same isolate but
+// is NOT shared between isolates or guaranteed to survive eviction. This means
+// the cache reduces redundant token fetches within a warm isolate but will
+// gracefully re-fetch when the isolate is cold-started.
 let tokenCache: { token: string; expiresAt: number } | null = null;
 
 async function getSendPulseToken(env: EmailEnv): Promise<string> {
@@ -62,8 +66,8 @@ async function getSendPulseToken(env: EmailEnv): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       grant_type: "client_credentials",
-      client_id: env.SENDPULSE_API_USER_ID,
-      client_secret: env.SENDPULSE_API_SECRET,
+      client_id: env.SENDPULSE_CLIENT_ID,
+      client_secret: env.SENDPULSE_CLIENT_SECRET,
     }),
   });
 
@@ -87,8 +91,8 @@ async function sendMail(env: EmailEnv, options: SendMailOptions): Promise<void> 
       subject: options.subject,
       html: options.html,
       from: {
-        name: env.SENDPULSE_SENDER_NAME,
-        email: env.SENDPULSE_SENDER_EMAIL,
+        name: env.SENDPULSE_FROM_NAME,
+        email: env.SENDPULSE_FROM_EMAIL,
       },
       to: options.to,
     },
