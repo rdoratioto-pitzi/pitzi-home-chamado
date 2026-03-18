@@ -71,6 +71,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useTheme } from "@/hooks/use-theme";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 import type { ModulePermissions } from "@shared/schema";
 
 const allMenuItems = [
@@ -178,65 +179,11 @@ const estoquesSubItems = [
   { title: "Relatório Contagens", url: "/estoques/relatorio-contagens", icon: FileSpreadsheet },
 ];
 
-function getCurrentUser() {
-  try {
-    // Primeiro tenta buscar do localStorage (novo sistema de auth)
-    const localStorageUser = localStorage.getItem("user_data");
-    if (localStorageUser) {
-      const user = JSON.parse(localStorageUser);
-      // Padroniza verificação de isAdmin
-      if (user) {
-        const adminValue = user.isAdmin ?? user.is_admin;
-        user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
-      }
-      return user;
-    }
-    
-    // Fallback para sessionStorage (compatibilidade com sistema antigo)
-    const sessionUserStr = sessionStorage.getItem("user");
-    if (sessionUserStr) {
-      const user = JSON.parse(sessionUserStr);
-      if (user) {
-        const adminValue = user.isAdmin ?? user.is_admin;
-        user.isAdmin = adminValue === true || adminValue === 'true' || adminValue === 1;
-      }
-      return user;
-    }
-  } catch (e) {
-    console.error("Error parsing user from storage:", e);
-  }
-  return null;
-}
-
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { theme } = useTheme();
   const { toast } = useToast();
-
-  // State to force re-render when user data changes
-  const [currentUser, setCurrentUser] = useState(getCurrentUser());
-
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const newUser = getCurrentUser();
-      // Only update if user data actually changed to prevent unnecessary re-renders
-      setCurrentUser(prevUser => {
-        if (!prevUser && !newUser) return prevUser;
-        if (prevUser && newUser && prevUser.id === newUser.id
-          && prevUser.isAdmin === newUser.isAdmin
-          && prevUser.modulePermissions === newUser.modulePermissions) return prevUser;
-        return newUser;
-      });
-    };
-    // Escuta mudanças de outras abas (evento nativo)
-    window.addEventListener("storage", handleStorageChange);
-    // Escuta mudanças na mesma aba (evento customizado disparado por saveAuth/clearAuth)
-    window.addEventListener("authChanged", handleStorageChange);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      window.removeEventListener("authChanged", handleStorageChange);
-    };
-  }, []);
+  const { user: currentUser, logout } = useAuth();
 
   const [metasOpen, setMetasOpen] = useState(location.startsWith("/metas"));
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
@@ -258,7 +205,7 @@ export function AppSidebar() {
 
   const permissions = useMemo(() => {
     try {
-      if (currentUser?.isAdmin === true || currentUser?.isAdmin === "true") {
+      if (currentUser?.isAdmin) {
         return {
           chamados: true,
           projetos: true,
@@ -319,17 +266,10 @@ export function AppSidebar() {
   // 3. O usuário estiver em uma página do módulo Estoques (indicação de acesso)
   const hasEstoquesPermission = permissions.estoques === true;
   const isInEstoquesPage = location.startsWith("/estoques");
-  const hasEstoquesAccess = currentUser?.isAdmin === true || currentUser?.isAdmin === "true" || hasEstoquesPermission || isInEstoquesPage;
+  const hasEstoquesAccess = currentUser?.isAdmin || hasEstoquesPermission || isInEstoquesPage;
 
   const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch { }
-    // Usa clearAuth do novo sistema de autenticação
-    const { clearAuth } = await import("@/lib/auth");
-    clearAuth();
-    sessionStorage.removeItem("user");
-    sessionStorage.removeItem("modulePermissions");
+    await logout();
     toast({
       title: "Saindo...",
       description: "Você foi desconectado com sucesso.",
@@ -666,29 +606,10 @@ export function AppSidebar() {
 export function UserProfileMenu() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const [currentUser, setCurrentUser] = useState(getCurrentUser());
-
-  useEffect(() => {
-    const handleStorageChange = () => {
-      setCurrentUser(getCurrentUser());
-    };
-    window.addEventListener("storage", handleStorageChange);
-    const interval = setInterval(handleStorageChange, 5000);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
+  const { user: currentUser, logout } = useAuth();
 
   const handleLogout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch { }
-    // Usa clearAuth do novo sistema de autenticação
-    const { clearAuth } = await import("@/lib/auth");
-    clearAuth();
-    sessionStorage.removeItem("user");
-    sessionStorage.removeItem("modulePermissions");
+    await logout();
     toast({
       title: "Saindo...",
       description: "Você foi desconectado com sucesso.",
