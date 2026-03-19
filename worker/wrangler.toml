@@ -4,6 +4,11 @@ main = "src/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
 
+workers_dev = true
+routes = [
+  { pattern = "homeapi.renovsmart.com.br", custom_domain = true }
+]
+
 [placement]
 mode = "smart"
 
