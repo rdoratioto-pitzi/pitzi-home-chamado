@@ -138,6 +138,15 @@ Configurados em `.mcp.json` — usar automaticamente conforme necessidade.
 | **reactbits**                    | Componentes React animados                      |
 | **pdf-reader**                   | Leitura de PDFs                                 |
 
+## Git Commands
+
+NEVER use compound commands combining `cd` with `git` (e.g. `cd subdir && git status`).
+Always use `git -C <path>` flag instead.
+Examples:
+- `git -C subdir status` instead of `cd subdir && git status`
+- `git -C subdir add .` instead of `cd subdir && git add .`
+- `git -C subdir commit -m "msg"` instead of `cd subdir && git commit -m "msg"`
+
 ## Time
 
 | Pessoa  | Papel                                                         |
