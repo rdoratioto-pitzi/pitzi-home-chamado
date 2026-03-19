@@ -11,6 +11,7 @@ import {
   insertCollectionRequestSchema,
   insertLogisticaReversaPedidoSchema,
 } from "../../../shared/schema";
+import { getCorreiosService } from "../services/correios.service";
 
 const shipments = new Hono<AppEnv>();
 
@@ -248,23 +249,57 @@ shipments.get("/api/logistica-reversa/pedidos/:id", async (c) => {
 // POST /api/logistica-reversa/solicitar
 shipments.post("/api/logistica-reversa/solicitar", async (c) => {
   const storage = getStorage(c.get("db"));
+  const correios = getCorreiosService(c.env);
   const body = await c.req.json();
 
-  const { tipo: tipoInput, codigoServico: servicoInput, remetente, destinatario, observacao } = body;
+  const {
+    tipo: tipoInput,
+    codigoServico: servicoInput,
+    remetente,
+    destinatario,
+    observacao,
+  } = body;
 
   const tipo = tipoInput || "A";
   const codigoServico = servicoInput || "03247";
 
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  // The correiosService.solicitarPostagemReversa() call is skipped in this phase.
-  // For now, return an error indicating the service is not yet available in the worker.
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  try {
+    const result = await correios.solicitarPostagemReversa({
+      codigo_servico: codigoServico,
+      destinatario,
+      coletas_solicitadas: [
+        {
+          tipo,
+          remetente,
+          descricao: observacao || "Logística Reversa - Trade-in",
+        },
+      ],
+    });
+
+    // Save pedido to database if successful
+    if (result.resultado_solicitacao?.length > 0) {
+      const primeiro = result.resultado_solicitacao[0];
+      await storage.createLogisticaReversaPedido({
+        numeroPedido: primeiro.numero_coleta || "",
+        numeroEtiqueta: primeiro.numero_etiqueta || "",
+        tipo,
+        codigoServico,
+        status: "solicitado",
+        remetente: JSON.stringify(remetente),
+        destinatario: JSON.stringify(destinatario),
+        observacao: observacao || null,
+      });
+    }
+
+    return c.json(result);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao solicitar postagem reversa", details: msg },
+      500,
+    );
+  }
 });
 
 // PATCH /api/logistica-reversa/pedidos/:id
@@ -342,14 +377,18 @@ shipments.get("/api/logistica-reversa/servicos", async (c) => {
 
 // GET /api/logistica-reversa/check-api-status
 shipments.get("/api/logistica-reversa/check-api-status", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  try {
+    const status = await correios.checkApi250Status();
+    return c.json(status);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao verificar status da API", details: msg },
+      500,
+    );
+  }
 });
 
 // ============== RS LOGISTICA API INTEGRATION ==============
@@ -637,110 +676,144 @@ shipments.get("/api/integrations/adm-logistica/divergentes", async (c) => {
 
 // GET /api/correios/config
 shipments.get("/api/correios/config", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  return c.json(correios.getConfig());
 });
 
 // POST /api/correios/solicitar-postagem-reversa
 shipments.post("/api/correios/solicitar-postagem-reversa", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  const body = await c.req.json();
+  try {
+    const result = await correios.solicitarPostagemReversa(body);
+    return c.json(result);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao solicitar postagem reversa", details: msg },
+      500,
+    );
+  }
 });
 
 // POST /api/correios/cancelar-pedido
 shipments.post("/api/correios/cancelar-pedido", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  const body = await c.req.json();
+  try {
+    const result = await correios.cancelarPedido(body);
+    return c.json(result);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao cancelar pedido", details: msg },
+      500,
+    );
+  }
 });
 
 // POST /api/correios/acompanhar-pedido
 shipments.post("/api/correios/acompanhar-pedido", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  const body = await c.req.json();
+  try {
+    const result = await correios.acompanharPedido(body);
+    return c.json(result);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao acompanhar pedido", details: msg },
+      500,
+    );
+  }
 });
 
 // POST /api/correios/acompanhar-pedido-por-data
 shipments.post("/api/correios/acompanhar-pedido-por-data", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  const body = await c.req.json();
+  try {
+    const result = await correios.acompanharPedidoPorData(body);
+    return c.json(result);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao acompanhar pedidos por data", details: msg },
+      500,
+    );
+  }
 });
 
 // POST /api/correios/revalidar-prazo
 shipments.post("/api/correios/revalidar-prazo", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  const body = await c.req.json();
+  try {
+    const result = await correios.revalidarPrazoAutorizacaoPostagem(body);
+    return c.json(result);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao revalidar prazo", details: msg },
+      500,
+    );
+  }
 });
 
 // POST /api/correios/solicitar-range
 shipments.post("/api/correios/solicitar-range", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  const body = await c.req.json();
+  try {
+    const result = await correios.solicitarRange(body);
+    return c.json(result);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao solicitar range", details: msg },
+      500,
+    );
+  }
 });
 
 // POST /api/correios/calcular-digito-verificador
 shipments.post("/api/correios/calcular-digito-verificador", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  const body = await c.req.json();
+  try {
+    const result = await correios.calcularDigitoVerificador(body);
+    return c.json(result);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao calcular dígito verificador", details: msg },
+      500,
+    );
+  }
 });
 
 // POST /api/correios/solicitar-postagem-simultanea
 shipments.post("/api/correios/solicitar-postagem-simultanea", async (c) => {
-  // TODO: Phase 2D — migrate correios service with factory pattern
-  return c.json(
-    {
-      error: "Correios service not yet migrated to worker",
-      details: "Phase 2D will migrate the correios service with factory pattern",
-    },
-    501,
-  );
+  const correios = getCorreiosService(c.env);
+  const body = await c.req.json();
+  try {
+    const result = await correios.solicitarPostagemSimultanea(body);
+    return c.json(result);
+  } catch (error: unknown) {
+    const msg =
+      error instanceof Error ? error.message : "Erro desconhecido";
+    return c.json(
+      { error: "Falha ao solicitar postagem simultânea", details: msg },
+      500,
+    );
+  }
 });
 
 export { shipments };
