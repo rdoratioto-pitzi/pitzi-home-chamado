@@ -18,6 +18,14 @@ const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "GET", path: /^\/api\/cep\// },
   { method: "POST", path: "/api/etiquetas/gerar-png" },
   { method: "POST", path: "/api/etiquetas/imprimir" },
+  // Phase 2C public routes — Integrations (all public proxy endpoints)
+  { method: "POST", path: "/api/integrations/relatorio-pedidos/test-connection" },
+  { method: "GET", path: "/api/integrations/relatorio-pedidos/orders/advanced" },
+  { method: "POST", path: "/api/logistica-reversa/eventos" },
+  { method: "GET", path: /^\/api\/avaliacoes-ia\// },
+  { method: "GET", path: "/api/estoques" },
+  // Phase 2C public routes — GitHub webhook (signature validated in-route)
+  { method: "POST", path: "/api/git-analytics/github-webhook" },
 ];
 
 /** Routes with optional auth (return null user if not authenticated) */

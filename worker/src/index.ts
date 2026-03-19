@@ -15,6 +15,12 @@ import { users } from "./routes/users";
 import { labels } from "./routes/labels";
 import { devTools } from "./routes/dev-tools";
 import { ai } from "./routes/ai";
+import { okrs } from "./routes/okrs";
+import { metas } from "./routes/metas";
+import { knowledge } from "./routes/knowledge";
+import { integrations } from "./routes/integrations";
+import { tickets } from "./routes/tickets";
+import { gitAnalytics } from "./routes/git-analytics";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -38,6 +44,7 @@ type Bindings = {
   FIRECRAWL_API_KEY: string;
   CLAUDE_USAGE_SECRET: string;
   GITHUB_TOKEN: string;
+  GITHUB_WEBHOOK_SECRET: string;
   // SendPulse (Phase 2A — replaces nodemailer)
   SENDPULSE_CLIENT_ID: string;
   SENDPULSE_CLIENT_SECRET: string;
@@ -103,5 +110,11 @@ app.route("/", users);
 app.route("/", labels);
 app.route("/", devTools);
 app.route("/", ai);
+app.route("/", okrs);
+app.route("/", metas);
+app.route("/", knowledge);
+app.route("/", integrations);
+app.route("/", tickets);
+app.route("/", gitAnalytics);
 
 export default app;
