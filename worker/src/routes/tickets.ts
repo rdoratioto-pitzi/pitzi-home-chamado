@@ -8,7 +8,7 @@ import {
   insertTicketSchema,
   insertTicketResponsavelSchema,
   insertTicketCommentSchema,
-} from "@shared/schema";
+} from "../../../shared/schema";
 import {
   sendTicketCreatedEmail,
   sendTicketAssignedEmail,

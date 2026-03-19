@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
-import { insertLogisticaReversaEventoSchema } from "@shared/schema";
+import { insertLogisticaReversaEventoSchema } from "../../../shared/schema";
 
 const integrations = new Hono<AppEnv>();
 

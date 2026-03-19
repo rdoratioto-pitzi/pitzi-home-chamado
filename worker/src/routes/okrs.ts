@@ -7,7 +7,7 @@ import {
   insertObjectiveSchema,
   insertKeyResultSchema,
   insertKeyResultUpdateSchema,
-} from "@shared/schema";
+} from "../../../shared/schema";
 
 const okrs = new Hono<AppEnv>();
 

@@ -6,7 +6,7 @@ import { getStorage } from "../lib/storage";
 import {
   insertKnowledgeDocumentSchema,
   insertKnowledgeDocumentVersionSchema,
-} from "@shared/schema";
+} from "../../../shared/schema";
 
 const knowledge = new Hono<AppEnv>();
 
