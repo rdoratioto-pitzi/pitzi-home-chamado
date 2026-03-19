@@ -13,9 +13,13 @@ import {
   insertKanbanCardDependencySchema,
 } from "../../../shared/schema";
 
-// TODO: Phase 2A — migrate email to SendPulse
-// Original imports: sendMentionNotificationEmail, sendCardStatusChangedEmail,
-// sendCardAssignedEmail, sendProjectMemberAddedEmail, sendCardCommentEmail
+import {
+  sendProjectMemberAddedEmail,
+  sendCardStatusChangedEmail,
+  sendCardAssignedEmail,
+  sendCardCommentEmail,
+  sendMentionNotificationEmail,
+} from "../lib/email";
 
 const projects = new Hono<AppEnv>();
 
@@ -181,8 +185,15 @@ projects.post("/api/projects/:id/members", async (c) => {
     role: memberRole || "member",
   });
 
-  // TODO: Phase 2A — migrate email to SendPulse
-  // Original: sendProjectMemberAddedEmail(project, newMember, addedBy)
+  // Send email notification (fire-and-forget)
+  const [project, newMember, addedBy] = await Promise.all([
+    storage.getProject(id),
+    storage.getUser(uid),
+    storage.getUser(sessionUserId),
+  ]);
+  if (project && newMember && addedBy) {
+    sendProjectMemberAddedEmail(c.env, storage, project, newMember, addedBy).catch(console.error);
+  }
 
   return c.json(member, 201);
 });
@@ -347,8 +358,17 @@ projects.patch("/api/cards/:id", async (c) => {
   const updatedBy = body.updatedBy || oldCard?.reporterId;
   const updater = updatedBy ? await storage.getUser(updatedBy) : null;
 
-  // TODO: Phase 2A — migrate email to SendPulse
-  // Original: sendCardStatusChangedEmail when status changes
+  // Send email when status changes
+  if (oldCard && validated.status && validated.status !== oldCard.status) {
+    const project = await storage.getProject(card.projectId);
+    const assignee = card.assigneeId ? await storage.getUser(card.assigneeId) : null;
+    const reporter = card.reporterId ? await storage.getUser(card.reporterId) : null;
+    if (project && updater) {
+      sendCardStatusChangedEmail(
+        c.env, storage, card, project, oldCard.status, validated.status, updater, assignee, reporter
+      ).catch(console.error);
+    }
+  }
 
   // Notification: assignee changed
   if (
@@ -371,8 +391,12 @@ projects.patch("/api/cards/:id", async (c) => {
       })
       .catch(() => {});
 
-    // TODO: Phase 2A — migrate email to SendPulse
-    // Original: sendCardAssignedEmail(card, project, newAssignee, updater)
+    // Send card assigned email
+    const project = await storage.getProject(card.projectId);
+    const newAssignee = await storage.getUser(card.assigneeId);
+    if (project && newAssignee && updater) {
+      sendCardAssignedEmail(c.env, storage, card, project, newAssignee, updater).catch(console.error);
+    }
   }
 
   // Notification: reporter changed
@@ -430,14 +454,21 @@ projects.post("/api/cards/:id/comments", async (c) => {
   });
   const comment = await storage.createKanbanComment(validated);
 
-  // TODO: Phase 2A — migrate email to SendPulse
-  // Original: sendCardCommentEmail(card, project, content, author, assignee, reporter)
+  // Send comment email + process @mentions
+  const card = await storage.getKanbanCard(id);
+  const author = await storage.getUser(validated.userId);
+  const project = card ? await storage.getProject(card.projectId) : null;
 
-  // Process @mentions and send notifications
+  if (card && project && author) {
+    const assignee = card.assigneeId ? await storage.getUser(card.assigneeId) : null;
+    const reporter = card.reporterId ? await storage.getUser(card.reporterId) : null;
+    sendCardCommentEmail(
+      c.env, storage, card, project, validated.content, author, assignee, reporter
+    ).catch(console.error);
+  }
+
   const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
   if (mentionMatches) {
-    const card = await storage.getKanbanCard(id);
-    const author = await storage.getUser(validated.userId);
     const users = await storage.getUsers();
 
     for (const mention of mentionMatches) {
@@ -449,8 +480,9 @@ projects.post("/api/cards/:id/comments", async (c) => {
       );
 
       if (mentionedUser && card && author) {
-        // TODO: Phase 2A — migrate email to SendPulse
-        // Original: sendMentionNotificationEmail(mentionedUser, author.name, card.title, card.id, content)
+        sendMentionNotificationEmail(
+          c.env, storage, mentionedUser, author.name, card.title, card.id, validated.content
+        ).catch(console.error);
         storage
           .createNotification({
             userId: mentionedUser.id,
