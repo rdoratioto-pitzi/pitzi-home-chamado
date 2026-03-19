@@ -13,6 +13,7 @@ import {
 } from "../lib/jwt";
 import { setCookie } from "hono/cookie";
 import type { AppEnv, AuthUser } from "../index";
+import { sendPasswordResetEmail } from "../lib/email";
 
 const auth = new Hono<AppEnv>();
 
@@ -227,7 +228,9 @@ auth.post("/api/auth/forgot-password", async (c) => {
   const hashedTemp = await hashPassword(temporaryPassword);
   await db.update(users).set({ password: hashedTemp }).where(eq(users.id, user.id));
 
-  // TODO Phase 2: send email with temporaryPassword via email service
+  sendPasswordResetEmail(c.env, user, temporaryPassword).catch((err) =>
+    console.error("[AUTH] Falha ao enviar email de reset:", err)
+  );
 
   return c.json({ success: true, message: successMsg });
 });
