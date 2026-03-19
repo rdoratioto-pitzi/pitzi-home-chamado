@@ -1,0 +1,16 @@
+# Cloudflare Pages configuration for Renov Home frontend
+# Deploy with: npx wrangler pages deploy dist/public --project-name renov-home
+# Or use the wrangler.pages.toml config below for `wrangler pages dev`
+
+name = "renov-home"
+pages_build_output_dir = "dist/public"
+compatibility_date = "2025-09-01"
+
+# Environment variables are set in the Cloudflare Pages dashboard
+# VITE_API_URL — the Worker API base URL (e.g., https://renov-home-api.renovsmart.workers.dev)
+
+[env.production]
+name = "renov-home"
+
+[env.preview]
+name = "renov-home"
