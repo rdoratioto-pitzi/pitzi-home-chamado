@@ -21,6 +21,8 @@ import { knowledge } from "./routes/knowledge";
 import { integrations } from "./routes/integrations";
 import { tickets } from "./routes/tickets";
 import { gitAnalytics } from "./routes/git-analytics";
+import { pricing } from "./routes/pricing";
+import { omie } from "./routes/omie";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -116,5 +118,7 @@ app.route("/", knowledge);
 app.route("/", integrations);
 app.route("/", tickets);
 app.route("/", gitAnalytics);
+app.route("/", pricing);
+app.route("/", omie);
 
 export default app;

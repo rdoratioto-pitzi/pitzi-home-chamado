@@ -42,7 +42,8 @@
       "Bash(mkdir -p worker/src/services)",
       "Bash(cp server/external-data.ts worker/src/services/external-data.ts)",
       "Bash(cp server/firecrawl-service.ts worker/src/services/firecrawl.service.ts)",
-      "Bash(cp server/openrouter.ts worker/src/services/openrouter.ts)"
+      "Bash(cp server/openrouter.ts worker/src/services/openrouter.ts)",
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute"
     ]
   }
 }
