@@ -117,14 +117,7 @@ import {
   Plus,
 } from "lucide-react";
 import type { Flowchart, FlowchartComment, FlowchartVersion } from "@shared/schema";
-
-function getCurrentUser() {
-  try {
-    const userStr = sessionStorage.getItem("user");
-    if (userStr) return JSON.parse(userStr);
-  } catch {}
-  return null;
-}
+import { useAuth } from "@/contexts/auth-context";
 
 const NODE_COLORS = [
   { name: "Padrão", bg: "#ffffff", border: "#d1d5db", text: "#1f2937" },
@@ -618,7 +611,7 @@ function FlowchartEditorInner() {
   const [, params] = useRoute("/fluxogramas/:id");
   const flowchartId = params?.id;
   const { toast } = useToast();
-  const currentUser = getCurrentUser();
+  const { user: currentUser } = useAuth();
   const reactFlowInstance = useReactFlow();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 

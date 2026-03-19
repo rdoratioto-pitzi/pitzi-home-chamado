@@ -18,6 +18,7 @@ export const pool = process.env.DATABASE_URL
   : null;
 
 export const db = pool ? drizzle(pool, { schema }) : null;
+export type Database = NonNullable<typeof db>;
 
 if (db) {
   console.log("✅ Database instance created.");

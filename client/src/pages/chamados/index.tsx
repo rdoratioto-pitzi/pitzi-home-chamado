@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -323,8 +324,8 @@ export default function ChamadosPage() {
   const [viewMode, setViewMode] = useState<"list" | "kanban" | "grid" | "analytics">("list");
   
   // Get current user info for admin check
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const isAdmin = currentUser?.isAdmin === true || currentUser?.isAdmin === "true" || currentUser?.perfilAcesso === "diretor";
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.isAdmin || currentUser?.perfilAcesso === "diretor";
 
   const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
     queryKey: ["/api/tickets"],

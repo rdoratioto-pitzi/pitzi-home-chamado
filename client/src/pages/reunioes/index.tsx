@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -96,7 +96,7 @@ export default function ReunioesPage() {
   // Ref para que meetingTableColumns (useMemo) acesse filteredMeetings sem problema de hoisting
   const filteredMeetingsRef = useRef<Task[]>([]);
 
-  const currentUser = getCurrentUser();
+  const { user: currentUser } = useAuth();
   const currentUserId = currentUser?.id || "";
 
   const [newArea, setNewArea] = useState({

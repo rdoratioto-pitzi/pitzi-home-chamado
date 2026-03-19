@@ -1,0 +1,37 @@
+account_id = "bfd46eef1d57c99e94fd8106ee6a8870"
+name = "renov-home-api"
+main = "src/index.ts"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+workers_dev = true
+routes = [
+  { pattern = "homeapi.renovsmart.com.br", custom_domain = true }
+]
+
+[placement]
+mode = "smart"
+
+[[r2_buckets]]
+binding = "ATTACHMENTS"
+bucket_name = "renov-home-attachments"
+
+[vars]
+APP_URL = "https://home-next.renovsmart.com.br"
+CORS_ORIGIN = "https://home-next.renovsmart.com.br"
+API_URL = "https://homeapi.renovsmart.com.br"
+SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
+SENDPULSE_FROM_NAME = "Renov Home"
+
+[env.dev]
+name = "renov-home-api-dev"
+[env.dev.vars]
+APP_URL = "https://home-dev.renovsmart.com.br"
+CORS_ORIGIN = "https://home-dev.renovsmart.com.br"
+API_URL = "https://homeapi-dev.renovsmart.com.br"
+SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
+SENDPULSE_FROM_NAME = "Renov Home (Dev)"
+
+[[env.dev.r2_buckets]]
+binding = "ATTACHMENTS"
+bucket_name = "renov-home-attachments-dev"

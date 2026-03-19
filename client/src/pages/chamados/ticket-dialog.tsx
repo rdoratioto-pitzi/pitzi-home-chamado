@@ -90,7 +90,7 @@ const defaultLocations: FieldItem[] = [
   { value: "Outros", label: "Outros" },
 ];
 
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 
 export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
   const { toast } = useToast();
@@ -98,7 +98,7 @@ export function TicketDialog({ open, onOpenChange }: TicketDialogProps) {
   const [showSuccess, setShowSuccess] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
 
-  const currentUser = getCurrentUser();
+  const { user: currentUser } = useAuth();
 
   const { data: categoriesSetting } = useQuery<Setting>({
     queryKey: ["/api/settings", "ticket_categories"],

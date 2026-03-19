@@ -47,7 +47,7 @@ import type { Ticket, TicketCommentWithUser, User, Setting } from "@shared/schem
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 
 const statusColors: Record<string, string> = {
   open: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
@@ -177,7 +177,7 @@ export default function TicketDetailPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const currentUser = getCurrentUser();
+  const { user: currentUser } = useAuth();
   const [comment, setComment] = useState("");
   const [commentImages, setCommentImages] = useState<string[]>([]);
   const [editedDescription, setEditedDescription] = useState("");

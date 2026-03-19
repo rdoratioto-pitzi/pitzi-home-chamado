@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { MatrizAging } from "./components/matriz-aging";
 import { ListaFifo, type FifoItem } from "./components/lista-fifo";
 import { AlertasConfig } from "./components/alertas-config";
@@ -101,7 +101,7 @@ type View = typeof TOGGLE_VIEWS[number]['key'];
 // ── componente principal ──────────────────────────────────────────────────────
 
 export default function AgingPage() {
-  const user    = getCurrentUser();
+  const { user } = useAuth();
   const isAdmin = user?.isAdmin === true;
   const { toast } = useToast();
 

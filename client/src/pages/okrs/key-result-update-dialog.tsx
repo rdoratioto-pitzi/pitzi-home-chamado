@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/contexts/auth-context";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +48,7 @@ interface KeyResultUpdateDialogProps {
 export function KeyResultUpdateDialog({ open, onOpenChange, keyResult }: KeyResultUpdateDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user: authUser } = useAuth();
 
   const { data: updates = [], isLoading: updatesLoading } = useQuery<(KeyResultUpdate & { user?: { name: string } })[]>({
     queryKey: ["/api/key-results", keyResult?.id, "updates"],
@@ -68,11 +70,10 @@ export function KeyResultUpdateDialog({ open, onOpenChange, keyResult }: KeyResu
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const user = JSON.parse(localStorage.getItem("renov-user") || "{}");
       return apiRequest("POST", `/api/key-results/${keyResult?.id}/updates`, {
         newValue: String(data.newValue),
         comment: data.comment,
-        userId: user.id || "system",
+        userId: authUser?.id || "system",
       });
     },
     onSuccess: () => {
