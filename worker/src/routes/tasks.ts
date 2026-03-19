@@ -19,8 +19,11 @@ import {
   type Task,
 } from "../../../shared/schema";
 
-// TODO: Phase 2A — migrate email to SendPulse
-// Skipped imports: sendMeetingInviteEmail, sendSharedAreaInviteEmail, sendMentionNotificationEmail
+import {
+  sendMeetingInviteEmail,
+  sendSharedAreaInviteEmail,
+  sendMentionNotificationEmail,
+} from "../lib/email";
 
 const tasksRouter = new Hono<AppEnv>();
 
@@ -107,8 +110,7 @@ tasksRouter.post("/api/task-tags", async (c) => {
 
           const member = await storage.getUser(memberId);
           if (member && owner) {
-            // TODO: Phase 2A — migrate email to SendPulse
-            // sendSharedAreaInviteEmail(member, area.name, area.id, owner.name)
+            sendSharedAreaInviteEmail(c.env, member, area.name, area.id, owner.name).catch(console.error);
 
             storage
               .createNotification({
@@ -185,8 +187,7 @@ tasksRouter.put("/api/task-tags/:id", async (c) => {
 
             const member = await storage.getUser(memberId);
             if (member && owner) {
-              // TODO: Phase 2A — migrate email to SendPulse
-              // sendSharedAreaInviteEmail(member, area.name, area.id, owner.name)
+              sendSharedAreaInviteEmail(c.env, member, area.name, area.id, owner.name).catch(console.error);
 
               storage
                 .createNotification({
@@ -560,8 +561,16 @@ tasksRouter.post("/api/tasks", async (c) => {
       }
 
       if (meetingData?.date && meetingData?.time) {
-        // TODO: Phase 2A — migrate email to SendPulse
-        // sendMeetingInviteEmail(task, organizer, validParticipants, externalEmails)
+        const organizer = task.createdBy ? await storage.getUser(task.createdBy) : null;
+        const participantIds = meetingData.participants || [];
+        const validParticipants = (
+          await Promise.all(participantIds.map((pid: string) => storage.getUser(pid)))
+        ).filter(Boolean) as any[];
+        const externalEmails = meetingData.externalParticipants || [];
+
+        if (organizer) {
+          sendMeetingInviteEmail(c.env, storage, task, organizer, validParticipants, externalEmails).catch(console.error);
+        }
       }
     }
 
@@ -899,8 +908,9 @@ tasksRouter.post("/api/tasks/:id/comments", async (c) => {
         );
 
         if (mentionedUser && task && author) {
-          // TODO: Phase 2A — migrate email to SendPulse
-          // sendMentionNotificationEmail(mentionedUser, author.name, task.title, task.id, validated.content)
+          sendMentionNotificationEmail(
+            c.env, storage, mentionedUser, author.name, task.title, task.id, validated.content
+          ).catch(console.error);
 
           storage
             .createNotification({
