@@ -4,9 +4,10 @@ import type { AppEnv } from "../index";
 
 export function createCorsMiddleware(): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const origin = c.env.CORS_ORIGIN;
+    const allowedOrigins = c.env.CORS_ORIGIN.split(",").map((o) => o.trim());
     const handler = cors({
-      origin,
+      origin: (requestOrigin) =>
+        allowedOrigins.includes(requestOrigin) ? requestOrigin : allowedOrigins[0],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowHeaders: ["Content-Type", "X-Claude-Usage-Secret"],
       credentials: true,
