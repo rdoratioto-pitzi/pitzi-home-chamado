@@ -10,7 +10,7 @@ import {
   syncRepositoryByPeriod,
   addRepository,
 } from "../services/github-sync";
-import { insertGitRepositorySchema } from "@shared/schema";
+import { insertGitRepositorySchema } from "../../../shared/schema";
 
 const gitAnalytics = new Hono<AppEnv>();
 

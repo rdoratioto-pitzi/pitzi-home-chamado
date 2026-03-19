@@ -7,7 +7,7 @@ import {
   insertMetaSchema,
   insertMetaAreaSchema,
   insertMetaCheckinSchema,
-} from "@shared/schema";
+} from "../../../shared/schema";
 
 const metas = new Hono<AppEnv>();
 
