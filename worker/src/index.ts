@@ -27,6 +27,7 @@ import { projects } from "./routes/projects";
 import { tasks } from "./routes/tasks";
 import { shipments } from "./routes/shipments";
 import { estoques } from "./routes/estoques";
+import { uploads } from "./routes/uploads";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -34,6 +35,7 @@ type Bindings = {
   JWT_REFRESH_SECRET: string;
   CORS_ORIGIN: string;
   APP_URL: string;
+  API_URL: string;
   ATTACHMENTS: R2Bucket;
   SMTP_USER: string;
   SMTP_PASS: string;
@@ -128,5 +130,6 @@ app.route("/", projects);
 app.route("/", tasks);
 app.route("/", shipments);
 app.route("/", estoques);
+app.route("/", uploads);
 
 export default app;
