@@ -34,7 +34,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { HelpCircle, CheckCircle2, ArrowLeft, Plus, Eye, Loader2 } from "lucide-react";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -85,7 +85,7 @@ export default function NovoChamadoPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const currentUser = getCurrentUser();
+  const { user: currentUser } = useAuth();
   const [showSuccess, setShowSuccess] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
   const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);

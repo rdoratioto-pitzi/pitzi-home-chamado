@@ -82,7 +82,7 @@ import {
   gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches,
   claudeCodeUsageReports,
  } from "@shared/schema";
- import { db } from "./db";
+ import { db as defaultDb, type Database } from "./db";
  import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
  
  export type NotificationPreferences = {
@@ -455,24 +455,26 @@ export class DatabaseStorage implements IStorage {
   // In-memory storage for updates when database is not available
   private mockUpdates: Update[] = [];
 
+  constructor(private db: Database = defaultDb!) {}
+
   // Users
   async getUser(id: string): Promise<User | undefined> {
-    if (!db) {
+    if (!this.db) {
       if (id === "mock-admin-id") return this.getMockAdmin();
       return undefined;
     }
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await this.db.select().from(users).where(eq(users.id, id));
     return user;
   }
   async getUserByEmail(email: string): Promise<User | undefined> {
     if (!email) return undefined;
     const emailLower = email.toLowerCase();
-    if (!db) {
+    if (!this.db) {
       const mock = this.getMockUsers().find(u => u.email.toLowerCase() === emailLower);
       return mock;
     }
     try {
-      const [user] = await db.select().from(users).where(eq(sql`LOWER(${users.email})`, emailLower));
+      const [user] = await this.db.select().from(users).where(eq(sql`LOWER(${users.email})`, emailLower));
       return user;
     } catch (e) {
       console.warn("[storage] DB query failed, using mock fallback for email:", email);
@@ -530,34 +532,34 @@ export class DatabaseStorage implements IStorage {
     ];
   }
   async getUsers(): Promise<User[]> {
-    if (!db) return this.getMockUsers();
+    if (!this.db) return this.getMockUsers();
     try {
-      return await db.select().from(users);
+      return await this.db.select().from(users);
     } catch (e) {
       return this.getMockUsers();
     }
   }
   async createUser(insertUser: InsertUser): Promise<User> {
-    if (!db) throw new Error("Database not connected");
-    const [user] = await db.insert(users).values(insertUser).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [user] = await this.db.insert(users).values(insertUser).returning();
     return user;
   }
   async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
-    if (!db) return undefined;
-    const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    if (!this.db) return undefined;
+    const [user] = await this.db.update(users).set(data).where(eq(users.id, id)).returning();
     return user;
   }
 
   // Tickets
   async getTicket(id: string): Promise<Ticket | undefined> {
-    if (!db) return undefined;
-    const [ticket] = await db.select().from(tickets).where(eq(tickets.id, id));
+    if (!this.db) return undefined;
+    const [ticket] = await this.db.select().from(tickets).where(eq(tickets.id, id));
     return ticket;
   }
   async getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     try {
-      let query = db.select().from(tickets);
+      let query = this.db.select().from(tickets);
       if (filters) {
         const conditions: SQL[] = [];
         if (filters.requesterId && filters.assigneeId) {
@@ -579,39 +581,39 @@ export class DatabaseStorage implements IStorage {
     }
   }
   async createTicket(insertTicket: InsertTicket): Promise<Ticket> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     // Generate sequential code like CHA-0001
-    const allTickets = await db.select().from(tickets);
+    const allTickets = await this.db.select().from(tickets);
     const nextNumber = allTickets.length + 1;
     const code = `CHA-${String(nextNumber).padStart(4, '0')}`;
 
-    const [ticket] = await db.insert(tickets).values({ ...insertTicket, code }).returning();
+    const [ticket] = await this.db.insert(tickets).values({ ...insertTicket, code }).returning();
     return ticket;
   }
   async updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined> {
-    if (!db) return undefined;
-    const [ticket] = await db.update(tickets).set(data).where(eq(tickets.id, id)).returning();
+    if (!this.db) return undefined;
+    const [ticket] = await this.db.update(tickets).set(data).where(eq(tickets.id, id)).returning();
     return ticket;
   }
   async deleteTicket(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(tickets).where(eq(tickets.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(tickets).where(eq(tickets.id, id)).returning();
     return result.length > 0;
   }
 
   // Ticket Responsaveis (Assignment Rules)
   async getTicketResponsaveis(): Promise<TicketResponsavel[]> {
-    if (!db) return [];
-    return await db.select().from(ticketResponsaveis);
+    if (!this.db) return [];
+    return await this.db.select().from(ticketResponsaveis);
   }
   async getTicketResponsavel(id: string): Promise<TicketResponsavel | undefined> {
-    if (!db) return undefined;
-    const [resp] = await db.select().from(ticketResponsaveis).where(eq(ticketResponsaveis.id, id));
+    if (!this.db) return undefined;
+    const [resp] = await this.db.select().from(ticketResponsaveis).where(eq(ticketResponsaveis.id, id));
     return resp;
   }
   async getTicketResponsavelByRule(categoria: string, tipo: string): Promise<TicketResponsavel[]> {
-    if (!db) return [];
-    return await db.select().from(ticketResponsaveis).where(
+    if (!this.db) return [];
+    return await this.db.select().from(ticketResponsaveis).where(
       and(
         eq(ticketResponsaveis.categoria, categoria),
         eq(ticketResponsaveis.tipo, tipo),
@@ -620,22 +622,22 @@ export class DatabaseStorage implements IStorage {
     );
   }
   async createTicketResponsavel(data: InsertTicketResponsavel): Promise<TicketResponsavel> {
-    if (!db) throw new Error("Database not connected");
-    const [resp] = await db.insert(ticketResponsaveis).values(data).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [resp] = await this.db.insert(ticketResponsaveis).values(data).returning();
     return resp;
   }
   async updateTicketResponsavel(id: string, data: Partial<TicketResponsavel>): Promise<TicketResponsavel | undefined> {
-    if (!db) return undefined;
-    const [resp] = await db.update(ticketResponsaveis).set(data).where(eq(ticketResponsaveis.id, id)).returning();
+    if (!this.db) return undefined;
+    const [resp] = await this.db.update(ticketResponsaveis).set(data).where(eq(ticketResponsaveis.id, id)).returning();
     return resp;
   }
   async deleteTicketResponsavel(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(ticketResponsaveis).where(eq(ticketResponsaveis.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(ticketResponsaveis).where(eq(ticketResponsaveis.id, id)).returning();
     return result.length > 0;
   }
   async findResponsavelForTicket(categoria: string, tipo: string): Promise<string | null> {
-    if (!db) return null;
+    if (!this.db) return null;
     const rules = await this.getTicketResponsavelByRule(categoria, tipo);
     if (rules.length === 0) return null;
 
@@ -671,8 +673,8 @@ export class DatabaseStorage implements IStorage {
 
   // Ticket Comments
   async getTicketComments(ticketId: string): Promise<TicketCommentWithUser[]> {
-    if (!db) return [];
-    return await db
+    if (!this.db) return [];
+    return await this.db
       .select({
         id: ticketComments.id,
         tenantId: ticketComments.tenantId,
@@ -694,126 +696,126 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(ticketComments.createdAt));
   }
   async createTicketComment(insertComment: InsertTicketComment): Promise<TicketComment> {
-    if (!db) throw new Error("Database not connected");
-    const [comment] = await db.insert(ticketComments).values(insertComment).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [comment] = await this.db.insert(ticketComments).values(insertComment).returning();
     return comment;
   }
 
   // Projects
   async getProject(id: string): Promise<Project | undefined> {
-    if (!db) return undefined;
-    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    if (!this.db) return undefined;
+    const [project] = await this.db.select().from(projects).where(eq(projects.id, id));
     return project;
   }
   async getProjects(): Promise<Project[]> {
-    if (!db) return [];
-    return await db.select().from(projects);
+    if (!this.db) return [];
+    return await this.db.select().from(projects);
   }
   async createProject(insertProject: InsertProject): Promise<Project> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     // Generate sequential code like PRO-0001
-    const allProjects = await db.select().from(projects);
+    const allProjects = await this.db.select().from(projects);
     const nextNumber = allProjects.length + 1;
     const code = `PRO-${String(nextNumber).padStart(4, '0')}`;
 
-    const [project] = await db.insert(projects).values({ ...insertProject, code }).returning();
+    const [project] = await this.db.insert(projects).values({ ...insertProject, code }).returning();
     return project;
   }
   async updateProject(id: string, data: Partial<Project>): Promise<Project | undefined> {
-    if (!db) return undefined;
-    const [project] = await db.update(projects).set(data).where(eq(projects.id, id)).returning();
+    if (!this.db) return undefined;
+    const [project] = await this.db.update(projects).set(data).where(eq(projects.id, id)).returning();
     return project;
   }
   async deleteProject(id: string): Promise<boolean> {
-    if (!db) return false;
+    if (!this.db) return false;
     // Cascade: delete dependencies, cards, columns, labels, members
-    const cards = await db.select({ id: kanbanCards.id }).from(kanbanCards).where(eq(kanbanCards.projectId, id));
+    const cards = await this.db.select({ id: kanbanCards.id }).from(kanbanCards).where(eq(kanbanCards.projectId, id));
     if (cards.length > 0) {
       for (const card of cards) {
-        await db.delete(kanbanCardDependencies).where(
+        await this.db.delete(kanbanCardDependencies).where(
           or(eq(kanbanCardDependencies.blockingCardId, card.id), eq(kanbanCardDependencies.blockedCardId, card.id))
         );
       }
-      await db.delete(kanbanCards).where(eq(kanbanCards.projectId, id));
+      await this.db.delete(kanbanCards).where(eq(kanbanCards.projectId, id));
     }
-    await db.delete(kanbanColumns).where(eq(kanbanColumns.projectId, id));
-    await db.delete(kanbanLabels).where(eq(kanbanLabels.projectId, id));
-    await db.delete(projectMembers).where(eq(projectMembers.projectId, id));
-    const result = await db.delete(projects).where(eq(projects.id, id)).returning();
+    await this.db.delete(kanbanColumns).where(eq(kanbanColumns.projectId, id));
+    await this.db.delete(kanbanLabels).where(eq(kanbanLabels.projectId, id));
+    await this.db.delete(projectMembers).where(eq(projectMembers.projectId, id));
+    const result = await this.db.delete(projects).where(eq(projects.id, id)).returning();
     return result.length > 0;
   }
 
   // Project Members
   async getProjectMembers(projectId: string): Promise<ProjectMember[]> {
-    if (!db) return [];
-    return await db.select().from(projectMembers).where(eq(projectMembers.projectId, projectId));
+    if (!this.db) return [];
+    return await this.db.select().from(projectMembers).where(eq(projectMembers.projectId, projectId));
   }
   async addProjectMember(member: InsertProjectMember): Promise<ProjectMember> {
-    if (!db) throw new Error("Database not connected");
-    const [m] = await db.insert(projectMembers).values(member).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [m] = await this.db.insert(projectMembers).values(member).returning();
     return m;
   }
   async removeProjectMember(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(projectMembers).where(eq(projectMembers.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(projectMembers).where(eq(projectMembers.id, id)).returning();
     return result.length > 0;
   }
   async getProjectMembersByUser(userId: string): Promise<ProjectMember[]> {
-    if (!db) return [];
-    return await db.select().from(projectMembers).where(eq(projectMembers.userId, userId));
+    if (!this.db) return [];
+    return await this.db.select().from(projectMembers).where(eq(projectMembers.userId, userId));
   }
 
   // Kanban Columns
   async getKanbanColumns(projectId: string): Promise<KanbanColumn[]> {
-    if (!db) return [];
-    return await db.select().from(kanbanColumns).where(eq(kanbanColumns.projectId, projectId));
+    if (!this.db) return [];
+    return await this.db.select().from(kanbanColumns).where(eq(kanbanColumns.projectId, projectId));
   }
   async createKanbanColumn(insertColumn: InsertKanbanColumn): Promise<KanbanColumn> {
-    if (!db) throw new Error("Database not connected");
-    const [column] = await db.insert(kanbanColumns).values(insertColumn).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [column] = await this.db.insert(kanbanColumns).values(insertColumn).returning();
     return column;
   }
   async updateKanbanColumn(id: string, data: Partial<KanbanColumn>): Promise<KanbanColumn | undefined> {
-    if (!db) return undefined;
-    const [column] = await db.update(kanbanColumns).set(data).where(eq(kanbanColumns.id, id)).returning();
+    if (!this.db) return undefined;
+    const [column] = await this.db.update(kanbanColumns).set(data).where(eq(kanbanColumns.id, id)).returning();
     return column;
   }
   async deleteKanbanColumn(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(kanbanColumns).where(eq(kanbanColumns.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(kanbanColumns).where(eq(kanbanColumns.id, id)).returning();
     return result.length > 0;
   }
 
   // Kanban Cards
   async getKanbanCard(id: string): Promise<KanbanCard | undefined> {
-    if (!db) return undefined;
-    const [card] = await db.select().from(kanbanCards).where(eq(kanbanCards.id, id));
+    if (!this.db) return undefined;
+    const [card] = await this.db.select().from(kanbanCards).where(eq(kanbanCards.id, id));
     return card;
   }
   async getKanbanCards(projectId: string): Promise<KanbanCard[]> {
-    if (!db) return [];
-    return await db.select().from(kanbanCards).where(eq(kanbanCards.projectId, projectId));
+    if (!this.db) return [];
+    return await this.db.select().from(kanbanCards).where(eq(kanbanCards.projectId, projectId));
   }
   async createKanbanCard(insertCard: InsertKanbanCard): Promise<KanbanCard> {
-    if (!db) throw new Error("Database not connected");
-    const [card] = await db.insert(kanbanCards).values(insertCard).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [card] = await this.db.insert(kanbanCards).values(insertCard).returning();
     return card;
   }
   async updateKanbanCard(id: string, data: Partial<KanbanCard>): Promise<KanbanCard | undefined> {
-    if (!db) return undefined;
-    const [card] = await db.update(kanbanCards).set(data).where(eq(kanbanCards.id, id)).returning();
+    if (!this.db) return undefined;
+    const [card] = await this.db.update(kanbanCards).set(data).where(eq(kanbanCards.id, id)).returning();
     return card;
   }
   async deleteKanbanCard(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(kanbanCards).where(eq(kanbanCards.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(kanbanCards).where(eq(kanbanCards.id, id)).returning();
     return result.length > 0;
   }
 
   // Kanban Comments
   async getKanbanComments(cardId: string): Promise<KanbanCommentWithUser[]> {
-    if (!db) return [];
-    return await db
+    if (!this.db) return [];
+    return await this.db
       .select({
         id: kanbanComments.id,
         tenantId: kanbanComments.tenantId,
@@ -833,202 +835,202 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(kanbanComments.createdAt));
   }
   async createKanbanComment(insertComment: InsertKanbanComment): Promise<KanbanComment> {
-    if (!db) throw new Error("Database not connected");
-    const [comment] = await db.insert(kanbanComments).values(insertComment).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [comment] = await this.db.insert(kanbanComments).values(insertComment).returning();
     return comment;
   }
 
   // Kanban Labels
   async getKanbanLabels(projectId: string): Promise<KanbanLabel[]> {
-    if (!db) return [];
-    return await db.select().from(kanbanLabels).where(eq(kanbanLabels.projectId, projectId));
+    if (!this.db) return [];
+    return await this.db.select().from(kanbanLabels).where(eq(kanbanLabels.projectId, projectId));
   }
   async createKanbanLabel(label: InsertKanbanLabel): Promise<KanbanLabel> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(kanbanLabels).values(label).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(kanbanLabels).values(label).returning();
     return created;
   }
   async updateKanbanLabel(id: string, data: Partial<KanbanLabel>): Promise<KanbanLabel | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(kanbanLabels).set(data).where(eq(kanbanLabels.id, id)).returning();
+    if (!this.db) return undefined;
+    const [updated] = await this.db.update(kanbanLabels).set(data).where(eq(kanbanLabels.id, id)).returning();
     return updated;
   }
   async deleteKanbanLabel(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(kanbanLabels).where(eq(kanbanLabels.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(kanbanLabels).where(eq(kanbanLabels.id, id)).returning();
     return result.length > 0;
   }
 
   // Kanban Card Dependencies
   async getCardDependencies(cardId: string): Promise<{ blockedBy: KanbanCardDependency[]; blocks: KanbanCardDependency[] }> {
-    if (!db) return { blockedBy: [], blocks: [] };
+    if (!this.db) return { blockedBy: [], blocks: [] };
     const [blockedBy, blocks] = await Promise.all([
-      db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.blockedCardId, cardId)),
-      db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.blockingCardId, cardId)),
+      this.db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.blockedCardId, cardId)),
+      this.db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.blockingCardId, cardId)),
     ]);
     return { blockedBy, blocks };
   }
   async getProjectBlockedCardIds(projectId: string): Promise<Set<string>> {
-    if (!db) return new Set();
-    const deps = await db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.projectId, projectId));
+    if (!this.db) return new Set();
+    const deps = await this.db.select().from(kanbanCardDependencies).where(eq(kanbanCardDependencies.projectId, projectId));
     return new Set(deps.map(d => d.blockedCardId));
   }
   async addCardDependency(data: InsertKanbanCardDependency): Promise<KanbanCardDependency> {
-    if (!db) throw new Error("Database not connected");
-    const [dep] = await db.insert(kanbanCardDependencies).values(data).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [dep] = await this.db.insert(kanbanCardDependencies).values(data).returning();
     return dep;
   }
   async removeCardDependency(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(kanbanCardDependencies).where(eq(kanbanCardDependencies.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(kanbanCardDependencies).where(eq(kanbanCardDependencies.id, id)).returning();
     return result.length > 0;
   }
 
   // Objectives
   async getObjective(id: string): Promise<Objective | undefined> {
-    if (!db) return undefined;
-    const [obj] = await db.select().from(objectives).where(eq(objectives.id, id));
+    if (!this.db) return undefined;
+    const [obj] = await this.db.select().from(objectives).where(eq(objectives.id, id));
     return obj;
   }
   async getObjectives(): Promise<Objective[]> {
-    if (!db) return [];
-    return await db.select().from(objectives);
+    if (!this.db) return [];
+    return await this.db.select().from(objectives);
   }
   async createObjective(insertObjective: InsertObjective): Promise<Objective> {
-    if (!db) throw new Error("Database not connected");
-    const [obj] = await db.insert(objectives).values(insertObjective).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [obj] = await this.db.insert(objectives).values(insertObjective).returning();
     return obj;
   }
   async updateObjective(id: string, data: Partial<Objective>): Promise<Objective | undefined> {
-    if (!db) return undefined;
-    const [obj] = await db.update(objectives).set(data).where(eq(objectives.id, id)).returning();
+    if (!this.db) return undefined;
+    const [obj] = await this.db.update(objectives).set(data).where(eq(objectives.id, id)).returning();
     return obj;
   }
   async deleteObjective(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(objectives).where(eq(objectives.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(objectives).where(eq(objectives.id, id)).returning();
     return result.length > 0;
   }
 
   // Key Results
   async getKeyResult(id: string): Promise<KeyResult | undefined> {
-    if (!db) return undefined;
-    const [kr] = await db.select().from(keyResults).where(eq(keyResults.id, id));
+    if (!this.db) return undefined;
+    const [kr] = await this.db.select().from(keyResults).where(eq(keyResults.id, id));
     return kr;
   }
   async getKeyResults(): Promise<KeyResult[]> {
-    if (!db) return [];
-    return await db.select().from(keyResults);
+    if (!this.db) return [];
+    return await this.db.select().from(keyResults);
   }
   async getKeyResultsByObjective(objectiveId: string): Promise<KeyResult[]> {
-    if (!db) return [];
-    return await db.select().from(keyResults).where(eq(keyResults.objectiveId, objectiveId));
+    if (!this.db) return [];
+    return await this.db.select().from(keyResults).where(eq(keyResults.objectiveId, objectiveId));
   }
   async createKeyResult(insertKR: InsertKeyResult): Promise<KeyResult> {
-    if (!db) throw new Error("Database not connected");
-    const [kr] = await db.insert(keyResults).values(insertKR).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [kr] = await this.db.insert(keyResults).values(insertKR).returning();
     return kr;
   }
   async updateKeyResult(id: string, data: Partial<KeyResult>): Promise<KeyResult | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
-    const [kr] = await db.update(keyResults).set(updateData).where(eq(keyResults.id, id)).returning();
+    const [kr] = await this.db.update(keyResults).set(updateData).where(eq(keyResults.id, id)).returning();
     return kr;
   }
   async deleteKeyResult(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(keyResults).where(eq(keyResults.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(keyResults).where(eq(keyResults.id, id)).returning();
     return result.length > 0;
   }
 
   // Key Result Updates (Check-ins)
   async getKeyResultUpdates(keyResultId: string): Promise<KeyResultUpdate[]> {
-    if (!db) return [];
-    return await db.select().from(keyResultUpdates).where(eq(keyResultUpdates.keyResultId, keyResultId));
+    if (!this.db) return [];
+    return await this.db.select().from(keyResultUpdates).where(eq(keyResultUpdates.keyResultId, keyResultId));
   }
   async createKeyResultUpdate(update: InsertKeyResultUpdate): Promise<KeyResultUpdate> {
-    if (!db) throw new Error("Database not connected");
-    const [u] = await db.insert(keyResultUpdates).values(update).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [u] = await this.db.insert(keyResultUpdates).values(update).returning();
     return u;
   }
 
   // Shipments
   async getShipment(id: string): Promise<Shipment | undefined> {
-    if (!db) return undefined;
-    const [s] = await db.select().from(shipments).where(eq(shipments.id, id));
+    if (!this.db) return undefined;
+    const [s] = await this.db.select().from(shipments).where(eq(shipments.id, id));
     return s;
   }
   async getShipments(): Promise<Shipment[]> {
-    if (!db) return [];
-    return await db.select().from(shipments);
+    if (!this.db) return [];
+    return await this.db.select().from(shipments);
   }
   async createShipment(insertShipment: InsertShipment): Promise<Shipment> {
-    if (!db) throw new Error("Database not connected");
-    const [s] = await db.insert(shipments).values(insertShipment).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [s] = await this.db.insert(shipments).values(insertShipment).returning();
     return s;
   }
   async updateShipment(id: string, data: Partial<Shipment>): Promise<Shipment | undefined> {
-    if (!db) return undefined;
-    const [s] = await db.update(shipments).set(data).where(eq(shipments.id, id)).returning();
+    if (!this.db) return undefined;
+    const [s] = await this.db.update(shipments).set(data).where(eq(shipments.id, id)).returning();
     return s;
   }
   async deleteShipment(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(shipments).where(eq(shipments.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(shipments).where(eq(shipments.id, id)).returning();
     return result.length > 0;
   }
 
   // Shipment Events
   async getShipmentEvents(shipmentId: string): Promise<ShipmentEvent[]> {
-    if (!db) return [];
-    return await db.select().from(shipmentEvents).where(eq(shipmentEvents.shipmentId, shipmentId));
+    if (!this.db) return [];
+    return await this.db.select().from(shipmentEvents).where(eq(shipmentEvents.shipmentId, shipmentId));
   }
   async createShipmentEvent(insertEvent: InsertShipmentEvent): Promise<ShipmentEvent> {
-    if (!db) throw new Error("Database not connected");
-    const [e] = await db.insert(shipmentEvents).values(insertEvent).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [e] = await this.db.insert(shipmentEvents).values(insertEvent).returning();
     return e;
   }
 
   // Settings - usa apenas dados da base (settings table). Sem mocks de logo para evitar paths inexistentes.
   async getSetting(key: string): Promise<Setting | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     try {
-      const [s] = await db.select().from(settings).where(eq(settings.key, key));
+      const [s] = await this.db.select().from(settings).where(eq(settings.key, key));
       return s ?? undefined;
     } catch (e) {
       return undefined;
     }
   }
   async getSettings(): Promise<Setting[]> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     try {
-      return await db.select().from(settings);
+      return await this.db.select().from(settings);
     } catch (e) {
       console.error("[storage] Error fetching settings:", e);
       throw e;
     }
   }
   async setSetting(key: string, value: string): Promise<Setting> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     const existing = await this.getSetting(key);
     if (existing) {
-      const [updated] = await db.update(settings).set({ value, updatedAt: new Date() }).where(eq(settings.id, existing.id)).returning();
+      const [updated] = await this.db.update(settings).set({ value, updatedAt: new Date() }).where(eq(settings.id, existing.id)).returning();
       return updated;
     }
-    const [created] = await db.insert(settings).values({ key, value }).returning();
+    const [created] = await this.db.insert(settings).values({ key, value }).returning();
     return created;
   }
 
   // Task Tags (formerly Task Areas)
   async getTaskTag(id: string): Promise<TaskTag | undefined> {
-    if (!db) return undefined;
-    const [t] = await db.select().from(taskTags).where(eq(taskTags.id, id));
+    if (!this.db) return undefined;
+    const [t] = await this.db.select().from(taskTags).where(eq(taskTags.id, id));
     return t;
   }
   async getTaskTags(userId: string): Promise<TaskTag[]> {
-    if (!db) return [];
-    const allTags = await db.select().from(taskTags).orderBy(asc(taskTags.displayOrder));
-    const memberRecords = await db.select().from(taskTagMembers).where(eq(taskTagMembers.userId, userId));
+    if (!this.db) return [];
+    const allTags = await this.db.select().from(taskTags).orderBy(asc(taskTags.displayOrder));
+    const memberRecords = await this.db.select().from(taskTagMembers).where(eq(taskTagMembers.userId, userId));
     const memberTagIds = new Set(memberRecords.map(m => m.tagId));
     return allTags.filter(tag =>
       tag.visibility === "public" ||
@@ -1037,18 +1039,18 @@ export class DatabaseStorage implements IStorage {
     );
   }
   async createTaskTag(insertTag: InsertTaskTag): Promise<TaskTag> {
-    if (!db) throw new Error("Database not connected");
-    const [t] = await db.insert(taskTags).values(insertTag).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [t] = await this.db.insert(taskTags).values(insertTag).returning();
     return t;
   }
   async updateTaskTag(id: string, data: Partial<TaskTag>): Promise<TaskTag | undefined> {
-    if (!db) return undefined;
-    const [t] = await db.update(taskTags).set(data).where(eq(taskTags.id, id)).returning();
+    if (!this.db) return undefined;
+    const [t] = await this.db.update(taskTags).set(data).where(eq(taskTags.id, id)).returning();
     return t;
   }
   async deleteTaskTag(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(taskTags).where(eq(taskTags.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(taskTags).where(eq(taskTags.id, id)).returning();
     return result.length > 0;
   }
   // Backward compatibility aliases
@@ -1070,22 +1072,22 @@ export class DatabaseStorage implements IStorage {
 
   // Task Tag Members (formerly Task Area Members)
   async getTaskTagMembers(tagId: string): Promise<TaskTagMember[]> {
-    if (!db) return [];
-    return await db.select().from(taskTagMembers).where(eq(taskTagMembers.tagId, tagId));
+    if (!this.db) return [];
+    return await this.db.select().from(taskTagMembers).where(eq(taskTagMembers.tagId, tagId));
   }
   async addTaskTagMember(member: InsertTaskTagMember): Promise<TaskTagMember> {
-    if (!db) throw new Error("Database not connected");
-    const [m] = await db.insert(taskTagMembers).values(member).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [m] = await this.db.insert(taskTagMembers).values(member).returning();
     return m;
   }
   async updateTaskTagMember(id: string, data: Partial<TaskTagMember>): Promise<TaskTagMember | undefined> {
-    if (!db) return undefined;
-    const [m] = await db.update(taskTagMembers).set(data).where(eq(taskTagMembers.id, id)).returning();
+    if (!this.db) return undefined;
+    const [m] = await this.db.update(taskTagMembers).set(data).where(eq(taskTagMembers.id, id)).returning();
     return m;
   }
   async removeTaskTagMember(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(taskTagMembers).where(eq(taskTagMembers.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(taskTagMembers).where(eq(taskTagMembers.id, id)).returning();
     return result.length > 0;
   }
   // Backward compatibility aliases
@@ -1104,13 +1106,13 @@ export class DatabaseStorage implements IStorage {
 
   // Tasks
   async getTask(id: string): Promise<Task | undefined> {
-    if (!db) return undefined;
-    const [t] = await db.select().from(tasks).where(eq(tasks.id, id));
+    if (!this.db) return undefined;
+    const [t] = await this.db.select().from(tasks).where(eq(tasks.id, id));
     return t;
   }
   async getTasks(filters?: { tagId?: string; areaId?: string; status?: string; assigneeId?: string; createdBy?: string; type?: string; isRecurring?: boolean; visibility?: string; subTaskParentId?: string }): Promise<Task[]> {
-    if (!db) return [];
-    let baseQuery = db.select().from(tasks);
+    if (!this.db) return [];
+    let baseQuery = this.db.select().from(tasks);
     const conditions = [];
     // Support both tagId and areaId for backward compatibility
     if (filters?.tagId) conditions.push(eq(tasks.tagId, filters.tagId));
@@ -1129,64 +1131,64 @@ export class DatabaseStorage implements IStorage {
     return await baseQuery;
   }
   async getSubTasks(parentId: string): Promise<Task[]> {
-    if (!db) return [];
-    return await db.select().from(tasks).where(eq(tasks.subTaskParentId, parentId));
+    if (!this.db) return [];
+    return await this.db.select().from(tasks).where(eq(tasks.subTaskParentId, parentId));
   }
   async getTasksWithConditions(conditions: SQL | undefined): Promise<Task[]> {
-    if (!db) return [];
-    return await db.select().from(tasks).where(conditions);
+    if (!this.db) return [];
+    return await this.db.select().from(tasks).where(conditions);
   }
   async createTask(task: InsertTask): Promise<Task> {
-    if (!db) throw new Error("Database not connected");
-    const [t] = await db.insert(tasks).values(task).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [t] = await this.db.insert(tasks).values(task).returning();
     return t;
   }
   async updateTask(id: string, data: Partial<Task>): Promise<Task | undefined> {
-    if (!db) return undefined;
-    const [t] = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
+    if (!this.db) return undefined;
+    const [t] = await this.db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
     return t;
   }
   async deleteTask(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(tasks).where(eq(tasks.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(tasks).where(eq(tasks.id, id)).returning();
     return result.length > 0;
   }
   async deleteTaskRecurrenceSeries(taskId: string): Promise<number> {
-    if (!db) return 0;
+    if (!this.db) return 0;
     const task = await this.getTask(taskId);
     if (!task) return 0;
     // Find the parent ID: if this task IS the parent, use its id; otherwise use its parentTaskId
     const parentId = task.isRecurring ? task.id : task.parentTaskId;
     if (!parentId) {
       // Not part of a series — just delete this one
-      await db.delete(tasks).where(eq(tasks.id, taskId));
+      await this.db.delete(tasks).where(eq(tasks.id, taskId));
       return 1;
     }
     // Delete all children + parent
-    const children = await db.delete(tasks).where(eq(tasks.parentTaskId, parentId)).returning();
-    const parent = await db.delete(tasks).where(eq(tasks.id, parentId)).returning();
+    const children = await this.db.delete(tasks).where(eq(tasks.parentTaskId, parentId)).returning();
+    const parent = await this.db.delete(tasks).where(eq(tasks.id, parentId)).returning();
     return children.length + parent.length;
   }
   async deleteTaskRecurrenceFuture(taskId: string): Promise<number> {
-    if (!db) return 0;
+    if (!this.db) return 0;
     const task = await this.getTask(taskId);
     if (!task) return 0;
     const parentId = task.isRecurring ? task.id : task.parentTaskId;
     if (!parentId) {
-      await db.delete(tasks).where(eq(tasks.id, taskId));
+      await this.db.delete(tasks).where(eq(tasks.id, taskId));
       return 1;
     }
     // Delete this task + all future siblings (dueDate >= this task's dueDate)
     const refDate = task.dueDate ?? task.createdAt;
     let deleted = 0;
     if (refDate) {
-      const futureChildren = await db.delete(tasks).where(
+      const futureChildren = await this.db.delete(tasks).where(
         and(eq(tasks.parentTaskId, parentId), gt(tasks.dueDate, refDate))
       ).returning();
       deleted += futureChildren.length;
     }
     // Delete the current task itself
-    await db.delete(tasks).where(eq(tasks.id, taskId));
+    await this.db.delete(tasks).where(eq(tasks.id, taskId));
     deleted += 1;
     // If we're deleting the parent, also stop recurrence
     if (task.isRecurring) {
@@ -1200,8 +1202,8 @@ export class DatabaseStorage implements IStorage {
    * sem excluir o registro da reunião. A instância se torna uma reunião avulsa.
    */
   async removeTaskRecurrence(id: string): Promise<Task | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db
+    if (!this.db) return undefined;
+    const [updated] = await this.db
       .update(tasks)
       .set({
         parentTaskId: null,
@@ -1217,8 +1219,8 @@ export class DatabaseStorage implements IStorage {
 
   // Task Comments
   async getTaskComments(taskId: string): Promise<TaskCommentWithUser[]> {
-    if (!db) return [];
-    return await db
+    if (!this.db) return [];
+    return await this.db
       .select({
         id: taskComments.id,
         tenantId: taskComments.tenantId,
@@ -1240,105 +1242,105 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(taskComments.createdAt));
   }
   async getTaskComment(id: string): Promise<TaskComment | undefined> {
-    if (!db) return undefined;
-    const [c] = await db.select().from(taskComments).where(eq(taskComments.id, id));
+    if (!this.db) return undefined;
+    const [c] = await this.db.select().from(taskComments).where(eq(taskComments.id, id));
     return c;
   }
   async createTaskComment(comment: InsertTaskComment): Promise<TaskComment> {
-    if (!db) throw new Error("Database not connected");
-    const [c] = await db.insert(taskComments).values(comment).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [c] = await this.db.insert(taskComments).values(comment).returning();
     return c;
   }
   async updateTaskComment(id: string, data: Partial<TaskComment>): Promise<TaskComment | undefined> {
-    if (!db) return undefined;
-    const [c] = await db.update(taskComments).set(data).where(eq(taskComments.id, id)).returning();
+    if (!this.db) return undefined;
+    const [c] = await this.db.update(taskComments).set(data).where(eq(taskComments.id, id)).returning();
     return c;
   }
   async deleteTaskComment(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(taskComments).where(eq(taskComments.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(taskComments).where(eq(taskComments.id, id)).returning();
     return result.length > 0;
   }
 
   // Task Reactions
   async getTaskReactions(commentId: string): Promise<TaskReaction[]> {
-    if (!db) return [];
-    return await db.select().from(taskReactions).where(eq(taskReactions.commentId, commentId));
+    if (!this.db) return [];
+    return await this.db.select().from(taskReactions).where(eq(taskReactions.commentId, commentId));
   }
   async addTaskReaction(reaction: InsertTaskReaction): Promise<TaskReaction> {
-    if (!db) throw new Error("Database not connected");
-    const [r] = await db.insert(taskReactions).values(reaction).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [r] = await this.db.insert(taskReactions).values(reaction).returning();
     return r;
   }
   async removeTaskReaction(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(taskReactions).where(eq(taskReactions.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(taskReactions).where(eq(taskReactions.id, id)).returning();
     return result.length > 0;
   }
 
   // Task Attachments
   async getTaskAttachments(taskId: string): Promise<TaskAttachment[]> {
-    if (!db) return [];
-    return await db.select().from(taskAttachments).where(eq(taskAttachments.taskId, taskId));
+    if (!this.db) return [];
+    return await this.db.select().from(taskAttachments).where(eq(taskAttachments.taskId, taskId));
   }
   async addTaskAttachment(attachment: InsertTaskAttachment): Promise<TaskAttachment> {
-    if (!db) throw new Error("Database not connected");
-    const [a] = await db.insert(taskAttachments).values(attachment).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [a] = await this.db.insert(taskAttachments).values(attachment).returning();
     return a;
   }
   async removeTaskAttachment(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(taskAttachments).where(eq(taskAttachments.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(taskAttachments).where(eq(taskAttachments.id, id)).returning();
     return result.length > 0;
   }
 
   // Task Templates
   async getTaskTemplates(type?: string): Promise<TaskTemplate[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     if (type) {
-      return await db.select().from(taskTemplates).where(eq(taskTemplates.type, type));
+      return await this.db.select().from(taskTemplates).where(eq(taskTemplates.type, type));
     }
-    return await db.select().from(taskTemplates);
+    return await this.db.select().from(taskTemplates);
   }
   async getTaskTemplate(id: string): Promise<TaskTemplate | undefined> {
-    if (!db) return undefined;
-    const [t] = await db.select().from(taskTemplates).where(eq(taskTemplates.id, id));
+    if (!this.db) return undefined;
+    const [t] = await this.db.select().from(taskTemplates).where(eq(taskTemplates.id, id));
     return t;
   }
   async createTaskTemplate(template: InsertTaskTemplate): Promise<TaskTemplate> {
-    if (!db) throw new Error("Database not connected");
-    const [t] = await db.insert(taskTemplates).values(template).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [t] = await this.db.insert(taskTemplates).values(template).returning();
     return t;
   }
   async deleteTaskTemplate(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(taskTemplates).where(eq(taskTemplates.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(taskTemplates).where(eq(taskTemplates.id, id)).returning();
     return result.length > 0;
   }
   async updateTaskTemplate(id: string, data: Partial<InsertTaskTemplate>): Promise<TaskTemplate | undefined> {
-    if (!db) return undefined;
-    const [t] = await db.update(taskTemplates)
+    if (!this.db) return undefined;
+    const [t] = await this.db.update(taskTemplates)
       .set(data)
       .where(eq(taskTemplates.id, id))
       .returning();
     return t;
   }
   async setDefaultTaskTemplate(id: string, type: string): Promise<boolean> {
-    if (!db) return false;
+    if (!this.db) return false;
     // Remove default from all templates of the same type
-    await db.update(taskTemplates)
+    await this.db.update(taskTemplates)
       .set({ isDefault: false })
       .where(eq(taskTemplates.type, type));
     // Set the selected template as default
-    const result = await db.update(taskTemplates)
+    const result = await this.db.update(taskTemplates)
       .set({ isDefault: true })
       .where(eq(taskTemplates.id, id))
       .returning();
     return result.length > 0;
   }
   async unsetDefaultTaskTemplate(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.update(taskTemplates)
+    if (!this.db) return false;
+    const result = await this.db.update(taskTemplates)
       .set({ isDefault: false })
       .where(eq(taskTemplates.id, id))
       .returning();
@@ -1347,96 +1349,96 @@ export class DatabaseStorage implements IStorage {
 
   // Logistic Operators
   async getLogisticOperator(id: string): Promise<LogisticOperator | undefined> {
-    if (!db) return undefined;
-    const [o] = await db.select().from(logisticOperators).where(eq(logisticOperators.id, id));
+    if (!this.db) return undefined;
+    const [o] = await this.db.select().from(logisticOperators).where(eq(logisticOperators.id, id));
     return o;
   }
   async getLogisticOperators(): Promise<LogisticOperator[]> {
-    if (!db) return [];
-    return await db.select().from(logisticOperators);
+    if (!this.db) return [];
+    return await this.db.select().from(logisticOperators);
   }
   async createLogisticOperator(operator: InsertLogisticOperator): Promise<LogisticOperator> {
-    if (!db) throw new Error("Database not connected");
-    const [o] = await db.insert(logisticOperators).values(operator).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [o] = await this.db.insert(logisticOperators).values(operator).returning();
     return o;
   }
   async updateLogisticOperator(id: string, data: Partial<LogisticOperator>): Promise<LogisticOperator | undefined> {
-    if (!db) return undefined;
-    const [o] = await db.update(logisticOperators).set(data).where(eq(logisticOperators.id, id)).returning();
+    if (!this.db) return undefined;
+    const [o] = await this.db.update(logisticOperators).set(data).where(eq(logisticOperators.id, id)).returning();
     return o;
   }
   async deleteLogisticOperator(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(logisticOperators).where(eq(logisticOperators.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(logisticOperators).where(eq(logisticOperators.id, id)).returning();
     return result.length > 0;
   }
 
   // Collection Requests
   async getCollectionRequest(id: string): Promise<CollectionRequest | undefined> {
-    if (!db) return undefined;
-    const [r] = await db.select().from(collectionRequests).where(eq(collectionRequests.id, id));
+    if (!this.db) return undefined;
+    const [r] = await this.db.select().from(collectionRequests).where(eq(collectionRequests.id, id));
     return r;
   }
   async getCollectionRequests(): Promise<CollectionRequest[]> {
-    if (!db) return [];
-    return await db.select().from(collectionRequests);
+    if (!this.db) return [];
+    return await this.db.select().from(collectionRequests);
   }
   async createCollectionRequest(request: InsertCollectionRequest): Promise<CollectionRequest> {
-    if (!db) throw new Error("Database not connected");
-    const [r] = await db.insert(collectionRequests).values(request).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [r] = await this.db.insert(collectionRequests).values(request).returning();
     return r;
   }
   async updateCollectionRequest(id: string, data: Partial<CollectionRequest>): Promise<CollectionRequest | undefined> {
-    if (!db) return undefined;
-    const [r] = await db.update(collectionRequests).set(data).where(eq(collectionRequests.id, id)).returning();
+    if (!this.db) return undefined;
+    const [r] = await this.db.update(collectionRequests).set(data).where(eq(collectionRequests.id, id)).returning();
     return r;
   }
   async deleteCollectionRequest(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(collectionRequests).where(eq(collectionRequests.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(collectionRequests).where(eq(collectionRequests.id, id)).returning();
     return result.length > 0;
   }
 
   // Logistica Reversa Pedidos
   async getLogisticaReversaPedido(id: string): Promise<LogisticaReversaPedido | undefined> {
-    if (!db) return undefined;
-    const [p] = await db.select().from(logisticaReversaPedidos).where(eq(logisticaReversaPedidos.id, id));
+    if (!this.db) return undefined;
+    const [p] = await this.db.select().from(logisticaReversaPedidos).where(eq(logisticaReversaPedidos.id, id));
     return p;
   }
   async getLogisticaReversaPedidos(): Promise<LogisticaReversaPedido[]> {
-    if (!db) return [];
-    return await db.select().from(logisticaReversaPedidos);
+    if (!this.db) return [];
+    return await this.db.select().from(logisticaReversaPedidos);
   }
   async createLogisticaReversaPedido(pedido: InsertLogisticaReversaPedido): Promise<LogisticaReversaPedido> {
-    if (!db) throw new Error("Database not connected");
-    const [p] = await db.insert(logisticaReversaPedidos).values(pedido).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [p] = await this.db.insert(logisticaReversaPedidos).values(pedido).returning();
     return p;
   }
   async updateLogisticaReversaPedido(id: string, data: Partial<LogisticaReversaPedido>): Promise<LogisticaReversaPedido | undefined> {
-    if (!db) return undefined;
-    const [p] = await db.update(logisticaReversaPedidos).set(data).where(eq(logisticaReversaPedidos.id, id)).returning();
+    if (!this.db) return undefined;
+    const [p] = await this.db.update(logisticaReversaPedidos).set(data).where(eq(logisticaReversaPedidos.id, id)).returning();
     return p;
   }
   async deleteLogisticaReversaPedido(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(logisticaReversaPedidos).where(eq(logisticaReversaPedidos.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(logisticaReversaPedidos).where(eq(logisticaReversaPedidos.id, id)).returning();
     return result.length > 0;
   }
 
   // Logistica Reversa Eventos
   async getLogisticaReversaEventos(pedidoId: string): Promise<LogisticaReversaEvento[]> {
-    if (!db) return [];
-    return await db.select().from(logisticaReversaEventos).where(eq(logisticaReversaEventos.pedidoId, pedidoId));
+    if (!this.db) return [];
+    return await this.db.select().from(logisticaReversaEventos).where(eq(logisticaReversaEventos.pedidoId, pedidoId));
   }
   async createLogisticaReversaEvento(evento: InsertLogisticaReversaEvento): Promise<LogisticaReversaEvento> {
-    if (!db) throw new Error("Database not connected");
-    const [e] = await db.insert(logisticaReversaEventos).values(evento).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [e] = await this.db.insert(logisticaReversaEventos).values(evento).returning();
     return e;
   }
 
   // Dashboard Stats
   async getLogisticsDashboardStats(): Promise<LogisticsDashboardStats> {
-    if (!db) {
+    if (!this.db) {
       return {
         totalRequests: 0,
         totalValue: 0,
@@ -1459,17 +1461,17 @@ export class DatabaseStorage implements IStorage {
 
   // SLA Rules
   async getSlaRules(): Promise<SlaRule[]> {
-    if (!db) return [];
-    return await db.select().from(slaRules);
+    if (!this.db) return [];
+    return await this.db.select().from(slaRules);
   }
   async getSlaRule(id: string): Promise<SlaRule | undefined> {
-    if (!db) return undefined;
-    const [rule] = await db.select().from(slaRules).where(eq(slaRules.id, id));
+    if (!this.db) return undefined;
+    const [rule] = await this.db.select().from(slaRules).where(eq(slaRules.id, id));
     return rule;
   }
   async getSlaRuleByTipoAndPrioridade(tipo: string, prioridade: string): Promise<SlaRule | undefined> {
-    if (!db) return undefined;
-    const [rule] = await db.select().from(slaRules).where(
+    if (!this.db) return undefined;
+    const [rule] = await this.db.select().from(slaRules).where(
       and(
         eq(slaRules.tipo, tipo),
         eq(slaRules.prioridade, prioridade),
@@ -1479,31 +1481,31 @@ export class DatabaseStorage implements IStorage {
     return rule;
   }
   async createSlaRule(rule: InsertSlaRule): Promise<SlaRule> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(slaRules).values(rule).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(slaRules).values(rule).returning();
     return created;
   }
   async updateSlaRule(id: string, data: Partial<SlaRule>): Promise<SlaRule | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
-    const [updated] = await db.update(slaRules).set(updateData).where(eq(slaRules.id, id)).returning();
+    const [updated] = await this.db.update(slaRules).set(updateData).where(eq(slaRules.id, id)).returning();
     return updated;
   }
   async deleteSlaRule(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(slaRules).where(eq(slaRules.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(slaRules).where(eq(slaRules.id, id)).returning();
     return result.length > 0;
   }
 
   // Pricing Devices
   async getPricingDevice(id: string): Promise<PricingDevice | undefined> {
-    if (!db) return undefined;
-    const [device] = await db.select().from(pricingDevices).where(eq(pricingDevices.id, id));
+    if (!this.db) return undefined;
+    const [device] = await this.db.select().from(pricingDevices).where(eq(pricingDevices.id, id));
     return device;
   }
   async getPricingDevices(filters?: { categoryId?: string; manufacturerName?: string; isActive?: boolean }): Promise<PricingDevice[]> {
-    if (!db) return [];
-    let query = db.select().from(pricingDevices);
+    if (!this.db) return [];
+    let query = this.db.select().from(pricingDevices);
     const conditions: SQL[] = [];
     if (filters?.categoryId) {
       conditions.push(eq(pricingDevices.categoryId, filters.categoryId));
@@ -1520,116 +1522,116 @@ export class DatabaseStorage implements IStorage {
     return await query;
   }
   async createPricingDevice(device: InsertPricingDevice): Promise<PricingDevice> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(pricingDevices).values(device).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(pricingDevices).values(device).returning();
     return created;
   }
   async updatePricingDevice(id: string, data: Partial<PricingDevice>): Promise<PricingDevice | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
-    const [updated] = await db.update(pricingDevices).set(updateData).where(eq(pricingDevices.id, id)).returning();
+    const [updated] = await this.db.update(pricingDevices).set(updateData).where(eq(pricingDevices.id, id)).returning();
     return updated;
   }
   async deletePricingDevice(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(pricingDevices).where(eq(pricingDevices.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(pricingDevices).where(eq(pricingDevices.id, id)).returning();
     return result.length > 0;
   }
 
   // Pricing Price History
   async getPricingPriceHistory(deviceId: string, startDate?: Date, endDate?: Date): Promise<PricingPriceHistory[]> {
-    if (!db) return [];
-    return await db.select().from(pricingPriceHistory).where(eq(pricingPriceHistory.deviceId, deviceId));
+    if (!this.db) return [];
+    return await this.db.select().from(pricingPriceHistory).where(eq(pricingPriceHistory.deviceId, deviceId));
   }
   async createPricingPriceHistory(history: InsertPricingPriceHistory): Promise<PricingPriceHistory> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(pricingPriceHistory).values(history).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(pricingPriceHistory).values(history).returning();
     return created;
   }
 
   // Pricing Alerts
   async getPricingAlerts(userId?: string): Promise<PricingAlert[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     if (userId) {
-      return await db.select().from(pricingAlerts).where(eq(pricingAlerts.userId, userId));
+      return await this.db.select().from(pricingAlerts).where(eq(pricingAlerts.userId, userId));
     }
-    return await db.select().from(pricingAlerts);
+    return await this.db.select().from(pricingAlerts);
   }
   async getPricingAlert(id: string): Promise<PricingAlert | undefined> {
-    if (!db) return undefined;
-    const [alert] = await db.select().from(pricingAlerts).where(eq(pricingAlerts.id, id));
+    if (!this.db) return undefined;
+    const [alert] = await this.db.select().from(pricingAlerts).where(eq(pricingAlerts.id, id));
     return alert;
   }
   async createPricingAlert(alert: InsertPricingAlert): Promise<PricingAlert> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(pricingAlerts).values(alert).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(pricingAlerts).values(alert).returning();
     return created;
   }
   async updatePricingAlert(id: string, data: Partial<PricingAlert>): Promise<PricingAlert | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(pricingAlerts).set(data).where(eq(pricingAlerts.id, id)).returning();
+    if (!this.db) return undefined;
+    const [updated] = await this.db.update(pricingAlerts).set(data).where(eq(pricingAlerts.id, id)).returning();
     return updated;
   }
   async deletePricingAlert(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(pricingAlerts).where(eq(pricingAlerts.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(pricingAlerts).where(eq(pricingAlerts.id, id)).returning();
     return result.length > 0;
   }
 
   // Pricing Scraped Data (Concurrent Prices)
   async getPricingScrapedData(deviceId: string): Promise<PricingScrapedData[]> {
-    if (!db) return [];
-    return await db.select().from(pricingScrapedData).where(eq(pricingScrapedData.deviceId, deviceId));
+    if (!this.db) return [];
+    return await this.db.select().from(pricingScrapedData).where(eq(pricingScrapedData.deviceId, deviceId));
   }
   async getLatestPricingScrapedData(deviceId: string): Promise<PricingScrapedData | undefined> {
-    if (!db) return undefined;
-    const [data] = await db.select().from(pricingScrapedData)
+    if (!this.db) return undefined;
+    const [data] = await this.db.select().from(pricingScrapedData)
       .where(eq(pricingScrapedData.deviceId, deviceId))
       .orderBy(desc(pricingScrapedData.scrapedAt))
       .limit(1);
     return data;
   }
   async createPricingScrapedData(data: InsertPricingScrapedData): Promise<PricingScrapedData> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(pricingScrapedData).values(data).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(pricingScrapedData).values(data).returning();
     return created;
   }
   async bulkCreatePricingScrapedData(dataList: InsertPricingScrapedData[]): Promise<PricingScrapedData[]> {
-    if (!db) throw new Error("Database not connected");
-    const created = await db.insert(pricingScrapedData).values(dataList).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const created = await this.db.insert(pricingScrapedData).values(dataList).returning();
     return created;
   }
   async deleteOldPricingScrapedData(deviceId: string, keepLatest: boolean = true): Promise<boolean> {
-    if (!db) return false;
+    if (!this.db) return false;
     if (keepLatest) {
       // Keep only the latest record, delete older ones
       const latest = await this.getLatestPricingScrapedData(deviceId);
       if (latest) {
-        await db.delete(pricingScrapedData)
+        await this.db.delete(pricingScrapedData)
           .where(and(
             eq(pricingScrapedData.deviceId, deviceId),
             sql`${pricingScrapedData.id} != ${latest.id}`
           ));
       }
     } else {
-      await db.delete(pricingScrapedData).where(eq(pricingScrapedData.deviceId, deviceId));
+      await this.db.delete(pricingScrapedData).where(eq(pricingScrapedData.deviceId, deviceId));
     }
     return true;
   }
 
   // Meta Areas
   async getMetaAreas(): Promise<MetaArea[]> {
-    if (!db) return [];
-    return await db.select().from(metaAreas).where(eq(metaAreas.archived, false));
+    if (!this.db) return [];
+    return await this.db.select().from(metaAreas).where(eq(metaAreas.archived, false));
   }
   async getMetaArea(id: string): Promise<MetaArea | undefined> {
-    if (!db) return undefined;
-    const [area] = await db.select().from(metaAreas).where(eq(metaAreas.id, id));
+    if (!this.db) return undefined;
+    const [area] = await this.db.select().from(metaAreas).where(eq(metaAreas.id, id));
     return area;
   }
   async getMetaAreaByName(name: string): Promise<MetaArea | undefined> {
-    if (!db) return undefined;
-    const [area] = await db.select().from(metaAreas).where(
+    if (!this.db) return undefined;
+    const [area] = await this.db.select().from(metaAreas).where(
       and(
         eq(sql`LOWER(${metaAreas.name})`, name.toLowerCase()),
         eq(metaAreas.archived, false)
@@ -1638,24 +1640,24 @@ export class DatabaseStorage implements IStorage {
     return area;
   }
   async createMetaArea(area: InsertMetaArea): Promise<MetaArea> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(metaAreas).values(area).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(metaAreas).values(area).returning();
     return created;
   }
   async updateMetaArea(id: string, data: Partial<MetaArea>): Promise<MetaArea | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(metaAreas).set(data).where(eq(metaAreas.id, id)).returning();
+    if (!this.db) return undefined;
+    const [updated] = await this.db.update(metaAreas).set(data).where(eq(metaAreas.id, id)).returning();
     return updated;
   }
   async deleteMetaArea(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(metaAreas).where(eq(metaAreas.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(metaAreas).where(eq(metaAreas.id, id)).returning();
     return result.length > 0;
   }
 
   // Metas (Goals)
   async getMetas(filters?: { month?: string; areaId?: string; responsibleId?: string }): Promise<Meta[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     const conditions = [];
     if (filters?.month) {
       conditions.push(eq(metas.month, filters.month));
@@ -1667,46 +1669,46 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(metas.responsibleId, filters.responsibleId));
     }
     if (conditions.length > 0) {
-      return await db.select().from(metas).where(and(...conditions));
+      return await this.db.select().from(metas).where(and(...conditions));
     }
-    return await db.select().from(metas);
+    return await this.db.select().from(metas);
   }
   async getMeta(id: string): Promise<Meta | undefined> {
-    if (!db) return undefined;
-    const [meta] = await db.select().from(metas).where(eq(metas.id, id));
+    if (!this.db) return undefined;
+    const [meta] = await this.db.select().from(metas).where(eq(metas.id, id));
     return meta;
   }
   async createMeta(meta: InsertMeta): Promise<Meta> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(metas).values(meta).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(metas).values(meta).returning();
     return created;
   }
   async updateMeta(id: string, data: Partial<Meta>): Promise<Meta | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
-    const [updated] = await db.update(metas).set(updateData).where(eq(metas.id, id)).returning();
+    const [updated] = await this.db.update(metas).set(updateData).where(eq(metas.id, id)).returning();
     return updated;
   }
   async deleteMeta(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(metas).where(eq(metas.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(metas).where(eq(metas.id, id)).returning();
     return result.length > 0;
   }
 
   // Meta Check-ins
   async getMetaCheckins(metaId: string): Promise<MetaCheckin[]> {
-    if (!db) return [];
-    return await db.select().from(metaCheckins).where(eq(metaCheckins.metaId, metaId));
+    if (!this.db) return [];
+    return await this.db.select().from(metaCheckins).where(eq(metaCheckins.metaId, metaId));
   }
   async createMetaCheckin(checkin: InsertMetaCheckin): Promise<MetaCheckin> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(metaCheckins).values(checkin).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(metaCheckins).values(checkin).returning();
     return created;
   }
 
   // Knowledge Base Documents
   async getKnowledgeDocuments(filters?: { area?: string; tipo?: string; status?: string; search?: string }): Promise<KnowledgeDocument[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     const conditions = [];
     if (filters?.area) {
       conditions.push(eq(knowledgeDocuments.area, filters.area));
@@ -1729,40 +1731,40 @@ export class DatabaseStorage implements IStorage {
       );
     }
     if (conditions.length > 0) {
-      return await db.select().from(knowledgeDocuments).where(and(...conditions)).orderBy(sql`${knowledgeDocuments.createdAt} DESC`);
+      return await this.db.select().from(knowledgeDocuments).where(and(...conditions)).orderBy(sql`${knowledgeDocuments.createdAt} DESC`);
     }
-    return await db.select().from(knowledgeDocuments).orderBy(sql`${knowledgeDocuments.createdAt} DESC`);
+    return await this.db.select().from(knowledgeDocuments).orderBy(sql`${knowledgeDocuments.createdAt} DESC`);
   }
 
   async getKnowledgeDocument(id: string): Promise<KnowledgeDocument | undefined> {
-    if (!db) return undefined;
-    const [doc] = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, id));
+    if (!this.db) return undefined;
+    const [doc] = await this.db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, id));
     return doc;
   }
 
   async createKnowledgeDocument(doc: InsertKnowledgeDocument): Promise<KnowledgeDocument> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     const data = { ...doc };
     if ((data as any).id) delete (data as any).id;
-    const [created] = await db.insert(knowledgeDocuments).values(data).returning();
+    const [created] = await this.db.insert(knowledgeDocuments).values(data).returning();
     return created;
   }
 
   async updateKnowledgeDocument(id: string, data: Partial<KnowledgeDocument>): Promise<KnowledgeDocument | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     const updateData = { ...data, updatedAt: new Date() };
-    const [updated] = await db.update(knowledgeDocuments).set(updateData).where(eq(knowledgeDocuments.id, id)).returning();
+    const [updated] = await this.db.update(knowledgeDocuments).set(updateData).where(eq(knowledgeDocuments.id, id)).returning();
     return updated;
   }
 
   async deleteKnowledgeDocument(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(knowledgeDocuments).where(eq(knowledgeDocuments.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(knowledgeDocuments).where(eq(knowledgeDocuments.id, id)).returning();
     return result.length > 0;
   }
 
   async getKnowledgeDocumentStats(): Promise<{ total: number; byTipo: Record<string, number>; byArea: Record<string, number>; byStatus: Record<string, number> }> {
-    if (!db) return { total: 0, byTipo: {}, byArea: {}, byStatus: {} };
+    if (!this.db) return { total: 0, byTipo: {}, byArea: {}, byStatus: {} };
     const docs = await this.getKnowledgeDocuments();
     const byTipo: Record<string, number> = {};
     const byArea: Record<string, number> = {};
@@ -1779,135 +1781,135 @@ export class DatabaseStorage implements IStorage {
 
   // Knowledge Document Versions
   async getKnowledgeDocumentVersions(documentId: string): Promise<KnowledgeDocumentVersion[]> {
-    if (!db) return [];
-    return await db.select().from(knowledgeDocumentVersions).where(eq(knowledgeDocumentVersions.documentId, documentId)).orderBy(sql`${knowledgeDocumentVersions.createdAt} DESC`);
+    if (!this.db) return [];
+    return await this.db.select().from(knowledgeDocumentVersions).where(eq(knowledgeDocumentVersions.documentId, documentId)).orderBy(sql`${knowledgeDocumentVersions.createdAt} DESC`);
   }
 
   async createKnowledgeDocumentVersion(version: InsertKnowledgeDocumentVersion): Promise<KnowledgeDocumentVersion> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(knowledgeDocumentVersions).values(version).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(knowledgeDocumentVersions).values(version).returning();
     return created;
   }
 
   // Knowledge Audit Logs
   async getKnowledgeAuditLogs(documentId: string): Promise<KnowledgeAuditLog[]> {
-    if (!db) return [];
-    return await db.select().from(knowledgeAuditLogs).where(eq(knowledgeAuditLogs.documentId, documentId)).orderBy(sql`${knowledgeAuditLogs.createdAt} DESC`);
+    if (!this.db) return [];
+    return await this.db.select().from(knowledgeAuditLogs).where(eq(knowledgeAuditLogs.documentId, documentId)).orderBy(sql`${knowledgeAuditLogs.createdAt} DESC`);
   }
 
   async createKnowledgeAuditLog(log: InsertKnowledgeAuditLog): Promise<KnowledgeAuditLog> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(knowledgeAuditLogs).values(log).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(knowledgeAuditLogs).values(log).returning();
     return created;
   }
 
   // Knowledge Favorites
   async getKnowledgeFavorites(userId: string): Promise<KnowledgeFavorite[]> {
-    if (!db) return [];
-    return await db.select().from(knowledgeFavorites).where(eq(knowledgeFavorites.userId, userId));
+    if (!this.db) return [];
+    return await this.db.select().from(knowledgeFavorites).where(eq(knowledgeFavorites.userId, userId));
   }
 
   async getKnowledgeFavorite(userId: string, documentId: string): Promise<KnowledgeFavorite | undefined> {
-    if (!db) return undefined;
-    const [fav] = await db.select().from(knowledgeFavorites).where(
+    if (!this.db) return undefined;
+    const [fav] = await this.db.select().from(knowledgeFavorites).where(
       and(eq(knowledgeFavorites.userId, userId), eq(knowledgeFavorites.documentId, documentId))
     );
     return fav;
   }
 
   async createKnowledgeFavorite(favorite: InsertKnowledgeFavorite): Promise<KnowledgeFavorite> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(knowledgeFavorites).values(favorite).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(knowledgeFavorites).values(favorite).returning();
     return created;
   }
 
   async deleteKnowledgeFavorite(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(knowledgeFavorites).where(eq(knowledgeFavorites.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(knowledgeFavorites).where(eq(knowledgeFavorites.id, id)).returning();
     return result.length > 0;
   }
 
   // AI Conversations
   async getAiConversations(userId: string): Promise<AiConversation[]> {
-    if (!db) throw new Error("Database not connected");
-    return await db.select().from(aiConversations).where(eq(aiConversations.userId, userId)).orderBy(sql`${aiConversations.updatedAt} DESC`);
+    if (!this.db) throw new Error("Database not connected");
+    return await this.db.select().from(aiConversations).where(eq(aiConversations.userId, userId)).orderBy(sql`${aiConversations.updatedAt} DESC`);
   }
 
   async getAiConversation(id: string): Promise<AiConversation | undefined> {
-    if (!db) return undefined;
-    const [conv] = await db.select().from(aiConversations).where(eq(aiConversations.id, id));
+    if (!this.db) return undefined;
+    const [conv] = await this.db.select().from(aiConversations).where(eq(aiConversations.id, id));
     return conv;
   }
 
   async createAiConversation(conversation: InsertAiConversation): Promise<AiConversation> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(aiConversations).values(conversation).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(aiConversations).values(conversation).returning();
     return created;
   }
 
   async updateAiConversation(id: string, data: Partial<AiConversation>): Promise<AiConversation | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(aiConversations).set({ ...data, updatedAt: new Date() }).where(eq(aiConversations.id, id)).returning();
+    if (!this.db) return undefined;
+    const [updated] = await this.db.update(aiConversations).set({ ...data, updatedAt: new Date() }).where(eq(aiConversations.id, id)).returning();
     return updated;
   }
 
   async deleteAiConversation(id: string): Promise<boolean> {
-    if (!db) return false;
-    await db.delete(aiMessages).where(eq(aiMessages.conversationId, id));
-    const result = await db.delete(aiConversations).where(eq(aiConversations.id, id)).returning();
+    if (!this.db) return false;
+    await this.db.delete(aiMessages).where(eq(aiMessages.conversationId, id));
+    const result = await this.db.delete(aiConversations).where(eq(aiConversations.id, id)).returning();
     return result.length > 0;
   }
 
   // AI Messages
   async getAiMessages(conversationId: string): Promise<AiMessage[]> {
-    if (!db) return [];
-    return await db.select().from(aiMessages).where(eq(aiMessages.conversationId, conversationId)).orderBy(sql`${aiMessages.createdAt} ASC`);
+    if (!this.db) return [];
+    return await this.db.select().from(aiMessages).where(eq(aiMessages.conversationId, conversationId)).orderBy(sql`${aiMessages.createdAt} ASC`);
   }
 
   async createAiMessage(message: InsertAiMessage): Promise<AiMessage> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(aiMessages).values(message).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(aiMessages).values(message).returning();
     return created;
   }
   // AI Spaces
   async getAiSpaces(userId: string): Promise<AiSpace[]> {
-    if (!db) throw new Error("Database not connected");
-    return await db.select().from(aiSpaces).where(eq(aiSpaces.userId, userId)).orderBy(sql`${aiSpaces.createdAt} DESC`);
+    if (!this.db) throw new Error("Database not connected");
+    return await this.db.select().from(aiSpaces).where(eq(aiSpaces.userId, userId)).orderBy(sql`${aiSpaces.createdAt} DESC`);
   }
 
   async createAiSpace(space: InsertAiSpace): Promise<AiSpace> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(aiSpaces).values(space).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(aiSpaces).values(space).returning();
     return created;
   }
 
   async updateAiSpace(id: string, data: Partial<AiSpace>): Promise<AiSpace | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(aiSpaces).set(data).where(eq(aiSpaces.id, id)).returning();
+    if (!this.db) return undefined;
+    const [updated] = await this.db.update(aiSpaces).set(data).where(eq(aiSpaces.id, id)).returning();
     return updated;
   }
 
   async deleteAiSpace(id: string): Promise<boolean> {
-    if (!db) return false;
-    await db.delete(aiSpaceConversations).where(eq(aiSpaceConversations.spaceId, id));
-    const result = await db.delete(aiSpaces).where(eq(aiSpaces.id, id)).returning();
+    if (!this.db) return false;
+    await this.db.delete(aiSpaceConversations).where(eq(aiSpaceConversations.spaceId, id));
+    const result = await this.db.delete(aiSpaces).where(eq(aiSpaces.id, id)).returning();
     return result.length > 0;
   }
 
   async getAiSpaceConversations(spaceId: string): Promise<AiSpaceConversation[]> {
-    if (!db) return [];
-    return await db.select().from(aiSpaceConversations).where(eq(aiSpaceConversations.spaceId, spaceId));
+    if (!this.db) return [];
+    return await this.db.select().from(aiSpaceConversations).where(eq(aiSpaceConversations.spaceId, spaceId));
   }
 
   async addConversationToSpace(data: InsertAiSpaceConversation): Promise<AiSpaceConversation> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(aiSpaceConversations).values(data).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(aiSpaceConversations).values(data).returning();
     return created;
   }
 
   async removeConversationFromSpace(spaceId: string, conversationId: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(aiSpaceConversations).where(
+    if (!this.db) return false;
+    const result = await this.db.delete(aiSpaceConversations).where(
       and(eq(aiSpaceConversations.spaceId, spaceId), eq(aiSpaceConversations.conversationId, conversationId))
     ).returning();
     return result.length > 0;
@@ -1915,103 +1917,103 @@ export class DatabaseStorage implements IStorage {
 
   // Flowcharts
   async getFlowcharts(ownerId?: string, source?: string): Promise<Flowchart[]> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     const conditions = [eq(flowcharts.isTemplate, false)];
     if (source) conditions.push(eq(flowcharts.source, source));
     if (ownerId) conditions.push(eq(flowcharts.ownerId, ownerId));
-    return await db.select().from(flowcharts).where(and(...conditions)).orderBy(sql`${flowcharts.updatedAt} DESC`);
+    return await this.db.select().from(flowcharts).where(and(...conditions)).orderBy(sql`${flowcharts.updatedAt} DESC`);
   }
 
   async getFlowchart(id: string): Promise<Flowchart | undefined> {
-    if (!db) return undefined;
-    const [fc] = await db.select().from(flowcharts).where(eq(flowcharts.id, id));
+    if (!this.db) return undefined;
+    const [fc] = await this.db.select().from(flowcharts).where(eq(flowcharts.id, id));
     return fc;
   }
 
   async createFlowchart(flowchart: InsertFlowchart): Promise<Flowchart> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(flowcharts).values(flowchart).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(flowcharts).values(flowchart).returning();
     return created;
   }
 
   async updateFlowchart(id: string, data: Partial<Flowchart>): Promise<Flowchart | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(flowcharts).set({ ...data, updatedAt: new Date() }).where(eq(flowcharts.id, id)).returning();
+    if (!this.db) return undefined;
+    const [updated] = await this.db.update(flowcharts).set({ ...data, updatedAt: new Date() }).where(eq(flowcharts.id, id)).returning();
     return updated;
   }
 
   async deleteFlowchart(id: string): Promise<boolean> {
-    if (!db) return false;
-    await db.delete(flowchartComments).where(eq(flowchartComments.flowchartId, id));
-    await db.delete(flowchartVersions).where(eq(flowchartVersions.flowchartId, id));
-    const result = await db.delete(flowcharts).where(eq(flowcharts.id, id)).returning();
+    if (!this.db) return false;
+    await this.db.delete(flowchartComments).where(eq(flowchartComments.flowchartId, id));
+    await this.db.delete(flowchartVersions).where(eq(flowchartVersions.flowchartId, id));
+    const result = await this.db.delete(flowcharts).where(eq(flowcharts.id, id)).returning();
     return result.length > 0;
   }
 
   // Flowchart Templates
   async getFlowchartTemplates(): Promise<Flowchart[]> {
-    if (!db) throw new Error("Database not connected");
-    return await db.select().from(flowcharts).where(eq(flowcharts.isTemplate, true));
+    if (!this.db) throw new Error("Database not connected");
+    return await this.db.select().from(flowcharts).where(eq(flowcharts.isTemplate, true));
   }
 
   // Flowchart Versions
   async getFlowchartVersions(flowchartId: string): Promise<FlowchartVersion[]> {
-    if (!db) throw new Error("Database not connected");
-    return await db.select().from(flowchartVersions).where(eq(flowchartVersions.flowchartId, flowchartId)).orderBy(sql`${flowchartVersions.createdAt} DESC`);
+    if (!this.db) throw new Error("Database not connected");
+    return await this.db.select().from(flowchartVersions).where(eq(flowchartVersions.flowchartId, flowchartId)).orderBy(sql`${flowchartVersions.createdAt} DESC`);
   }
 
   async createFlowchartVersion(version: InsertFlowchartVersion): Promise<FlowchartVersion> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(flowchartVersions).values(version).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(flowchartVersions).values(version).returning();
     return created;
   }
 
   // Flowchart Comments
   async getFlowchartComments(flowchartId: string): Promise<FlowchartComment[]> {
-    if (!db) throw new Error("Database not connected");
-    return await db.select().from(flowchartComments).where(eq(flowchartComments.flowchartId, flowchartId)).orderBy(sql`${flowchartComments.createdAt} DESC`);
+    if (!this.db) throw new Error("Database not connected");
+    return await this.db.select().from(flowchartComments).where(eq(flowchartComments.flowchartId, flowchartId)).orderBy(sql`${flowchartComments.createdAt} DESC`);
   }
 
   async createFlowchartComment(comment: InsertFlowchartComment): Promise<FlowchartComment> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(flowchartComments).values(comment).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(flowchartComments).values(comment).returning();
     return created;
   }
 
   async deleteFlowchartComment(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(flowchartComments).where(eq(flowchartComments.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(flowchartComments).where(eq(flowchartComments.id, id)).returning();
     return result.length > 0;
   }
 
   // Notifications
   async getNotifications(userId: string, limit: number = 50, offset: number = 0): Promise<Notification[]> {
-    if (!db) throw new Error("Database not connected");
-    return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(sql`${notifications.createdAt} DESC`).limit(limit).offset(offset);
+    if (!this.db) throw new Error("Database not connected");
+    return await this.db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(sql`${notifications.createdAt} DESC`).limit(limit).offset(offset);
   }
 
   async getUnreadNotificationCount(userId: string): Promise<number> {
-    if (!db) throw new Error("Database not connected");
-    const result = await db.select({ count: sql<number>`count(*)` }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    if (!this.db) throw new Error("Database not connected");
+    const result = await this.db.select({ count: sql<number>`count(*)` }).from(notifications).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
     return Number(result[0]?.count || 0);
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(notifications).values(notification).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(notifications).values(notification).returning();
     return created;
   }
 
   async markNotificationRead(id: string, userId: string): Promise<Notification | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.id, id), eq(notifications.userId, userId))).returning();
+    if (!this.db) return undefined;
+    const [updated] = await this.db.update(notifications).set({ isRead: true }).where(and(eq(notifications.id, id), eq(notifications.userId, userId))).returning();
     return updated;
   }
 
   async markAllNotificationsRead(userId: string): Promise<void> {
-    if (!db) return;
+    if (!this.db) return;
     try {
-      await db.update(notifications).set({ isRead: true }).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+      await this.db.update(notifications).set({ isRead: true }).where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
     } catch (e) {
       console.error("[storage] Error marking all notifications read:", e);
     }
@@ -2019,9 +2021,9 @@ export class DatabaseStorage implements IStorage {
 
   // Notification Preferences
   async getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined> {
-    if (!db) return { emailNotificationsEnabled: true, pushNotificationsEnabled: true };
+    if (!this.db) return { emailNotificationsEnabled: true, pushNotificationsEnabled: true };
     try {
-      const [row] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+      const [row] = await this.db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
       if (!row) return { emailNotificationsEnabled: true, pushNotificationsEnabled: true };
       const emailPrefs = row.emailPreferences ? JSON.parse(row.emailPreferences) : {};
       return {
@@ -2041,16 +2043,16 @@ export class DatabaseStorage implements IStorage {
     push?: boolean,
     emailPrefs?: Record<string, boolean>
   ): Promise<NotificationPreferences> {
-    if (!db) return { emailNotificationsEnabled: email ?? true, pushNotificationsEnabled: push ?? true, emailPreferences: emailPrefs };
+    if (!this.db) return { emailNotificationsEnabled: email ?? true, pushNotificationsEnabled: push ?? true, emailPreferences: emailPrefs };
     try {
-      const [existing] = await db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
+      const [existing] = await this.db.select().from(notificationPreferences).where(eq(notificationPreferences.userId, userId));
       const updateData: Record<string, unknown> = { updatedAt: new Date() };
       if (email !== undefined) updateData.emailEnabled = email;
       if (push !== undefined) updateData.pushEnabled = push;
       if (emailPrefs !== undefined) updateData.emailPreferences = JSON.stringify(emailPrefs);
 
       if (existing) {
-        const [updated] = await db.update(notificationPreferences)
+        const [updated] = await this.db.update(notificationPreferences)
           .set(updateData)
           .where(eq(notificationPreferences.userId, userId))
           .returning();
@@ -2061,7 +2063,7 @@ export class DatabaseStorage implements IStorage {
           emailPreferences: parsedPrefs,
         };
       } else {
-        const [created] = await db.insert(notificationPreferences).values({
+        const [created] = await this.db.insert(notificationPreferences).values({
           userId,
           emailEnabled: email ?? true,
           pushEnabled: push ?? true,
@@ -2087,20 +2089,20 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
   async deleteNotification(id: string, userId: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, userId))).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(notifications).where(and(eq(notifications.id, id), eq(notifications.userId, userId))).returning();
     return result.length > 0;
   }
   async clearNotifications(userId: string): Promise<void> {
-    if (!db) return;
-    await db.delete(notifications).where(eq(notifications.userId, userId));
+    if (!this.db) return;
+    await this.db.delete(notifications).where(eq(notifications.userId, userId));
   }
 
   // Updates / News
   async getUpdates(tenantId?: string, includeUnpublished?: boolean): Promise<Update[]> {
-    if (!db) return this.getMockUpdates();
+    if (!this.db) return this.getMockUpdates();
     try {
-      let query = db.select().from(updates).$dynamic();
+      let query = this.db.select().from(updates).$dynamic();
       const conditions = [];
 
       if (tenantId) {
@@ -2148,10 +2150,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUpdate(id: string): Promise<Update | undefined> {
-    if (!db) {
+    if (!this.db) {
       return this.getMockUpdates().find(u => u.id === id);
     }
-    const [update] = await db.select().from(updates).where(eq(updates.id, id));
+    const [update] = await this.db.select().from(updates).where(eq(updates.id, id));
     return update;
   }
 
@@ -2169,7 +2171,7 @@ export class DatabaseStorage implements IStorage {
       updatedAt: new Date(),
     } as Update;
     
-    if (!db) {
+    if (!this.db) {
       // Store in memory when database is not available
       this.mockUpdates.unshift(newUpdate);
       return newUpdate;
@@ -2177,7 +2179,7 @@ export class DatabaseStorage implements IStorage {
     
     try {
       const { id, ...data } = dataToInsert;
-      const [created] = await db.insert(updates).values(data).returning();
+      const [created] = await this.db.insert(updates).values(data).returning();
       return created;
     } catch (error) {
       console.warn("[storage] DB insert failed, using memory fallback:", error);
@@ -2194,7 +2196,7 @@ export class DatabaseStorage implements IStorage {
       updateData.publishedAt = new Date();
     }
     
-    if (!db) {
+    if (!this.db) {
       // Update in memory when database is not available
       const index = this.mockUpdates.findIndex(u => u.id === id);
       if (index !== -1) {
@@ -2205,7 +2207,7 @@ export class DatabaseStorage implements IStorage {
     }
     
     try {
-      const [updated] = await db.update(updates).set(updateData).where(eq(updates.id, id)).returning();
+      const [updated] = await this.db.update(updates).set(updateData).where(eq(updates.id, id)).returning();
       return updated;
     } catch (error) {
       console.warn("[storage] DB update failed, using memory fallback:", error);
@@ -2219,7 +2221,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUpdate(id: string): Promise<boolean> {
-    if (!db) {
+    if (!this.db) {
       // Delete from memory when database is not available
       const index = this.mockUpdates.findIndex(u => u.id === id);
       if (index !== -1) {
@@ -2229,14 +2231,14 @@ export class DatabaseStorage implements IStorage {
       return false;
     }
     
-    const result = await db.delete(updates).where(eq(updates.id, id)).returning();
+    const result = await this.db.delete(updates).where(eq(updates.id, id)).returning();
     return result.length > 0;
   }
 
   async getLatestUpdates(limit: number = 5, tenantId?: string): Promise<Update[]> {
-    if (!db) return this.getMockUpdates().slice(0, limit);
+    if (!this.db) return this.getMockUpdates().slice(0, limit);
     try {
-      let query = db.select().from(updates).where(eq(updates.isPublished, true)).$dynamic();
+      let query = this.db.select().from(updates).where(eq(updates.isPublished, true)).$dynamic();
 
       if (tenantId) {
         query = query.where(and(eq(updates.tenantId, tenantId), eq(updates.isPublished, true)));
@@ -2250,11 +2252,11 @@ export class DatabaseStorage implements IStorage {
 
   // Prompts Library
   async getPrompts(filters?: { category?: string; search?: string; onlyActive?: boolean }): Promise<PromptLibrary[]> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     
     try {
       // Query simples - buscar todos os prompts sem filtro de is_active primeiro
-      const result = await db.execute(sql`
+      const result = await this.db.execute(sql`
         SELECT * FROM prompts_library
         ORDER BY usage_count DESC
       `);
@@ -2308,27 +2310,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPrompt(id: string): Promise<PromptLibrary | undefined> {
-    if (!db) return undefined;
-    const [prompt] = await db.select().from(promptsLibrary).where(eq(promptsLibrary.id, id));
+    if (!this.db) return undefined;
+    const [prompt] = await this.db.select().from(promptsLibrary).where(eq(promptsLibrary.id, id));
     return prompt;
   }
 
   async getPromptByName(name: string): Promise<PromptLibrary | undefined> {
-    if (!db) return undefined;
-    const [prompt] = await db.select().from(promptsLibrary).where(eq(promptsLibrary.name, name));
+    if (!this.db) return undefined;
+    const [prompt] = await this.db.select().from(promptsLibrary).where(eq(promptsLibrary.name, name));
     return prompt;
   }
 
   async createPrompt(prompt: InsertPromptLibrary): Promise<PromptLibrary> {
-    if (!db) throw new Error("Database not connected");
-    const [created] = await db.insert(promptsLibrary).values(prompt).returning();
+    if (!this.db) throw new Error("Database not connected");
+    const [created] = await this.db.insert(promptsLibrary).values(prompt).returning();
     return created;
   }
 
   async updatePrompt(id: string, data: Partial<PromptLibrary>): Promise<PromptLibrary | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     try {
-      const [updated] = await db.update(promptsLibrary).set(data).where(eq(promptsLibrary.id, id)).returning();
+      const [updated] = await this.db.update(promptsLibrary).set(data).where(eq(promptsLibrary.id, id)).returning();
       return updated;
     } catch (error) {
       console.error("[Storage.updatePrompt] Erro:", error);
@@ -2337,9 +2339,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePrompt(id: string): Promise<boolean> {
-    if (!db) return false;
+    if (!this.db) return false;
     try {
-      const result = await db.delete(promptsLibrary).where(eq(promptsLibrary.id, id)).returning();
+      const result = await this.db.delete(promptsLibrary).where(eq(promptsLibrary.id, id)).returning();
       return result.length > 0;
     } catch (error) {
       console.error("[Storage.deletePrompt] Erro:", error);
@@ -2348,9 +2350,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async incrementPromptUsage(id: string): Promise<void> {
-    if (!db) return;
+    if (!this.db) return;
     try {
-      await db
+      await this.db
         .update(promptsLibrary)
         .set({ usageCount: sql`${promptsLibrary.usageCount} + 1` })
         .where(eq(promptsLibrary.id, id));
@@ -2360,9 +2362,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPromptStats(): Promise<{ total: number; byCategory: Record<string, number> }> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     
-    const allPrompts = await db.select().from(promptsLibrary).where(eq(promptsLibrary.isActive, true));
+    const allPrompts = await this.db.select().from(promptsLibrary).where(eq(promptsLibrary.isActive, true));
     
     const byCategory: Record<string, number> = {};
     for (const prompt of allPrompts) {
@@ -2377,17 +2379,17 @@ export class DatabaseStorage implements IStorage {
 
   // Prompt User Favorites
   async getPromptFavorites(userId: string): Promise<PromptUserFavorite[]> {
-    if (!db) throw new Error("Database not connected");
-    return await db
+    if (!this.db) throw new Error("Database not connected");
+    return await this.db
       .select()
       .from(promptUserFavorites)
       .where(eq(promptUserFavorites.userId, userId));
   }
 
   async getPromptFavorite(userId: string, promptId: string): Promise<PromptUserFavorite | undefined> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     try {
-      const [favorite] = await db
+      const [favorite] = await this.db
         .select()
         .from(promptUserFavorites)
         .where(and(
@@ -2402,9 +2404,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPromptFavorite(favorite: InsertPromptUserFavorite): Promise<PromptUserFavorite> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     try {
-      const [created] = await db.insert(promptUserFavorites).values(favorite).returning();
+      const [created] = await this.db.insert(promptUserFavorites).values(favorite).returning();
       return created;
     } catch (error) {
       console.error("[Storage.createPromptFavorite] Erro:", error);
@@ -2413,9 +2415,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePromptFavorite(id: string): Promise<boolean> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     try {
-      const result = await db.delete(promptUserFavorites).where(eq(promptUserFavorites.id, id)).returning();
+      const result = await this.db.delete(promptUserFavorites).where(eq(promptUserFavorites.id, id)).returning();
       return result.length > 0;
     } catch (error) {
       console.error("[Storage.deletePromptFavorite] Erro:", error);
@@ -2426,14 +2428,14 @@ export class DatabaseStorage implements IStorage {
   // ============== GIT ANALYTICS - REPOSITORIES ==============
   
   async getGitRepositories(tenantId?: string): Promise<GitRepository[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
       // Filter only active repositories
       const activeCondition = eq(gitRepositories.isActive, true);
       if (tenantId) {
-        return await db.select().from(gitRepositories).where(and(eq(gitRepositories.tenantId, tenantId), activeCondition)).orderBy(desc(gitRepositories.createdAt));
+        return await this.db.select().from(gitRepositories).where(and(eq(gitRepositories.tenantId, tenantId), activeCondition)).orderBy(desc(gitRepositories.createdAt));
       }
-      return await db.select().from(gitRepositories).where(activeCondition).orderBy(desc(gitRepositories.createdAt));
+      return await this.db.select().from(gitRepositories).where(activeCondition).orderBy(desc(gitRepositories.createdAt));
     } catch (error) {
       console.error("[storage] getGitRepositories error:", error);
       return [];
@@ -2441,9 +2443,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGitRepository(id: string): Promise<GitRepository | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     try {
-      const [repo] = await db.select().from(gitRepositories).where(eq(gitRepositories.id, id));
+      const [repo] = await this.db.select().from(gitRepositories).where(eq(gitRepositories.id, id));
       return repo;
     } catch (error) {
       console.error("[storage] getGitRepository error:", error);
@@ -2452,9 +2454,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGitRepositoryByFullName(fullName: string): Promise<GitRepository | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     try {
-      const [repo] = await db.select().from(gitRepositories).where(eq(gitRepositories.fullName, fullName));
+      const [repo] = await this.db.select().from(gitRepositories).where(eq(gitRepositories.fullName, fullName));
       return repo;
     } catch (error) {
       console.error("[storage] getGitRepositoryByFullName error:", error);
@@ -2463,14 +2465,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGitRepository(data: InsertGitRepository): Promise<GitRepository> {
-    if (!db) throw new Error("Database not available");
-    const [repo] = await db.insert(gitRepositories).values(data).returning();
+    if (!this.db) throw new Error("Database not available");
+    const [repo] = await this.db.insert(gitRepositories).values(data).returning();
     return repo;
   }
 
   async updateGitRepository(id: string, data: Partial<InsertGitRepository>): Promise<GitRepository | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(gitRepositories)
+    if (!this.db) return undefined;
+    const [updated] = await this.db.update(gitRepositories)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(gitRepositories.id, id))
       .returning();
@@ -2478,8 +2480,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteGitRepository(id: string): Promise<boolean> {
-    if (!db) return false;
-    const result = await db.delete(gitRepositories).where(eq(gitRepositories.id, id)).returning();
+    if (!this.db) return false;
+    const result = await this.db.delete(gitRepositories).where(eq(gitRepositories.id, id)).returning();
     return result.length > 0;
   }
 
@@ -2495,7 +2497,7 @@ export class DatabaseStorage implements IStorage {
     limit?: number;
     offset?: number;
   }): Promise<GitCommit[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
       const conditions = [];
       
@@ -2518,7 +2520,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
       }
       
-      let query = db.select().from(gitCommits);
+      let query = this.db.select().from(gitCommits);
       
       if (conditions.length > 0) {
         query = query.where(and(...conditions)) as any;
@@ -2541,9 +2543,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGitCommitBySha(sha: string): Promise<GitCommit | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     try {
-      const [commit] = await db.select().from(gitCommits).where(eq(gitCommits.sha, sha));
+      const [commit] = await this.db.select().from(gitCommits).where(eq(gitCommits.sha, sha));
       return commit;
     } catch (error) {
       console.error("[storage] getGitCommitBySha error:", error);
@@ -2552,15 +2554,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGitCommit(data: InsertGitCommit): Promise<GitCommit> {
-    if (!db) throw new Error("Database not available");
-    const [commit] = await db.insert(gitCommits).values(data).returning();
+    if (!this.db) throw new Error("Database not available");
+    const [commit] = await this.db.insert(gitCommits).values(data).returning();
     return commit;
   }
 
   async updateGitCommit(sha: string, data: Partial<InsertGitCommit>): Promise<GitCommit | undefined> {
-    if (!db) return undefined;
+    if (!this.db) return undefined;
     try {
-      const [updated] = await db.update(gitCommits)
+      const [updated] = await this.db.update(gitCommits)
         .set(data)
         .where(eq(gitCommits.sha, sha))
         .returning();
@@ -2572,10 +2574,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGitCommitsBatch(data: InsertGitCommit[]): Promise<number> {
-    if (!db || data.length === 0) return 0;
+    if (!this.db || data.length === 0) return 0;
     try {
       // Usar upsert para atualizar commits existentes ou inserir novos
-      const result = await db.insert(gitCommits).values(data).onConflictDoUpdate({
+      const result = await this.db.insert(gitCommits).values(data).onConflictDoUpdate({
         target: gitCommits.sha,
         set: {
           message: sql`EXCLUDED.message`,
@@ -2610,7 +2612,7 @@ export class DatabaseStorage implements IStorage {
     startDate?: Date;
     endDate?: Date;
   }): Promise<number> {
-    if (!db) return 0;
+    if (!this.db) return 0;
     try {
       const conditions = [];
       
@@ -2630,7 +2632,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
       }
       
-      let query = db.select({ count: sql<number>`count(*)` }).from(gitCommits);
+      let query = this.db.select({ count: sql<number>`count(*)` }).from(gitCommits);
       
       if (conditions.length > 0) {
         query = query.where(and(...conditions)) as any;
@@ -2656,7 +2658,7 @@ export class DatabaseStorage implements IStorage {
     limit?: number;
     offset?: number;
   }): Promise<GitPullRequest[]> {
-    if (!db) throw new Error("Database not connected");
+    if (!this.db) throw new Error("Database not connected");
     try {
       // Build WHERE conditions
       const conditions: string[] = [];
@@ -2735,7 +2737,7 @@ export class DatabaseStorage implements IStorage {
         ${offsetClause}
       `;
 
-      const result = await db.execute(sql`${sql.raw(query)}`);
+      const result = await this.db.execute(sql`${sql.raw(query)}`);
       return result.rows as GitPullRequest[];
     } catch (error) {
       console.error("[storage] getGitPullRequests error:", error);
@@ -2744,14 +2746,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGitPullRequest(data: InsertGitPullRequest): Promise<GitPullRequest> {
-    if (!db) throw new Error("Database not available");
-    const [pr] = await db.insert(gitPullRequests).values(data).returning();
+    if (!this.db) throw new Error("Database not available");
+    const [pr] = await this.db.insert(gitPullRequests).values(data).returning();
     return pr;
   }
 
   async updateGitPullRequest(id: string, data: Partial<InsertGitPullRequest>): Promise<GitPullRequest | undefined> {
-    if (!db) return undefined;
-    const [updated] = await db.update(gitPullRequests)
+    if (!this.db) return undefined;
+    const [updated] = await this.db.update(gitPullRequests)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(gitPullRequests.id, id))
       .returning();
@@ -2759,23 +2761,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertGitPullRequest(data: InsertGitPullRequest): Promise<GitPullRequest> {
-    if (!db) throw new Error("Database not available");
+    if (!this.db) throw new Error("Database not available");
     
-    const [existing] = await db.select().from(gitPullRequests)
+    const [existing] = await this.db.select().from(gitPullRequests)
       .where(and(
         eq(gitPullRequests.repositoryId, data.repositoryId),
         eq(gitPullRequests.githubPrNumber, data.githubPrNumber)
       ));
     
     if (existing) {
-      const [updated] = await db.update(gitPullRequests)
+      const [updated] = await this.db.update(gitPullRequests)
         .set({ ...data, updatedAt: new Date() })
         .where(eq(gitPullRequests.id, existing.id))
         .returning();
       return updated;
     }
     
-    const [created] = await db.insert(gitPullRequests).values(data).returning();
+    const [created] = await this.db.insert(gitPullRequests).values(data).returning();
     return created;
   }
 
@@ -2786,7 +2788,7 @@ export class DatabaseStorage implements IStorage {
     startDate?: Date;
     endDate?: Date;
   }): Promise<number> {
-    if (!db) return 0;
+    if (!this.db) return 0;
     try {
       const conditions = [];
       
@@ -2806,7 +2808,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
       }
       
-      let query = db.select({ count: sql<number>`count(*)` }).from(gitPullRequests);
+      let query = this.db.select({ count: sql<number>`count(*)` }).from(gitPullRequests);
       
       if (conditions.length > 0) {
         query = query.where(and(...conditions)) as any;
@@ -2827,7 +2829,7 @@ export class DatabaseStorage implements IStorage {
     severity?: string;
     status?: string;
   }): Promise<GitSecurityAlert[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
       const conditions = [];
       
@@ -2841,7 +2843,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(eq(gitSecurityAlerts.status, filters.status));
       }
       
-      let query = db.select().from(gitSecurityAlerts);
+      let query = this.db.select().from(gitSecurityAlerts);
       
       if (conditions.length > 0) {
         query = query.where(and(...conditions)) as any;
@@ -2855,29 +2857,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createGitSecurityAlert(data: InsertGitSecurityAlert): Promise<GitSecurityAlert> {
-    if (!db) throw new Error("Database not available");
-    const [alert] = await db.insert(gitSecurityAlerts).values(data).returning();
+    if (!this.db) throw new Error("Database not available");
+    const [alert] = await this.db.insert(gitSecurityAlerts).values(data).returning();
     return alert;
   }
 
   async upsertGitSecurityAlert(data: InsertGitSecurityAlert): Promise<GitSecurityAlert> {
-    if (!db) throw new Error("Database not available");
+    if (!this.db) throw new Error("Database not available");
     
-    const [existing] = await db.select().from(gitSecurityAlerts)
+    const [existing] = await this.db.select().from(gitSecurityAlerts)
       .where(and(
         eq(gitSecurityAlerts.repositoryId, data.repositoryId),
         eq(gitSecurityAlerts.githubAlertNumber, data.githubAlertNumber)
       ));
     
     if (existing) {
-      const [updated] = await db.update(gitSecurityAlerts)
+      const [updated] = await this.db.update(gitSecurityAlerts)
         .set(data)
         .where(eq(gitSecurityAlerts.id, existing.id))
         .returning();
       return updated;
     }
     
-    const [created] = await db.insert(gitSecurityAlerts).values(data).returning();
+    const [created] = await this.db.insert(gitSecurityAlerts).values(data).returning();
     return created;
   }
 
@@ -2885,7 +2887,7 @@ export class DatabaseStorage implements IStorage {
     repositoryId?: string;
     status?: string;
   }): Promise<{ total: number; bySeverity: Record<string, number> }> {
-    if (!db) return { total: 0, bySeverity: {} };
+    if (!this.db) return { total: 0, bySeverity: {} };
     try {
       const conditions = [];
       
@@ -2896,7 +2898,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(eq(gitSecurityAlerts.status, filters.status));
       }
       
-      let query = db.select({
+      let query = this.db.select({
         severity: gitSecurityAlerts.severity,
         count: sql<number>`count(*)`
       }).from(gitSecurityAlerts);
@@ -2925,9 +2927,9 @@ export class DatabaseStorage implements IStorage {
   // ============== GIT ANALYTICS - BRANCHES ==============
 
   async upsertGitBranch(data: any): Promise<any> {
-    if (!db) throw new Error("Database not available");
+    if (!this.db) throw new Error("Database not available");
     try {
-      const existing = await db
+      const existing = await this.db
         .select()
         .from(gitBranches)
         .where(and(
@@ -2937,7 +2939,7 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
 
       if (existing.length > 0) {
-        const [updated] = await db
+        const [updated] = await this.db
           .update(gitBranches)
           .set({ ...data, updatedAt: new Date() })
           .where(eq(gitBranches.id, existing[0].id))
@@ -2945,7 +2947,7 @@ export class DatabaseStorage implements IStorage {
         return updated;
       }
 
-      const [created] = await db.insert(gitBranches).values(data).returning();
+      const [created] = await this.db.insert(gitBranches).values(data).returning();
       return created;
     } catch (error) {
       console.error("[storage] upsertGitBranch error:", error);
@@ -2954,14 +2956,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGitBranches(repositoryId?: string): Promise<any[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
       const conditions = [];
       if (repositoryId) {
         conditions.push(eq(gitBranches.repositoryId, repositoryId));
       }
       
-      const result = await db
+      const result = await this.db
         .select()
         .from(gitBranches)
         .where(conditions.length > 0 ? and(...conditions) : undefined)
@@ -2975,7 +2977,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPendingBranches(repositoryId?: string): Promise<any[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
       const conditions = [
         eq(gitBranches.isDefault, false),
@@ -2987,7 +2989,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(eq(gitBranches.repositoryId, repositoryId));
       }
       
-      const result = await db
+      const result = await this.db
         .select()
         .from(gitBranches)
         .where(and(...conditions))
@@ -3007,7 +3009,7 @@ export class DatabaseStorage implements IStorage {
     startDate?: Date;
     endDate?: Date;
   }): Promise<{ date: string; commits: number }[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
       const conditions = [];
       
@@ -3021,7 +3023,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
       }
       
-      let query = db.select({
+      let query = this.db.select({
         date: sql<string>`DATE(${gitCommits.committedAt})`,
         commits: sql<number>`count(*)`
       }).from(gitCommits);
@@ -3047,7 +3049,7 @@ export class DatabaseStorage implements IStorage {
     startDate?: Date;
     endDate?: Date;
   }): Promise<{ date: string; prs: number }[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
       const conditions = [];
       
@@ -3061,7 +3063,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
       }
       
-      let query = db.select({
+      let query = this.db.select({
         date: sql<string>`DATE(${gitPullRequests.createdAt})`,
         prs: sql<number>`count(*)`
       }).from(gitPullRequests);
@@ -3087,7 +3089,7 @@ export class DatabaseStorage implements IStorage {
     startDate?: Date;
     endDate?: Date;
   }): Promise<{ month: string; commits: number }[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
       const conditions = [];
       
@@ -3101,7 +3103,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
       }
       
-      let query = db.select({
+      let query = this.db.select({
         month: sql<string>`TO_CHAR(${gitCommits.committedAt}, 'YYYY-MM')`,
         commits: sql<number>`count(*)`
       }).from(gitCommits);
@@ -3127,7 +3129,7 @@ export class DatabaseStorage implements IStorage {
     startDate?: Date;
     endDate?: Date;
   }): Promise<{ month: string; prs: number }[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
       const conditions = [];
       
@@ -3141,7 +3143,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${gitPullRequests.createdAt} <= ${filters.endDate}`);
       }
       
-      let query = db.select({
+      let query = this.db.select({
         month: sql<string>`TO_CHAR(${gitPullRequests.createdAt}, 'YYYY-MM')`,
         prs: sql<number>`count(*)`
       }).from(gitPullRequests);
@@ -3179,9 +3181,9 @@ export class DatabaseStorage implements IStorage {
     prs: number;
     prsMerged: number;
   }[]> {
-    if (!db) return [];
+    if (!this.db) return [];
     try {
-      const database = db;
+      const database = this.db;
       const conditions = [];
       
       if (filters?.repositoryId) {
@@ -3257,7 +3259,7 @@ export class DatabaseStorage implements IStorage {
     commitsByType: Record<string, number>;
     securityAlerts: { total: number; bySeverity: Record<string, number> };
   }> {
-    if (!db) return {
+    if (!this.db) return {
       totalCommits: 0,
       totalPRs: 0,
       totalPRsMerged: 0,
@@ -3312,7 +3314,7 @@ export class DatabaseStorage implements IStorage {
         conditions.push(sql`${gitCommits.committedAt} <= ${filters.endDate}`);
       }
       
-      let devsQuery = db.selectDistinct({ author: gitCommits.authorName }).from(gitCommits);
+      let devsQuery = this.db.selectDistinct({ author: gitCommits.authorName }).from(gitCommits);
       if (conditions.length > 0) {
         devsQuery = devsQuery.where(and(...conditions)) as any;
       }
@@ -3320,7 +3322,7 @@ export class DatabaseStorage implements IStorage {
       const totalDevelopers = devs.length;
       
       // Commits by type
-      let typeQuery = db.select({
+      let typeQuery = this.db.select({
         type: gitCommits.commitType,
         count: sql<number>`count(*)`
       }).from(gitCommits);
@@ -3364,7 +3366,7 @@ export class DatabaseStorage implements IStorage {
   // ─── Claude Code Usage ──────────────────────────────────────────────────────
 
   async upsertClaudeCodeUsage(data: InsertClaudeCodeUsage): Promise<ClaudeCodeUsageReport> {
-    const [row] = await db
+    const [row] = await this.db
       .insert(claudeCodeUsageReports)
       .values(data)
       .onConflictDoUpdate({
@@ -3384,7 +3386,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getClaudeCodeUsageByPeriod(startDate: Date, endDate: Date): Promise<ClaudeCodeUsageReport[]> {
-    return db
+    return this.db
       .select()
       .from(claudeCodeUsageReports)
       .where(
@@ -3398,3 +3400,11 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+/**
+ * Factory para criar instancia de storage com db especifico.
+ * Usado pelo Worker (per-request db via Hono context).
+ */
+export function getStorage(db: Database): IStorage {
+  return new DatabaseStorage(db);
+}

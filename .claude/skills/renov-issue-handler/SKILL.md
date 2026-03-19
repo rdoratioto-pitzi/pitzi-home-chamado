@@ -37,6 +37,7 @@ gh issue list --repo Renov-BD/Renov.Home --state open --label "enhancement" --js
 ```
 
 Priorizar por:
+
 1. Bugs criticos (label: `critical`, `urgent`, `P0`)
 2. Bugs normais (label: `bug`)
 3. Melhorias (label: `enhancement`, `improvement`)
@@ -59,6 +60,7 @@ um plano de acao antes de fazer qualquer alteracao.
 ```
 
 Atualizar o status da issue no GitHub:
+
 ```bash
 gh issue comment [NUMBER] --body "Chamado assumido por Claude Agent. Investigacao em andamento."
 ```
@@ -74,6 +76,7 @@ Investigar a causa raiz do problema:
 5. **Verificar dependencias** — outros modulos/funcoes afetados
 
 Arquivos-chave do Renov.Home para investigacao:
+
 - `shared/schema.ts` — Schema central (Drizzle ORM)
 - `server/storage.ts` — Camada de dados (~126KB)
 - `server/routes/` — 25+ rotas REST
@@ -117,6 +120,7 @@ Aprovar para prosseguir?
 Apos aprovacao:
 
 1. **Criar branch seguindo o padrao** (usar skill renov-git-workflow se disponivel):
+
    ```bash
    git checkout develop
    git pull origin develop
@@ -137,6 +141,7 @@ Apos aprovacao:
    - Filtros com `tenantId` em queries (multi-tenant)
 
 4. **Commitar seguindo Conventional Commits:**
+
    ```bash
    git add [arquivos especificos]
    git commit -m "fix(modulo): descricao do que foi corrigido
@@ -168,7 +173,7 @@ Closes #XX
 - [x] Sem console.log esquecidos
 - [x] UI em PT-BR
 - [x] Multi-tenant (tenantId) respeitado" \
-  --reviewer marcelorenov
+  --reviewer marcelo-maciel
 ```
 
 Notificar o usuario:
@@ -178,7 +183,7 @@ Notificar o usuario:
 
 **PR:** [link do PR]
 **Branch:** fix/REN-XX-descricao
-**Reviewer:** @marcelorenov (obrigatorio)
+**Reviewer:** @marcelo-maciel (obrigatorio)
 **Status:** Aguardando review
 
 Resumo das alteracoes:

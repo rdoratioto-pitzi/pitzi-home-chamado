@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { ResumoCards } from "./components/resumo-cards";
 import { VisaoCategoria } from "./components/visao-categoria";
 import { VisaoItem } from "./components/visao-item";
@@ -59,7 +59,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function EstoquesRelatorioContagemDetalhePage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
-  const user = getCurrentUser();
+  const { user } = useAuth();
 
   const { data: resumo, isLoading: isLoadingResumo } = useQuery({
     queryKey: ["contagem-resumo", id],

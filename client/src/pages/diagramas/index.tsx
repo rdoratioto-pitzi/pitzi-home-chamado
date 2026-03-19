@@ -44,14 +44,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import type { Flowchart } from "@shared/schema";
-
-function getCurrentUser() {
-  try {
-    const userStr = sessionStorage.getItem("user");
-    if (userStr) return JSON.parse(userStr);
-  } catch {}
-  return null;
-}
+import { useAuth } from "@/contexts/auth-context";
 
 const createDiagramSchema = z.object({
   title: z.string().min(3, "Título deve ter pelo menos 3 caracteres"),
@@ -63,12 +56,12 @@ type CreateFormData = z.infer<typeof createDiagramSchema>;
 
 export default function DiagramasPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
-  const currentUser = getCurrentUser();
 
   const { data: diagramas, isLoading } = useQuery<Flowchart[]>({
     queryKey: ["/api/flowcharts", "excalidraw"],

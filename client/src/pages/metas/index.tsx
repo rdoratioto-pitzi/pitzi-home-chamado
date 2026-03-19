@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import type { Meta, MetaArea, User, MetaCheckin } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/contexts/auth-context";
 
 const statusColors: Record<string, string> = {
   on_track: "bg-green-500/10 text-green-600 dark:text-green-400",
@@ -190,19 +191,11 @@ function MetaCard({
   );
 }
 
-function getCurrentUser() {
-  try {
-    const userStr = sessionStorage.getItem("user");
-    if (userStr) return JSON.parse(userStr);
-  } catch (e) {}
-  return null;
-}
-
 export default function MetasVisaoGeralPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), "yyyy-MM"));
   const currentMonthLabel = format(parseISO(`${selectedMonth}-01`), "MMMM yyyy", { locale: ptBR });
-  const currentUser = getCurrentUser();
 
   const [isCheckinDialogOpen, setIsCheckinDialogOpen] = useState(false);
   const [checkinMeta, setCheckinMeta] = useState<Meta | null>(null);

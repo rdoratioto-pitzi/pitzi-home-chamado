@@ -9,7 +9,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { getCurrentUser } from "@/lib/permissions";
+import { useAuth } from "@/contexts/auth-context";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { ErrorBoundary } from "@/components/error-boundary";
 
@@ -117,7 +117,7 @@ function VisaoEstoque({ periodo }: { periodo: string }) {
 // ── page ─────────────────────────────────────────────────────────────────────
 
 export default function EstoquesDashboardPage() {
-  const user    = getCurrentUser();
+  const { user } = useAuth();
   const isAdmin = user?.isAdmin === true;
 
   const [tab,    setTab]    = useState<string>("executiva");
