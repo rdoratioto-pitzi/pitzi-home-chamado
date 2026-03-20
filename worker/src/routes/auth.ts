@@ -171,8 +171,7 @@ auth.post("/api/auth/refresh", async (c) => {
   setCookie(c, "access_token", newAccessToken, {
     httpOnly: true,
     secure: isProduction,
-    sameSite: "Lax",
-    domain: ".renovsmart.com.br",
+    sameSite: isProduction ? "None" : "Lax",
     path: "/",
     maxAge: 2 * 60 * 60,
   });

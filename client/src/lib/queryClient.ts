@@ -2,6 +2,19 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
+// Global fetch interceptor: prepend API_BASE for all /api/ calls
+// so every fetch("/api/...") automatically hits the correct backend
+if (API_BASE) {
+  const originalFetch = window.fetch;
+  window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+    if (typeof input === "string" && input.startsWith("/api/")) {
+      input = `${API_BASE}${input}`;
+      init = { ...init, credentials: "include" as RequestCredentials };
+    }
+    return originalFetch.call(this, input, init);
+  };
+}
+
 let _handlingUnauthorized = false;
 
 async function tryRefreshToken(): Promise<boolean> {
