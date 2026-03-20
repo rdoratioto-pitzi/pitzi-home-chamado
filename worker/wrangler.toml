@@ -25,9 +25,13 @@ SENDPULSE_FROM_NAME = "Renov Home"
 
 [env.dev]
 name = "renov-home-api-dev"
+routes = [
+  { pattern = "homeapi-dev.renovsmart.com.br", custom_domain = true }
+]
+
 [env.dev.vars]
 APP_URL = "https://home-dev.renovsmart.com.br"
-CORS_ORIGIN = "https://home-dev.renovsmart.com.br"
+CORS_ORIGIN = "https://home-dev.renovsmart.com.br,https://renov-home-dev.pages.dev"
 API_URL = "https://homeapi-dev.renovsmart.com.br"
 SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
 SENDPULSE_FROM_NAME = "Renov Home (Dev)"
