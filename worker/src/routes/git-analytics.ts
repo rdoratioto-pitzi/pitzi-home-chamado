@@ -298,18 +298,24 @@ gitAnalytics.post("/api/git-analytics/sync-period", async (c) => {
     return c.json({ success: true, ...result });
   }
 
+  // Worker subrequest limit: sync only first enabled repo per request
+  // Frontend should call once per repo for full sync
   const storage = getStorage(c.get("db"));
   const repos = await storage.getGitRepositories();
-  let totalCommits = 0;
-  let totalPRs = 0;
-  for (const repo of repos) {
-    if (repo.syncEnabled) {
-      const result = await syncRepositoryByPeriod(deps, repo.id, new Date(startDate), new Date(endDate));
-      totalCommits += result.commits;
-      totalPRs += result.prs;
-    }
+  const enabledRepos = repos.filter((r: any) => r.syncEnabled);
+
+  if (enabledRepos.length === 0) {
+    return c.json({ success: true, commits: 0, prs: 0, message: "Nenhum repositório habilitado" });
   }
-  return c.json({ success: true, commits: totalCommits, prs: totalPRs });
+
+  const firstRepo = enabledRepos[0];
+  const result = await syncRepositoryByPeriod(deps, firstRepo.id, new Date(startDate), new Date(endDate));
+  return c.json({
+    success: true,
+    ...result,
+    syncedRepo: firstRepo.fullName,
+    remainingRepos: enabledRepos.slice(1).map((r: any) => ({ id: r.id, fullName: r.fullName })),
+  });
 });
 
 gitAnalytics.post("/api/git-analytics/add-repository", async (c) => {
