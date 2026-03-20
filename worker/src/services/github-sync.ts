@@ -96,67 +96,48 @@ async function syncCommits(
   until?: Date
 ): Promise<number> {
   console.log(`Syncing commits for ${fullName}...`);
-  let allCommits: any[] = [];
-  let page = 1;
-  const perPage = 100;
-  let hasMore = true;
+  // Worker limit: max 50 subrequests per invocation
+  // Fetch only 1 page of 15 commits, skip individual detail fetches
+  const perPage = 15;
+  let url = `/repos/${fullName}/commits?per_page=${perPage}&page=1`;
+  if (since) url += `&since=${since.toISOString()}`;
+  if (until) url += `&until=${until.toISOString()}`;
+  const allCommits = await githubFetch(url, deps.githubToken);
 
-  while (hasMore) {
-    let url = `/repos/${fullName}/commits?per_page=${perPage}&page=${page}`;
-    if (since) url += `&since=${since.toISOString()}`;
-    if (until) url += `&until=${until.toISOString()}`;
-    const commitsPage = await githubFetch(url, deps.githubToken);
-    if (!Array.isArray(commitsPage) || commitsPage.length === 0) { hasMore = false; break; }
-    allCommits = allCommits.concat(commitsPage);
-    if (commitsPage.length < perPage || allCommits.length >= 5000) hasMore = false;
-    else page++;
-  }
+  if (!Array.isArray(allCommits) || allCommits.length === 0) return 0;
 
-  if (allCommits.length === 0) return 0;
-
-  const commitDataList = [];
-  const batchSize = 10;
-  for (let i = 0; i < allCommits.length; i += batchSize) {
-    const batch = allCommits.slice(i, i + batchSize);
-    const batchWithStats = await Promise.all(
-      batch.map(async (commit: any) => {
-        const stats = await fetchCommitDetails(fullName, commit.sha, deps.githubToken);
-        return {
-          tenantId: null,
-          repositoryId,
-          sha: commit.sha,
-          message: commit.commit.message.split("\n")[0].substring(0, 255),
-          fullMessage: commit.commit.message,
-          authorName: commit.commit.author?.name || commit.author?.login || "Unknown",
-          authorEmail: commit.commit.author?.email || null,
-          authorAvatarUrl: commit.author?.avatar_url || null,
-          commitType: detectCommitType(commit.commit.message),
-          branch: null,
-          prNumber: null,
-          filesChanged: stats.filesChanged,
-          additions: stats.additions,
-          deletions: stats.deletions,
-          committedAt: new Date(commit.commit.author?.date || new Date()),
-        };
-      })
-    );
-    commitDataList.push(...batchWithStats);
-  }
+  const commitDataList = allCommits.map((commit: any) => ({
+    tenantId: null,
+    repositoryId,
+    sha: commit.sha,
+    message: commit.commit.message.split("\n")[0].substring(0, 255),
+    fullMessage: commit.commit.message,
+    authorName: commit.commit.author?.name || commit.author?.login || "Unknown",
+    authorEmail: commit.commit.author?.email || null,
+    authorAvatarUrl: commit.author?.avatar_url || null,
+    commitType: detectCommitType(commit.commit.message),
+    branch: null,
+    prNumber: null,
+    filesChanged: 0,
+    additions: 0,
+    deletions: 0,
+    committedAt: new Date(commit.commit.author?.date || new Date()),
+  }));
 
   return deps.storage.createGitCommitsBatch(commitDataList);
 }
 
 async function syncPullRequests(deps: GitSyncDeps, repositoryId: string, fullName: string): Promise<number> {
   try {
+    // Worker limit: fetch limited PRs, skip individual detail fetches
     const [openPRs, closedPRs] = await Promise.all([
-      githubFetch(`/repos/${fullName}/pulls?state=open&per_page=100`, deps.githubToken),
-      githubFetch(`/repos/${fullName}/pulls?state=closed&per_page=50&sort=updated&direction=desc`, deps.githubToken),
+      githubFetch(`/repos/${fullName}/pulls?state=open&per_page=5`, deps.githubToken),
+      githubFetch(`/repos/${fullName}/pulls?state=closed&per_page=5&sort=updated&direction=desc`, deps.githubToken),
     ]);
     const allPRs = [...openPRs, ...closedPRs];
     let upserted = 0;
     for (const pr of allPRs) {
       const status = pr.merged_at ? "merged" : pr.state === "closed" ? "closed" : "open";
-      const prDetails = await fetchPRDetails(fullName, pr.number, deps.githubToken);
       await deps.storage.upsertGitPullRequest({
         repositoryId,
         githubPrNumber: pr.number,
@@ -168,9 +149,9 @@ async function syncPullRequests(deps: GitSyncDeps, repositoryId: string, fullNam
         prType: detectCommitType(pr.title),
         sourceBranch: pr.head?.ref || "",
         targetBranch: pr.base?.ref || "",
-        commitsCount: prDetails.commitsCount,
-        additions: prDetails.additions,
-        deletions: prDetails.deletions,
+        commitsCount: pr.commits || 0,
+        additions: pr.additions || 0,
+        deletions: pr.deletions || 0,
         reviewers: JSON.stringify(pr.requested_reviewers?.map((r: any) => r.login) || []),
         labels: JSON.stringify(pr.labels?.map((l: any) => l.name) || []),
         createdAt: pr.created_at ? new Date(pr.created_at) : null,
@@ -219,37 +200,16 @@ async function syncSecurityAlerts(deps: GitSyncDeps, repositoryId: string, fullN
 }
 
 async function syncBranches(deps: GitSyncDeps, repositoryId: string, fullName: string): Promise<number> {
-  const branchesData = await githubFetch(`/repos/${fullName}/branches?per_page=100`, deps.githubToken);
+  // Worker limit: fetch branches list only, skip per-branch comparisons
+  const branchesData = await githubFetch(`/repos/${fullName}/branches?per_page=10`, deps.githubToken);
   if (!Array.isArray(branchesData)) return 0;
 
-  const openPRs = await githubFetch(`/repos/${fullName}/pulls?state=open&per_page=100`, deps.githubToken);
-  const branchesWithPR = new Set(openPRs.map((pr: any) => pr.head.ref));
   const repoInfo = await githubFetch(`/repos/${fullName}`, deps.githubToken);
   const defaultBranch = repoInfo.default_branch || "main";
 
   let synced = 0;
   for (const branch of branchesData) {
     try {
-      let aheadBy = 0;
-      let behindBy = 0;
-      if (branch.name !== defaultBranch) {
-        try {
-          const comparison = await githubFetch(`/repos/${fullName}/compare/${defaultBranch}...${branch.name}`, deps.githubToken);
-          aheadBy = comparison.ahead_by || 0;
-          behindBy = comparison.behind_by || 0;
-        } catch { /* ignore */ }
-      }
-
-      let lastCommitAt = null;
-      let lastCommitAuthor = null;
-      try {
-        const commits = await githubFetch(`/repos/${fullName}/commits?sha=${branch.name}&per_page=1`, deps.githubToken);
-        if (commits.length > 0) {
-          lastCommitAt = new Date(commits[0].commit.author?.date);
-          lastCommitAuthor = commits[0].commit.author?.name || commits[0].author?.login;
-        }
-      } catch { /* ignore */ }
-
       await deps.storage.upsertGitBranch({
         tenantId: null,
         repositoryId,
@@ -257,11 +217,11 @@ async function syncBranches(deps: GitSyncDeps, repositoryId: string, fullName: s
         sha: branch.commit.sha,
         isDefault: branch.name === defaultBranch,
         isProtected: branch.protected || false,
-        aheadBy,
-        behindBy,
-        hasOpenPR: branchesWithPR.has(branch.name),
-        lastCommitAt,
-        lastCommitAuthor,
+        aheadBy: 0,
+        behindBy: 0,
+        hasOpenPR: false,
+        lastCommitAt: null,
+        lastCommitAuthor: null,
       });
       synced++;
     } catch (error) {
@@ -288,12 +248,10 @@ export async function syncRepository(deps: GitSyncDeps, repositoryId: string): P
     since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   }
 
-  await Promise.all([
-    syncCommits(deps, repositoryId, repo.fullName, since),
-    syncPullRequests(deps, repositoryId, repo.fullName),
-    syncSecurityAlerts(deps, repositoryId, repo.fullName),
-    syncBranches(deps, repositoryId, repo.fullName),
-  ]);
+  // Serialize to stay within Worker subrequest limits
+  await syncCommits(deps, repositoryId, repo.fullName, since);
+  await syncPullRequests(deps, repositoryId, repo.fullName);
+  await syncBranches(deps, repositoryId, repo.fullName);
 
   await deps.storage.updateGitRepository(repositoryId, { lastSyncAt: new Date() });
 }
