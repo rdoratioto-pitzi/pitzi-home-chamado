@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, CheckCheck, Volume2, VolumeX, BellRing, Ticket, FolderKanban, CheckSquare, Target, Package, GitBranch, Calendar, MessageSquare } from "lucide-react";
+import { Bell, CheckCheck, Volume2, VolumeX, BellRing, Ticket, FolderKanban, CheckSquare, Target, Package, GitBranch, Calendar, MessageSquare, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -45,6 +45,7 @@ function ModuleIcon({ module }: { module: string }) {
     case "tarefas": return <CheckSquare className={className} />;
     case "metas": return <Target className={className} />;
     case "logistica": return <Package className={className} />;
+    case "triagem": return <Printer className={className} />;
     case "fluxogramas": return <GitBranch className={className} />;
     case "reunioes": return <Calendar className={className} />;
     case "comentarios": return <MessageSquare className={className} />;

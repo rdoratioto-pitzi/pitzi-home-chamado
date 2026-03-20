@@ -137,8 +137,11 @@ const logisticaSubItems = [
   { title: "Solicitações", url: "/logistica/solicitacoes", icon: Package },
   { title: "Logística Reversa", url: "/logistica/reversa", icon: RotateCcw },
   { title: "Romaneios", url: "/logistica/romaneios", icon: ClipboardList },
-  { title: "Impressão Etiquetas", url: "/logistica/impressao-etiquetas", icon: Printer },
   { title: "Eficiência Avaliações IA", url: "/logistica/avaliacoes-ia", icon: Bot },
+];
+
+const triagemSubItems = [
+  { title: "Impressão Etiquetas", url: "/triagem/impressao-etiquetas", icon: Printer },
 ];
 
 const apisSubItems = [
@@ -187,6 +190,7 @@ export function AppSidebar() {
 
   const [metasOpen, setMetasOpen] = useState(location.startsWith("/metas"));
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
+  const [triagemOpen, setTriagemOpen] = useState(location.startsWith("/triagem"));
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
   const [bibliotecaOpen, setBibliotecaOpen] = useState(location.startsWith("/biblioteca"));
@@ -198,6 +202,7 @@ export function AppSidebar() {
 
   const isMetasActive = location.startsWith("/metas");
   const isLogisticaActive = location.startsWith("/logistica");
+  const isTriagemActive = location.startsWith("/triagem");
   const isApisActive = location.startsWith("/apis");
   const isPricingActive = location.startsWith("/pricing");
   const isBibliotecaActive = location.startsWith("/biblioteca");
@@ -214,6 +219,7 @@ export function AppSidebar() {
           fluxogramas: true,
           diagramas: true,
           logistica: true,
+          triagem: true,
           pricing: true,
           conhecimento: true,
           apis: true,
@@ -237,6 +243,7 @@ export function AppSidebar() {
       fluxogramas: false,
       diagramas: false,
       logistica: false,
+      triagem: false,
       pricing: false,
       conhecimento: false,
       apis: false,
@@ -254,6 +261,7 @@ export function AppSidebar() {
 
   const hasMetasAccess = permissions.okrs === true;
   const hasLogisticaAccess = permissions.logistica === true;
+  const hasTriagemAccess = permissions.triagem === true;
   const hasPricingAccess = permissions.pricing === true;
   const hasBibliotecaAccess = permissions.conhecimento === true;
   const hasApisAccess = permissions.apis === true;
@@ -433,6 +441,45 @@ export function AppSidebar() {
                     <CollapsibleContent>
                       <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
                         {logisticaSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {hasTriagemAccess && (
+                <Collapsible open={triagemOpen} onOpenChange={setTriagemOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isTriagemActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        isActive={isTriagemActive}
+                        data-testid="link-triagem"
+                      >
+                        <Printer className={`h-[20px] w-[20px] ${isTriagemActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                        <span className="text-[14px]">Triagem</span>
+                        {triagemOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                        {triagemSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
