@@ -188,7 +188,7 @@ export default function TicketDetailPage() {
   const { data: ticket, isLoading: ticketLoading } = useQuery<Ticket>({
     queryKey: ["/api/tickets", id],
     queryFn: async () => {
-      const res = await fetch(`/api/tickets/${id}`);
+      const res = await apiRequest("GET", `/api/tickets/${id}`);
       if (!res.ok) throw new Error("Failed to fetch ticket");
       return res.json();
     },
@@ -203,7 +203,7 @@ export default function TicketDetailPage() {
   const { data: comments = [] } = useQuery<TicketCommentWithUser[]>({
     queryKey: ["/api/tickets", id, "comments"],
     queryFn: async () => {
-      const res = await fetch(`/api/tickets/${id}/comments`);
+      const res = await apiRequest("GET", `/api/tickets/${id}/comments`);
       if (!res.ok) return [];
       return res.json();
     },
