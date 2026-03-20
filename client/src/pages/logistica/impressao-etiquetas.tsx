@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, API_BASE } from "@/lib/queryClient";
 
 interface DeviceData {
   imei: string;
@@ -81,7 +81,7 @@ export default function ImpressaoEtiquetasPage() {
   useEffect(() => {
     if (deviceData?.imei) {
       const primaryImei = deviceData.imei.split("/")[0].trim();
-      setBarcodeUrl(`/api/etiquetas/barcode/${primaryImei}?t=${Date.now()}`);
+      setBarcodeUrl(`${API_BASE}/api/etiquetas/barcode/${primaryImei}?t=${Date.now()}`);
     } else {
       setBarcodeUrl(null);
     }
@@ -318,7 +318,7 @@ export default function ImpressaoEtiquetasPage() {
         <div class="info-line">Cód: ${data.deviceErpCode}</div>
         <div class="info-line">Triador: ${data.triador}</div>
         <div class="barcode-area">
-          <img id="barcode-img" src="/api/etiquetas/barcode/${imei}" alt="Barcode" />
+          <img id="barcode-img" src="${API_BASE}/api/etiquetas/barcode/${imei}" alt="Barcode" />
           <div class="barcode-number">${imei}</div>
         </div>
       </div>
