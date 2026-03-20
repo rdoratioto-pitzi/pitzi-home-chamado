@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
     paths:
       - 'client/**'
       - 'shared/**'
@@ -37,11 +38,11 @@ jobs:
       - name: Build frontend
         run: npx vite build --config vite.config.ts
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_URL }}
+          VITE_API_BASE_URL: ${{ github.ref == 'refs/heads/main' && vars.VITE_API_URL || vars.VITE_API_URL_DEV }}
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist/public --project-name renov-home
+          command: pages deploy dist/public --project-name ${{ github.ref == 'refs/heads/main' && 'renov-home' || 'renov-home-dev' }} --commit-dirty=true
