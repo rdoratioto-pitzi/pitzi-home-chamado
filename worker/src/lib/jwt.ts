@@ -73,34 +73,34 @@ export function setAuthCookies(
   rememberMe: boolean,
 ) {
   const isProduction = c.env.APP_URL.startsWith("https://");
-  const domain = ".renovsmart.com.br";
   const refreshMaxAge = rememberMe ? 7 * 24 * 60 * 60 : 24 * 60 * 60;
+
+  // Cross-site cookies (pages.dev → renovsmart.com.br) require SameSite=None + Secure.
+  // Omit domain so cookie is scoped to the API host only.
+  const cookieOpts = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? "None" : "Lax",
+  } as const;
 
   // Access token cookie
   setCookie(c, ACCESS_TOKEN_COOKIE, accessToken, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: "Lax",
-    domain,
+    ...cookieOpts,
     path: "/",
     maxAge: 2 * 60 * 60,
   });
 
   // Refresh token cookie — path covers both /refresh and /logout
   setCookie(c, REFRESH_TOKEN_COOKIE, refreshToken, {
-    httpOnly: true,
-    secure: isProduction,
-    sameSite: "Lax",
-    domain,
+    ...cookieOpts,
     path: "/api/auth/",
     maxAge: refreshMaxAge,
   });
 }
 
 export function clearAuthCookies(c: Context<AppEnv>) {
-  const domain = ".renovsmart.com.br";
-  deleteCookie(c, ACCESS_TOKEN_COOKIE, { domain, path: "/" });
-  deleteCookie(c, REFRESH_TOKEN_COOKIE, { domain, path: "/api/auth/" });
+  deleteCookie(c, ACCESS_TOKEN_COOKIE, { path: "/" });
+  deleteCookie(c, REFRESH_TOKEN_COOKIE, { path: "/api/auth/" });
 }
 
 export function getAccessTokenFromCookie(c: Context<AppEnv>): string | null {
