@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Printer, Search, Download, Loader2, CheckCircle, AlertCircle, Smartphone, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, API_BASE } from "@/lib/queryClient";
 
 // ==========================================
 // 1. INTERFACES E REGRAS DE NEGÓCIO
@@ -105,7 +105,7 @@ function getHtmlForDirectPrint(device: DeviceData, primaryImei: string) {
           <div class="info-line">${codText}</div>
           <div class="info-line">Triador: ${device.triador}</div>
           <div class="barcode-area">
-            <img id="barcode-img" src="/api/etiquetas/barcode/${primaryImei}" alt="Barcode" />
+            <img id="barcode-img" src="${API_BASE}/api/etiquetas/barcode/${primaryImei}" alt="Barcode" />
             <div class="barcode-number">${primaryImei}</div>
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function ImpressaoEtiquetasPage() {
   const [showPopup, setShowPopup] = useState(false);
   const imeiInputRef = useRef<HTMLInputElement>(null);
 
-  const barcodeUrl = deviceData ? `/api/etiquetas/barcode/${deviceData.imei.split("/")[0].trim()}?t=${Date.now()}` : null;
+  const barcodeUrl = deviceData ? `${API_BASE}/api/etiquetas/barcode/${deviceData.imei.split("/")[0].trim()}?t=${Date.now()}` : null;
 
   const closeLabelPopup = useCallback(() => {
     setShowPopup(false);
