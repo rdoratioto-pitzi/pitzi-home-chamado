@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/auth-context";
@@ -93,6 +93,8 @@ export default function ReunioesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"table" | "grid" | "list">("table");
   const [showTagsSidebar, setShowTagsSidebar] = useState(true);
+  // Ref para que meetingTableColumns (useMemo) acesse filteredMeetings sem problema de hoisting
+  const filteredMeetingsRef = useRef<Task[]>([]);
 
   const { user: currentUser } = useAuth();
   const currentUserId = currentUser?.id || "";
@@ -298,14 +300,80 @@ export default function ReunioesPage() {
     {
       key: 'recurrence',
       label: 'Recorrência',
-      className: 'w-[120px]',
+      className: 'w-[130px]',
       render: (value: any, row: Task) => {
         if (row.isRecurring) {
           const recurrenceType = row.recurrenceType === 'weekly' ? 'Semanal' : 'Diária';
-          return `🔄 ${recurrenceType}`;
+          return <span className="text-sm">🔄 {recurrenceType}</span>;
         }
-        return '-';
+        if (row.parentTaskId) {
+          return <span className="text-xs text-muted-foreground">↩ Recorrente</span>;
+        }
+        return <span className="text-muted-foreground">-</span>;
       }
+    },
+    {
+      key: 'actions',
+      label: '',
+      className: 'w-[48px]',
+      render: (value: any, row: Task) => (
+        <div onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              data-testid={`button-meeting-menu-${row.id}`}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={(e) => {
+              e.stopPropagation();
+              const idx = filteredMeetingsRef.current.findIndex(m => m.id === row.id);
+              setCurrentPresentationIndex(idx >= 0 ? idx : 0);
+              setPresentationMode(true);
+            }}>
+              <MonitorPlay className="h-4 w-4 mr-2" />
+              Modo Apresentação
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/reunioes/${row.id}`);
+            }}>
+              <Edit className="h-4 w-4 mr-2" />
+              Editar
+            </DropdownMenuItem>
+            {(row.isRecurring || row.parentTaskId) && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={(e) => {
+                  e.stopPropagation();
+                  setRemovingRecurrenceMeeting(row);
+                }}>
+                  <Repeat className="h-4 w-4 mr-2" />
+                  Remover recorrência
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeletingMeeting(row);
+                setDeleteScope("single");
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        </div>
+      )
     }
   ], [users, areas]);
 
@@ -834,6 +902,9 @@ export default function ReunioesPage() {
 
     return result;
   }, [meetings, searchQuery, statusFilter, sortBy]);
+
+  // Mantém ref sincronizada para uso dentro de meetingTableColumns (evita problema de hoisting)
+  filteredMeetingsRef.current = filteredMeetings;
 
   const selectedArea = areas.find(a => a.id === selectedAreaId);
 

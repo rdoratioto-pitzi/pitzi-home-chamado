@@ -432,14 +432,16 @@ export async function processRecurringMeetings(): Promise<void> {
  * O job roda a cada hora para verificar novas reuniões a criar
  */
 export function startRecurrenceJob(): void {
-  // Cron: a cada hora no minuto 15
-  // "15 * * * *" = minuto 15 de cada hora
-  cron.schedule("15 * * * *", async () => {
+  // Cron de recorrência: apenas em horário comercial (8h–19h, seg–sex, America/Sao_Paulo)
+  // Evita criar instâncias e enviar emails de convite durante a madrugada/fins de semana
+  cron.schedule("15 8-19 * * 1-5", async () => {
     console.log("[RecurrenceJob] Executando job de recorrência...");
     await processRecurringMeetings();
+  }, { timezone: "America/Sao_Paulo" });
 
-    // Aquece o cache Omie junto com o job horário, para que nenhum usuário
-    // fique esperando pela chamada à API externa na primeira requisição pós-TTL.
+  // Cron de aquecimento do cache Omie: mantém a cada hora (separado do job de recorrência)
+  // para que nenhum usuário fique esperando pela chamada à API externa
+  cron.schedule("15 * * * *", async () => {
     try {
       await getCachedProdutos();
       console.log("[RecurrenceJob] Cache Omie aquecido com sucesso");
@@ -447,8 +449,8 @@ export function startRecurrenceJob(): void {
       console.error("[RecurrenceJob] Falha ao aquecer cache Omie:", err.message);
     }
   });
-  
-  console.log("[RecurrenceJob] Job de recorrência agendado para executar a cada hora (minuto 15)");
+
+  console.log("[RecurrenceJob] Job de recorrência agendado (8h–19h seg–sex) | Cache Omie a cada hora");
 }
 
 // Exporta também para execução manual
