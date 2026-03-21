@@ -537,7 +537,10 @@ export function registerTaskRoutes(router: Router) {
           meetingData = null;
         }
 
-        if (meetingData?.date && meetingData?.time) {
+        // Envia email de convite apenas para reuniões avulsas (não-recorrentes).
+        // Instâncias recorrentes são criadas pelo cron job, que já envia os convites.
+        const isRecurringInstance = !!task.parentTaskId;
+        if (!isRecurringInstance && meetingData?.date && meetingData?.time) {
           const organizer = await storage.getUser(task.createdBy);
           if (organizer) {
             const participantIds = meetingData.participants || [];
