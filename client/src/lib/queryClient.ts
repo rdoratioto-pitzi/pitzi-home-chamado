@@ -1,6 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 // Global fetch interceptor: prepend API_BASE for all /api/ calls
 // so every fetch("/api/...") automatically hits the correct backend

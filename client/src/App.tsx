@@ -35,7 +35,7 @@ const OperadoresPage                   = lazy(() => import("@/pages/logistica/op
 const SolicitacoesPage                 = lazy(() => import("@/pages/logistica/solicitacoes"));
 const LogisticaReversaPage             = lazy(() => import("@/pages/logistica/logistica-reversa"));
 const SimularFretePage                 = lazy(() => import("@/pages/logistica/simular-frete"));
-const ImpressaoEtiquetasPage           = lazy(() => import("@/pages/logistica/impressao-etiquetas"));
+const ImpressaoEtiquetasPage           = lazy(() => import("@/pages/triagem/impressao-etiquetas"));
 const RomaneiosPage                    = lazy(() => import("@/pages/logistica/romaneios"));
 const EficienciaAvaliacoesIaPage       = lazy(() => import("@/pages/logistica/avaliacoes-ia"));
 const ApisPage                         = lazy(() => import("@/pages/apis/index"));
@@ -210,11 +210,6 @@ function Router() {
           <LogisticaReversaPage />
         </ProtectedRoute>
       </Route>
-      <Route path="/logistica/impressao-etiquetas">
-        <ProtectedRoute requiredPermission="logistica">
-          <ImpressaoEtiquetasPage />
-        </ProtectedRoute>
-      </Route>
       <Route path="/logistica/romaneios">
         <ProtectedRoute requiredPermission="logistica">
           <RomaneiosPage />
@@ -223,6 +218,11 @@ function Router() {
       <Route path="/logistica/avaliacoes-ia">
         <ProtectedRoute requiredPermission="logistica">
           <EficienciaAvaliacoesIaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/triagem/impressao-etiquetas">
+        <ProtectedRoute requiredPermission="triagem">
+          <ImpressaoEtiquetasPage />
         </ProtectedRoute>
       </Route>
       <Route path="/apis">

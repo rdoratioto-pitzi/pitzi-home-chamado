@@ -7,6 +7,7 @@ export interface UserPermissions {
   reunioes: boolean;
   fluxogramas: boolean;
   logistica: boolean;
+  triagem: boolean;
   pricing: boolean;
   conhecimento: boolean;
   apis: boolean;
@@ -47,6 +48,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     reunioes: false,
     fluxogramas: false,
     logistica: false,
+    triagem: false,
     pricing: false,
     conhecimento: false,
     apis: false,
@@ -69,6 +71,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       reunioes: true,
       fluxogramas: true,
       logistica: true,
+      triagem: true,
       pricing: true,
       conhecimento: true,
       apis: true,

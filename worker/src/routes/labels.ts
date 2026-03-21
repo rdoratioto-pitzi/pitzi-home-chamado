@@ -1,7 +1,7 @@
 // worker/src/routes/labels.ts
 import { Hono } from "hono";
 import { z } from "zod";
-import { toBuffer } from "bwip-js/node";
+import bwipjs from "bwip-js";
 import type { AppEnv } from "../index";
 
 const labels = new Hono<AppEnv>();
@@ -13,8 +13,8 @@ const labelDataSchema = z.object({
   triador: z.string().min(1).max(100),
 });
 
-async function generateBarcodeBuffer(imei: string): Promise<Buffer> {
-  return toBuffer({
+function generateBarcodeSvg(imei: string): string {
+  return bwipjs.toSVG({
     bcid: "code128",
     text: imei,
     scale: 2,
@@ -34,8 +34,8 @@ labels.post("/api/etiquetas/gerar-png", async (c) => {
   const { imei, deviceDescription, deviceErpCode, triador } = result.data;
   const grading = deviceErpCode.length >= 2 ? deviceErpCode.slice(-2) : "??";
 
-  const pngBuffer = await generateBarcodeBuffer(imei);
-  const barcodeBase64 = pngBuffer.toString("base64");
+  const svgString = generateBarcodeSvg(imei);
+  const barcodeBase64 = btoa(svgString);
 
   return c.json({
     success: true,
@@ -45,7 +45,7 @@ labels.post("/api/etiquetas/gerar-png", async (c) => {
       deviceErpCode,
       grading,
       triador,
-      barcodeBase64: `data:image/png;base64,${barcodeBase64}`,
+      barcodeBase64: `data:image/svg+xml;base64,${barcodeBase64}`,
     },
   });
 });
@@ -73,7 +73,7 @@ labels.get("/api/etiquetas/barcode/:imei", async (c) => {
     return c.json({ error: "Código inválido. Deve ter entre 1 e 50 caracteres." }, 400);
   }
 
-  const pngBuffer = await toBuffer({
+  const svgString = bwipjs.toSVG({
     bcid: "code128",
     text: imei,
     scale: 2,
@@ -82,8 +82,8 @@ labels.get("/api/etiquetas/barcode/:imei", async (c) => {
     textxalign: "center",
   });
 
-  return new Response(pngBuffer, {
-    headers: { "Content-Type": "image/png" },
+  return new Response(svgString, {
+    headers: { "Content-Type": "image/svg+xml" },
   });
 });
 
