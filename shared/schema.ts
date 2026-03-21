@@ -51,6 +51,7 @@ export type ModulePermissions = {
   fluxogramas: boolean;
   diagramas: boolean;
   logistica: boolean;
+  triagem: boolean;
   pricing: boolean;
   conhecimento: boolean;
   apis: boolean;
