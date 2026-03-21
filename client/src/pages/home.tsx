@@ -1,14 +1,14 @@
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { 
-  Ticket, 
-  FolderKanban, 
-  CheckSquare, 
-  Target, 
-  Truck, 
-  DollarSign, 
-  BookOpen, 
+import {
+  Ticket,
+  FolderKanban,
+  CheckSquare,
+  Target,
+  Truck,
+  DollarSign,
+  BookOpen,
   Video,
   BarChart3,
   Bot,
@@ -16,6 +16,7 @@ import {
   Workflow,
   Sparkles,
   GitBranch,
+  Printer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
@@ -113,6 +114,15 @@ const modules: ModuleCard[] = [
     color: "text-amber-600 dark:text-amber-400",
     bgColor: "bg-amber-100 dark:bg-amber-900/30",
     permissionKey: "logistica",
+  },
+  {
+    title: "Triagem",
+    description: "Impressão de etiquetas para triagem",
+    icon: Printer,
+    href: "/triagem/impressao-etiquetas",
+    color: "text-cyan-600 dark:text-cyan-400",
+    bgColor: "bg-cyan-100 dark:bg-cyan-900/30",
+    permissionKey: "triagem",
   },
   {
     title: "Pricing",
