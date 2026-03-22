@@ -421,16 +421,16 @@ function AppContent() {
   useAuthSync();
 
   const sidebarStyle = {
-    "--sidebar-width": "16rem",
-    "--sidebar-width-icon": "3.5rem",
+    "--sidebar-width": "14rem",
+    "--sidebar-width-icon": "3.375rem",
   };
 
   if (isLoginPage) {
     return (
       <ThemeProvider>
         <TooltipProvider>
-          <div className="flex h-screen w-full overflow-hidden">
-            <main className="flex-1 overflow-auto">
+          <div className="flex h-screen w-full overflow-hidden bg-background">
+            <main className="flex-1 overflow-auto bg-background">
               <Suspense fallback={null}>
                 <Router />
               </Suspense>
@@ -447,9 +447,9 @@ function AppContent() {
       <TooltipProvider>
         <Suspense fallback={null}>
           <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-            <div className="flex h-screen w-full">
+            <div className="flex h-screen w-full bg-background">
               <AppSidebar />
-              <main className="flex-1 overflow-auto">
+              <main className="flex-1 overflow-auto bg-background">
                 <Suspense fallback={null}>
                   <Router />
                 </Suspense>

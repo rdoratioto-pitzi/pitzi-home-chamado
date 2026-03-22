@@ -85,43 +85,43 @@ export default function LogisticaPage() {
 
       <main className="flex-1 p-6 space-y-6">
         <div className="grid gap-4 md:grid-cols-4">
-          <Card>
+          <Card style={{ background: 'var(--vf)', border: 'none' }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Envios</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#FFFFFF' }}>Total de Envios</CardTitle>
+              <Package className="h-4 w-4" style={{ color: '#FFFFFF' }} />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-shipments">{stats.total}</div>
-              <p className="text-xs text-muted-foreground">registrados no sistema</p>
+              <div className="text-[28px] font-bold" style={{ color: '#FFFFFF' }} data-testid="text-total-shipments">{stats.total}</div>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.8)' }}>registrados no sistema</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Em Trânsito</CardTitle>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Em Trânsito</CardTitle>
               <Truck className="h-4 w-4 text-yellow-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-yellow-600" data-testid="text-transit-shipments">{stats.inTransit}</div>
+              <div className="text-[28px] font-bold" style={{ color: 'var(--l1)' }} data-testid="text-transit-shipments">{stats.inTransit}</div>
               <p className="text-xs text-muted-foreground">a caminho do destino</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Entregues</CardTitle>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Entregues</CardTitle>
               <CheckCircle2 className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600" data-testid="text-delivered-shipments">{stats.delivered}</div>
-              <p className="text-xs text-muted-foreground">concluídos com sucesso</p>
+              <div className="text-[28px] font-bold" style={{ color: 'var(--l1)' }} data-testid="text-delivered-shipments">{stats.delivered}</div>
+              <p className="text-xs text-muted-foreground">concluidos com sucesso</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pendentes</CardTitle>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Pendentes</CardTitle>
               <Clock className="h-4 w-4 text-slate-500" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-slate-600" data-testid="text-pending-shipments">{stats.pending}</div>
+              <div className="text-[28px] font-bold" style={{ color: 'var(--l1)' }} data-testid="text-pending-shipments">{stats.pending}</div>
               <p className="text-xs text-muted-foreground">aguardando processamento</p>
             </CardContent>
           </Card>

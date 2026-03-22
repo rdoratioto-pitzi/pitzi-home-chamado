@@ -628,44 +628,46 @@ export default function ChamadosPage() {
               Em Tratativa
             </Button>
           </div>
-          <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest bg-primary/5 px-3 py-1 rounded-full border border-primary/10">
+          <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide bg-primary/5 px-3 py-1 rounded-full border border-primary/10">
             Visão Estratégica
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-7">
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-primary/30 transition-all duration-300 ${statusFilter === "all" && slaFilter === "all" ? "ring-2 ring-primary bg-primary/5" : "bg-card"}`}
+            className={`shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 ${statusFilter === "all" && slaFilter === "all" ? "ring-2 ring-primary" : ""}`}
+            style={{ background: 'var(--vf)', border: 'none' }}
             onClick={() => handleKpiClick("status", "all")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Total</CardTitle>
-              <div className="p-1.5 bg-muted rounded-md tracking-tighter">
-                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#FFFFFF' }}>Total</CardTitle>
+              <div className="p-1.5 rounded-md" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                <Clock className="h-3.5 w-3.5" style={{ color: '#FFFFFF' }} />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold tracking-tight mb-2" data-testid="text-total-tickets">{stats.total}</div>
+              <div className="text-[28px] font-bold tracking-tight mb-2" style={{ color: '#FFFFFF' }} data-testid="text-total-tickets">{stats.total}</div>
               <div className="flex items-center gap-1.5 mt-2">
-                <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary" style={{ width: `${(stats.total / (stats.historicalTotal || 1)) * 100}%` }} />
+                <div className="h-1.5 flex-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.2)' }}>
+                  <div className="h-full" style={{ background: '#FFFFFF', width: `${(stats.total / (stats.historicalTotal || 1)) * 100}%` }} />
                 </div>
-                <p className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">de {stats.historicalTotal}</p>
+                <p className="text-[11px] font-medium whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.8)' }}>de {stats.historicalTotal}</p>
               </div>
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-blue-500/30 transition-all duration-300 ${statusFilter === "open" ? "ring-2 ring-blue-500 bg-blue-500/5" : "bg-card"}`}
+            className={`shadow-sm border cursor-pointer hover:shadow-md hover:border-blue-500/30 transition-all duration-300 ${statusFilter === "open" ? "ring-2 ring-blue-500 bg-blue-500/5" : ""}`}
+            style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}
             onClick={() => handleKpiClick("status", "open")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Abertos</CardTitle>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Abertos</CardTitle>
               <div className="p-1.5 bg-blue-500/10 rounded-md">
                 <AlertCircle className="h-3.5 w-3.5 text-blue-500" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold tracking-tight text-blue-600 mb-1" data-testid="text-open-tickets">{stats.open}</div>
+              <div className="text-[28px] font-bold tracking-tight mb-1" style={{ color: 'var(--l1)' }} data-testid="text-open-tickets">{stats.open}</div>
               <div className="flex items-center gap-1 mt-2">
                 <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-blue-50 text-blue-700 border-blue-200">{openPerc}%</Badge>
                 <p className="text-[11px] font-medium text-muted-foreground">do período</p>
@@ -673,17 +675,18 @@ export default function ChamadosPage() {
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-yellow-500/30 transition-all duration-300 ${statusFilter === "in_progress" ? "ring-2 ring-yellow-500 bg-yellow-500/5" : "bg-card"}`}
+            className={`shadow-sm border cursor-pointer hover:shadow-md hover:border-yellow-500/30 transition-all duration-300 ${statusFilter === "in_progress" ? "ring-2 ring-yellow-500 bg-yellow-500/5" : ""}`}
+            style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}
             onClick={() => handleKpiClick("status", "in_progress")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Andamento</CardTitle>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Andamento</CardTitle>
               <div className="p-1.5 bg-yellow-500/10 rounded-md">
                 <Clock className="h-3.5 w-3.5 text-yellow-500" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold tracking-tight text-yellow-600 mb-1" data-testid="text-progress-tickets">{stats.inProgress}</div>
+              <div className="text-[28px] font-bold tracking-tight mb-1" style={{ color: 'var(--l1)' }} data-testid="text-progress-tickets">{stats.inProgress}</div>
               <div className="flex items-center gap-1 mt-2">
                 <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-yellow-50 text-yellow-700 border-yellow-200">{inProgressPerc}%</Badge>
                 <p className="text-[11px] font-medium text-muted-foreground">do período</p>
@@ -691,17 +694,18 @@ export default function ChamadosPage() {
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-red-500/30 transition-all duration-300 ${statusFilter === "blocked" ? "ring-2 ring-red-500 bg-red-500/5" : "bg-card"}`}
+            className={`shadow-sm border cursor-pointer hover:shadow-md hover:border-red-500/30 transition-all duration-300 ${statusFilter === "blocked" ? "ring-2 ring-red-500 bg-red-500/5" : ""}`}
+            style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}
             onClick={() => handleKpiClick("status", "blocked")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Bloqueados</CardTitle>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Bloqueados</CardTitle>
               <div className="p-1.5 bg-red-500/10 rounded-md">
                 <Ban className="h-3.5 w-3.5 text-red-500" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold tracking-tight text-red-600 mb-1" data-testid="text-blocked-tickets">{stats.blocked}</div>
+              <div className="text-[28px] font-bold tracking-tight mb-1" style={{ color: 'var(--l1)' }} data-testid="text-blocked-tickets">{stats.blocked}</div>
               <div className="flex items-center gap-1 mt-2">
                 <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-red-50 text-red-700 border-red-200">{blockedPerc}%</Badge>
                 <p className="text-[11px] font-medium text-muted-foreground">do período</p>
@@ -709,17 +713,18 @@ export default function ChamadosPage() {
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-green-500/30 transition-all duration-300 ${statusFilter === "resolved" ? "ring-2 ring-green-500 bg-green-500/5" : "bg-card"}`}
+            className={`shadow-sm border cursor-pointer hover:shadow-md hover:border-green-500/30 transition-all duration-300 ${statusFilter === "resolved" ? "ring-2 ring-green-500 bg-green-500/5" : ""}`}
+            style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}
             onClick={() => handleKpiClick("status", "resolved")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Resolvidos</CardTitle>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Resolvidos</CardTitle>
               <div className="p-1.5 bg-green-500/10 rounded-md">
                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold tracking-tight text-green-600 mb-1" data-testid="text-resolved-tickets">
+              <div className="text-[28px] font-bold tracking-tight mb-1" style={{ color: 'var(--l1)' }} data-testid="text-resolved-tickets">
                 {periodFilter === "previousMonth" ? (
                   <span>
                     {stats.resolved} <span className="text-green-400 text-2xl">/</span> {previousMonthResolved}
@@ -741,41 +746,43 @@ export default function ChamadosPage() {
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-green-600/30 transition-all duration-300 ${slaFilter === "dentro_prazo" ? "ring-2 ring-green-600 bg-green-600/5" : "bg-card"}`}
+            className={`shadow-sm border cursor-pointer hover:shadow-md hover:border-green-600/30 transition-all duration-300 ${slaFilter === "dentro_prazo" ? "ring-2 ring-green-600 bg-green-600/5" : ""}`}
+            style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}
             onClick={() => handleKpiClick("sla", "dentro_prazo")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">No Prazo</CardTitle>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>No Prazo</CardTitle>
               <div className="p-1.5 bg-green-600/10 rounded-md">
                 <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold tracking-tight text-green-700 font-mono mb-1" data-testid="text-sla-in-time-tickets">
+              <div className="text-[28px] font-bold tracking-tight font-mono mb-1" style={{ color: 'var(--l1)' }} data-testid="text-sla-in-time-tickets">
                 {stats.dentroPrazo}
               </div>
               <div className="flex items-center gap-1 mt-2">
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-green-50 text-green-800 border-green-300 font-bold">{dentroPrazoPerc}%</Badge>
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-green-50 text-green-800 border-green-300 font-semibold">{dentroPrazoPerc}%</Badge>
                 <p className="text-[11px] font-medium text-muted-foreground">taxa de sucesso</p>
               </div>
             </CardContent>
           </Card>
           <Card
-            className={`shadow-sm border-border/60 cursor-pointer hover:shadow-md hover:border-red-600/30 transition-all duration-300 ${slaFilter === "em_atraso" ? "ring-2 ring-red-600 bg-red-600/5" : "bg-card"}`}
+            className={`shadow-sm border cursor-pointer hover:shadow-md hover:border-red-600/30 transition-all duration-300 ${slaFilter === "em_atraso" ? "ring-2 ring-red-600 bg-red-600/5" : ""}`}
+            style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}
             onClick={() => handleKpiClick("sla", "em_atraso")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-              <CardTitle className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Em Atraso</CardTitle>
+              <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Em Atraso</CardTitle>
               <div className="p-1.5 bg-red-600/10 rounded-md">
                 <AlertCircle className="h-3.5 w-3.5 text-red-600" />
               </div>
             </CardHeader>
              <CardContent>
-              <div className="text-4xl font-bold tracking-tight text-red-700 font-mono mb-1" data-testid="text-sla-overdue-tickets">
+              <div className="text-[28px] font-bold tracking-tight font-mono mb-1" style={{ color: 'var(--l1)' }} data-testid="text-sla-overdue-tickets">
                 {stats.emAtraso}
               </div>
               <div className="flex items-center gap-1 mt-2">
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-red-50 text-red-800 border-red-300 font-bold">{emAtrasoPerc}%</Badge>
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 bg-red-50 text-red-800 border-red-300 font-semibold">{emAtrasoPerc}%</Badge>
                 <p className="text-[11px] font-medium text-muted-foreground">em atraso</p>
               </div>
             </CardContent>
@@ -783,7 +790,7 @@ export default function ChamadosPage() {
           
           {/* Label de período ativo */}
           <div className="mt-2 text-center">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               Período: {periodFilter === "month" ? "Mês Vigente" : periodFilter === "previousMonth" ? "Mês Anterior" : periodFilter === "year" ? "Este Ano" : periodFilter === "execution" ? "Em Tratativa" : "Total Histórico"}
             </span>
           </div>
@@ -792,7 +799,7 @@ export default function ChamadosPage() {
         <Card className="shadow-sm border-border/60">
           <CardHeader className="pb-4 px-6 pt-6 border-b border-border/50">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-              <CardTitle className="text-[18px] font-bold tracking-tight">Chamados</CardTitle>
+              <CardTitle className="text-[13px] font-semibold tracking-tight">Chamados</CardTitle>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"
@@ -970,90 +977,90 @@ export default function ChamadosPage() {
               <Table className="border-collapse">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[100px] text-[12px] font-bold uppercase tracking-wider">
+                    <TableHead className="w-[100px] text-[10px] font-semibold uppercase tracking-wide">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide"
                         onClick={() => handleSort("code")}
                       >
                         Código
                         {sortField === "code" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider min-w-[250px]">
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide min-w-[250px]">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide"
                         onClick={() => handleSort("title")}
                       >
                         Título
                         {sortField === "title" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide"
                         onClick={() => handleSort("category")}
                       >
                         Categoria
                         {sortField === "category" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tipo</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">Tipo</TableHead>
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide"
                         onClick={() => handleSort("requesterId")}
                       >
                         Solicitante
                         {sortField === "requesterId" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Responsável</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">Responsável</TableHead>
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide"
                         onClick={() => handleSort("status")}
                       >
                         Status
                         {sortField === "status" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide"
                         onClick={() => handleSort("priority")}
                       >
                         Prioridade
                         {sortField === "priority" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 -ml-3 flex items-center gap-1 text-[12px] font-bold uppercase tracking-wider"
+                        className="h-8 -ml-3 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide"
                         onClick={() => handleSort("createdAt")}
                       >
                         Abertura
                         {sortField === "createdAt" && (sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)}
                       </Button>
                     </TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Resolução</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tempo Aberto</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">SLA</TableHead>
-                    <TableHead className="text-[12px] font-bold uppercase tracking-wider">Status SLA</TableHead>
-                    <TableHead className="w-[60px] text-[12px] font-bold uppercase tracking-wider">Ações</TableHead>
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">Resolução</TableHead>
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">Tempo Aberto</TableHead>
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">SLA</TableHead>
+                    <TableHead className="text-[10px] font-semibold uppercase tracking-wide">Status SLA</TableHead>
+                    <TableHead className="w-[60px] text-[10px] font-semibold uppercase tracking-wide">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1085,7 +1092,7 @@ export default function ChamadosPage() {
                           </TableCell>
                           <TableCell className="text-[13px] text-muted-foreground">{ticket.category}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={`${getTypeColor(ticket.type || "bug")} text-[10px] font-bold uppercase tracking-wider`}>
+                            <Badge variant="outline" className={`${getTypeColor(ticket.type || "bug")} text-[10px] font-semibold uppercase tracking-wide`}>
                               {ticket.type || "Bug"}
                             </Badge>
                           </TableCell>
@@ -1104,12 +1111,12 @@ export default function ChamadosPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={`${statusColors[ticket.status]} text-[10px] font-bold uppercase tracking-wider`}>
+                            <Badge variant="outline" className={`${statusColors[ticket.status]} text-[10px] font-semibold uppercase tracking-wide`}>
                               {statusLabels[ticket.status]}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className={`${priorityColors[ticket.priority]} text-[10px] font-bold uppercase tracking-wider`}>
+                            <Badge variant="outline" className={`${priorityColors[ticket.priority]} text-[10px] font-semibold uppercase tracking-wide`}>
                               {priorityLabels[ticket.priority]}
                             </Badge>
                           </TableCell>
@@ -1149,11 +1156,11 @@ export default function ChamadosPage() {
                                 return <span className="text-[12px] text-muted-foreground">—</span>;
                               }
                               return slaInfo.status === "dentro_prazo" ? (
-                                <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-bold uppercase tracking-wider">
+                                <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-semibold uppercase tracking-wide">
                                   Dentro do Prazo
                                 </Badge>
                               ) : (
-                                <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-bold uppercase tracking-wider">
+                                <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-semibold uppercase tracking-wide">
                                   Em Atraso
                                 </Badge>
                               );

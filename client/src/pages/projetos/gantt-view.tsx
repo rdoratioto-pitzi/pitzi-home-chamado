@@ -236,7 +236,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                     {card.title}
                   </span>
                   {hasChildren && (
-                    <Badge variant="secondary" className="text-[9px] h-4 px-1">
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1">
                       {children.length}
                     </Badge>
                   )}
@@ -392,7 +392,7 @@ export function GanttView({ cards, columns, users, onEditCard, onNewCard, isRead
                               {isInherited && " (herdado do pai)"}
                             </p>
                             <div className="flex items-center gap-2 text-[10px]">
-                              <Badge variant="secondary" className="text-[9px] h-4">
+                              <Badge variant="secondary" className="text-[10px] h-4">
                                 {priorityLabels[card.priority]}
                               </Badge>
                               <span>{getColumnName(card.columnId)}</span>
