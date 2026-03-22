@@ -30,7 +30,7 @@ interface Props {
 export function KpiTempo({ dados, isLoading }: Props) {
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-0.5">
+      <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider px-0.5">
         Tempo
       </h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -45,6 +45,7 @@ export function KpiTempo({ dados, isLoading }: Props) {
           formato="dias"
           icone={<Clock className="h-4 w-4" />}
           isLoading={isLoading}
+          highlight
         />
         <KpiCard
           titulo="Pré-Estoque"

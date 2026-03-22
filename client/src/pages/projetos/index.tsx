@@ -254,7 +254,7 @@ export default function ProjetosPage() {
 
           {/* Contagem */}
           <div className="px-3 py-2 border-b">
-            <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+            <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">
               {filteredProjects.length} projeto{filteredProjects.length !== 1 ? "s" : ""}
             </p>
           </div>
@@ -456,7 +456,7 @@ export default function ProjetosPage() {
             /* Overview: grade com todos os projetos filtrados */
             <div className="flex-1 overflow-auto p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                <h2 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider">
                   {filteredProjects.length} projeto{filteredProjects.length !== 1 ? "s" : ""}
                 </h2>
                 <Button size="sm" onClick={handleNewProject} className="gap-1.5 h-8 text-xs">

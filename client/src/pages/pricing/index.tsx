@@ -318,43 +318,43 @@ export default function PricingOverviewPage() {
         </Card>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
+          <Card style={{ background: 'var(--vf)', border: 'none' }}>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-primary/10">
-                  <Smartphone className="h-6 w-6 text-primary" />
+                <div className="p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                  <Smartphone className="h-6 w-6" style={{ color: '#FFFFFF' }} />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Dispositivos Monitorados</p>
-                  <p className="text-2xl font-bold">{filteredDevices.length}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#FFFFFF' }}>Dispositivos Monitorados</p>
+                  <p className="text-[28px] font-bold" style={{ color: '#FFFFFF' }}>{filteredDevices.length}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-lg bg-green-500/10">
                   <TrendingDown className="h-6 w-6 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Modelos Únicos</p>
-                  <p className="text-2xl font-bold">{groupedDevices.length}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Modelos Únicos</p>
+                  <p className="text-[28px] font-bold" style={{ color: 'var(--l1)' }}>{groupedDevices.length}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-lg bg-blue-500/10">
                   <BarChart3 className="h-6 w-6 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Categoria</p>
-                  <p className="text-2xl font-bold">{categoryName}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Categoria</p>
+                  <p className="text-[28px] font-bold" style={{ color: 'var(--l1)' }}>{categoryName}</p>
                 </div>
               </div>
             </CardContent>
