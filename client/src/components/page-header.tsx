@@ -20,8 +20,8 @@ export interface PageHeaderProps {
 
 export function PageHeader({ title, description, breadcrumbs, actions }: PageHeaderProps) {
   return (
-    <header className="border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-10">
-      <div className="flex items-center justify-between h-14 px-6 gap-4">
+    <header data-slot="page-header" className="sticky top-0 z-10" style={{ height: 46, background: 'var(--bg1)', borderBottom: '1px solid var(--sep)' }}>
+      <div className="flex items-center justify-between h-full px-6 gap-4">
         <div className="flex items-center gap-4 min-w-0">
           <SidebarTrigger data-testid="button-sidebar-toggle" className="h-9 w-9 rounded-lg hover:bg-muted shrink-0" />
           <div className="h-6 w-px bg-border/60" />
@@ -37,7 +37,7 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
                         {crumb.href ? (
                           <BreadcrumbLink href={crumb.href} className="hover:text-primary transition-colors">{crumb.label}</BreadcrumbLink>
                         ) : (
-                          <BreadcrumbPage className="font-bold text-foreground text-[18px]">{crumb.label}</BreadcrumbPage>
+                          <BreadcrumbPage className="font-bold text-foreground text-[22px]">{crumb.label}</BreadcrumbPage>
                         )}
                       </BreadcrumbItem>
                     </span>
@@ -45,7 +45,7 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
                 </BreadcrumbList>
               </Breadcrumb>
             ) : (
-              <h1 className="text-[20px] font-bold tracking-tight text-foreground leading-tight truncate">{title}</h1>
+              <h1 className="text-[22px] font-bold tracking-tight text-foreground leading-tight truncate">{title}</h1>
             )}
             {description && !breadcrumbs && (
               <p className="text-[12px] text-muted-foreground leading-none mt-1 truncate">{description}</p>

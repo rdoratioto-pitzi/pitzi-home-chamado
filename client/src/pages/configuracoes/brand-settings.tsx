@@ -233,6 +233,7 @@ export function BrandSettings() {
             <div className="space-y-4">
               <Label>Tema Escuro</Label>
               <div 
+                data-dark-preview=""
                 className="relative group cursor-pointer p-8 rounded-lg bg-slate-900 border-2 border-dashed border-white/10 hover:border-primary/50 transition-colors flex flex-col items-center justify-center min-h-[160px]"
                 onClick={() => document.getElementById('logo-upload-dark')?.click()}
               >
