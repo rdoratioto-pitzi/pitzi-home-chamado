@@ -1,0 +1,172 @@
+/* ==========================================================================
+   Renov Design System — CSS Tokens v1
+   Source of truth: .claude/skills/renov-brand/SKILL.md
+   ========================================================================== */
+
+/* ---------- Font Import ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@200;300;400;500;600;700;800&display=swap');
+
+/* ==========================================================================
+   Root Variables (Dark Mode — Default)
+   ========================================================================== */
+:root {
+  /* --- Primary Palette --- */
+  --verde-bandeira:   #00A137;
+  --verde-esmeralda:  #048E33;
+  --verde-floresta:   #068130;
+  --verde-musgo:      #066828;
+
+  /* --- Semantic Colors --- */
+  --cor-sucesso: #00A137;
+  --cor-alerta:  #C07A00;
+  --cor-erro:    #C53030;
+  --cor-info:    #3C78D8;
+
+  /* --- Label Colors (Apple HIG) --- */
+  --l1: rgba(255, 255, 255, 0.93);
+  --l2: rgba(255, 255, 255, 0.62);
+  --l3: rgba(255, 255, 255, 0.38);
+  --l4: rgba(255, 255, 255, 0.18);
+
+  /* --- Background Layers --- */
+  --bg:  #0A0A0A;
+  --bg1: #111113;
+  --bg2: #161618;
+  --bg3: #1C1C1F;
+  --bg4: #222226;
+
+  /* --- Tier Colors --- */
+  --tier-diamond-bg:   rgba(0, 161, 55, 0.10);
+  --tier-diamond-text: #048E33;
+  --tier-gold-bg:      rgba(192, 122, 0, 0.10);
+  --tier-gold-text:    #C07A00;
+  --tier-silver-bg:    var(--bg3);
+  --tier-silver-text:  var(--l3);
+  --tier-bronze-bg:    rgba(160, 80, 0, 0.10);
+  --tier-bronze-text:  #A05000;
+
+  /* --- Layout --- */
+  --sidebar-expanded: 224px;
+  --sidebar-collapsed: 54px;
+  --topbar-height: 46px;
+  --content-padding: 22px;
+
+  /* --- Radius --- */
+  --radius-panel: 12px;
+  --radius-button: 8px;
+  --radius-chip: 6px;
+  --radius-input: 8px;
+
+  /* --- Typography --- */
+  --font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-logo: 'Stereo Funk', cursive;
+
+  --fw-thin:       200;
+  --fw-light:      300;
+  --fw-regular:    400;
+  --fw-medium:     500;
+  --fw-semibold:   600;
+  --fw-bold:       700;
+  --fw-extrabold:  800;
+
+  --fs-display:    72px;
+  --fs-hero:       42px;
+  --fs-title:      22px;
+  --fs-kpi-value:  28px;
+  --fs-section:    13px;
+  --fs-nav:        12px;
+  --fs-body:       13px;
+  --fs-label:      10px;
+  --fs-hint:       11px;
+
+  /* --- Spacing --- */
+  --sp-xs:  4px;
+  --sp-sm:  8px;
+  --sp-md:  12px;
+  --sp-lg:  16px;
+  --sp-xl:  22px;
+  --sp-2xl: 32px;
+
+  /* --- Transitions --- */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+}
+
+/* ==========================================================================
+   Light Mode Overrides
+   ========================================================================== */
+.app.light {
+  --l1: rgba(0, 0, 0, 0.88);
+  --l2: rgba(0, 0, 0, 0.56);
+  --l3: rgba(0, 0, 0, 0.38);
+  --l4: rgba(0, 0, 0, 0.18);
+
+  --bg:  #FFFFFF;
+  --bg1: #FFFFFF;
+  --bg2: #FFFFFF;
+  --bg3: #F5F5F5;
+  --bg4: #EBEBEB;
+
+  --tier-silver-bg: var(--bg3);
+  --tier-silver-text: var(--l3);
+}
+
+/* ==========================================================================
+   Base Styles
+   ========================================================================== */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--fs-body);
+  font-weight: var(--fw-regular);
+  color: var(--l1);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ==========================================================================
+   App Shell — Dark Mode (default)
+   ========================================================================== */
+.app {
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+.main-content {
+  background: var(--bg);
+}
+
+/* ==========================================================================
+   App Shell — Light Mode Surfaces
+   ========================================================================== */
+.app.light {
+  background: #FFFFFF;
+}
+
+.app.light .main-content {
+  background: #FFFFFF;
+}
+
+.app.light .sidebar {
+  background: #FAFAFA;
+}
+
+.app.light .topbar {
+  background: #FAFAFA;
+}
+
+.app.light .panel,
+.app.light .kpi-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.app.light .kpi-card.highlight {
+  background: #068130;
+}
