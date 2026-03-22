@@ -168,7 +168,7 @@ export default function OKRsPage() {
       <main className="flex-1 p-6 space-y-6">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
-            <h2 className="text-[20px] font-bold tracking-tight">Objetivos e Resultados-Chave</h2>
+            <h2 className="text-[22px] font-bold tracking-tight">Objetivos e Resultados-Chave</h2>
             <p className="text-[14px] text-muted-foreground mt-1">
               Acompanhe o progresso dos objetivos da empresa
             </p>
@@ -317,14 +317,14 @@ export default function OKRsPage() {
                                       <div className="flex items-center gap-2 flex-wrap mb-2">
                                         <p className="text-[14px] font-bold text-foreground leading-snug">{kr.title}</p>
                                         {kr.measurementType && (
-                                          <Badge variant="secondary" className="text-[9px] uppercase font-bold">
+                                          <Badge variant="secondary" className="text-[10px] uppercase font-bold">
                                             {measurementTypeLabels[kr.measurementType] || kr.measurementType}
                                           </Badge>
                                         )}
                                         {kr.dueDate && (
                                           <Badge 
                                             variant="outline" 
-                                            className={`text-[9px] uppercase font-bold ${deadlineStatusColors[deadlineStatus]}`}
+                                            className={`text-[10px] uppercase font-bold ${deadlineStatusColors[deadlineStatus]}`}
                                           >
                                             <CalendarClock className="h-3 w-3 mr-1" />
                                             {deadlineStatusLabels[deadlineStatus]}

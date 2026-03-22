@@ -19,6 +19,7 @@ interface KpiCardProps {
   formato: KpiFormato;
   icone: ReactNode;
   isLoading?: boolean;
+  highlight?: boolean;
 }
 
 export function formatarValor(valor: number | string, formato: KpiFormato): string {
@@ -43,7 +44,7 @@ export function formatarValor(valor: number | string, formato: KpiFormato): stri
 
 export function KpiCard({
   titulo, subtitulo, valor, variacao, variacaoBoa = true,
-  meta, metaLabel, status, formato, icone, isLoading,
+  meta, metaLabel, status, formato, icone, isLoading, highlight,
 }: KpiCardProps) {
   if (isLoading) {
     return (
@@ -72,23 +73,32 @@ export function KpiCard({
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card
+      className={cn("hover:shadow-md transition-shadow", highlight ? "" : "border")}
+      style={highlight
+        ? { background: 'var(--vf)', border: 'none' }
+        : { background: 'var(--bg2)', borderColor: 'var(--sep)' }
+      }
+    >
       <CardContent className="pt-4 pb-3 px-4">
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
           <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide leading-tight">
+            <p
+              className="text-[10px] font-semibold uppercase tracking-wide leading-tight"
+              style={{ color: highlight ? '#FFFFFF' : 'var(--l3)' }}
+            >
               {titulo}
             </p>
             {subtitulo && (
-              <p className="text-[10px] text-muted-foreground leading-tight">{subtitulo}</p>
+              <p className="text-[10px] leading-tight" style={{ color: highlight ? 'rgba(255,255,255,0.8)' : undefined }}>{subtitulo}</p>
             )}
           </div>
-          <div className="text-muted-foreground/60">{icone}</div>
+          <div style={{ color: highlight ? '#FFFFFF' : undefined }} className={highlight ? '' : 'text-muted-foreground/60'}>{icone}</div>
         </div>
 
         {/* Valor principal */}
-        <p className="text-2xl font-bold tracking-tight mb-1">{valorFormatado}</p>
+        <p className="text-[28px] font-bold tracking-tight mb-1" style={{ color: highlight ? '#FFFFFF' : 'var(--l1)' }}>{valorFormatado}</p>
 
         {/* Variação */}
         {variacao !== undefined && (

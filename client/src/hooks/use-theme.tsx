@@ -25,6 +25,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.classList.remove("light", "dark");
     root.classList.add(theme);
     localStorage.setItem("theme", theme);
+    document.body.style.background = theme === "light" ? "#FFFFFF" : "#0A0A0A";
   }, [theme]);
 
   const toggleTheme = () => {
