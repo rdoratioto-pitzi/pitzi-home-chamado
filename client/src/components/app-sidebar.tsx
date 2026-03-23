@@ -44,6 +44,7 @@ import {
   GitMerge,
   Clock,
   Route,
+  LayoutGrid,
 } from "lucide-react";
 import {
   Sidebar,
@@ -88,12 +89,6 @@ url: "/chat-ia",
     module: null,
   },
   {
-    title: "Chamados",
-    url: "/chamados",
-    icon: Ticket,
-    module: "chamados" as keyof ModulePermissions,
-  },
-  {
     title: "Tarefas",
     url: "/tarefas",
     icon: CheckSquare,
@@ -104,12 +99,6 @@ url: "/chat-ia",
     url: "/reunioes",
     icon: Video,
     module: "tarefas" as keyof ModulePermissions,
-  },
-  {
-    title: "Projetos",
-    url: "/projetos",
-    icon: FolderKanban,
-    module: "projetos" as keyof ModulePermissions,
   },
   {
     title: "Fluxogramas",
@@ -123,6 +112,12 @@ url: "/chat-ia",
     icon: PenLine,
     module: "diagramas" as keyof ModulePermissions,
   },
+];
+
+const workspaceSubItems = [
+  { title: "Todos", url: "/workspace", icon: LayoutGrid },
+  { title: "Chamados", url: "/workspace/chamados", icon: Ticket },
+  { title: "Projetos", url: "/workspace/projetos", icon: FolderKanban },
 ];
 
 const metasSubItems = [
@@ -188,6 +183,7 @@ export function AppSidebar() {
   const { toast } = useToast();
   const { user: currentUser, logout } = useAuth();
 
+  const [workspaceOpen, setWorkspaceOpen] = useState(location.startsWith("/workspace"));
   const [metasOpen, setMetasOpen] = useState(location.startsWith("/metas"));
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
   const [triagemOpen, setTriagemOpen] = useState(location.startsWith("/triagem"));
@@ -198,8 +194,10 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (location.startsWith("/estoques")) setEstoquesOpen(true);
+    if (location.startsWith("/workspace")) setWorkspaceOpen(true);
   }, [location]);
 
+  const isWorkspaceActive = location.startsWith("/workspace");
   const isMetasActive = location.startsWith("/metas");
   const isLogisticaActive = location.startsWith("/logistica");
   const isTriagemActive = location.startsWith("/triagem");
@@ -328,6 +326,47 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+
+              <Collapsible open={workspaceOpen} onOpenChange={setWorkspaceOpen}>
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      className="h-11 px-3"
+                      isActive={isWorkspaceActive}
+                      data-testid="link-workspace"
+                    >
+                      <LayoutGrid className="h-[20px] w-[20px]" />
+                      <span className="text-[12px]">Workspace</span>
+                      <span className="ml-auto mr-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#00c853]/15 px-1.5 text-[10px] font-semibold text-[#00c853]">
+                        116
+                      </span>
+                      {workspaceOpen ? (
+                        <ChevronDown className="h-4 w-4 opacity-50" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 opacity-50" />
+                      )}
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
+                      {workspaceSubItems.map((subItem) => {
+                        const isSubActive = location === subItem.url ||
+                          (subItem.url === "/workspace" && location === "/workspace");
+                        return (
+                          <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                              <Link href={subItem.url} data-testid={`link-workspace-${subItem.title.toLowerCase()}`}>
+                                <subItem.icon className="h-4 w-4 mr-2" />
+                                <span className="text-[12px]">{subItem.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
 
               {hasEstoquesAccess && (
                 <Collapsible open={estoquesOpen} onOpenChange={setEstoquesOpen}>
