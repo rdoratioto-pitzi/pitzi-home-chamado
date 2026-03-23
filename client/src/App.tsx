@@ -78,6 +78,7 @@ const EstoquesAgingPage                = lazy(() => import("@/pages/estoques/agi
 const EstoquesRastreabilidadePage      = lazy(() => import("@/pages/estoques/rastreabilidade"));
 const SQLRunnerPage                    = lazy(() => import("@/pages/dev/sql-runner"));
 const OmieIntegration                  = lazy(() => import("@/pages/integrations/omie/OmieIntegration"));
+const WorkspacePage                    = lazy(() => import("@/pages/workspace/WorkspacePage"));
 const NovoChamadoPage                  = lazy(() => import("@/pages/chamados/novo"));
 const TicketDetailPage                 = lazy(() => import("@/pages/chamados/[id]"));
 const EstoquesPage                     = lazy(() => import("@/pages/estoques/index"));
@@ -93,6 +94,16 @@ function Router() {
       <Route path="/chat-ia">
         <ProtectedRoute>
           <ChatIAPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/workspace">
+        <ProtectedRoute>
+          <WorkspacePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/workspace/:tab">
+        <ProtectedRoute>
+          <WorkspacePage />
         </ProtectedRoute>
       </Route>
       <Route path="/chamados">
