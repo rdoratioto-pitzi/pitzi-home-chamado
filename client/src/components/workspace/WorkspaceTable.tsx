@@ -1,0 +1,374 @@
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
+
+export interface ChamadoItem {
+  id: string;
+  codigo: string;
+  titulo: string;
+  categoria: string;
+  tipo: string;
+  responsavel: string;
+  responsavelInitials: string;
+  status: string;
+  prioridade: string;
+  sla: number | null;
+  statusSla: "dentro_prazo" | "em_atraso" | null;
+  abertura: string | null;
+}
+
+interface WorkspaceTableProps {
+  items: ChamadoItem[];
+  loading?: boolean;
+}
+
+const statusDotColors: Record<string, { bg: string; border?: string }> = {
+  in_progress: { bg: "#00c853" },
+  resolved: { bg: "#4ade80" },
+  closed: { bg: "#4ade80" },
+  open: { bg: "#f59e0b" },
+  blocked: { bg: "#ef4444" },
+};
+
+const statusLabels: Record<string, string> = {
+  open: "Aberto",
+  in_progress: "Em Andamento",
+  blocked: "Bloqueado",
+  resolved: "Resolvido",
+  closed: "Fechado",
+};
+
+const statusGroupOrder = ["in_progress", "open", "blocked", "resolved"] as const;
+
+const statusGroupLabels: Record<string, string> = {
+  in_progress: "Em Andamento",
+  open: "Abertos",
+  blocked: "Em Atraso",
+  resolved: "Resolvidos",
+};
+
+const priorityLabels: Record<string, string> = {
+  low: "Baixa",
+  medium: "Média",
+  high: "Alta",
+  critical: "Crítica",
+};
+
+const priorityColors: Record<string, string> = {
+  low: "bg-slate-500/10 text-slate-400 border-slate-700",
+  medium: "bg-yellow-500/10 text-yellow-400 border-yellow-700",
+  high: "bg-orange-500/10 text-orange-400 border-orange-700",
+  critical: "bg-red-500/10 text-red-400 border-red-700",
+};
+
+const typeColors: Record<string, string> = {
+  bug: "bg-red-500/10 text-red-400",
+  melhoria: "bg-blue-500/10 text-blue-400",
+  negocio: "bg-purple-500/10 text-purple-400",
+};
+
+function StatusDot({ status }: { status: string }) {
+  const style = statusDotColors[status];
+  if (!style) {
+    return (
+      <span
+        className="inline-block flex-shrink-0"
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: "50%",
+          border: "1.5px solid rgba(255,255,255,0.2)",
+        }}
+      />
+    );
+  }
+  return (
+    <span
+      className="inline-block flex-shrink-0"
+      style={{
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: style.bg,
+      }}
+    />
+  );
+}
+
+function GroupHeader({ status, count }: { status: string; count: number }) {
+  const dotStyle = statusDotColors[status];
+  return (
+    <div
+      className="flex items-center gap-2 px-4 py-2"
+      style={{ background: "rgba(255,255,255,0.02)" }}
+    >
+      {dotStyle ? (
+        <span
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            background: dotStyle.bg,
+            display: "inline-block",
+          }}
+        />
+      ) : (
+        <span
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            border: "1.5px solid rgba(255,255,255,0.2)",
+            display: "inline-block",
+          }}
+        />
+      )}
+      <span
+        style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          textTransform: "uppercase",
+          fontSize: "10px",
+          letterSpacing: "0.05em",
+          color: "rgba(255,255,255,0.5)",
+        }}
+      >
+        {statusGroupLabels[status] || status}
+      </span>
+      <span
+        className="text-xs px-1.5 py-0.5 rounded-full"
+        style={{
+          background: "rgba(255,255,255,0.06)",
+          color: "rgba(255,255,255,0.4)",
+          fontSize: "10px",
+        }}
+      >
+        {count}
+      </span>
+    </div>
+  );
+}
+
+function SkeletonRows() {
+  return (
+    <>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div
+          key={i}
+          className="grid items-center px-4 py-3 gap-2 animate-pulse"
+          style={{
+            gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 98px 30px",
+          }}
+        >
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-5 w-5 rounded-full" />
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-8" />
+          <Skeleton className="h-4 w-16" />
+          <div />
+        </div>
+      ))}
+    </>
+  );
+}
+
+export function WorkspaceTable({ items, loading }: WorkspaceTableProps) {
+  if (loading) {
+    return (
+      <div className="w-full">
+        <HeaderRow />
+        <SkeletonRows />
+      </div>
+    );
+  }
+
+  // Group items by status
+  const grouped = new Map<string, ChamadoItem[]>();
+  for (const status of statusGroupOrder) {
+    grouped.set(status, []);
+  }
+  for (const item of items) {
+    const key = item.status === "closed" ? "resolved" : item.status;
+    const group = grouped.get(key);
+    if (group) {
+      group.push(item);
+    } else {
+      // fallback: put in open
+      grouped.get("open")?.push(item);
+    }
+  }
+
+  return (
+    <div className="w-full">
+      <HeaderRow />
+      {statusGroupOrder.map((status) => {
+        const groupItems = grouped.get(status) || [];
+        if (groupItems.length === 0) return null;
+        return (
+          <div key={status}>
+            <GroupHeader status={status} count={groupItems.length} />
+            {groupItems.map((item) => (
+              <ItemRow key={item.id} item={item} />
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function HeaderRow() {
+  const headers = [
+    "Código",
+    "Título",
+    "Categoria / Tipo",
+    "Responsável",
+    "Status",
+    "Prioridade",
+    "SLA",
+    "Status SLA",
+    "",
+  ];
+  return (
+    <div
+      className="grid items-center px-4 py-2 gap-2"
+      style={{
+        gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 98px 30px",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+      }}
+    >
+      {headers.map((h, i) => (
+        <span
+          key={i}
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            textTransform: "uppercase",
+            fontSize: "9px",
+            letterSpacing: "0.05em",
+            color: "rgba(255,255,255,0.25)",
+          }}
+        >
+          {h}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ItemRow({ item }: { item: ChamadoItem }) {
+  const typeColor = typeColors[item.tipo?.toLowerCase()] || "bg-slate-500/10 text-slate-400";
+  const prioColor = priorityColors[item.prioridade] || priorityColors.medium;
+
+  return (
+    <div
+      className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-default"
+      style={{
+        gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 98px 30px",
+        borderBottom: "1px solid rgba(255,255,255,0.03)",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "#141814")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      {/* Código */}
+      <div className="flex items-center gap-2 min-w-0">
+        <StatusDot status={item.status} />
+        <span className="text-xs text-muted-foreground truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {item.codigo}
+        </span>
+      </div>
+
+      {/* Título */}
+      <span className="text-sm truncate" style={{ color: "rgba(255,255,255,0.85)" }}>
+        {item.titulo}
+      </span>
+
+      {/* Categoria / Tipo */}
+      <div className="flex items-center gap-1.5 min-w-0 truncate">
+        <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
+          {item.categoria}
+        </span>
+        <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${typeColor}`}>
+          {item.tipo}
+        </Badge>
+      </div>
+
+      {/* Responsável */}
+      <div className="flex items-center gap-2 min-w-0">
+        <div
+          className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
+          style={{
+            width: 22,
+            height: 22,
+            background: "rgba(0,200,83,0.15)",
+            color: "#00c853",
+          }}
+        >
+          {item.responsavelInitials}
+        </div>
+      </div>
+
+      {/* Status */}
+      <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
+        {statusLabels[item.status] || item.status}
+      </span>
+
+      {/* Prioridade */}
+      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
+        {priorityLabels[item.prioridade] || item.prioridade}
+      </Badge>
+
+      {/* SLA */}
+      <span className="text-xs text-muted-foreground">
+        {item.sla ? `${item.sla}h` : "—"}
+      </span>
+
+      {/* Status SLA */}
+      <span
+        className="text-xs font-medium"
+        style={{
+          color: item.statusSla === "dentro_prazo"
+            ? "#00c853"
+            : item.statusSla === "em_atraso"
+              ? "#ff5050"
+              : "rgba(255,255,255,0.2)",
+        }}
+      >
+        {item.statusSla === "dentro_prazo"
+          ? "No Prazo"
+          : item.statusSla === "em_atraso"
+            ? "Em Atraso"
+            : "—"}
+      </span>
+
+      {/* Actions */}
+      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="p-1 rounded hover:bg-white/5">
+              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>
+              <Edit className="h-3.5 w-3.5 mr-2" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-red-400">
+              <Trash2 className="h-3.5 w-3.5 mr-2" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
