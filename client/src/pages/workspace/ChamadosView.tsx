@@ -18,6 +18,7 @@ import {
 import { KpiStrip, type WorkspaceKpis } from "@/components/workspace/KpiStrip";
 import { WorkspaceTable, type ChamadoItem } from "@/components/workspace/WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type Periodo = "este-ano" | "mes-vigente" | "mes-anterior" | "em-tratativa";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
@@ -43,6 +44,7 @@ const viewIcons: Record<ViewMode, React.ReactNode> = {
 };
 
 export function ChamadosView() {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<WorkspaceKpis>({
     total: 0,
@@ -75,6 +77,7 @@ export function ChamadosView() {
         if (cancelled) return;
         setKpis({ total: 0, abertos: 0, andamento: 0, bloqueados: 0, resolvidos: 0, noPrazo: 0, emAtraso: 0 });
         setItems([]);
+        toast({ title: "Não foi possível carregar os dados. Tente novamente.", variant: "destructive" });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

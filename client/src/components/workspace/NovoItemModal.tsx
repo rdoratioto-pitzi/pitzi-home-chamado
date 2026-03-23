@@ -308,12 +308,18 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
         throw new Error(err.error || "Erro ao criar item");
       }
 
-      const labels: Record<ItemType, string> = {
-        chamado: "Chamado",
-        tarefa: "Tarefa",
-        projeto: "Projeto",
-      };
-      toast({ title: `${labels[type]} criado com sucesso!` });
+      const created = await response.json();
+      const codigo: string = created.codigo || "";
+      let toastTitle = "";
+      if (type === "chamado") {
+        toastTitle = codigo ? `Chamado ${codigo} criado com sucesso` : "Chamado criado com sucesso";
+      } else if (type === "tarefa") {
+        const projetoCtx = created.contexto && created.contexto !== "Sem projeto" ? ` no projeto ${created.contexto}` : "";
+        toastTitle = `Tarefa criada${projetoCtx}`;
+      } else {
+        toastTitle = codigo ? `Projeto ${codigo} criado com sucesso` : "Projeto criado com sucesso";
+      }
+      toast({ title: toastTitle });
 
       if (criarMais) {
         resetForm();
