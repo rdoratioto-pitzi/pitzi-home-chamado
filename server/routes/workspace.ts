@@ -3,7 +3,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { requireAuth, getSessionUser } from "../middleware/auth";
 import { workspaceProjetos, workspaceTarefas, users } from "@shared/schema";
-import type { Ticket, User, SlaRule } from "@shared/schema";
+import type { Ticket, User, SlaRule, InsertTicket } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 export function registerWorkspaceRoutes(router: Router) {
@@ -98,6 +98,233 @@ export function registerWorkspaceRoutes(router: Router) {
     } catch (error: any) {
       const status = error.status || 500;
       res.status(status).json({ error: error.message });
+    }
+  });
+
+  // ─── POST chamados ───────────────────────────────────────────────────────────
+  router.post("/api/workspace/chamados", requireAuth, async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      const { titulo, descricao } = req.body as { titulo?: string; descricao?: string };
+
+      if (!titulo?.trim()) {
+        return res.status(400).json({ error: "Título obrigatório" });
+      }
+
+      const ticket = await storage.createTicket({
+        title: titulo.trim(),
+        description: descricao || "",
+        category: "geral",
+        type: "bug",
+        location: "outros",
+        priority: "medium",
+        impact: "medio",
+        status: "open",
+        requesterId: userId,
+        tenantId: null,
+      } as InsertTicket);
+
+      const [allUsers, slaRules] = await Promise.all([
+        storage.getUsers(),
+        storage.getSlaRules(),
+      ]);
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const assignee = ticket.assigneeId ? userMap.get(ticket.assigneeId) : null;
+      const name = assignee?.name || "Não atribuído";
+      const initials = name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0].toUpperCase())
+        .join("");
+      const sla = getSlaForTicket(ticket, slaRules);
+
+      return res.status(201).json({
+        tipo: "chamado",
+        id: String(ticket.id),
+        codigo: ticket.code,
+        titulo: ticket.title,
+        categoria: ticket.category,
+        responsavel: name,
+        responsavelInitials: initials,
+        status: ticket.status,
+        prioridade: ticket.priority,
+        sla: sla.slaHoras,
+        statusSla: sla.status,
+        criadoEm: (ticket.dataAbertura || ticket.createdAt || "").toString(),
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── POST tarefas ─────────────────────────────────────────────────────────────
+  router.post("/api/workspace/tarefas", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+
+      const { titulo, descricao, projetoId, prioridade, responsavelId, dataEntrega, sprint } =
+        req.body as {
+          titulo?: string;
+          descricao?: string;
+          projetoId?: string;
+          prioridade?: string;
+          responsavelId?: string;
+          dataEntrega?: string;
+          sprint?: string;
+        };
+
+      if (!titulo?.trim()) {
+        return res.status(400).json({ error: "Título obrigatório" });
+      }
+
+      // Generate codigo
+      const allTarefas = await db.select().from(workspaceTarefas);
+      let codigo = `TAR-${String(allTarefas.length + 1).padStart(4, "0")}`;
+
+      if (projetoId) {
+        const projResult = await db
+          .select()
+          .from(workspaceProjetos)
+          .where(eq(workspaceProjetos.id, projetoId))
+          .limit(1);
+        if (projResult[0]) {
+          const tarefasDoProjeto = await db
+            .select()
+            .from(workspaceTarefas)
+            .where(eq(workspaceTarefas.projetoId, projetoId));
+          codigo = `${projResult[0].codigo}·T${tarefasDoProjeto.length + 1}`;
+        }
+      }
+
+      const [tarefa] = await db
+        .insert(workspaceTarefas)
+        .values({
+          codigo,
+          titulo: titulo.trim(),
+          descricao: descricao || null,
+          projetoId: projetoId || null,
+          prioridade: prioridade || "media",
+          responsavelId: responsavelId || null,
+          dataEntrega: dataEntrega || null,
+          sprint: sprint || null,
+          status: "a-fazer",
+          progresso: 0,
+        })
+        .returning();
+
+      const allUsers = await storage.getUsers();
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const responsavel = tarefa.responsavelId ? userMap.get(tarefa.responsavelId) : null;
+      const respNome = responsavel?.name || "Não atribuído";
+      const respInitials = respNome
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0].toUpperCase())
+        .join("");
+
+      let projetoNome = "Sem projeto";
+      let corContexto: string | null = null;
+      if (tarefa.projetoId) {
+        const projResult = await db
+          .select()
+          .from(workspaceProjetos)
+          .where(eq(workspaceProjetos.id, tarefa.projetoId))
+          .limit(1);
+        if (projResult[0]) {
+          projetoNome = projResult[0].nome;
+          corContexto = projResult[0].cor || null;
+        }
+      }
+
+      return res.status(201).json({
+        tipo: "tarefa",
+        id: tarefa.id,
+        codigo: tarefa.codigo,
+        titulo: tarefa.titulo,
+        contexto: projetoNome,
+        corContexto,
+        badgeLabel: "TAREFA",
+        badgeVariant: "tarefa",
+        responsavel: respNome,
+        responsavelInitials: respInitials,
+        status: tarefa.status || "a-fazer",
+        prioridade: tarefa.prioridade || "media",
+        sla: null,
+        statusSla: null,
+        criadoEm: (tarefa.criadoEm || "").toString(),
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── POST projetos ────────────────────────────────────────────────────────────
+  router.post("/api/workspace/projetos", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+
+      const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria } =
+        req.body as {
+          nome?: string;
+          descricao?: string;
+          prioridade?: string;
+          responsavelId?: string;
+          dataInicio?: string;
+          dataFim?: string;
+          categoria?: string;
+        };
+
+      if (!nome?.trim()) {
+        return res.status(400).json({ error: "Nome obrigatório" });
+      }
+
+      const allProjetos = await db.select().from(workspaceProjetos);
+      const codigo = `PRO-${String(allProjetos.length + 1).padStart(3, "0")}`;
+
+      const [projeto] = await db
+        .insert(workspaceProjetos)
+        .values({
+          codigo,
+          nome: nome.trim(),
+          descricao: descricao || null,
+          status: "backlog",
+          prioridade: prioridade || "media",
+          responsavelId: responsavelId || null,
+          dataInicio: dataInicio || null,
+          dataFim: dataFim || null,
+          cor: "#00c853",
+          categoria: categoria || null,
+          progresso: 0,
+        })
+        .returning();
+
+      const allUsers = await storage.getUsers();
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const responsavel = projeto.responsavelId ? userMap.get(projeto.responsavelId) : null;
+      const respNome = responsavel?.name || "Não atribuído";
+      const respInitials = respNome
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((w) => w[0].toUpperCase())
+        .join("");
+
+      return res.status(201).json({
+        tipo: "projeto",
+        id: projeto.id,
+        codigo: projeto.codigo,
+        nome: projeto.nome,
+        status: projeto.status,
+        prioridade: projeto.prioridade,
+        responsavel: respNome,
+        responsavelInitials: respInitials,
+        cor: projeto.cor,
+        criadoEm: (projeto.criadoEm || "").toString(),
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
     }
   });
 
