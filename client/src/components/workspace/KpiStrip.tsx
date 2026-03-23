@@ -37,7 +37,17 @@ function getKpiItems(kpis: WorkspaceKpis, variant: string): KpiItem[] {
     ];
   }
 
-  // projetos / todos — 5 columns (placeholder)
+  if (variant === "projetos") {
+    return [
+      { label: "Proj. Ativos", value: kpis.total, isFirst: true },
+      { label: "Tarefas Abertas", value: kpis.abertos },
+      { label: "Em Andamento", value: kpis.andamento },
+      { label: "Concluídas", value: kpis.resolvidos, color: "#00c853" },
+      { label: "Atrasadas", value: kpis.emAtraso, negativeWhen: (v) => v > 0 },
+    ];
+  }
+
+  // todos — 5 columns
   return [
     { label: "Total", value: kpis.total, isFirst: true },
     { label: "Abertos", value: kpis.abertos },
