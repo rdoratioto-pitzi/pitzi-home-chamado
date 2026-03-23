@@ -1,8 +1,9 @@
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Package } from "lucide-react";
+import { Loader2, Package, Trash2 } from "lucide-react";
 
 interface ContagemItem {
   id: string;
@@ -18,9 +19,12 @@ interface ContagemItem {
 interface ListaItensProps {
   itens: ContagemItem[];
   isLoading: boolean;
+  onRemove: (itemId: string) => void;
+  onRemoveRequest?: (itemId: string, imei: string) => void;
+  isRemoving: boolean;
 }
 
-export function ListaItens({ itens, isLoading }: ListaItensProps) {
+export function ListaItens({ itens, isLoading, onRemove, isRemoving }: ListaItensProps) {
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString("pt-BR", {
@@ -31,8 +35,8 @@ export function ListaItens({ itens, isLoading }: ListaItensProps) {
   };
 
   const formatImei = (imei: string) => {
-    // Show first 6 and last 3 digits, hide middle
-    return `${imei.substring(0, 6)}***${imei.substring(12, 15)}`;
+    // Mostrar IMEI completo
+    return imei;
   };
 
   return (
@@ -82,13 +86,25 @@ export function ListaItens({ itens, isLoading }: ListaItensProps) {
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground">
-                      {formatTime(item.contadoEm)}
-                    </p>
-                    <Badge variant="outline" className="text-xs">
-                      {item.metodoLeitura === 'barcode' ? 'Scanner' : 'Manual'}
-                    </Badge>
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">
+                        {formatTime(item.contadoEm)}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {item.metodoLeitura === 'barcode' ? 'Scanner' : 'Manual'}
+                      </Badge>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onRemoveRequest ? onRemoveRequest(item.id, item.imei) : onRemove(item.id)}
+                      disabled={isRemoving}
+                      className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                      aria-label="Remover item"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               ))}
