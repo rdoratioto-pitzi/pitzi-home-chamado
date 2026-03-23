@@ -4,83 +4,129 @@
 
 /* Metronic / Renov Identity Styles */
 :root {
-  --background: 210 20% 98%;
+  --background: 0 0% 100%;
   --foreground: 222 47% 11%;
-  
+
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
-  --card-border: 214 32% 91%;
+  --card-border: 0 0% 92%;
 
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
 
-  --primary: 145 100% 32%;
+  --primary: 140.5 100% 31.6%;
   --primary-foreground: 210 40% 98%;
 
-  --secondary: 210 40% 96.1%;
+  --secondary: 0 0% 96.1%;
   --secondary-foreground: 222 47% 11.2%;
 
-  --muted: 210 40% 96.1%;
+  --muted: 0 0% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
 
-  --accent: 210 40% 96.1%;
+  --accent: 0 0% 96.1%;
   --accent-foreground: 222 47% 11.2%;
 
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
 
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 145 100% 32%;
+  --border: 0 0% 92%;
+  --input: 0 0% 92%;
+  --ring: 140.5 100% 31.6%;
 
   --radius: 0.75rem;
-  
+
   --font-sans: 'Montserrat', sans-serif;
-  
-  --sidebar: 0 0% 100%;
+
+  --sidebar: 0 0% 98%;
   --sidebar-foreground: 215 25% 27%;
-  --sidebar-primary: 145 100% 32%;
-  --sidebar-accent: 210 40% 98%;
-  --sidebar-accent-foreground: 145 100% 25%;
-  --sidebar-border: 214 32% 91%;
+  --sidebar-primary: 140.5 100% 31.6%;
+  --sidebar-accent: 0 0% 96.1%;
+  --sidebar-accent-foreground: 140.5 100% 25%;
+  --sidebar-border: 0 0% 92%;
+
+  /* Renov Brand Tokens — Label Colors (Apple HIG) */
+  --l1: rgba(0,0,0,0.88);
+  --l2: rgba(0,0,0,0.56);
+  --l3: rgba(0,0,0,0.38);
+  --l4: rgba(0,0,0,0.18);
+
+  /* Background Layers */
+  --bg: #FFFFFF;
+  --bg1: #FFFFFF;
+  --bg2: #FFFFFF;
+  --bg3: #F5F5F5;
+  --bg4: #EBEBEB;
+
+  /* Separator */
+  --sep: rgba(0,0,0,0.08);
+
+  /* Verde Palette */
+  --vb: #00A137;
+  --ve: #048E33;
+  --vf: #068130;
+  --vm: #066828;
+  --vb-low: rgba(0,161,55,0.08);
 }
 
 .dark {
-  --background: 222 47% 4%;
+  --background: 0 0% 3.9%;
   --foreground: 210 40% 98%;
 
-  --card: 222 47% 6%;
+  --card: 240 5.6% 7.1%;
   --card-foreground: 210 40% 98%;
-  --card-border: 217 32% 17.5%;
+  --card-border: 240 1% 13%;
 
-  --popover: 222 47% 6%;
+  --popover: 240 5.6% 7.1%;
   --popover-foreground: 210 40% 98%;
 
-  --primary: 145 100% 40%;
-  --primary-foreground: 222 47% 4%;
+  --primary: 140.5 100% 31.6%;
+  --primary-foreground: 0 0% 3.9%;
 
-  --secondary: 217 32% 12%;
+  --secondary: 240 5.1% 11.6%;
   --secondary-foreground: 210 40% 98%;
 
-  --muted: 217 32% 12%;
+  --muted: 240 5.1% 11.6%;
   --muted-foreground: 215 20.2% 65.1%;
 
-  --accent: 217 32% 12%;
+  --accent: 240 5.1% 11.6%;
   --accent-foreground: 210 40% 98%;
 
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 210 40% 98%;
 
-  --border: 217 32% 17.5%;
-  --input: 217 32% 17.5%;
-  --ring: 145 100% 40%;
-  
-  --sidebar: 222 47% 4%;
+  --border: 240 1% 13%;
+  --input: 240 1% 13%;
+  --ring: 140.5 100% 31.6%;
+
+  --sidebar: 240 5.6% 7.1%;
   --sidebar-foreground: 215 20% 85%;
-  --sidebar-primary: 145 100% 40%;
-  --sidebar-accent: 217 32% 12%;
-  --sidebar-accent-foreground: 145 80% 60%;
-  --sidebar-border: 217 32% 17.5%;
+  --sidebar-primary: 140.5 100% 31.6%;
+  --sidebar-accent: 240 5.1% 11.6%;
+  --sidebar-accent-foreground: 140.5 80% 60%;
+  --sidebar-border: 240 1% 13%;
+
+  /* Renov Brand Tokens — Label Colors (Apple HIG) */
+  --l1: rgba(255,255,255,0.93);
+  --l2: rgba(255,255,255,0.62);
+  --l3: rgba(255,255,255,0.38);
+  --l4: rgba(255,255,255,0.18);
+
+  /* Background Layers */
+  --bg: #0A0A0A;
+  --bg1: #111113;
+  --bg2: #161618;
+  --bg3: #1C1C1F;
+  --bg4: #222226;
+
+  /* Separator */
+  --sep: rgba(255,255,255,0.06);
+
+  /* Verde Palette */
+  --vb: #00A137;
+  --ve: #048E33;
+  --vf: #068130;
+  --vm: #066828;
+  --vb-low: rgba(0,161,55,0.10);
 }
 
 @layer base {
@@ -421,4 +467,318 @@
 /* Container do editor no modo escuro */
 .dark .ql-snow .ql-editor {
   background-color: transparent;
+}
+
+/* ============================================
+   RENOV BRAND — SIDEBAR & TOPBAR OVERRIDES
+   ============================================ */
+
+/* Sidebar transition — 220ms ease (brand spec) */
+[data-slot="sidebar-gap"],
+[data-slot="sidebar-container"] {
+  transition-duration: 220ms;
+  transition-timing-function: ease;
+}
+
+/* Sidebar borders — var(--sep) rgba instead of solid HSL */
+[data-slot="sidebar-container"] {
+  border-right-color: var(--sep);
+}
+
+[data-slot="sidebar-header"] {
+  border-bottom: 1px solid var(--sep);
+}
+
+/* Sidebar menu button — brand typography & colors */
+[data-slot="sidebar-menu-button"] {
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--l2);
+  border-radius: 10px;
+  transition: all 220ms ease;
+}
+
+[data-slot="sidebar-menu-button"] svg {
+  color: var(--l2);
+}
+
+[data-slot="sidebar-menu-button"]:hover {
+  background: var(--bg3);
+  color: var(--l1);
+}
+
+[data-slot="sidebar-menu-button"]:hover svg {
+  color: var(--l1);
+}
+
+/* Active state — Verde Bandeira accent */
+[data-slot="sidebar-menu-button"][data-active="true"] {
+  background: var(--vb-low);
+  color: var(--vb);
+  font-weight: 600;
+}
+
+[data-slot="sidebar-menu-button"][data-active="true"] svg {
+  color: var(--vb);
+}
+
+/* Submenu buttons */
+[data-sidebar="menu-sub"] {
+  border-left-color: var(--sep);
+}
+
+/* Group labels — brand typography */
+[data-slot="sidebar-group-label"] {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.3px;
+  color: var(--l3);
+}
+
+/* Topbar (PageHeader) — brand overrides */
+[data-slot="page-header"] {
+  height: 46px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--sep);
+  backdrop-filter: none;
+}
+
+/* ============================================
+   RENOV BRAND — TYPOGRAPHY HIERARCHY
+   ============================================ */
+
+/* Utility classes — canonical typography scale */
+.text-page-title     { font-weight: 700; font-size: 22px; line-height: 1.2; }
+.text-section-header { font-weight: 600; font-size: 13px; line-height: 1.4; }
+.text-kpi-value      { font-weight: 700; font-size: 28px; line-height: 1; }
+.text-kpi-label      { font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; }
+.text-body           { font-weight: 400; font-size: 13px; line-height: 1.5; }
+.text-label          { font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Card — section header title + description */
+.shadcn-card [data-slot="card-title"],
+[data-slot="card-title"] {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.4;
+  letter-spacing: normal;
+}
+
+.shadcn-card [data-slot="card-description"],
+[data-slot="card-description"] {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--l2);
+}
+
+/* Table — UPPERCASE headers, 12px cells, brand rows */
+table {
+  font-size: 12px;
+}
+
+table th {
+  font-weight: 600;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--l3);
+}
+
+table td {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+table tbody tr {
+  border-bottom: 1px solid var(--sep);
+}
+
+table tbody tr:hover {
+  background: var(--bg3);
+}
+
+table tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* Dialog — page-title weight for title */
+[role="dialog"] [data-slot="dialog-title"] {
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+[role="dialog"] [data-slot="dialog-description"] {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--l2);
+}
+
+/* ============================================
+   RENOV BRAND — BUTTONS
+   ============================================ */
+
+/* Primary (default) — Verde Bandeira */
+button[class*="bg-primary"],
+[data-slot="button"]:not([data-variant]) {
+  /* fallback for non-slot buttons */
+}
+
+/* CSS-driven button brand colors */
+.btn-renov-primary,
+button:where(:not([class*="destructive"]):not([class*="ghost"]):not([class*="outline"]):not([class*="secondary"])) {
+  /* handled by Tailwind + overrides below */
+}
+
+/* Button variant overrides via CSS custom properties */
+:root {
+  --btn-primary-bg: var(--vb);
+  --btn-primary-hover: var(--ve);
+  --btn-primary-active: var(--vm);
+  --btn-destructive-bg: #C53030;
+  --btn-destructive-hover: #A02020;
+}
+
+/* ============================================
+   RENOV BRAND — BADGE SEMANTIC VARIANTS
+   ============================================ */
+
+/* Success badge */
+.badge-success,
+[data-variant="success"] {
+  background: rgba(0, 161, 55, 0.10);
+  color: #00A137;
+}
+
+/* Warning badge */
+.badge-warning,
+[data-variant="warning"] {
+  background: rgba(192, 122, 0, 0.10);
+  color: #C07A00;
+}
+
+/* Error/destructive badge */
+.badge-error {
+  background: rgba(197, 48, 48, 0.10);
+  color: #C53030;
+}
+
+/* Info badge */
+.badge-info,
+[data-variant="info"] {
+  background: rgba(60, 120, 216, 0.10);
+  color: #3C78D8;
+}
+
+/* Tier chips */
+.chip-diamond {
+  background: rgba(0, 161, 55, 0.10);
+  color: #048E33;
+}
+
+.chip-gold {
+  background: rgba(192, 122, 0, 0.10);
+  color: #C07A00;
+}
+
+.chip-silver {
+  background: var(--bg3);
+  color: var(--l3);
+}
+
+.chip-bronze {
+  background: rgba(160, 80, 0, 0.10);
+  color: #A05000;
+}
+
+/* ============================================
+   RENOV BRAND — LIGHT MODE ZERO-DARK COMPLIANCE
+   ============================================
+   Rule: ZERO dark surfaces in light mode.
+   body is PARENT of .app — must be set explicitly.
+   All surfaces must be white/light gray in light mode.
+   ============================================ */
+
+/* Root containers — explicit white in light mode */
+:root:not(.dark) body,
+html:not(.dark) body {
+  background: #FFFFFF;
+}
+
+:root:not(.dark) main,
+html:not(.dark) main {
+  background: #FFFFFF;
+}
+
+/* Cards & Panels in light mode — white with subtle border */
+:root:not(.dark) .shadcn-card {
+  background: #FFFFFF;
+  border-color: rgba(0,0,0,0.08);
+}
+
+/* KPI card light mode overrides */
+:root:not(.dark) [data-kpi-card]:not([data-highlight="true"]) {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+/* KPI highlight card — Verde Floresta in BOTH modes */
+[data-highlight="true"] {
+  background: var(--vf);
+}
+
+/* Dialog/Modal content in light mode — white */
+:root:not(.dark) [role="dialog"] > div {
+  background: #FFFFFF;
+}
+
+/* Popover/Dropdown — ensure white in light */
+:root:not(.dark) [data-radix-popper-content-wrapper] > div {
+  background: #FFFFFF;
+}
+
+/* Table rows light mode — transparent bg, hover #F5F5F5 */
+:root:not(.dark) table tbody tr:hover {
+  background: #F5F5F5;
+}
+
+/* Sidebar light mode — #FAFAFA */
+:root:not(.dark) [data-slot="sidebar-inner"] {
+  background: #FAFAFA;
+}
+
+/* Topbar light mode — #FAFAFA */
+:root:not(.dark) [data-slot="page-header"] {
+  background: #FAFAFA;
+}
+
+/* Input fields light mode */
+:root:not(.dark) input,
+:root:not(.dark) textarea,
+:root:not(.dark) select {
+  background: #FFFFFF;
+}
+
+/* Tooltip light mode */
+:root:not(.dark) [role="tooltip"] {
+  background: #F5F5F5;
+  color: rgba(0,0,0,0.88);
+}
+
+/* Toast/Toaster light mode */
+:root:not(.dark) [data-sonner-toaster] [data-sonner-toast],
+:root:not(.dark) [data-state="open"][role="status"] {
+  background: #FFFFFF;
+  border-color: rgba(0,0,0,0.08);
+}
+
+/* Sheet content light mode (sidebar drawer on mobile) */
+:root:not(.dark) [data-slot="sidebar"] [data-mobile="true"] {
+  background: #FAFAFA;
+}
+
+/* Fix brand-settings dark preview — intentionally dark, mark as exception */
+:root:not(.dark) [data-dark-preview] {
+  /* Intentionally dark — this is a preview of dark theme logo */
 }

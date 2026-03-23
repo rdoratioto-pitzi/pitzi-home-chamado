@@ -125,15 +125,15 @@ function MetaCard({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-[14px] font-bold text-foreground leading-snug">{meta.title}</p>
-          <Badge variant="secondary" className="text-[9px] uppercase font-bold">
+          <Badge variant="secondary" className="text-[10px] uppercase font-bold">
             {measurementLabels[meta.measurementType] || meta.measurementType}
           </Badge>
-          <Badge variant="outline" className={`text-[9px] uppercase font-bold ${statusColors[meta.status]}`}>
+          <Badge variant="outline" className={`text-[10px] uppercase font-bold ${statusColors[meta.status]}`}>
             <CalendarClock className="h-3 w-3 mr-1" />
             {statusLabels[meta.status]}
           </Badge>
         </div>
-        <div className="text-[20px] font-bold" style={{ color: area?.color }}>{Math.round(progress)}%</div>
+        <div className="text-[28px] font-bold" style={{ color: area?.color }}>{Math.round(progress)}%</div>
       </div>
 
       {/* Barra de progresso + Valor */}
@@ -155,7 +155,7 @@ function MetaCard({
       {/* Responsável + Data + Botão */}
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <div className="flex items-center gap-2">
-          <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
+          <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
             {user?.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || 'U'}
           </div>
           <span>{user?.name || 'Usuário'}</span>
@@ -382,7 +382,7 @@ export default function MetasVisaoGeralPage() {
       <main className="flex-1 p-6 space-y-6">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
-            <h2 className="text-[20px] font-bold tracking-tight">Metas Mensais</h2>
+            <h2 className="text-[22px] font-bold tracking-tight">Metas Mensais</h2>
             <p className="text-[14px] text-muted-foreground mt-1">
               Acompanhe o progresso das metas por área de negócio
             </p>
@@ -411,28 +411,28 @@ export default function MetasVisaoGeralPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="card-total">
+          <Card data-testid="card-total" style={{ background: 'var(--vf)', border: 'none' }}>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Target className="h-5 w-5 text-primary" />
+                <div className="p-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.15)' }}>
+                  <Target className="h-5 w-5" style={{ color: '#FFFFFF' }} />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total de Metas</p>
-                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#FFFFFF' }}>Total de Metas</p>
+                  <p className="text-[28px] font-bold" style={{ color: '#FFFFFF' }}>{stats.total}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card data-testid="card-by-area">
+          <Card data-testid="card-by-area" className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="p-2 rounded-lg bg-blue-500/10">
                   <Building2 className="h-5 w-5 text-blue-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-muted-foreground mb-1">Total por Área</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--l3)' }}>Total por Área</p>
                   <div className="space-y-0.5 max-h-20 overflow-auto">
                     {Object.entries(stats.byArea)
                       .filter(([_, data]) => data.total > 0)
@@ -451,15 +451,15 @@ export default function MetasVisaoGeralPage() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-progress">
+          <Card data-testid="card-progress" className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="p-2 rounded-lg bg-purple-500/10">
                   <TrendingUp className="h-5 w-5 text-purple-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-muted-foreground">Progresso Médio</p>
-                  <p className="text-2xl font-bold" data-testid="text-avg-progress">{stats.avgProgress.toFixed(0)}%</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Progresso Médio</p>
+                  <p className="text-[28px] font-bold" data-testid="text-avg-progress">{stats.avgProgress.toFixed(0)}%</p>
                   <div className="space-y-0.5 mt-1 max-h-16 overflow-auto">
                     {Object.entries(stats.byArea)
                       .filter(([_, data]) => data.total > 0)
@@ -475,15 +475,15 @@ export default function MetasVisaoGeralPage() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-completed">
+          <Card data-testid="card-completed" className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 <div className="p-2 rounded-lg bg-green-500/10">
                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-muted-foreground">Metas Atingidas</p>
-                  <p className="text-2xl font-bold" data-testid="text-completed-count">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Metas Atingidas</p>
+                  <p className="text-[28px] font-bold" data-testid="text-completed-count">
                     {stats.completed}
                     <span className="text-sm font-normal text-muted-foreground ml-1">
                       ({stats.total > 0 ? ((stats.completed / stats.total) * 100).toFixed(0) : 0}%)
@@ -703,7 +703,7 @@ export default function MetasVisaoGeralPage() {
                               </span>
                             </div>
                             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                              <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center text-[8px] font-bold text-primary">
+                              <div className="h-4 w-4 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
                                 {cUser?.name?.charAt(0) || "U"}
                               </div>
                               <span>{cUser?.name || "Usuário"}</span>

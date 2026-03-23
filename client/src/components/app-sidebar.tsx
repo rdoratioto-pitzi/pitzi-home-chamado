@@ -290,8 +290,8 @@ export function AppSidebar() {
     : "US";
 
   return (
-    <Sidebar className="border-r border-sidebar-border">
-      <SidebarHeader className="h-16 flex items-center justify-center border-b border-sidebar-border">
+    <Sidebar className="border-r" style={{ borderRightColor: 'var(--sep)' }}>
+      <SidebarHeader className="h-14 flex items-center justify-center">
         <Link href="/" data-testid="link-home" className="flex items-center justify-center w-full px-6">
           <RenovLogo
             variant={theme === "dark" ? "dark" : "light"}
@@ -318,11 +318,11 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
-                      className={`h-11 px-3 transition-all duration-200 rounded-lg ${isActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                      className="h-11 px-3"
                     >
                       <Link href={item.url} data-testid={`link-${item.url.slice(1)}`} onClick={handleClick}>
-                        <item.icon className={`h-[20px] w-[20px] ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">{item.title}</span>
+                        <item.icon className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">{item.title}</span>
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -334,12 +334,12 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isEstoquesActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        className="h-11 px-3"
                         isActive={isEstoquesActive}
                         data-testid="link-estoques"
                       >
-                        <Warehouse className={`h-[20px] w-[20px] ${isEstoquesActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">Estoques</span>
+                        <Warehouse className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Estoques</span>
                         {estoquesOpen ? (
                           <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                         ) : (
@@ -348,7 +348,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
                         {estoquesSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
@@ -356,7 +356,7 @@ export function AppSidebar() {
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                  <span className="text-[12px]">{subItem.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
@@ -373,12 +373,12 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isMetasActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        className="h-11 px-3"
                         isActive={isMetasActive}
                         data-testid="link-metas"
                       >
-                        <BarChart3 className={`h-[20px] w-[20px] ${isMetasActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">Metas</span>
+                        <BarChart3 className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Metas</span>
                         {metasOpen ? (
                           <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                         ) : (
@@ -387,7 +387,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
                         {metasSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
@@ -395,7 +395,7 @@ export function AppSidebar() {
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-metas-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                  <span className="text-[12px]">{subItem.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
@@ -411,11 +411,11 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={location === "/okrs"}
-                  className={`h-11 px-3 transition-all duration-200 rounded-lg ${location === "/okrs" ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                  className="h-11 px-3"
                 >
                   <Link href="/okrs" data-testid="link-okrs">
-                    <Target className={`h-[20px] w-[20px] ${location === "/okrs" ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-[14px]">OKRs</span>
+                    <Target className="h-[20px] w-[20px]" />
+                    <span className="text-[12px]">OKRs</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -425,12 +425,12 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isLogisticaActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        className="h-11 px-3"
                         isActive={isLogisticaActive}
                         data-testid="link-logistica"
                       >
-                        <Truck className={`h-[20px] w-[20px] ${isLogisticaActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">Logística</span>
+                        <Truck className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Logística</span>
                         {logisticaOpen ? (
                           <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                         ) : (
@@ -439,7 +439,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
                         {logisticaSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
@@ -447,7 +447,7 @@ export function AppSidebar() {
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                  <span className="text-[12px]">{subItem.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
@@ -464,12 +464,12 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isTriagemActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        className="h-11 px-3"
                         isActive={isTriagemActive}
                         data-testid="link-triagem"
                       >
-                        <Printer className={`h-[20px] w-[20px] ${isTriagemActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">Triagem</span>
+                        <Printer className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Triagem</span>
                         {triagemOpen ? (
                           <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                         ) : (
@@ -478,7 +478,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
                         {triagemSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
@@ -486,7 +486,7 @@ export function AppSidebar() {
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                  <span className="text-[12px]">{subItem.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
@@ -503,12 +503,12 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isPricingActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        className="h-11 px-3"
                         isActive={isPricingActive}
                         data-testid="link-pricing"
                       >
-                        <DollarSign className={`h-[20px] w-[20px] ${isPricingActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">Pricing</span>
+                        <DollarSign className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Pricing</span>
                         {pricingOpen ? (
                           <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                         ) : (
@@ -517,7 +517,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
                         {pricingSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
@@ -525,7 +525,7 @@ export function AppSidebar() {
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                  <span className="text-[12px]">{subItem.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
@@ -542,12 +542,12 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isBibliotecaActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        className="h-11 px-3"
                         isActive={isBibliotecaActive}
                         data-testid="link-biblioteca"
                       >
-                        <BookOpen className={`h-[20px] w-[20px] ${isBibliotecaActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">Biblioteca</span>
+                        <BookOpen className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Biblioteca</span>
                         {bibliotecaOpen ? (
                           <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                         ) : (
@@ -556,7 +556,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
                         {bibliotecaSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
@@ -564,7 +564,7 @@ export function AppSidebar() {
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-biblioteca-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                  <span className="text-[12px]">{subItem.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
@@ -581,12 +581,12 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className={`h-11 px-3 transition-all duration-200 rounded-lg ${isApisActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                        className="h-11 px-3"
                         isActive={isApisActive}
                         data-testid="link-integracoes"
                       >
-                        <Code2 className={`h-[20px] w-[20px] ${isApisActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                        <span className="text-[14px]">Integrações</span>
+                        <Code2 className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Integrações</span>
                         {apisOpen ? (
                           <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                         ) : (
@@ -595,7 +595,7 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l border-sidebar-border/50 pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
                         {apisSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
@@ -603,7 +603,7 @@ export function AppSidebar() {
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[13.5px]">{subItem.title}</span>
+                                  <span className="text-[12px]">{subItem.title}</span>
                                 </Link>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
@@ -619,11 +619,11 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={location === "/git-analytics"}
-                  className={`h-11 px-3 transition-all duration-200 rounded-lg ${location === "/git-analytics" ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                  className="h-11 px-3"
                 >
                   <Link href="/git-analytics" data-testid="link-git-analytics">
-                    <GitBranch className={`h-[20px] w-[20px] ${location === "/git-analytics" ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-[14px]">Git Analytics</span>
+                    <GitBranch className="h-[20px] w-[20px]" />
+                    <span className="text-[12px]">Git Analytics</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -633,11 +633,11 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={location === "/configuracoes" || location.startsWith("/configuracoes/")}
-                    className={`h-11 px-3 transition-all duration-200 rounded-lg ${location.startsWith("/configuracoes") ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-muted'}`}
+                    className="h-11 px-3"
                   >
                     <Link href="/configuracoes" data-testid="link-configuracoes">
-                      <Settings className={`h-[20px] w-[20px] ${location.startsWith("/configuracoes") ? 'text-primary' : 'text-muted-foreground'}`} />
-                      <span className="text-[14px]">Configurações</span>
+                      <Settings className="h-[20px] w-[20px]" />
+                      <span className="text-[12px]">Configurações</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

@@ -55,27 +55,27 @@ export default function LogisticsDashboard() {
   return (
     <div className="space-y-8" data-testid="page-logistics-dashboard">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card data-testid="card-total-requests">
+        <Card data-testid="card-total-requests" style={{ background: 'var(--vf)', border: 'none' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium">Solicitações de Coleta</CardTitle>
-            <Package className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#FFFFFF' }}>Solicitações de Coleta</CardTitle>
+            <Package className="h-4 w-4" style={{ color: '#FFFFFF' }} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-total-requests">{stats?.totalRequests || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center">
-              <ArrowUpRight className="h-3 w-3 text-green-500 mr-1" />
-              <span className="text-green-600 font-medium">+20.1%</span> vs mês anterior
+            <div className="text-[28px] font-bold" style={{ color: '#FFFFFF' }} data-testid="stat-total-requests">{stats?.totalRequests || 0}</div>
+            <p className="text-xs mt-1 flex items-center" style={{ color: 'rgba(255,255,255,0.8)' }}>
+              <ArrowUpRight className="h-3 w-3 mr-1" style={{ color: 'rgba(255,255,255,0.8)' }} />
+              <span className="font-medium" style={{ color: '#FFFFFF' }}>+20.1%</span> vs mês anterior
             </p>
           </CardContent>
         </Card>
-        
-        <Card data-testid="card-total-value">
+
+        <Card data-testid="card-total-value" className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Valor Total</CardTitle>
             <DollarSign className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-total-value">
+            <div className="text-[28px] font-bold" style={{ color: 'var(--l1)' }} data-testid="stat-total-value">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats?.totalValue || 0)}
             </div>
             <p className="text-xs text-muted-foreground mt-1 flex items-center">
@@ -84,27 +84,27 @@ export default function LogisticsDashboard() {
             </p>
           </CardContent>
         </Card>
-        
-        <Card data-testid="card-ontime-rate">
+
+        <Card data-testid="card-ontime-rate" className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium">Entregas no Prazo</CardTitle>
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Entregas no Prazo</CardTitle>
             <Clock className="h-4 w-4 text-purple-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-ontime-rate">{stats?.onTimeRate || 0}%</div>
+            <div className="text-[28px] font-bold" style={{ color: 'var(--l1)' }} data-testid="stat-ontime-rate">{stats?.onTimeRate || 0}%</div>
             <p className="text-xs text-muted-foreground mt-1">
               Meta: 98%
             </p>
           </CardContent>
         </Card>
-        
-        <Card data-testid="card-savings">
+
+        <Card data-testid="card-savings" className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
-            <CardTitle className="text-sm font-medium">Economia Gerada</CardTitle>
+            <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Economia Gerada</CardTitle>
             <TrendingUp className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-savings">
+            <div className="text-[28px] font-bold" style={{ color: 'var(--l1)' }} data-testid="stat-savings">
               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats?.savings || 0)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -133,7 +133,7 @@ export default function LogisticsDashboard() {
                       <span className="text-sm font-medium">Aguardando</span>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="text-lg font-bold">{dispositivosStatus.aguardando}</span>
+                      <span className="text-[28px] font-bold">{dispositivosStatus.aguardando}</span>
                       <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
                         {totalDispositivos > 0 ? ((dispositivosStatus.aguardando / totalDispositivos) * 100).toFixed(0) : 0}%
                       </Badge>
@@ -149,7 +149,7 @@ export default function LogisticsDashboard() {
                       <span className="text-sm font-medium">Confirmado</span>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="text-lg font-bold">{dispositivosStatus.confirmado}</span>
+                      <span className="text-[28px] font-bold">{dispositivosStatus.confirmado}</span>
                       <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                         {totalDispositivos > 0 ? ((dispositivosStatus.confirmado / totalDispositivos) * 100).toFixed(0) : 0}%
                       </Badge>
@@ -165,7 +165,7 @@ export default function LogisticsDashboard() {
                       <span className="text-sm font-medium">Em Coleta</span>
                     </div>
                     <div className="flex items-center gap-4">
-                      <span className="text-lg font-bold">{dispositivosStatus.emColeta}</span>
+                      <span className="text-[28px] font-bold">{dispositivosStatus.emColeta}</span>
                       <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                         {totalDispositivos > 0 ? ((dispositivosStatus.emColeta / totalDispositivos) * 100).toFixed(0) : 0}%
                       </Badge>
@@ -210,7 +210,7 @@ export default function LogisticsDashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">{stats?.pendingRequests || 0}</p>
+                  <p className="text-[28px] font-bold">{stats?.pendingRequests || 0}</p>
                 </div>
               </div>
 
@@ -225,7 +225,7 @@ export default function LogisticsDashboard() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">{stats?.deliveredRequests || 0}</p>
+                  <p className="text-[28px] font-bold">{stats?.deliveredRequests || 0}</p>
                 </div>
               </div>
             </div>
