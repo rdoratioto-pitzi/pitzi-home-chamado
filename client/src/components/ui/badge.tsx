@@ -4,9 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const badgeVariants = cva(
-  // Whitespace-nowrap: Badges should never wrap.
-  "whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" +
-  " hover-elevate " ,
+  "whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
   {
     variants: {
       variant: {
@@ -14,9 +12,11 @@ const badgeVariants = cva(
           "border-transparent bg-primary text-primary-foreground shadow-xs",
         secondary: "border-transparent bg-secondary text-secondary-foreground",
         destructive:
-          "border-transparent bg-destructive text-destructive-foreground shadow-xs",
-
-        outline: " border [border-color:var(--badge-outline)] shadow-xs",
+          "border-transparent shadow-xs",
+        outline: "border shadow-xs",
+        success: "border-transparent",
+        warning: "border-transparent",
+        info: "border-transparent",
       },
     },
     defaultVariants: {
@@ -29,9 +29,25 @@ export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
+const semanticStyles: Record<string, React.CSSProperties> = {
+  success: { background: "rgba(0,161,55,0.10)", color: "#00A137" },
+  warning: { background: "rgba(192,122,0,0.10)", color: "#C07A00" },
+  destructive: { background: "rgba(197,48,48,0.10)", color: "#C53030" },
+  info: { background: "rgba(60,120,216,0.10)", color: "#3C78D8" },
+}
+
+function Badge({ className, variant, style, ...props }: BadgeProps) {
+  const variantKey = variant as string
+  const mergedStyle = semanticStyles[variantKey]
+    ? { ...semanticStyles[variantKey], ...style }
+    : style
+
   return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+    <div
+      className={cn(badgeVariants({ variant }), className)}
+      style={mergedStyle}
+      {...props}
+    />
   );
 }
 

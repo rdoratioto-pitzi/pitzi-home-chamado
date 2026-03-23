@@ -16,7 +16,7 @@ interface Props {
 export function KpiVolume({ dados, isLoading }: Props) {
   return (
     <div className="space-y-2">
-      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-0.5">
+      <h3 className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wider px-0.5">
         Volume
       </h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -28,6 +28,7 @@ export function KpiVolume({ dados, isLoading }: Props) {
           formato="numero"
           icone={<Package className="h-4 w-4" />}
           isLoading={isLoading}
+          highlight
         />
         <KpiCard
           titulo="Triados"

@@ -2565,7 +2565,7 @@ export default function ReunioesPage() {
                     </Badge>
                   </div>
                   
-                  <h1 className="text-4xl font-bold">
+                  <h1 className="text-[22px] font-bold">
                     {meeting.title}
                   </h1>
                   

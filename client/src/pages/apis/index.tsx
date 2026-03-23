@@ -77,45 +77,45 @@ export default function ApisPage() {
 
       <main className="flex-1 p-6 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="shadow-sm border-border/60">
+          <Card className="shadow-sm" style={{ background: 'var(--vf)', border: 'none' }}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Endpoints Internos</p>
-                  <p className="text-3xl font-bold mt-1">{stats.endpointsInternos}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#FFFFFF' }}>Endpoints Internos</p>
+                  <p className="text-[28px] font-bold mt-1" style={{ color: '#FFFFFF' }}>{stats.endpointsInternos}</p>
                 </div>
-                <Code2 className="h-8 w-8 text-muted-foreground opacity-50" />
+                <Code2 className="h-8 w-8 opacity-50" style={{ color: '#FFFFFF' }} />
               </div>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-border/60">
+          <Card className="shadow-sm border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Operadores Ativos</p>
-                  <p className="text-3xl font-bold text-green-600 mt-1">{stats.operadoresAtivos}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Operadores Ativos</p>
+                  <p className="text-[28px] font-bold mt-1" style={{ color: 'var(--l1)' }}>{stats.operadoresAtivos}</p>
                 </div>
                 <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
               </div>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-border/60">
+          <Card className="shadow-sm border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Em Desenvolvimento</p>
-                  <p className="text-3xl font-bold text-yellow-600 mt-1">{stats.emDesenvolvimento}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Em Desenvolvimento</p>
+                  <p className="text-[28px] font-bold mt-1" style={{ color: 'var(--l1)' }}>{stats.emDesenvolvimento}</p>
                 </div>
                 <Settings2 className="h-8 w-8 text-yellow-500 opacity-50" />
               </div>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-border/60">
+          <Card className="shadow-sm border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider">Total Integrações</p>
-                  <p className="text-3xl font-bold mt-1">{stats.totalIntegracoes}</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Total Integrações</p>
+                  <p className="text-[28px] font-bold mt-1" style={{ color: 'var(--l1)' }}>{stats.totalIntegracoes}</p>
                 </div>
                 <Package className="h-8 w-8 text-muted-foreground opacity-50" />
               </div>

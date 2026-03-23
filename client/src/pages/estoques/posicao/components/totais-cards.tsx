@@ -76,10 +76,10 @@ export function TotaisCards({
               <Package className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+              <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold uppercase tracking-wide">
                 Qtde Estoque
               </p>
-              <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+              <p className="text-[28px] font-bold text-blue-700 dark:text-blue-300">
                 {formatNumber(qtdeTotal)}
               </p>
             </div>
@@ -95,10 +95,10 @@ export function TotaisCards({
               <DollarSign className="h-6 w-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+              <p className="text-[10px] text-green-600 dark:text-green-400 font-semibold uppercase tracking-wide">
                 Valor Estoque
               </p>
-              <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+              <p className="text-[28px] font-bold text-green-700 dark:text-green-300">
                 {formatCurrency(valorTotal)}
               </p>
             </div>
@@ -114,10 +114,10 @@ export function TotaisCards({
               <TrendingUp className="h-6 w-6 text-gray-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+              <p className="text-[10px] text-gray-600 dark:text-gray-400 font-semibold uppercase tracking-wide">
                 Custo Médio Unitário
               </p>
-              <p className="text-2xl font-bold text-gray-700 dark:text-gray-300">
+              <p className="text-[28px] font-bold text-gray-700 dark:text-gray-300">
                 {formatCurrency(custoMedioUnitario)}
               </p>
             </div>
