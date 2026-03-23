@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,8 @@ import { Plus, BarChart3 } from "lucide-react";
 import { TodosView } from "./TodosView";
 import { ChamadosView } from "./ChamadosView";
 import { ProjetosView } from "./ProjetosView";
+import { VisaoEstrategica } from "@/components/workspace/VisaoEstrategica";
+import { fetchWithAuth } from "@/lib/queryClient";
 
 type TabKey = "todos" | "chamados" | "projetos";
 
@@ -14,7 +17,7 @@ const tabs: { key: TabKey; label: string; count: number }[] = [
   { key: "projetos", label: "Projetos", count: 74 },
 ];
 
-function TopbarActions({ activeTab }: { activeTab: TabKey }) {
+function TopbarActions({ activeTab, onVisaoEstrategica }: { activeTab: TabKey; onVisaoEstrategica?: () => void }) {
   if (activeTab === "chamados") {
     return (
       <Button size="sm" className="bg-[#00a137] hover:bg-[#00a137]/90 text-white">
@@ -36,7 +39,7 @@ function TopbarActions({ activeTab }: { activeTab: TabKey }) {
           Novo Projeto
         </Button>
         <div className="h-6 w-px bg-border/40" />
-        <Button size="sm" variant="outline">
+        <Button size="sm" variant="outline" onClick={onVisaoEstrategica}>
           <BarChart3 className="h-4 w-4 mr-1" />
           Visão Estratégica
         </Button>
@@ -75,6 +78,22 @@ export default function WorkspacePage() {
   const activeTab: TabKey = (params?.tab as TabKey) || "todos";
   const ActiveView = viewMap[activeTab] ?? viewMap.todos;
 
+  const [visaoOpen, setVisaoOpen] = useState(false);
+  const [visaoData, setVisaoData] = useState<{ projetos: any[]; kpis: any }>({
+    projetos: [],
+    kpis: { ativos: 0, tarefasAbertas: 0, emAndamento: 0, concluidas: 0, atrasadas: 0 },
+  });
+
+  const handleOpenVisao = () => {
+    fetchWithAuth("/api/workspace/projetos")
+      .then((res) => res.json())
+      .then((data) => {
+        setVisaoData({ projetos: data.projetos, kpis: data.kpis });
+        setVisaoOpen(true);
+      })
+      .catch(() => setVisaoOpen(true));
+  };
+
   const handleTabClick = (key: TabKey) => {
     setLocation(key === "todos" ? "/workspace" : `/workspace/${key}`);
   };
@@ -87,7 +106,14 @@ export default function WorkspacePage() {
           { label: "Renov Home", href: "/" },
           { label: "Workspace" },
         ]}
-        actions={<TopbarActions activeTab={activeTab} />}
+        actions={<TopbarActions activeTab={activeTab} onVisaoEstrategica={handleOpenVisao} />}
+      />
+
+      <VisaoEstrategica
+        open={visaoOpen}
+        projetos={visaoData.projetos}
+        kpis={visaoData.kpis}
+        onClose={() => setVisaoOpen(false)}
       />
 
       {/* Tabs */}
