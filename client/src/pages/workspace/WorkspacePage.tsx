@@ -1,0 +1,133 @@
+import { useLocation, useRoute } from "wouter";
+import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
+import { Plus, BarChart3 } from "lucide-react";
+import { TodosView } from "./TodosView";
+import { ChamadosView } from "./ChamadosView";
+import { ProjetosView } from "./ProjetosView";
+
+type TabKey = "todos" | "chamados" | "projetos";
+
+const tabs: { key: TabKey; label: string; count: number }[] = [
+  { key: "todos", label: "Todos", count: 116 },
+  { key: "chamados", label: "Chamados", count: 42 },
+  { key: "projetos", label: "Projetos", count: 74 },
+];
+
+function TopbarActions({ activeTab }: { activeTab: TabKey }) {
+  if (activeTab === "chamados") {
+    return (
+      <Button size="sm" className="bg-[#00a137] hover:bg-[#00a137]/90 text-white">
+        <Plus className="h-4 w-4 mr-1" />
+        Novo Chamado
+      </Button>
+    );
+  }
+
+  if (activeTab === "projetos") {
+    return (
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" className="border-[#00c853] text-[#00c853] hover:bg-[#00c853]/10">
+          <Plus className="h-4 w-4 mr-1" />
+          Nova Tarefa
+        </Button>
+        <Button size="sm" className="bg-[#00a137] hover:bg-[#00a137]/90 text-white">
+          <Plus className="h-4 w-4 mr-1" />
+          Novo Projeto
+        </Button>
+        <div className="h-6 w-px bg-border/40" />
+        <Button size="sm" variant="outline">
+          <BarChart3 className="h-4 w-4 mr-1" />
+          Visão Estratégica
+        </Button>
+      </div>
+    );
+  }
+
+  // Tab "Todos"
+  return (
+    <div className="flex items-center gap-2">
+      <Button size="sm" variant="outline" className="border-[#00c853] text-[#00c853] hover:bg-[#00c853]/10">
+        <Plus className="h-4 w-4 mr-1" />
+        Chamado
+      </Button>
+      <Button size="sm" variant="outline">
+        <Plus className="h-4 w-4 mr-1" />
+        Nova Tarefa
+      </Button>
+      <Button size="sm" className="bg-[#00a137] hover:bg-[#00a137]/90 text-white">
+        <Plus className="h-4 w-4 mr-1" />
+        Projeto
+      </Button>
+    </div>
+  );
+}
+
+const viewMap: Record<TabKey, React.ComponentType> = {
+  todos: TodosView,
+  chamados: ChamadosView,
+  projetos: ProjetosView,
+};
+
+export default function WorkspacePage() {
+  const [, setLocation] = useLocation();
+  const [, params] = useRoute("/workspace/:tab");
+  const activeTab: TabKey = (params?.tab as TabKey) || "todos";
+  const ActiveView = viewMap[activeTab] ?? viewMap.todos;
+
+  const handleTabClick = (key: TabKey) => {
+    setLocation(key === "todos" ? "/workspace" : `/workspace/${key}`);
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      <PageHeader
+        title="Workspace"
+        breadcrumbs={[
+          { label: "Renov Home", href: "/" },
+          { label: "Workspace" },
+        ]}
+        actions={<TopbarActions activeTab={activeTab} />}
+      />
+
+      {/* Tabs */}
+      <div className="flex items-center gap-0 px-6 border-b" style={{ borderColor: "var(--sep)" }}>
+        {tabs.map((tab, idx) => {
+          const isActive = tab.key === activeTab;
+          return (
+            <div key={tab.key} className="flex items-center">
+              {/* Divisor sutil antes de "Chamados" (após "Todos") */}
+              {idx === 1 && (
+                <div className="h-5 w-px bg-border/30 mx-1" />
+              )}
+              <button
+                onClick={() => handleTabClick(tab.key)}
+                className="relative px-4 py-3 text-sm font-medium transition-colors"
+                style={{
+                  color: isActive ? "#00c853" : "rgba(255,255,255,0.3)",
+                  borderBottom: isActive ? "2px solid #00c853" : "2px solid transparent",
+                }}
+              >
+                {tab.label}
+                <span
+                  className="ml-2 text-xs px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: isActive ? "rgba(0,200,83,0.15)" : "rgba(255,255,255,0.05)",
+                    color: isActive ? "#00c853" : "rgba(255,255,255,0.3)",
+                  }}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto p-6">
+        <ActiveView />
+      </div>
+    </div>
+  );
+}
