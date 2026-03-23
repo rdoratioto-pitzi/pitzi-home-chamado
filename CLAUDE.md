@@ -147,6 +147,42 @@ Examples:
 - `git -C subdir add .` instead of `cd subdir && git add .`
 - `git -C subdir commit -m "msg"` instead of `cd subdir && git commit -m "msg"`
 
+## Módulo Workspace
+
+Rota principal: `/workspace`
+Sub-rotas: `/workspace/chamados` · `/workspace/projetos` · `/workspace` (todos)
+
+Rotas legadas redirecionam automaticamente: `/chamados` → `/workspace/chamados` · `/projetos` → `/workspace/projetos`
+
+**Componentes principais:**
+- `client/src/pages/workspace/WorkspacePage.tsx` — orquestrador principal com tabs e topbar actions
+- `client/src/components/workspace/KpiStrip.tsx` — KPIs (variant: `chamados` | `projetos` | `todos`)
+- `client/src/components/workspace/WorkspaceTable.tsx` — tabela unificada com loading skeleton e responsividade
+- `client/src/components/workspace/NovoItemModal.tsx` — modal de criação (chamado / tarefa / projeto)
+- `client/src/components/workspace/VisaoEstrategica.tsx` — overlay estratégico de projetos
+- `client/src/components/workspace/WorkspaceErrorBoundary.tsx` — error boundary com fallback PT-BR
+
+**Novas tabelas:**
+- `workspace_projetos` — projetos macro
+- `workspace_tarefas` — tarefas dentro de projetos
+
+**Endpoints REST:**
+- `GET  /api/workspace/chamados?periodo=...`
+- `GET  /api/workspace/projetos`
+- `GET  /api/workspace/todos`
+- `POST /api/workspace/chamados`
+- `POST /api/workspace/tarefas`
+- `POST /api/workspace/projetos`
+
+**Prefixos de código:**
+- Chamados: `CHA-XXXX` (usa ticket.code gerado pelo storage)
+- Projetos: `PRO-XXX`
+- Tarefas vinculadas: `PRO-XXX·TX` · Tarefas avulsas: `TAR-XXXX`
+
+**Testes:**
+- `server/routes/workspace.test.ts` — 6 testes de integração (vitest + supertest)
+- Rodar: `npm test`
+
 ## Time
 
 | Pessoa  | Papel                                                         |

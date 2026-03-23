@@ -1,5 +1,4 @@
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -196,23 +195,45 @@ function GroupHeader({ status, count }: { status: string; count: number }) {
   );
 }
 
+const skeletonKeyframes = `
+@keyframes ws-skeleton-pulse {
+  from { background-color: rgba(255,255,255,0.04); }
+  to   { background-color: rgba(255,255,255,0.08); }
+}
+`;
+
+function SkeletonCell({ width, height = 14, rounded }: { width: number; height?: number; rounded?: boolean }) {
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        width,
+        height,
+        borderRadius: rounded ? "50%" : 4,
+        animation: "ws-skeleton-pulse 1.5s ease-in-out infinite alternate",
+      }}
+    />
+  );
+}
+
 function SkeletonRows({ colTemplate }: { colTemplate: string }) {
   return (
     <>
+      <style>{skeletonKeyframes}</style>
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}
-          className="grid items-center px-4 py-3 gap-2 animate-pulse"
+          className="ws-table-row grid items-center px-4 py-3 gap-2"
           style={{ gridTemplateColumns: colTemplate }}
         >
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-5 w-5 rounded-full" />
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-8" />
-          <Skeleton className="h-4 w-16" />
+          <SkeletonCell width={64} />
+          <SkeletonCell width={160} />
+          <SkeletonCell width={128} />
+          <SkeletonCell width={20} height={20} rounded />
+          <SkeletonCell width={80} />
+          <SkeletonCell width={64} />
+          <span className="ws-col-sla"><SkeletonCell width={32} /></span>
+          <span className="ws-col-sla"><SkeletonCell width={64} /></span>
           <div />
         </div>
       ))}
@@ -221,6 +242,14 @@ function SkeletonRows({ colTemplate }: { colTemplate: string }) {
 }
 
 const COL_TEMPLATE = "96px 1fr 175px 100px 115px 110px 62px 98px 30px";
+const COL_TEMPLATE_MOBILE = "96px 1fr 175px 100px 115px 110px 30px";
+
+const responsiveStyles = `
+@media (max-width: 767px) {
+  .ws-col-sla { display: none !important; }
+  .ws-table-row { grid-template-columns: ${COL_TEMPLATE_MOBILE} !important; }
+}
+`;
 
 export function WorkspaceTable(props: WorkspaceTableProps) {
   const { items, loading } = props;
@@ -231,9 +260,12 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
 
   if (loading) {
     return (
-      <div className="w-full">
-        <HeaderRow headers={headers} />
-        <SkeletonRows colTemplate={COL_TEMPLATE} />
+      <div style={{ overflowX: "auto" }}>
+        <style>{responsiveStyles}</style>
+        <div style={{ minWidth: 900 }}>
+          <HeaderRow headers={headers} />
+          <SkeletonRows colTemplate={COL_TEMPLATE} />
+        </div>
       </div>
     );
   }
@@ -257,24 +289,27 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
   }
 
   return (
-    <div className="w-full">
-      <HeaderRow headers={headers} />
-      {statusGroupOrder.map((status) => {
-        const groupItems = grouped.get(status) || [];
-        if (groupItems.length === 0) return null;
-        return (
-          <div key={status}>
-            <GroupHeader status={status} count={groupItems.length} />
-            {groupItems.map((item) =>
-              variant === "todos" ? (
-                <UnifiedItemRow key={item.id} item={item as UnifiedItem} />
-              ) : (
-                <ChamadoItemRow key={(item as ChamadoItem).id} item={item as ChamadoItem} />
-              ),
-            )}
-          </div>
-        );
-      })}
+    <div style={{ overflowX: "auto" }}>
+      <style>{responsiveStyles}</style>
+      <div style={{ minWidth: 900 }}>
+        <HeaderRow headers={headers} />
+        {statusGroupOrder.map((status) => {
+          const groupItems = grouped.get(status) || [];
+          if (groupItems.length === 0) return null;
+          return (
+            <div key={status}>
+              <GroupHeader status={status} count={groupItems.length} />
+              {groupItems.map((item) =>
+                variant === "todos" ? (
+                  <UnifiedItemRow key={item.id} item={item as UnifiedItem} />
+                ) : (
+                  <ChamadoItemRow key={(item as ChamadoItem).id} item={item as ChamadoItem} />
+                ),
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -282,7 +317,7 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
 function HeaderRow({ headers }: { headers: string[] }) {
   return (
     <div
-      className="grid items-center px-4 py-2 gap-2"
+      className="ws-table-row grid items-center px-4 py-2 gap-2"
       style={{
         gridTemplateColumns: COL_TEMPLATE,
         borderBottom: "1px solid rgba(255,255,255,0.06)",
@@ -291,6 +326,7 @@ function HeaderRow({ headers }: { headers: string[] }) {
       {headers.map((h, i) => (
         <span
           key={i}
+          className={i === 6 || i === 7 ? "ws-col-sla" : undefined}
           style={{
             fontFamily: "'JetBrains Mono', monospace",
             textTransform: "uppercase",
@@ -312,7 +348,7 @@ function ChamadoItemRow({ item }: { item: ChamadoItem }) {
 
   return (
     <div
-      className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-default"
+      className="ws-table-row group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-default"
       style={{
         gridTemplateColumns: COL_TEMPLATE,
         borderBottom: "1px solid rgba(255,255,255,0.03)",
@@ -345,10 +381,10 @@ function ChamadoItemRow({ item }: { item: ChamadoItem }) {
       <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
         {priorityLabels[item.prioridade] || item.prioridade}
       </Badge>
-      <span className="text-xs text-muted-foreground">
+      <span className="ws-col-sla text-xs text-muted-foreground">
         {item.sla ? `${item.sla}h` : "—"}
       </span>
-      <SlaStatusCell statusSla={item.statusSla} />
+      <SlaStatusCell statusSla={item.statusSla} className="ws-col-sla" />
       <ActionsMenu />
     </div>
   );
@@ -365,7 +401,7 @@ function UnifiedItemRow({ item }: { item: UnifiedItem }) {
 
   return (
     <div
-      className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-default"
+      className="ws-table-row group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-default"
       style={{
         gridTemplateColumns: COL_TEMPLATE,
         borderBottom: "1px solid rgba(255,255,255,0.03)",
@@ -398,10 +434,10 @@ function UnifiedItemRow({ item }: { item: UnifiedItem }) {
       <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
         {priorityLabels[item.prioridade] || item.prioridade}
       </Badge>
-      <span className="text-xs text-muted-foreground">
+      <span className="ws-col-sla text-xs text-muted-foreground">
         {item.sla ? `${item.sla}h` : "—"}
       </span>
-      <SlaStatusCell statusSla={item.statusSla} />
+      <SlaStatusCell statusSla={item.statusSla} className="ws-col-sla" />
       <ActionsMenu />
     </div>
   );
@@ -425,10 +461,10 @@ function ResponsavelCell({ initials }: { initials: string }) {
   );
 }
 
-function SlaStatusCell({ statusSla }: { statusSla: "dentro_prazo" | "em_atraso" | null }) {
+function SlaStatusCell({ statusSla, className }: { statusSla: "dentro_prazo" | "em_atraso" | null; className?: string }) {
   return (
     <span
-      className="text-xs font-medium"
+      className={`text-xs font-medium${className ? ` ${className}` : ""}`}
       style={{
         color:
           statusSla === "dentro_prazo"

@@ -1,6 +1,6 @@
 // Renov Home - Sistema de Gestão Operacional
 import React, { lazy, Suspense } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/hooks/use-theme";
 const SidebarProvider = lazy(() => import("@/components/ui/sidebar").then(m => ({ default: m.SidebarProvider })));
 import { useAuthSync } from "@/hooks/useAuthSync";
 import { AuthProvider } from "@/contexts/auth-context";
+import { WorkspaceErrorBoundary } from "@/components/workspace/WorkspaceErrorBoundary";
 
 const AppSidebar    = lazy(() => import("@/components/app-sidebar").then(m => ({ default: m.AppSidebar })));
 const ProtectedRoute = lazy(() => import("@/components/protected-route").then(m => ({ default: m.ProtectedRoute })));
@@ -98,18 +99,20 @@ function Router() {
       </Route>
       <Route path="/workspace">
         <ProtectedRoute>
-          <WorkspacePage />
+          <WorkspaceErrorBoundary>
+            <WorkspacePage />
+          </WorkspaceErrorBoundary>
         </ProtectedRoute>
       </Route>
       <Route path="/workspace/:tab">
         <ProtectedRoute>
-          <WorkspacePage />
+          <WorkspaceErrorBoundary>
+            <WorkspacePage />
+          </WorkspaceErrorBoundary>
         </ProtectedRoute>
       </Route>
       <Route path="/chamados">
-        <ProtectedRoute requiredPermission="chamados">
-          <ChamadosPage />
-        </ProtectedRoute>
+        <Redirect to="/workspace/chamados" />
       </Route>
       <Route path="/chamados/csat-analytics">
         <ProtectedRoute requiredPermission="chamados">
@@ -127,9 +130,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/projetos">
-        <ProtectedRoute requiredPermission="projetos">
-          <ProjetosPage />
-        </ProtectedRoute>
+        <Redirect to="/workspace/projetos" />
       </Route>
       <Route path="/projetos/:id">
         <ProtectedRoute requiredPermission="projetos">
