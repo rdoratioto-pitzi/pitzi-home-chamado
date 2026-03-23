@@ -1,4 +1,9 @@
-import { Skeleton } from "@/components/ui/skeleton";
+const kpiSkeletonKeyframes = `
+@keyframes kpi-skeleton-pulse {
+  from { background-color: rgba(255,255,255,0.04); }
+  to   { background-color: rgba(255,255,255,0.08); }
+}
+`;
 
 export interface WorkspaceKpis {
   total: number;
@@ -66,12 +71,18 @@ export function KpiStrip({ kpis, variant, loading }: KpiStripProps) {
   const items = getKpiItems(kpis, variant);
 
   if (loading) {
+    const skeletonStyle = {
+      display: "block",
+      borderRadius: 4,
+      animation: "kpi-skeleton-pulse 1.5s ease-in-out infinite alternate",
+    };
     return (
       <div className="flex gap-0 w-full">
+        <style>{kpiSkeletonKeyframes}</style>
         {items.map((_, i) => (
           <div key={i} className="flex-1 px-4 py-3">
-            <Skeleton className="h-3 w-16 mb-2" />
-            <Skeleton className="h-6 w-10" />
+            <span style={{ ...skeletonStyle, width: 64, height: 10, marginBottom: 8 }} />
+            <span style={{ ...skeletonStyle, width: 40, height: 24 }} />
           </div>
         ))}
       </div>
