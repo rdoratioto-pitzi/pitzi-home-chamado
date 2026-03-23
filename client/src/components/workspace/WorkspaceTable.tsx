@@ -23,17 +23,39 @@ export interface ChamadoItem {
   abertura: string | null;
 }
 
-interface WorkspaceTableProps {
-  items: ChamadoItem[];
-  loading?: boolean;
+export interface UnifiedItem {
+  tipo: "chamado" | "tarefa";
+  id: string;
+  codigo: string;
+  titulo: string;
+  contexto: string;
+  corContexto: string | null;
+  badgeLabel: string;
+  badgeVariant: string;
+  responsavel: string;
+  responsavelInitials: string;
+  status: string;
+  prioridade: string;
+  sla: number | null;
+  statusSla: "dentro_prazo" | "em_atraso" | null;
+  criadoEm: string | null;
 }
 
-const statusDotColors: Record<string, { bg: string; border?: string }> = {
+type WorkspaceTableProps =
+  | { variant?: "chamados"; items: ChamadoItem[]; loading?: boolean }
+  | { variant: "todos"; items: UnifiedItem[]; loading?: boolean };
+
+const statusDotColors: Record<string, { bg: string }> = {
   in_progress: { bg: "#00c853" },
   resolved: { bg: "#4ade80" },
   closed: { bg: "#4ade80" },
   open: { bg: "#f59e0b" },
   blocked: { bg: "#ef4444" },
+  // tarefa statuses
+  "a-fazer": { bg: "#f59e0b" },
+  "em-andamento": { bg: "#00c853" },
+  concluido: { bg: "#4ade80" },
+  cancelado: { bg: "#ef4444" },
 };
 
 const statusLabels: Record<string, string> = {
@@ -42,6 +64,19 @@ const statusLabels: Record<string, string> = {
   blocked: "Bloqueado",
   resolved: "Resolvido",
   closed: "Fechado",
+  "a-fazer": "A Fazer",
+  "em-andamento": "Em Andamento",
+  concluido: "Concluído",
+  cancelado: "Cancelado",
+};
+
+// Normalize status to a group key
+const toGroup = (status: string): string => {
+  if (status === "em-andamento") return "in_progress";
+  if (status === "a-fazer") return "open";
+  if (status === "concluido" || status === "cancelado") return "resolved";
+  if (status === "closed") return "resolved";
+  return status;
 };
 
 const statusGroupOrder = ["in_progress", "open", "blocked", "resolved"] as const;
@@ -58,6 +93,9 @@ const priorityLabels: Record<string, string> = {
   medium: "Média",
   high: "Alta",
   critical: "Crítica",
+  baixa: "Baixa",
+  media: "Média",
+  alta: "Alta",
 };
 
 const priorityColors: Record<string, string> = {
@@ -65,12 +103,16 @@ const priorityColors: Record<string, string> = {
   medium: "bg-yellow-500/10 text-yellow-400 border-yellow-700",
   high: "bg-orange-500/10 text-orange-400 border-orange-700",
   critical: "bg-red-500/10 text-red-400 border-red-700",
+  baixa: "bg-slate-500/10 text-slate-400 border-slate-700",
+  media: "bg-yellow-500/10 text-yellow-400 border-yellow-700",
+  alta: "bg-orange-500/10 text-orange-400 border-orange-700",
 };
 
 const typeColors: Record<string, string> = {
   bug: "bg-red-500/10 text-red-400",
   melhoria: "bg-blue-500/10 text-blue-400",
   negocio: "bg-purple-500/10 text-purple-400",
+  tarefa: "bg-teal-500/10 text-teal-400",
 };
 
 function StatusDot({ status }: { status: string }) {
@@ -154,16 +196,14 @@ function GroupHeader({ status, count }: { status: string; count: number }) {
   );
 }
 
-function SkeletonRows() {
+function SkeletonRows({ colTemplate }: { colTemplate: string }) {
   return (
     <>
       {Array.from({ length: 5 }).map((_, i) => (
         <div
           key={i}
           className="grid items-center px-4 py-3 gap-2 animate-pulse"
-          style={{
-            gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 98px 30px",
-          }}
+          style={{ gridTemplateColumns: colTemplate }}
         >
           <Skeleton className="h-4 w-16" />
           <Skeleton className="h-4 w-40" />
@@ -180,44 +220,58 @@ function SkeletonRows() {
   );
 }
 
-export function WorkspaceTable({ items, loading }: WorkspaceTableProps) {
+const COL_TEMPLATE = "96px 1fr 175px 100px 115px 110px 62px 98px 30px";
+
+export function WorkspaceTable(props: WorkspaceTableProps) {
+  const { items, loading } = props;
+  const variant = props.variant ?? "chamados";
+
+  const col3Header = variant === "todos" ? "Tipo / Contexto" : "Categoria / Tipo";
+  const headers = ["Código", "Título", col3Header, "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""];
+
   if (loading) {
     return (
       <div className="w-full">
-        <HeaderRow />
-        <SkeletonRows />
+        <HeaderRow headers={headers} />
+        <SkeletonRows colTemplate={COL_TEMPLATE} />
       </div>
     );
   }
 
-  // Group items by status
-  const grouped = new Map<string, ChamadoItem[]>();
+  // Group items by normalized status
+  const grouped = new Map<string, (ChamadoItem | UnifiedItem)[]>();
   for (const status of statusGroupOrder) {
     grouped.set(status, []);
   }
   for (const item of items) {
-    const key = item.status === "closed" ? "resolved" : item.status;
-    const group = grouped.get(key);
-    if (group) {
-      group.push(item);
+    const rawStatus = variant === "todos"
+      ? (item as UnifiedItem).status
+      : (item as ChamadoItem).status;
+    const group = toGroup(rawStatus);
+    const bucket = grouped.get(group);
+    if (bucket) {
+      bucket.push(item);
     } else {
-      // fallback: put in open
       grouped.get("open")?.push(item);
     }
   }
 
   return (
     <div className="w-full">
-      <HeaderRow />
+      <HeaderRow headers={headers} />
       {statusGroupOrder.map((status) => {
         const groupItems = grouped.get(status) || [];
         if (groupItems.length === 0) return null;
         return (
           <div key={status}>
             <GroupHeader status={status} count={groupItems.length} />
-            {groupItems.map((item) => (
-              <ItemRow key={item.id} item={item} />
-            ))}
+            {groupItems.map((item) =>
+              variant === "todos" ? (
+                <UnifiedItemRow key={item.id} item={item as UnifiedItem} />
+              ) : (
+                <ChamadoItemRow key={(item as ChamadoItem).id} item={item as ChamadoItem} />
+              ),
+            )}
           </div>
         );
       })}
@@ -225,23 +279,12 @@ export function WorkspaceTable({ items, loading }: WorkspaceTableProps) {
   );
 }
 
-function HeaderRow() {
-  const headers = [
-    "Código",
-    "Título",
-    "Categoria / Tipo",
-    "Responsável",
-    "Status",
-    "Prioridade",
-    "SLA",
-    "Status SLA",
-    "",
-  ];
+function HeaderRow({ headers }: { headers: string[] }) {
   return (
     <div
       className="grid items-center px-4 py-2 gap-2"
       style={{
-        gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 98px 30px",
+        gridTemplateColumns: COL_TEMPLATE,
         borderBottom: "1px solid rgba(255,255,255,0.06)",
       }}
     >
@@ -263,7 +306,7 @@ function HeaderRow() {
   );
 }
 
-function ItemRow({ item }: { item: ChamadoItem }) {
+function ChamadoItemRow({ item }: { item: ChamadoItem }) {
   const typeColor = typeColors[item.tipo?.toLowerCase()] || "bg-slate-500/10 text-slate-400";
   const prioColor = priorityColors[item.prioridade] || priorityColors.medium;
 
@@ -271,26 +314,21 @@ function ItemRow({ item }: { item: ChamadoItem }) {
     <div
       className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-default"
       style={{
-        gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 98px 30px",
+        gridTemplateColumns: COL_TEMPLATE,
         borderBottom: "1px solid rgba(255,255,255,0.03)",
       }}
       onMouseEnter={(e) => (e.currentTarget.style.background = "#141814")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
-      {/* Código */}
       <div className="flex items-center gap-2 min-w-0">
         <StatusDot status={item.status} />
         <span className="text-xs text-muted-foreground truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
           {item.codigo}
         </span>
       </div>
-
-      {/* Título */}
       <span className="text-sm truncate" style={{ color: "rgba(255,255,255,0.85)" }}>
         {item.titulo}
       </span>
-
-      {/* Categoria / Tipo */}
       <div className="flex items-center gap-1.5 min-w-0 truncate">
         <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
           {item.categoria}
@@ -300,75 +338,131 @@ function ItemRow({ item }: { item: ChamadoItem }) {
           {item.tipo}
         </Badge>
       </div>
-
-      {/* Responsável */}
-      <div className="flex items-center gap-2 min-w-0">
-        <div
-          className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
-          style={{
-            width: 22,
-            height: 22,
-            background: "rgba(0,200,83,0.15)",
-            color: "#00c853",
-          }}
-        >
-          {item.responsavelInitials}
-        </div>
-      </div>
-
-      {/* Status */}
+      <ResponsavelCell initials={item.responsavelInitials} />
       <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
         {statusLabels[item.status] || item.status}
       </span>
-
-      {/* Prioridade */}
       <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
         {priorityLabels[item.prioridade] || item.prioridade}
       </Badge>
-
-      {/* SLA */}
       <span className="text-xs text-muted-foreground">
         {item.sla ? `${item.sla}h` : "—"}
       </span>
+      <SlaStatusCell statusSla={item.statusSla} />
+      <ActionsMenu />
+    </div>
+  );
+}
 
-      {/* Status SLA */}
-      <span
-        className="text-xs font-medium"
+function UnifiedItemRow({ item }: { item: UnifiedItem }) {
+  const badgeColor = typeColors[item.badgeVariant] || "bg-slate-500/10 text-slate-400";
+  const prioColor = priorityColors[item.prioridade] || priorityColors.media;
+
+  const contextoColor =
+    item.tipo === "tarefa" && item.corContexto
+      ? `${item.corContexto}b3`
+      : "rgba(255,255,255,0.5)";
+
+  return (
+    <div
+      className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-default"
+      style={{
+        gridTemplateColumns: COL_TEMPLATE,
+        borderBottom: "1px solid rgba(255,255,255,0.03)",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "#141814")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <StatusDot status={item.status} />
+        <span className="text-xs text-muted-foreground truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {item.codigo}
+        </span>
+      </div>
+      <span className="text-sm truncate" style={{ color: "rgba(255,255,255,0.85)" }}>
+        {item.titulo}
+      </span>
+      <div className="flex items-center gap-1.5 min-w-0 truncate">
+        <span className="text-xs truncate" style={{ color: contextoColor }}>
+          {item.contexto}
+        </span>
+        <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${badgeColor}`}>
+          {item.badgeLabel}
+        </Badge>
+      </div>
+      <ResponsavelCell initials={item.responsavelInitials} />
+      <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
+        {statusLabels[item.status] || item.status}
+      </span>
+      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
+        {priorityLabels[item.prioridade] || item.prioridade}
+      </Badge>
+      <span className="text-xs text-muted-foreground">
+        {item.sla ? `${item.sla}h` : "—"}
+      </span>
+      <SlaStatusCell statusSla={item.statusSla} />
+      <ActionsMenu />
+    </div>
+  );
+}
+
+function ResponsavelCell({ initials }: { initials: string }) {
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <div
+        className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
         style={{
-          color: item.statusSla === "dentro_prazo"
-            ? "#00c853"
-            : item.statusSla === "em_atraso"
-              ? "#ff5050"
-              : "rgba(255,255,255,0.2)",
+          width: 22,
+          height: 22,
+          background: "rgba(0,200,83,0.15)",
+          color: "#00c853",
         }}
       >
-        {item.statusSla === "dentro_prazo"
-          ? "No Prazo"
-          : item.statusSla === "em_atraso"
-            ? "Em Atraso"
-            : "—"}
-      </span>
-
-      {/* Actions */}
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="p-1 rounded hover:bg-white/5">
-              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <Edit className="h-3.5 w-3.5 mr-2" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-400">
-              <Trash2 className="h-3.5 w-3.5 mr-2" />
-              Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {initials}
       </div>
+    </div>
+  );
+}
+
+function SlaStatusCell({ statusSla }: { statusSla: "dentro_prazo" | "em_atraso" | null }) {
+  return (
+    <span
+      className="text-xs font-medium"
+      style={{
+        color:
+          statusSla === "dentro_prazo"
+            ? "#00c853"
+            : statusSla === "em_atraso"
+              ? "#ff5050"
+              : "rgba(255,255,255,0.2)",
+      }}
+    >
+      {statusSla === "dentro_prazo" ? "No Prazo" : statusSla === "em_atraso" ? "Em Atraso" : "—"}
+    </span>
+  );
+}
+
+function ActionsMenu() {
+  return (
+    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="p-1 rounded hover:bg-white/5">
+            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem>
+            <Edit className="h-3.5 w-3.5 mr-2" />
+            Editar
+          </DropdownMenuItem>
+          <DropdownMenuItem className="text-red-400">
+            <Trash2 className="h-3.5 w-3.5 mr-2" />
+            Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

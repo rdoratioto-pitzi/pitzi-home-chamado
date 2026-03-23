@@ -101,6 +101,129 @@ export function registerWorkspaceRoutes(router: Router) {
     }
   });
 
+  // ─── Todos (visão unificada) ──────────────────────────────────────────────────
+  router.get("/api/workspace/todos", requireAuth, async (req, res) => {
+    try {
+      if (!db) {
+        return res.status(500).json({ error: "Database not available" });
+      }
+
+      const { userId, isAdmin } = getSessionUser(req);
+
+      const [allTickets, tarefas, projetos, allUsers, slaRules] = await Promise.all([
+        isAdmin
+          ? storage.getTickets()
+          : storage.getTickets({ requesterId: userId, assigneeId: userId }),
+        db.select().from(workspaceTarefas),
+        db.select().from(workspaceProjetos),
+        storage.getUsers(),
+        storage.getSlaRules(),
+      ]);
+
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const projetoMap = new Map(projetos.map((p) => [p.id, p]));
+
+      const getInitials = (name: string) =>
+        name
+          .split(" ")
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((w) => w[0].toUpperCase())
+          .join("");
+
+      const getBadgeVariantForType = (tipo: string): string => {
+        const map: Record<string, string> = {
+          bug: "bug",
+          melhoria: "melhoria",
+          negocio: "negocio",
+        };
+        return map[tipo.toLowerCase()] || "default";
+      };
+
+      // Map chamados
+      const chamadoItems = allTickets.map((t) => {
+        const user = t.assigneeId ? userMap.get(t.assigneeId) : null;
+        const name = user?.name || "Não atribuído";
+        const sla = getSlaForTicket(t, slaRules);
+        return {
+          tipo: "chamado" as const,
+          id: String(t.id),
+          codigo: t.code,
+          titulo: t.title,
+          contexto: t.category || "",
+          corContexto: null as string | null,
+          badgeLabel: t.type || "",
+          badgeVariant: getBadgeVariantForType(t.type || ""),
+          responsavel: name,
+          responsavelInitials: getInitials(name),
+          status: t.status,
+          prioridade: t.priority,
+          sla: sla.slaHoras,
+          statusSla: sla.status,
+          criadoEm: (t.dataAbertura || t.createdAt || "").toString(),
+        };
+      });
+
+      // Map tarefas
+      const tarefaItems = tarefas.map((t) => {
+        const user = t.responsavelId ? userMap.get(t.responsavelId) : null;
+        const name = user?.name || "Não atribuído";
+        const projeto = t.projetoId ? projetoMap.get(t.projetoId) : null;
+        return {
+          tipo: "tarefa" as const,
+          id: t.id,
+          codigo: t.codigo,
+          titulo: t.titulo,
+          contexto: projeto?.nome || "Sem projeto",
+          corContexto: projeto?.cor || null,
+          badgeLabel: "TAREFA",
+          badgeVariant: "tarefa",
+          responsavel: name,
+          responsavelInitials: getInitials(name),
+          status: t.status || "a-fazer",
+          prioridade: t.prioridade || "media",
+          sla: null as number | null,
+          statusSla: null as "dentro_prazo" | "em_atraso" | null,
+          criadoEm: (t.criadoEm || "").toString(),
+        };
+      });
+
+      // Merge and sort by criadoEm desc
+      const items = [...chamadoItems, ...tarefaItems].sort((a, b) => {
+        const da = a.criadoEm ? new Date(a.criadoEm).getTime() : 0;
+        const db2 = b.criadoEm ? new Date(b.criadoEm).getTime() : 0;
+        return db2 - da;
+      });
+
+      // KPIs
+      const totalGeral = items.length;
+      const chamadosCount = chamadoItems.length;
+      const tarefasCount = tarefaItems.length;
+      const emAndamento = items.filter(
+        (i) => i.status === "in_progress" || i.status === "em-andamento",
+      ).length;
+      const resolvidos = items.filter(
+        (i) => i.status === "resolved" || i.status === "closed" || i.status === "concluido",
+      ).length;
+
+      let noPrazo = 0;
+      let emAtraso = 0;
+      for (const ticket of allTickets) {
+        const slaStatus = getSlaStatus(ticket, slaRules);
+        if (slaStatus === "dentro_prazo") noPrazo++;
+        else if (slaStatus === "em_atraso") emAtraso++;
+      }
+
+      res.json({
+        kpis: { totalGeral, chamados: chamadosCount, tarefas: tarefasCount, emAndamento, resolvidos, noPrazo, emAtraso },
+        items,
+      });
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
   // ─── Projetos ────────────────────────────────────────────────────────────────
   router.get("/api/workspace/projetos", requireAuth, async (_req, res) => {
     try {
