@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { storage } from "../storage";
+import { db } from "../db";
 import { requireAuth, getSessionUser } from "../middleware/auth";
+import { workspaceProjetos, workspaceTarefas, users } from "@shared/schema";
 import type { Ticket, User, SlaRule } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export function registerWorkspaceRoutes(router: Router) {
   router.get("/api/workspace/chamados", requireAuth, async (req, res) => {
@@ -91,6 +94,71 @@ export function registerWorkspaceRoutes(router: Router) {
       res.json({
         kpis: { total, abertos, andamento, bloqueados, resolvidos, noPrazo, emAtraso },
         items,
+      });
+    } catch (error: any) {
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message });
+    }
+  });
+
+  // ─── Projetos ────────────────────────────────────────────────────────────────
+  router.get("/api/workspace/projetos", requireAuth, async (_req, res) => {
+    try {
+      if (!db) {
+        return res.status(500).json({ error: "Database not available" });
+      }
+
+      const projetos = await db.select().from(workspaceProjetos);
+      const tarefas = await db.select().from(workspaceTarefas);
+      const allUsers = await db.select().from(users);
+
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+      // Build projetos with nested tarefas
+      const projetosComTarefas = projetos.map((p) => {
+        const tarefasDoProjeto = tarefas.filter((t) => t.projetoId === p.id);
+        const responsavel = p.responsavelId ? userMap.get(p.responsavelId) : null;
+        const nome = responsavel?.name || "Não atribuído";
+        const initials = nome
+          .split(" ")
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((w) => w[0].toUpperCase())
+          .join("");
+
+        return {
+          ...p,
+          responsavel: nome,
+          responsavelInitials: initials,
+          tarefas: tarefasDoProjeto.map((t) => {
+            const tResp = t.responsavelId ? userMap.get(t.responsavelId) : null;
+            const tNome = tResp?.name || "Não atribuído";
+            const tInitials = tNome
+              .split(" ")
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((w) => w[0].toUpperCase())
+              .join("");
+            return { ...t, responsavel: tNome, responsavelInitials: tInitials };
+          }),
+        };
+      });
+
+      // KPIs
+      const ativos = projetos.filter((p) => p.status !== "concluido" && p.status !== "cancelado").length;
+      const tarefasAbertas = tarefas.filter((t) => t.status === "a-fazer").length;
+      const emAndamento = tarefas.filter((t) => t.status === "em-andamento").length;
+      const concluidas = tarefas.filter((t) => t.status === "concluido").length;
+      const now = new Date();
+      const atrasadas = tarefas.filter((t) => {
+        if (t.status === "concluido") return false;
+        if (!t.dataEntrega) return false;
+        return new Date(t.dataEntrega) < now;
+      }).length;
+
+      res.json({
+        kpis: { ativos, tarefasAbertas, emAndamento, concluidas, atrasadas },
+        projetos: projetosComTarefas,
       });
     } catch (error: any) {
       const status = error.status || 500;
