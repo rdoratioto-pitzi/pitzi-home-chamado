@@ -8,6 +8,9 @@ export interface WorkspaceKpis {
   resolvidos: number;
   noPrazo: number;
   emAtraso: number;
+  // todos variant extras
+  chamados?: number;
+  tarefas?: number;
 }
 
 interface KpiItem {
@@ -47,12 +50,14 @@ function getKpiItems(kpis: WorkspaceKpis, variant: string): KpiItem[] {
     ];
   }
 
-  // todos — 5 columns
+  // todos — 7 columns
   return [
-    { label: "Total", value: kpis.total, isFirst: true },
-    { label: "Abertos", value: kpis.abertos },
+    { label: "Total Geral", value: kpis.total, isFirst: true },
+    { label: "Chamados", value: kpis.chamados ?? 0 },
+    { label: "Tarefas", value: kpis.tarefas ?? 0 },
     { label: "Em Andamento", value: kpis.andamento },
     { label: "Resolvidos", value: kpis.resolvidos, color: "#00c853" },
+    { label: "No Prazo", value: kpis.noPrazo, color: "#00c853" },
     { label: "Em Atraso", value: kpis.emAtraso, negativeWhen: (v) => v > 0 },
   ];
 }
