@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useLocation, useRoute } from "wouter";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { TodosView } from "./TodosView";
 import { ChamadosView } from "./ChamadosView";
 import { ProjetosView } from "./ProjetosView";
 import { VisaoEstrategica } from "@/components/workspace/VisaoEstrategica";
+import { NovoItemModal, type ItemType } from "@/components/workspace/NovoItemModal";
 import { fetchWithAuth } from "@/lib/queryClient";
 
 type TabKey = "todos" | "chamados" | "projetos";
@@ -17,10 +18,20 @@ const tabs: { key: TabKey; label: string; count: number }[] = [
   { key: "projetos", label: "Projetos", count: 74 },
 ];
 
-function TopbarActions({ activeTab, onVisaoEstrategica }: { activeTab: TabKey; onVisaoEstrategica?: () => void }) {
+interface TopbarActionsProps {
+  activeTab: TabKey;
+  onVisaoEstrategica?: () => void;
+  onNewItem: (type: ItemType) => void;
+}
+
+function TopbarActions({ activeTab, onVisaoEstrategica, onNewItem }: TopbarActionsProps) {
   if (activeTab === "chamados") {
     return (
-      <Button size="sm" className="bg-[#00a137] hover:bg-[#00a137]/90 text-white">
+      <Button
+        size="sm"
+        className="bg-[#00a137] hover:bg-[#00a137]/90 text-white"
+        onClick={() => onNewItem("chamado")}
+      >
         <Plus className="h-4 w-4 mr-1" />
         Novo Chamado
       </Button>
@@ -30,11 +41,20 @@ function TopbarActions({ activeTab, onVisaoEstrategica }: { activeTab: TabKey; o
   if (activeTab === "projetos") {
     return (
       <div className="flex items-center gap-2">
-        <Button size="sm" variant="outline" className="border-[#00c853] text-[#00c853] hover:bg-[#00c853]/10">
+        <Button
+          size="sm"
+          variant="outline"
+          className="border-[#00c853] text-[#00c853] hover:bg-[#00c853]/10"
+          onClick={() => onNewItem("tarefa")}
+        >
           <Plus className="h-4 w-4 mr-1" />
           Nova Tarefa
         </Button>
-        <Button size="sm" className="bg-[#00a137] hover:bg-[#00a137]/90 text-white">
+        <Button
+          size="sm"
+          className="bg-[#00a137] hover:bg-[#00a137]/90 text-white"
+          onClick={() => onNewItem("projeto")}
+        >
           <Plus className="h-4 w-4 mr-1" />
           Novo Projeto
         </Button>
@@ -50,15 +70,24 @@ function TopbarActions({ activeTab, onVisaoEstrategica }: { activeTab: TabKey; o
   // Tab "Todos"
   return (
     <div className="flex items-center gap-2">
-      <Button size="sm" variant="outline" className="border-[#00c853] text-[#00c853] hover:bg-[#00c853]/10">
+      <Button
+        size="sm"
+        variant="outline"
+        className="border-[#00c853] text-[#00c853] hover:bg-[#00c853]/10"
+        onClick={() => onNewItem("chamado")}
+      >
         <Plus className="h-4 w-4 mr-1" />
         Chamado
       </Button>
-      <Button size="sm" variant="outline">
+      <Button size="sm" variant="outline" onClick={() => onNewItem("tarefa")}>
         <Plus className="h-4 w-4 mr-1" />
         Nova Tarefa
       </Button>
-      <Button size="sm" className="bg-[#00a137] hover:bg-[#00a137]/90 text-white">
+      <Button
+        size="sm"
+        className="bg-[#00a137] hover:bg-[#00a137]/90 text-white"
+        onClick={() => onNewItem("projeto")}
+      >
         <Plus className="h-4 w-4 mr-1" />
         Projeto
       </Button>
@@ -84,6 +113,10 @@ export default function WorkspacePage() {
     kpis: { ativos: 0, tarefasAbertas: 0, emAndamento: 0, concluidas: 0, atrasadas: 0 },
   });
 
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalType, setModalType] = useState<ItemType>("chamado");
+  const [viewRefreshKey, setViewRefreshKey] = useState(0);
+
   const handleOpenVisao = () => {
     fetchWithAuth("/api/workspace/projetos")
       .then((res) => res.json())
@@ -93,6 +126,15 @@ export default function WorkspacePage() {
       })
       .catch(() => setVisaoOpen(true));
   };
+
+  const handleNewItem = useCallback((type: ItemType) => {
+    setModalType(type);
+    setModalOpen(true);
+  }, []);
+
+  const handleModalSuccess = useCallback(() => {
+    setViewRefreshKey((k) => k + 1);
+  }, []);
 
   const handleTabClick = (key: TabKey) => {
     setLocation(key === "todos" ? "/workspace" : `/workspace/${key}`);
@@ -106,7 +148,20 @@ export default function WorkspacePage() {
           { label: "Renov Home", href: "/" },
           { label: "Workspace" },
         ]}
-        actions={<TopbarActions activeTab={activeTab} onVisaoEstrategica={handleOpenVisao} />}
+        actions={
+          <TopbarActions
+            activeTab={activeTab}
+            onVisaoEstrategica={handleOpenVisao}
+            onNewItem={handleNewItem}
+          />
+        }
+      />
+
+      <NovoItemModal
+        open={modalOpen}
+        defaultType={modalType}
+        onClose={() => setModalOpen(false)}
+        onSuccess={handleModalSuccess}
       />
 
       <VisaoEstrategica
@@ -152,7 +207,7 @@ export default function WorkspacePage() {
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <ActiveView />
+        <ActiveView key={viewRefreshKey} />
       </div>
     </div>
   );
