@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search } from "lucide-react";
 import { KpiStrip } from "@/components/workspace/KpiStrip";
 import { fetchWithAuth } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -319,6 +320,7 @@ function SkeletonRows() {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function ProjetosView() {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<ProjetosKpis>({
     ativos: 0,
@@ -346,6 +348,7 @@ export function ProjetosView() {
         if (cancelled) return;
         setKpis({ ativos: 0, tarefasAbertas: 0, emAndamento: 0, concluidas: 0, atrasadas: 0 });
         setProjetos([]);
+        toast({ title: "Não foi possível carregar os dados. Tente novamente.", variant: "destructive" });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

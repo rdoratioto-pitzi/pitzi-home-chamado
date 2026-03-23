@@ -18,6 +18,7 @@ import {
 import { KpiStrip, type WorkspaceKpis } from "@/components/workspace/KpiStrip";
 import { WorkspaceTable, type UnifiedItem } from "@/components/workspace/WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 type TipoFilter = "todos" | "chamados" | "tarefas" | "projetos";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
@@ -65,6 +66,7 @@ const EMPTY_KPIS: WorkspaceKpis = {
 };
 
 export function TodosView() {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<WorkspaceKpis>(EMPTY_KPIS);
   const [items, setItems] = useState<UnifiedItem[]>([]);
@@ -99,6 +101,7 @@ export function TodosView() {
         if (cancelled) return;
         setKpis(EMPTY_KPIS);
         setItems([]);
+        toast({ title: "Não foi possível carregar os dados. Tente novamente.", variant: "destructive" });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
