@@ -551,12 +551,12 @@ workspace.get("/api/workspace/projetos", async (c) => {
         prioridade: p.priority,
         responsavel: nome,
         responsavelInitials: initials,
-        dataInicio: p.startDate ? p.startDate.toISOString() : null,
-        dataFim: p.endDate ? p.endDate.toISOString() : null,
+        dataInicio: p.startDate ? String(p.startDate) : null,
+        dataFim: p.endDate ? String(p.endDate) : null,
         progresso: p.progress,
         cor: p.color,
         categoria: p.category,
-        criadoEm: p.createdAt ? p.createdAt.toISOString() : null,
+        criadoEm: p.createdAt ? String(p.createdAt) : null,
         tarefas: tarefasDoProjeto.map((t) => {
           const tResp = t.responsavelId ? userMap.get(t.responsavelId) : null;
           const tNome = tResp?.name || "Não atribuído";
