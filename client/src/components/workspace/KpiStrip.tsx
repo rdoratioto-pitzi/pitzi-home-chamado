@@ -30,6 +30,8 @@ interface KpiStripProps {
   kpis: WorkspaceKpis;
   variant: "chamados" | "projetos" | "todos";
   loading?: boolean;
+  activeKpi?: string | null;
+  onKpiClick?: (label: string) => void;
 }
 
 function getKpiItems(kpis: WorkspaceKpis, variant: string): KpiItem[] {
@@ -67,7 +69,7 @@ function getKpiItems(kpis: WorkspaceKpis, variant: string): KpiItem[] {
   ];
 }
 
-export function KpiStrip({ kpis, variant, loading }: KpiStripProps) {
+export function KpiStrip({ kpis, variant, loading, activeKpi, onKpiClick }: KpiStripProps) {
   const items = getKpiItems(kpis, variant);
 
   if (loading) {
@@ -96,15 +98,29 @@ export function KpiStrip({ kpis, variant, loading }: KpiStripProps) {
         const valueColor = isNegative
           ? "#ff5050"
           : item.color || "rgba(255,255,255,0.85)";
+        const isActive = activeKpi === item.label;
+        const isClickable = !!onKpiClick;
 
         return (
           <div
             key={i}
             className="flex-1 px-4 py-3 min-w-0"
+            onClick={isClickable ? () => onKpiClick(item.label) : undefined}
             style={{
-              borderLeft: item.isFirst ? "2px solid #00c853" : undefined,
-              background: item.isFirst ? "#111411" : undefined,
+              cursor: isClickable ? "pointer" : "default",
+              borderLeft: item.isFirst
+                ? `2px solid ${isActive ? "#00e676" : "#00c853"}`
+                : isActive
+                ? "2px solid rgba(0,200,83,0.5)"
+                : undefined,
+              background: isActive
+                ? "rgba(0,200,83,0.08)"
+                : item.isFirst
+                ? "#111411"
+                : undefined,
               borderRadius: item.isFirst ? "4px 0 0 4px" : undefined,
+              outline: isActive && !item.isFirst ? "1px solid rgba(0,200,83,0.3)" : undefined,
+              transition: "background 0.15s, outline 0.15s",
             }}
           >
             <div
@@ -113,7 +129,7 @@ export function KpiStrip({ kpis, variant, loading }: KpiStripProps) {
                 textTransform: "uppercase",
                 fontSize: "9px",
                 letterSpacing: "0.05em",
-                color: "rgba(255,255,255,0.25)",
+                color: isActive ? "rgba(0,200,83,0.7)" : "rgba(255,255,255,0.25)",
                 marginBottom: "4px",
               }}
             >
