@@ -2,7 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import { requireAuth, getSessionUser } from "../middleware/auth";
-import { workspaceProjetos, workspaceTarefas, users } from "@shared/schema";
+import { projects, workspaceTarefas, users } from "@shared/schema";
 import type { Ticket, User, SlaRule, InsertTicket } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
@@ -185,15 +185,15 @@ export function registerWorkspaceRoutes(router: Router) {
       if (projetoId) {
         const projResult = await db
           .select()
-          .from(workspaceProjetos)
-          .where(eq(workspaceProjetos.id, projetoId))
+          .from(projects)
+          .where(eq(projects.id, projetoId))
           .limit(1);
         if (projResult[0]) {
           const tarefasDoProjeto = await db
             .select()
             .from(workspaceTarefas)
             .where(eq(workspaceTarefas.projetoId, projetoId));
-          codigo = `${projResult[0].codigo}·T${tarefasDoProjeto.length + 1}`;
+          codigo = `${projResult[0].code}·T${tarefasDoProjeto.length + 1}`;
         }
       }
 
@@ -229,12 +229,12 @@ export function registerWorkspaceRoutes(router: Router) {
       if (tarefa.projetoId) {
         const projResult = await db
           .select()
-          .from(workspaceProjetos)
-          .where(eq(workspaceProjetos.id, tarefa.projetoId))
+          .from(projects)
+          .where(eq(projects.id, tarefa.projetoId))
           .limit(1);
         if (projResult[0]) {
-          projetoNome = projResult[0].nome;
-          corContexto = projResult[0].cor || null;
+          projetoNome = projResult[0].name;
+          corContexto = projResult[0].color || null;
         }
       }
 
@@ -265,6 +265,7 @@ export function registerWorkspaceRoutes(router: Router) {
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
 
+      const { userId } = getSessionUser(req);
       const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria } =
         req.body as {
           nome?: string;
@@ -280,29 +281,34 @@ export function registerWorkspaceRoutes(router: Router) {
         return res.status(400).json({ error: "Nome obrigatório" });
       }
 
-      const allProjetos = await db.select().from(workspaceProjetos);
-      const codigo = `PRO-${String(allProjetos.length + 1).padStart(3, "0")}`;
+      // Generate next PRO-XXXX code
+      const allProjects = await db.select().from(projects);
+      const maxCode = allProjects
+        .map((p) => parseInt(p.code.replace("PRO-", ""), 10))
+        .filter((n) => !isNaN(n))
+        .reduce((a, b) => Math.max(a, b), 0);
+      const code = `PRO-${String(maxCode + 1).padStart(4, "0")}`;
 
       const [projeto] = await db
-        .insert(workspaceProjetos)
+        .insert(projects)
         .values({
-          codigo,
-          nome: nome.trim(),
-          descricao: descricao || null,
+          code,
+          name: nome.trim(),
+          description: descricao || null,
           status: "backlog",
-          prioridade: prioridade || "media",
-          responsavelId: responsavelId || null,
-          dataInicio: dataInicio || null,
-          dataFim: dataFim || null,
-          cor: "#00c853",
-          categoria: categoria || null,
-          progresso: 0,
+          priority: prioridade || "media",
+          ownerId: responsavelId || userId,
+          startDate: dataInicio ? new Date(dataInicio) : null,
+          endDate: dataFim ? new Date(dataFim) : null,
+          color: "#00c853",
+          category: categoria || null,
+          progress: 0,
         })
         .returning();
 
       const allUsers = await storage.getUsers();
       const userMap = new Map(allUsers.map((u) => [u.id, u]));
-      const responsavel = projeto.responsavelId ? userMap.get(projeto.responsavelId) : null;
+      const responsavel = projeto.ownerId ? userMap.get(projeto.ownerId) : null;
       const respNome = responsavel?.name || "Não atribuído";
       const respInitials = respNome
         .split(" ")
@@ -314,14 +320,14 @@ export function registerWorkspaceRoutes(router: Router) {
       return res.status(201).json({
         tipo: "projeto",
         id: projeto.id,
-        codigo: projeto.codigo,
-        nome: projeto.nome,
+        codigo: projeto.code,
+        nome: projeto.name,
         status: projeto.status,
-        prioridade: projeto.prioridade,
+        prioridade: projeto.priority,
         responsavel: respNome,
         responsavelInitials: respInitials,
-        cor: projeto.cor,
-        criadoEm: (projeto.criadoEm || "").toString(),
+        cor: projeto.color,
+        criadoEm: (projeto.createdAt || "").toString(),
       });
     } catch (error: any) {
       return res.status(error.status || 500).json({ error: error.message });
@@ -337,18 +343,18 @@ export function registerWorkspaceRoutes(router: Router) {
 
       const { userId, isAdmin } = getSessionUser(req);
 
-      const [allTickets, tarefas, projetos, allUsers, slaRules] = await Promise.all([
+      const [allTickets, tarefas, allProjects, allUsers, slaRules] = await Promise.all([
         isAdmin
           ? storage.getTickets()
           : storage.getTickets({ requesterId: userId, assigneeId: userId }),
         db.select().from(workspaceTarefas),
-        db.select().from(workspaceProjetos),
+        db.select().from(projects),
         storage.getUsers(),
         storage.getSlaRules(),
       ]);
 
       const userMap = new Map(allUsers.map((u) => [u.id, u]));
-      const projetoMap = new Map(projetos.map((p) => [p.id, p]));
+      const projetoMap = new Map(allProjects.map((p) => [p.id, { nome: p.name, cor: p.color }]));
 
       const getInitials = (name: string) =>
         name
@@ -395,14 +401,14 @@ export function registerWorkspaceRoutes(router: Router) {
       const tarefaItems = tarefas.map((t) => {
         const user = t.responsavelId ? userMap.get(t.responsavelId) : null;
         const name = user?.name || "Não atribuído";
-        const projeto = t.projetoId ? projetoMap.get(t.projetoId) : null;
+        const proj = t.projetoId ? projetoMap.get(t.projetoId) : null;
         return {
           tipo: "tarefa" as const,
           id: t.id,
           codigo: t.codigo,
           titulo: t.titulo,
-          contexto: projeto?.nome || "Sem projeto",
-          corContexto: projeto?.cor || null,
+          contexto: proj?.nome || "Sem projeto",
+          corContexto: proj?.cor || null,
           badgeLabel: "TAREFA",
           badgeVariant: "tarefa",
           responsavel: name,
@@ -458,16 +464,16 @@ export function registerWorkspaceRoutes(router: Router) {
         return res.status(500).json({ error: "Database not available" });
       }
 
-      const projetos = await db.select().from(workspaceProjetos);
+      const allProjects = await db.select().from(projects);
       const tarefas = await db.select().from(workspaceTarefas);
       const allUsers = await db.select().from(users);
 
       const userMap = new Map(allUsers.map((u) => [u.id, u]));
 
-      // Build projetos with nested tarefas
-      const projetosComTarefas = projetos.map((p) => {
+      // Map projects (EN) -> formato frontend (PT-BR)
+      const projetosComTarefas = allProjects.map((p) => {
         const tarefasDoProjeto = tarefas.filter((t) => t.projetoId === p.id);
-        const responsavel = p.responsavelId ? userMap.get(p.responsavelId) : null;
+        const responsavel = p.ownerId ? userMap.get(p.ownerId) : null;
         const nome = responsavel?.name || "Não atribuído";
         const initials = nome
           .split(" ")
@@ -477,9 +483,20 @@ export function registerWorkspaceRoutes(router: Router) {
           .join("");
 
         return {
-          ...p,
+          id: p.id,
+          codigo: p.code,
+          nome: p.name,
+          descricao: p.description,
+          status: p.status,
+          prioridade: p.priority,
           responsavel: nome,
           responsavelInitials: initials,
+          dataInicio: p.startDate ? p.startDate.toISOString() : null,
+          dataFim: p.endDate ? p.endDate.toISOString() : null,
+          progresso: p.progress,
+          cor: p.color,
+          categoria: p.category,
+          criadoEm: p.createdAt ? p.createdAt.toISOString() : null,
           tarefas: tarefasDoProjeto.map((t) => {
             const tResp = t.responsavelId ? userMap.get(t.responsavelId) : null;
             const tNome = tResp?.name || "Não atribuído";
@@ -494,8 +511,10 @@ export function registerWorkspaceRoutes(router: Router) {
         };
       });
 
-      // KPIs
-      const ativos = projetos.filter((p) => p.status !== "concluido" && p.status !== "cancelado").length;
+      // KPIs — "ativos" = não concluído nem cancelado nem completed
+      const ativos = allProjects.filter((p) =>
+        p.status !== "concluido" && p.status !== "cancelado" && p.status !== "completed"
+      ).length;
       const tarefasAbertas = tarefas.filter((t) => t.status === "a-fazer").length;
       const emAndamento = tarefas.filter((t) => t.status === "em-andamento").length;
       const concluidas = tarefas.filter((t) => t.status === "concluido").length;
