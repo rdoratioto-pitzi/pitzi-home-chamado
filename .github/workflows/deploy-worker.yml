@@ -43,3 +43,8 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           command: deploy ${{ github.ref == 'refs/heads/develop' && '-e dev' || '' }}
+
+      - name: Run database migrations
+        run: npx drizzle-kit push --force
+        env:
+          DATABASE_URL: ${{ github.ref == 'refs/heads/develop' && secrets.DATABASE_URL_DEV || secrets.DATABASE_URL }}
