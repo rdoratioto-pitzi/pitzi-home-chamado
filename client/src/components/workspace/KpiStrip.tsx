@@ -1,0 +1,138 @@
+const kpiSkeletonKeyframes = `
+@keyframes kpi-skeleton-pulse {
+  from { background-color: rgba(255,255,255,0.04); }
+  to   { background-color: rgba(255,255,255,0.08); }
+}
+`;
+
+export interface WorkspaceKpis {
+  total: number;
+  abertos: number;
+  andamento: number;
+  bloqueados: number;
+  resolvidos: number;
+  noPrazo: number;
+  emAtraso: number;
+  // todos variant extras
+  chamados?: number;
+  tarefas?: number;
+}
+
+interface KpiItem {
+  label: string;
+  value: number;
+  color?: string;
+  isFirst?: boolean;
+  negativeWhen?: (v: number) => boolean;
+}
+
+interface KpiStripProps {
+  kpis: WorkspaceKpis;
+  variant: "chamados" | "projetos" | "todos";
+  loading?: boolean;
+}
+
+function getKpiItems(kpis: WorkspaceKpis, variant: string): KpiItem[] {
+  if (variant === "chamados") {
+    return [
+      { label: "Total", value: kpis.total, isFirst: true },
+      { label: "Abertos", value: kpis.abertos },
+      { label: "Em Andamento", value: kpis.andamento },
+      { label: "Bloqueados", value: kpis.bloqueados, negativeWhen: (v) => v > 0 },
+      { label: "Resolvidos", value: kpis.resolvidos, color: "#00c853" },
+      { label: "No Prazo", value: kpis.noPrazo, color: "#00c853" },
+      { label: "Em Atraso", value: kpis.emAtraso, negativeWhen: (v) => v > 0 },
+    ];
+  }
+
+  if (variant === "projetos") {
+    return [
+      { label: "Proj. Ativos", value: kpis.total, isFirst: true },
+      { label: "Tarefas Abertas", value: kpis.abertos },
+      { label: "Em Andamento", value: kpis.andamento },
+      { label: "Concluídas", value: kpis.resolvidos, color: "#00c853" },
+      { label: "Atrasadas", value: kpis.emAtraso, negativeWhen: (v) => v > 0 },
+    ];
+  }
+
+  // todos — 7 columns
+  return [
+    { label: "Total Geral", value: kpis.total, isFirst: true },
+    { label: "Chamados", value: kpis.chamados ?? 0 },
+    { label: "Tarefas", value: kpis.tarefas ?? 0 },
+    { label: "Em Andamento", value: kpis.andamento },
+    { label: "Resolvidos", value: kpis.resolvidos, color: "#00c853" },
+    { label: "No Prazo", value: kpis.noPrazo, color: "#00c853" },
+    { label: "Em Atraso", value: kpis.emAtraso, negativeWhen: (v) => v > 0 },
+  ];
+}
+
+export function KpiStrip({ kpis, variant, loading }: KpiStripProps) {
+  const items = getKpiItems(kpis, variant);
+
+  if (loading) {
+    const skeletonStyle = {
+      display: "block",
+      borderRadius: 4,
+      animation: "kpi-skeleton-pulse 1.5s ease-in-out infinite alternate",
+    };
+    return (
+      <div className="flex gap-0 w-full">
+        <style>{kpiSkeletonKeyframes}</style>
+        {items.map((_, i) => (
+          <div key={i} className="flex-1 px-4 py-3">
+            <span style={{ ...skeletonStyle, width: 64, height: 10, marginBottom: 8 }} />
+            <span style={{ ...skeletonStyle, width: 40, height: 24 }} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-0 w-full">
+      {items.map((item, i) => {
+        const isNegative = item.negativeWhen?.(item.value);
+        const valueColor = isNegative
+          ? "#ff5050"
+          : item.color || "rgba(255,255,255,0.85)";
+
+        return (
+          <div
+            key={i}
+            className="flex-1 px-4 py-3 min-w-0"
+            style={{
+              borderLeft: item.isFirst ? "2px solid #00c853" : undefined,
+              background: item.isFirst ? "#111411" : undefined,
+              borderRadius: item.isFirst ? "4px 0 0 4px" : undefined,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                textTransform: "uppercase",
+                fontSize: "9px",
+                letterSpacing: "0.05em",
+                color: "rgba(255,255,255,0.25)",
+                marginBottom: "4px",
+              }}
+            >
+              {item.label}
+            </div>
+            <div
+              style={{
+                fontFamily: "'DM Sans', sans-serif",
+                fontSize: "21px",
+                fontWeight: 600,
+                color: valueColor,
+                lineHeight: 1.2,
+              }}
+            >
+              {item.value}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
