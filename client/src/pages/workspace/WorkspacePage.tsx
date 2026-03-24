@@ -12,10 +12,10 @@ import { fetchWithAuth } from "@/lib/queryClient";
 
 type TabKey = "todos" | "chamados" | "projetos";
 
-const tabs: { key: TabKey; label: string; count: number }[] = [
-  { key: "todos", label: "Todos", count: 116 },
-  { key: "chamados", label: "Chamados", count: 42 },
-  { key: "projetos", label: "Projetos", count: 74 },
+const tabs: { key: TabKey; label: string }[] = [
+  { key: "todos", label: "Todos" },
+  { key: "chamados", label: "Chamados" },
+  { key: "projetos", label: "Projetos" },
 ];
 
 interface TopbarActionsProps {
@@ -190,15 +190,6 @@ export default function WorkspacePage() {
                 }}
               >
                 {tab.label}
-                <span
-                  className="ml-2 text-xs px-1.5 py-0.5 rounded-full"
-                  style={{
-                    background: isActive ? "rgba(0,200,83,0.15)" : "rgba(255,255,255,0.05)",
-                    color: isActive ? "#00c853" : "rgba(255,255,255,0.3)",
-                  }}
-                >
-                  {tab.count}
-                </span>
               </button>
             </div>
           );
