@@ -191,6 +191,19 @@ function HeaderRow() {
   );
 }
 
+function EmptyTarefasRow() {
+  return (
+    <div
+      className="flex items-center px-4 py-3"
+      style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
+    >
+      <span className="text-xs italic" style={{ color: "rgba(255,255,255,0.2)", paddingLeft: 18 }}>
+        Nenhuma tarefa neste projeto
+      </span>
+    </div>
+  );
+}
+
 function TarefaRow({ tarefa, projetoCor }: { tarefa: TarefaItem; projetoCor: string }) {
   const status = tarefa.status || "a-fazer";
   const dotColor = statusDotColors[status] || "rgba(255,255,255,0.2)";
@@ -243,13 +256,18 @@ function TarefaRow({ tarefa, projetoCor }: { tarefa: TarefaItem; projetoCor: str
       </div>
 
       {/* Responsável */}
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-1.5 min-w-0">
         <div
           className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
           style={{ width: 22, height: 22, background: "rgba(0,200,83,0.15)", color: "#00c853" }}
         >
           {tarefa.responsavelInitials}
         </div>
+        {tarefa.responsavel && tarefa.responsavel !== "Não atribuído" && (
+          <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+            {tarefa.responsavel}
+          </span>
+        )}
       </div>
 
       {/* Status */}
@@ -332,6 +350,7 @@ export function ProjetosView() {
   const [projetos, setProjetos] = useState<ProjetoComTarefas[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [projetoFilter, setProjetoFilter] = useState("all");
+  const [filtroKpi, setFiltroKpi] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -371,25 +390,54 @@ export function ProjetosView() {
   };
 
   // Filter projetos
+  function applyKpiFilterToTarefa(tarefa: TarefaItem, kpi: string | null): boolean {
+    if (!kpi || kpi === "Proj. Ativos") return true;
+    if (kpi === "Tarefas Abertas") return tarefa.status === "a-fazer";
+    if (kpi === "Em Andamento") return tarefa.status === "em-andamento";
+    if (kpi === "Concluídas") return tarefa.status === "concluido";
+    if (kpi === "Atrasadas") {
+      if (!tarefa.dataEntrega) return false;
+      return tarefa.status !== "concluido" && new Date(tarefa.dataEntrega) < new Date();
+    }
+    return true;
+  }
+
   const filteredProjetos = projetos
     .filter((p) => projetoFilter === "all" || p.id === projetoFilter)
     .map((p) => {
-      if (!searchQuery) return p;
+      if (!searchQuery) {
+        // Apply KPI filter even without search query
+        const kpiFiltered = p.tarefas.filter((t) => applyKpiFilterToTarefa(t, filtroKpi));
+        return filtroKpi && filtroKpi !== "Proj. Ativos" ? { ...p, tarefas: kpiFiltered } : p;
+      }
       const q = searchQuery.toLowerCase();
+      // Search projects by name/code too
+      const projetoMatch =
+        p.nome.toLowerCase().includes(q) ||
+        p.codigo.toLowerCase().includes(q);
       const tarefasFiltradas = p.tarefas.filter(
         (t) =>
-          t.codigo.toLowerCase().includes(q) ||
-          t.titulo.toLowerCase().includes(q) ||
-          t.responsavel.toLowerCase().includes(q),
+          applyKpiFilterToTarefa(t, filtroKpi) &&
+          (t.codigo.toLowerCase().includes(q) ||
+            t.titulo.toLowerCase().includes(q) ||
+            t.responsavel.toLowerCase().includes(q)),
       );
-      return { ...p, tarefas: tarefasFiltradas };
+      // Show project if name matches or has matching tarefas
+      if (!projetoMatch && tarefasFiltradas.length === 0) return null;
+      return { ...p, tarefas: projetoMatch ? p.tarefas.filter((t) => applyKpiFilterToTarefa(t, filtroKpi)) : tarefasFiltradas };
     })
-    .filter((p) => p.tarefas.length > 0 || !searchQuery);
+    .filter((p): p is ProjetoComTarefas => p !== null);
 
   return (
     <div className="flex flex-col gap-4">
       {/* KPI Strip */}
-      <KpiStrip kpis={kpiStripData} variant="projetos" loading={loading} />
+      <KpiStrip
+        kpis={kpiStripData}
+        variant="projetos"
+        loading={loading}
+        activeKpi={filtroKpi}
+        onKpiClick={(label) => setFiltroKpi(filtroKpi === label ? null : label)}
+      />
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -433,13 +481,17 @@ export function ProjetosView() {
           filteredProjetos.map((projeto) => (
             <div key={projeto.id}>
               <ProjectGroupHeader projeto={projeto} />
-              {projeto.tarefas.map((tarefa) => (
-                <TarefaRow
-                  key={tarefa.id}
-                  tarefa={tarefa}
-                  projetoCor={projeto.cor || "#00c853"}
-                />
-              ))}
+              {projeto.tarefas.length === 0 ? (
+                <EmptyTarefasRow />
+              ) : (
+                projeto.tarefas.map((tarefa) => (
+                  <TarefaRow
+                    key={tarefa.id}
+                    tarefa={tarefa}
+                    projetoCor={projeto.cor || "#00c853"}
+                  />
+                ))
+              )}
             </div>
           ))
         )}

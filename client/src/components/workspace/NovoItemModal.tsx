@@ -179,9 +179,29 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync defaultType when modal opens
+  // Reset form and sync type when modal opens
   useEffect(() => {
-    if (open) setType(defaultType);
+    if (!open) return;
+    setType(defaultType);
+    setTitulo("");
+    setDescricao("");
+    setAttachments([]);
+    setExtraOpen(false);
+    setStatusTarefa("a-fazer");
+    setProjetoId("");
+    setPrioridade("");
+    setResponsavelId("");
+    setDataEntrega("");
+    setSprint("");
+    setEstimativa("");
+    setEtapa("");
+    setStatusProjeto("backlog");
+    setPrioridadeProjeto("");
+    setResponsavelProjeto("");
+    setDataInicio("");
+    setDataFim("");
+    setCategoriaProjeto("");
+    setBudget("");
   }, [open, defaultType]);
 
   // Fetch users and projetos on open
@@ -383,7 +403,12 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
           {(["chamado", "tarefa", "projeto"] as ItemType[]).map((t) => (
             <button
               key={t}
-              onClick={() => setType(t)}
+              onClick={() => {
+                setType(t);
+                setTitulo("");
+                setDescricao("");
+                setAttachments([]);
+              }}
               className="px-3 py-1 text-xs font-medium rounded border transition-all"
               style={
                 t === type
