@@ -41,8 +41,8 @@ export interface UnifiedItem {
 }
 
 type WorkspaceTableProps =
-  | { variant?: "chamados"; items: ChamadoItem[]; loading?: boolean }
-  | { variant: "todos"; items: UnifiedItem[]; loading?: boolean };
+  | { variant?: "chamados"; items: ChamadoItem[]; loading?: boolean; onRowClick?: (item: ChamadoItem) => void }
+  | { variant: "todos"; items: UnifiedItem[]; loading?: boolean; onRowClick?: (item: UnifiedItem) => void };
 
 const statusDotColors: Record<string, { bg: string }> = {
   in_progress: { bg: "#00c853" },
@@ -241,8 +241,8 @@ function SkeletonRows({ colTemplate }: { colTemplate: string }) {
   );
 }
 
-const COL_TEMPLATE = "96px 1fr 175px 100px 115px 110px 62px 98px 30px";
-const COL_TEMPLATE_MOBILE = "96px 1fr 175px 100px 115px 110px 30px";
+const COL_TEMPLATE = "96px 1fr 175px 140px 115px 110px 62px 98px 30px";
+const COL_TEMPLATE_MOBILE = "96px 1fr 175px 140px 115px 110px 30px";
 
 const responsiveStyles = `
 @media (max-width: 767px) {
@@ -254,6 +254,7 @@ const responsiveStyles = `
 export function WorkspaceTable(props: WorkspaceTableProps) {
   const { items, loading } = props;
   const variant = props.variant ?? "chamados";
+  const onRowClick = "onRowClick" in props ? props.onRowClick : undefined;
 
   const col3Header = variant === "todos" ? "Tipo / Contexto" : "Categoria / Tipo";
   const headers = ["Código", "Título", col3Header, "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""];
@@ -301,9 +302,17 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
               <GroupHeader status={status} count={groupItems.length} />
               {groupItems.map((item) =>
                 variant === "todos" ? (
-                  <UnifiedItemRow key={item.id} item={item as UnifiedItem} />
+                  <UnifiedItemRow
+                    key={item.id}
+                    item={item as UnifiedItem}
+                    onRowClick={onRowClick as ((item: UnifiedItem) => void) | undefined}
+                  />
                 ) : (
-                  <ChamadoItemRow key={(item as ChamadoItem).id} item={item as ChamadoItem} />
+                  <ChamadoItemRow
+                    key={(item as ChamadoItem).id}
+                    item={item as ChamadoItem}
+                    onRowClick={onRowClick as ((item: ChamadoItem) => void) | undefined}
+                  />
                 ),
               )}
             </div>
@@ -342,13 +351,14 @@ function HeaderRow({ headers }: { headers: string[] }) {
   );
 }
 
-function ChamadoItemRow({ item }: { item: ChamadoItem }) {
+function ChamadoItemRow({ item, onRowClick }: { item: ChamadoItem; onRowClick?: (item: ChamadoItem) => void }) {
   const typeColor = typeColors[item.tipo?.toLowerCase()] || "bg-slate-500/10 text-slate-400";
   const prioColor = priorityColors[item.prioridade] || priorityColors.medium;
 
   return (
     <div
-      className="ws-table-row group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-default"
+      className="ws-table-row group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer"
+      onClick={() => onRowClick?.(item)}
       style={{
         gridTemplateColumns: COL_TEMPLATE,
         borderBottom: "1px solid rgba(255,255,255,0.03)",
@@ -374,7 +384,7 @@ function ChamadoItemRow({ item }: { item: ChamadoItem }) {
           {item.tipo}
         </Badge>
       </div>
-      <ResponsavelCell initials={item.responsavelInitials} />
+      <ResponsavelCell initials={item.responsavelInitials} name={item.responsavel} />
       <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
         {statusLabels[item.status] || item.status}
       </span>
@@ -390,7 +400,7 @@ function ChamadoItemRow({ item }: { item: ChamadoItem }) {
   );
 }
 
-function UnifiedItemRow({ item }: { item: UnifiedItem }) {
+function UnifiedItemRow({ item, onRowClick }: { item: UnifiedItem; onRowClick?: (item: UnifiedItem) => void }) {
   const badgeColor = typeColors[item.badgeVariant] || "bg-slate-500/10 text-slate-400";
   const prioColor = priorityColors[item.prioridade] || priorityColors.media;
 
@@ -401,7 +411,8 @@ function UnifiedItemRow({ item }: { item: UnifiedItem }) {
 
   return (
     <div
-      className="ws-table-row group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-default"
+      className="ws-table-row group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer"
+      onClick={() => onRowClick?.(item)}
       style={{
         gridTemplateColumns: COL_TEMPLATE,
         borderBottom: "1px solid rgba(255,255,255,0.03)",
@@ -427,7 +438,7 @@ function UnifiedItemRow({ item }: { item: UnifiedItem }) {
           {item.badgeLabel}
         </Badge>
       </div>
-      <ResponsavelCell initials={item.responsavelInitials} />
+      <ResponsavelCell initials={item.responsavelInitials} name={item.responsavel} />
       <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
         {statusLabels[item.status] || item.status}
       </span>
@@ -443,9 +454,10 @@ function UnifiedItemRow({ item }: { item: UnifiedItem }) {
   );
 }
 
-function ResponsavelCell({ initials }: { initials: string }) {
+function ResponsavelCell({ initials, name }: { initials: string; name: string }) {
+  const displayName = name && name !== "Não atribuído" ? name : null;
   return (
-    <div className="flex items-center gap-2 min-w-0">
+    <div className="flex items-center gap-1.5 min-w-0">
       <div
         className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
         style={{
@@ -457,6 +469,11 @@ function ResponsavelCell({ initials }: { initials: string }) {
       >
         {initials}
       </div>
+      {displayName && (
+        <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+          {displayName}
+        </span>
+      )}
     </div>
   );
 }
