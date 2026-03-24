@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { KpiStrip, type WorkspaceKpis } from "@/components/workspace/KpiStrip";
 import { WorkspaceTable, type ChamadoItem } from "@/components/workspace/WorkspaceTable";
+import { KanbanView } from "@/components/workspace/KanbanView";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -61,6 +63,9 @@ export function ChamadosView() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [viewMode, setViewMode] = useState<ViewMode>("lista");
+  const [selectedItem, setSelectedItem] = useState<ChamadoItem | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [filtroKpi, setFiltroKpi] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,8 +93,21 @@ export function ChamadosView() {
     };
   }, [periodo]);
 
+  // KPI label → filter function
+  function applyKpiFilter(item: ChamadoItem, kpi: string | null): boolean {
+    if (!kpi || kpi === "Total") return true;
+    if (kpi === "Abertos") return item.status === "open";
+    if (kpi === "Em Andamento") return item.status === "in_progress";
+    if (kpi === "Bloqueados") return item.status === "blocked";
+    if (kpi === "Resolvidos") return item.status === "resolved" || item.status === "closed";
+    if (kpi === "No Prazo") return item.statusSla === "dentro_prazo";
+    if (kpi === "Em Atraso") return item.statusSla === "em_atraso";
+    return true;
+  }
+
   // Client-side filtering
   const filteredItems = items.filter((item) => {
+    if (!applyKpiFilter(item, filtroKpi)) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matches =
@@ -110,7 +128,13 @@ export function ChamadosView() {
   return (
     <div className="flex flex-col gap-4">
       {/* KPI Strip */}
-      <KpiStrip kpis={kpis} variant="chamados" loading={loading} />
+      <KpiStrip
+        kpis={kpis}
+        variant="chamados"
+        loading={loading}
+        activeKpi={filtroKpi}
+        onKpiClick={(label) => setFiltroKpi(filtroKpi === label ? null : label)}
+      />
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
@@ -192,7 +216,28 @@ export function ChamadosView() {
       </div>
 
       {/* Table */}
-      <WorkspaceTable items={filteredItems} loading={loading} />
+      {viewMode === "lista" && (
+        <>
+          <WorkspaceTable
+            items={filteredItems}
+            loading={loading}
+            onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
+          />
+          <ItemDetailDrawer
+            open={drawerOpen}
+            item={selectedItem}
+            onClose={() => setDrawerOpen(false)}
+          />
+        </>
+      )}
+      {viewMode === "kanban" && !loading && (
+        <KanbanView items={filteredItems} variant="chamados" />
+      )}
+      {viewMode !== "lista" && viewMode !== "kanban" && (
+        <div style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "14px" }}>
+          Visualização {viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} em desenvolvimento
+        </div>
+      )}
     </div>
   );
 }
