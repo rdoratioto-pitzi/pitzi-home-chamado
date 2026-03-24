@@ -46,38 +46,6 @@ function extrairMarca(descricao: string): string {
   return 'Outros';
 }
 
-// ─── Validação de IMEI (Algoritmo de Luhn) ───────────────────────────────────
-
-function isValidImei(imei: string): boolean {
-  // Verifique se o IMEI não está em branco e tem o comprimento correto.
-  if (!imei || imei.length !== 15) {
-    return false;
-  }
-
-  // Verifique se o IMEI contém apenas dígitos.
-  if (!/^\d+$/.test(imei)) {
-    return false;
-  }
-
-  // Calcula o dígito de verificação do IMEI.
-  let sum = 0;
-  for (let i = 0; i < 14; i++) {
-    let digit = parseInt(imei[i], 10);
-
-    if (i % 2 === 0) {
-      sum += digit;
-    } else {
-      digit *= 2;
-      sum += Math.floor(digit / 10) + (digit % 10);
-    }
-  }
-
-  const checkDigit = (10 - (sum % 10)) % 10;
-  const lastDigit = parseInt(imei[14], 10);
-
-  return checkDigit === lastDigit;
-}
-
 export function registerEstoqueRoutes(router: Router) {
 
   // ============== CONTAGENS ==============
@@ -286,14 +254,6 @@ export function registerEstoqueRoutes(router: Router) {
       const { userId, isAdmin } = getSessionUser(req);
       
       console.log('[Estoque Routes] POST /api/estoques/contagens/:id/item - Contagem:', id, 'IMEI:', imei);
-      
-      // Validar IMEI (algoritmo de Luhn)
-      if (!isValidImei(imei)) {
-        return res.status(400).json({
-          success: false,
-          error: "IMEI inválido - deve ter 15 dígitos válidos (dígito verificador incorreto)"
-        });
-      }
       
       // Buscar contagem
       const contagem = await db.select()
