@@ -28,6 +28,7 @@ import { tasks } from "./routes/tasks";
 import { shipments } from "./routes/shipments";
 import { estoques } from "./routes/estoques";
 import { uploads } from "./routes/uploads";
+import { workspace } from "./routes/workspace";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -131,5 +132,6 @@ app.route("/", tasks);
 app.route("/", shipments);
 app.route("/", estoques);
 app.route("/", uploads);
+app.route("/", workspace);
 
 export default app;
