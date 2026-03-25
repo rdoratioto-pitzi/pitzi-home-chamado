@@ -58,7 +58,7 @@ export function ChamadosView() {
     emAtraso: 0,
   });
   const [items, setItems] = useState<ChamadoItem[]>([]);
-  const [periodo, setPeriodo] = useState<Periodo>("este-ano");
+  const [periodo, setPeriodo] = useState<Periodo>("em-tratativa");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");

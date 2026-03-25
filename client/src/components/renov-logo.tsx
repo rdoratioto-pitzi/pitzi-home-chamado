@@ -24,7 +24,8 @@ function normalizeObjectPath(path: string): string {
 
 export function RenovLogo({ variant = "auto", size = "md", className = "" }: RenovLogoProps) {
   const { theme } = useTheme();
-  const [imgError, setImgError] = useState(false);
+  // 0 = nenhum erro, 1 = DB falhou (tenta static), 2 = static falhou (usa SVG inline)
+  const [imgError, setImgError] = useState<0 | 1 | 2>(0);
 
   const { data: logoUrlLight, isLoading: isLoadingLight } = useQuery<Setting>({
     queryKey: ["/api/settings/logo_url_light"],
@@ -48,9 +49,9 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
     retry: false,
   });
 
-  // Reset error state if logo URL changes
+  // Resetar ao trocar de setting
   useEffect(() => {
-    setImgError(false);
+    setImgError(0);
   }, [logoUrlLight?.value, logoUrlDark?.value]);
 
   const { width, height } = sizeMap[size];
@@ -59,24 +60,42 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
   const logoUrlSetting = resolvedVariant === "dark" || resolvedVariant === "white" ? logoUrlDark : logoUrlLight;
   const isLoading = resolvedVariant === "dark" || resolvedVariant === "white" ? isLoadingDark : isLoadingLight;
 
+  // Asset estático comprometido no repositório — fallback garantido
+  const staticSrc = resolvedVariant === "dark" || resolvedVariant === "white"
+    ? "/brand/renov-logo-dark.svg"
+    : "/brand/renov-logo-light.svg";
+
   if (isLoading) {
     return <div style={{ width, height }} className={className} />;
   }
 
-  if (logoUrlSetting?.value && !imgError) {
-    const src = normalizeObjectPath(logoUrlSetting.value);
-
+  // Nível 1: URL do banco (upload customizado)
+  if (logoUrlSetting?.value && imgError === 0) {
     return (
       <img
-        src={src}
+        src={normalizeObjectPath(logoUrlSetting.value)}
         alt="Renov Logo"
         style={{ width, height, objectFit: 'contain' }}
         className={className}
-        onError={() => setImgError(true)}
+        onError={() => setImgError(1)}
       />
     );
   }
 
+  // Nível 2: Asset estático versionado no repositório
+  if (imgError < 2) {
+    return (
+      <img
+        src={staticSrc}
+        alt="Renov Logo"
+        style={{ width, height, objectFit: 'contain' }}
+        className={className}
+        onError={() => setImgError(2)}
+      />
+    );
+  }
+
+  // Nível 3: SVG inline (zero dependência externa)
   const textColor = resolvedVariant === "dark" || resolvedVariant === "white" ? "#FFFFFF" : "#000000";
 
   return (
