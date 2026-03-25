@@ -203,6 +203,15 @@ export default function WorkspacePage() {
                 }}
               >
                 {tab.label}
+                <span
+                  className="ml-2 text-xs px-1.5 py-0.5 rounded-full"
+                  style={{
+                    background: isActive ? "rgba(0,200,83,0.15)" : "rgba(255,255,255,0.05)",
+                    color: isActive ? "#00c853" : "rgba(255,255,255,0.3)",
+                  }}
+                >
+                  {tab.count}
+                </span>
               </button>
             </div>
           );
