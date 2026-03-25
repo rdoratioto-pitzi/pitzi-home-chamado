@@ -5,10 +5,17 @@ import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import {
   projects,
-  workspaceTarefas,
+  kanbanCards,
+  kanbanColumns,
   users,
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
+
+const kanbanStatusToPtBr: Record<string, string> = {
+  todo: "a-fazer",
+  doing: "em-andamento",
+  done: "concluido",
+};
 
 const workspace = new Hono<AppEnv>();
 
@@ -199,62 +206,65 @@ workspace.post("/api/workspace/tarefas", async (c) => {
       prioridade?: string;
       responsavelId?: string;
       dataEntrega?: string;
-      sprint?: string;
     }>();
-    const {
-      titulo,
-      descricao,
-      projetoId,
-      prioridade,
-      responsavelId,
-      dataEntrega,
-      sprint,
-    } = body;
+    const { titulo, descricao, projetoId, prioridade, responsavelId, dataEntrega } = body;
 
     if (!titulo?.trim()) {
       return c.json({ error: "Título obrigatório" }, 400);
     }
-
-    const allTarefas = await db.select().from(workspaceTarefas);
-    let codigo = `TAR-${String(allTarefas.length + 1).padStart(4, "0")}`;
-
-    if (projetoId) {
-      const projResult = await db
-        .select()
-        .from(projects)
-        .where(eq(projects.id, projetoId))
-        .limit(1);
-      if (projResult[0]) {
-        const tarefasDoProjeto = await db
-          .select()
-          .from(workspaceTarefas)
-          .where(eq(workspaceTarefas.projetoId, projetoId));
-        codigo = `${projResult[0].code}·T${tarefasDoProjeto.length + 1}`;
-      }
+    if (!projetoId) {
+      return c.json({ error: "Projeto obrigatório para criar tarefa" }, 400);
     }
 
-    const [tarefa] = await db
-      .insert(workspaceTarefas)
+    const [projeto] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projetoId))
+      .limit(1);
+    if (!projeto) {
+      return c.json({ error: "Projeto não encontrado" }, 404);
+    }
+
+    // Find or create first column for the project
+    let columns = await db
+      .select()
+      .from(kanbanColumns)
+      .where(eq(kanbanColumns.projectId, projetoId));
+    if (columns.length === 0) {
+      const [col] = await db
+        .insert(kanbanColumns)
+        .values({ projectId: projetoId, name: "A Fazer", order: 0 })
+        .returning();
+      columns = [col];
+    }
+    const columnId = columns.sort((a, b) => a.order - b.order)[0].id;
+
+    const cardsInProject = await db
+      .select()
+      .from(kanbanCards)
+      .where(eq(kanbanCards.projectId, projetoId));
+    const codigo = `${projeto.code}·T${cardsInProject.length + 1}`;
+
+    const [card] = await db
+      .insert(kanbanCards)
       .values({
-        codigo,
-        titulo: titulo.trim(),
-        descricao: descricao || null,
-        projetoId: projetoId || null,
-        prioridade: prioridade || "media",
-        responsavelId: responsavelId || null,
-        dataEntrega: dataEntrega || null,
-        sprint: sprint || null,
-        status: "a-fazer",
-        progresso: 0,
+        code: codigo,
+        title: titulo.trim(),
+        objectives: descricao || null,
+        projectId: projetoId,
+        columnId,
+        priority: prioridade || "normal",
+        assigneeId: responsavelId || null,
+        dueDate: dataEntrega ? new Date(dataEntrega) : null,
+        status: "todo",
+        progress: 0,
       })
       .returning();
 
     const storage = getStorage(db);
     const allUsers = await storage.getUsers();
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
-    const responsavel = tarefa.responsavelId
-      ? userMap.get(tarefa.responsavelId)
-      : null;
+    const responsavel = card.assigneeId ? userMap.get(card.assigneeId) : null;
     const respNome = responsavel?.name || "Não atribuído";
     const respInitials = respNome
       .split(" ")
@@ -263,37 +273,23 @@ workspace.post("/api/workspace/tarefas", async (c) => {
       .map((w) => w[0].toUpperCase())
       .join("");
 
-    let projetoNome = "Sem projeto";
-    let corContexto: string | null = null;
-    if (tarefa.projetoId) {
-      const projResult = await db
-        .select()
-        .from(projects)
-        .where(eq(projects.id, tarefa.projetoId))
-        .limit(1);
-      if (projResult[0]) {
-        projetoNome = projResult[0].name;
-        corContexto = projResult[0].color || null;
-      }
-    }
-
     return c.json(
       {
         tipo: "tarefa",
-        id: tarefa.id,
-        codigo: tarefa.codigo,
-        titulo: tarefa.titulo,
-        contexto: projetoNome,
-        corContexto,
+        id: card.id,
+        codigo: card.code,
+        titulo: card.title,
+        contexto: projeto.name,
+        corContexto: projeto.color || null,
         badgeLabel: "TAREFA",
         badgeVariant: "tarefa",
         responsavel: respNome,
         responsavelInitials: respInitials,
-        status: tarefa.status || "a-fazer",
-        prioridade: tarefa.prioridade || "media",
+        status: kanbanStatusToPtBr[card.status] || "a-fazer",
+        prioridade: card.priority || "normal",
         sla: null,
         statusSla: null,
-        criadoEm: (tarefa.criadoEm || "").toString(),
+        criadoEm: (card.createdAt || "").toString(),
       },
       201,
     );
@@ -398,12 +394,12 @@ workspace.get("/api/workspace/todos", async (c) => {
     const db = c.get("db");
     const storage = getStorage(db);
 
-    const [allTickets, tarefas, allProjects, allUsers, slaRules] =
+    const [allTickets, cards, allProjects, allUsers, slaRules] =
       await Promise.all([
         isAdmin
           ? storage.getTickets()
           : storage.getTickets({ requesterId: userId, assigneeId: userId }),
-        db.select().from(workspaceTarefas),
+        db.select().from(kanbanCards),
         db.select().from(projects),
         storage.getUsers(),
         storage.getSlaRules(),
@@ -452,26 +448,26 @@ workspace.get("/api/workspace/todos", async (c) => {
       };
     });
 
-    const tarefaItems = tarefas.map((t) => {
-      const user = t.responsavelId ? userMap.get(t.responsavelId) : null;
+    const tarefaItems = cards.map((c) => {
+      const user = c.assigneeId ? userMap.get(c.assigneeId) : null;
       const name = user?.name || "Não atribuído";
-      const projeto = t.projetoId ? projetoMap.get(t.projetoId) : null;
+      const proj = c.projectId ? projetoMap.get(c.projectId) : null;
       return {
         tipo: "tarefa" as const,
-        id: t.id,
-        codigo: t.codigo,
-        titulo: t.titulo,
-        contexto: projeto?.nome || "Sem projeto",
-        corContexto: projeto?.cor || null,
+        id: c.id,
+        codigo: c.code,
+        titulo: c.title,
+        contexto: proj?.nome || "Sem projeto",
+        corContexto: proj?.cor || null,
         badgeLabel: "TAREFA",
         badgeVariant: "tarefa",
         responsavel: name,
         responsavelInitials: getInitials(name),
-        status: t.status || "a-fazer",
-        prioridade: t.prioridade || "media",
+        status: kanbanStatusToPtBr[c.status] || c.status,
+        prioridade: c.priority || "normal",
         sla: null as number | null,
         statusSla: null as "dentro_prazo" | "em_atraso" | null,
-        criadoEm: (t.criadoEm || "").toString(),
+        criadoEm: (c.createdAt || "").toString(),
       };
     });
 
@@ -485,13 +481,14 @@ workspace.get("/api/workspace/todos", async (c) => {
     const chamadosCount = chamadoItems.length;
     const tarefasCount = tarefaItems.length;
     const emAndamento = items.filter(
-      (i) => i.status === "in_progress" || i.status === "em-andamento",
+      (i) => i.status === "in_progress" || i.status === "em-andamento" || i.status === "doing",
     ).length;
     const resolvidos = items.filter(
       (i) =>
         i.status === "resolved" ||
         i.status === "closed" ||
-        i.status === "concluido",
+        i.status === "concluido" ||
+        i.status === "done",
     ).length;
 
     let noPrazo = 0;
@@ -525,14 +522,16 @@ workspace.get("/api/workspace/projetos", async (c) => {
   try {
     const db = c.get("db");
 
-    const allProjects = await db.select().from(projects);
-    const tarefas = await db.select().from(workspaceTarefas);
-    const allUsers = await db.select().from(users);
+    const [allProjects, cards, allUsers] = await Promise.all([
+      db.select().from(projects),
+      db.select().from(kanbanCards),
+      db.select().from(users),
+    ]);
 
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
 
     const projetosComTarefas = allProjects.map((p) => {
-      const tarefasDoProjeto = tarefas.filter((t) => t.projetoId === p.id);
+      const cardsDoProjeto = cards.filter((c) => c.projectId === p.id);
       const responsavel = p.ownerId ? userMap.get(p.ownerId) : null;
       const nome = responsavel?.name || "Não atribuído";
       const initials = nome
@@ -557,8 +556,8 @@ workspace.get("/api/workspace/projetos", async (c) => {
         cor: p.color,
         categoria: p.category,
         criadoEm: p.createdAt ? String(p.createdAt) : null,
-        tarefas: tarefasDoProjeto.map((t) => {
-          const tResp = t.responsavelId ? userMap.get(t.responsavelId) : null;
+        tarefas: cardsDoProjeto.map((c) => {
+          const tResp = c.assigneeId ? userMap.get(c.assigneeId) : null;
           const tNome = tResp?.name || "Não atribuído";
           const tInitials = tNome
             .split(" ")
@@ -566,7 +565,20 @@ workspace.get("/api/workspace/projetos", async (c) => {
             .slice(0, 2)
             .map((w) => w[0].toUpperCase())
             .join("");
-          return { ...t, responsavel: tNome, responsavelInitials: tInitials };
+          return {
+            id: c.id,
+            codigo: c.code,
+            titulo: c.title,
+            descricao: c.objectives,
+            status: kanbanStatusToPtBr[c.status] || c.status,
+            prioridade: c.priority,
+            responsavelId: c.assigneeId,
+            dataEntrega: c.dueDate ? String(c.dueDate) : null,
+            progresso: c.progress,
+            criadoEm: c.createdAt ? String(c.createdAt) : null,
+            responsavel: tNome,
+            responsavelInitials: tInitials,
+          };
         }),
       };
     });
@@ -574,16 +586,14 @@ workspace.get("/api/workspace/projetos", async (c) => {
     const ativos = allProjects.filter(
       (p) => p.status !== "concluido" && p.status !== "cancelado" && p.status !== "completed",
     ).length;
-    const tarefasAbertas = tarefas.filter((t) => t.status === "a-fazer").length;
-    const emAndamento = tarefas.filter(
-      (t) => t.status === "em-andamento",
-    ).length;
-    const concluidas = tarefas.filter((t) => t.status === "concluido").length;
+    const tarefasAbertas = cards.filter((c) => c.status === "todo").length;
+    const emAndamento = cards.filter((c) => c.status === "doing").length;
+    const concluidas = cards.filter((c) => c.status === "done").length;
     const now = new Date();
-    const atrasadas = tarefas.filter((t) => {
-      if (t.status === "concluido") return false;
-      if (!t.dataEntrega) return false;
-      return new Date(t.dataEntrega) < now;
+    const atrasadas = cards.filter((c) => {
+      if (c.status === "done") return false;
+      if (!c.dueDate) return false;
+      return new Date(c.dueDate) < now;
     }).length;
 
     return c.json({

@@ -1582,26 +1582,6 @@ export const insertEstoquesAjusteSchema = createInsertSchema(estoquesAjustes).om
 export type InsertEstoquesAjuste = z.infer<typeof insertEstoquesAjusteSchema>;
 export type EstoquesAjuste = typeof estoquesAjustes.$inferSelect;
 
-// ─── Workspace Tarefas ───────────────────────────────────────────────────────
-export const workspaceTarefas = pgTable("workspace_tarefas", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  codigo: varchar("codigo", { length: 30 }).notNull(),
-  projetoId: varchar("projeto_id").references(() => projects.id),
-  titulo: varchar("titulo", { length: 300 }).notNull(),
-  descricao: text("descricao"),
-  status: varchar("status", { length: 50 }).default("a-fazer"),
-  prioridade: varchar("prioridade", { length: 20 }).default("media"),
-  responsavelId: varchar("responsavel_id").references(() => users.id),
-  dataEntrega: date("data_entrega"),
-  sprint: varchar("sprint", { length: 80 }),
-  progresso: integer("progresso").default(0),
-  criadoEm: timestamp("criado_em").defaultNow(),
-});
-
-export const insertWorkspaceTarefaSchema = createInsertSchema(workspaceTarefas).omit({ id: true, criadoEm: true });
-export type InsertWorkspaceTarefa = z.infer<typeof insertWorkspaceTarefaSchema>;
-export type WorkspaceTarefa = typeof workspaceTarefas.$inferSelect;
-
 // ─── Claude Code Usage Reports ───────────────────────────────────────────────
 // Alimentada via script local (scripts/report-claude-usage.ts) que cada dev roda 1x/dia
 export const claudeCodeUsageReports = pgTable("claude_code_usage_reports", {
