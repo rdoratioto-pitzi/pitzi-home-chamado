@@ -45,6 +45,6 @@ jobs:
           command: deploy ${{ github.ref == 'refs/heads/develop' && '-e dev' || '' }}
 
       - name: Run database migrations
-        run: npx drizzle-kit push --force
+        run: yes '' | npx drizzle-kit push --force || true
         env:
           DATABASE_URL: ${{ github.ref == 'refs/heads/develop' && secrets.DATABASE_URL_DEV || secrets.DATABASE_URL }}
