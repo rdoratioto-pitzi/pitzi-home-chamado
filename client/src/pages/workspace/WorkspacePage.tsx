@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,6 @@ import { NovoItemModal, type ItemType } from "@/components/workspace/NovoItemMod
 import { fetchWithAuth } from "@/lib/queryClient";
 
 type TabKey = "todos" | "chamados" | "projetos";
-
-const tabs: { key: TabKey; label: string }[] = [
-  { key: "todos", label: "Todos" },
-  { key: "chamados", label: "Chamados" },
-  { key: "projetos", label: "Projetos" },
-];
 
 interface TopbarActionsProps {
   activeTab: TabKey;
@@ -106,6 +100,25 @@ export default function WorkspacePage() {
   const [, params] = useRoute("/workspace/:tab");
   const activeTab: TabKey = (params?.tab as TabKey) || "todos";
   const ActiveView = viewMap[activeTab] ?? viewMap.todos;
+
+  const [tabCounts, setTabCounts] = useState({ todos: 0, chamados: 0, projetos: 0 });
+
+  useEffect(() => {
+    Promise.allSettled([
+      fetchWithAuth("/api/workspace/chamados?periodo=em-tratativa").then(r => r.json()),
+      fetchWithAuth("/api/workspace/projetos").then(r => r.json()),
+    ]).then(([chamadosRes, projetosRes]) => {
+      const chamados = chamadosRes.status === "fulfilled" ? (chamadosRes.value.kpis?.total ?? 0) : 0;
+      const projetos = projetosRes.status === "fulfilled" ? (projetosRes.value.kpis?.ativos ?? 0) : 0;
+      setTabCounts({ todos: chamados + projetos, chamados, projetos });
+    });
+  }, []);
+
+  const tabs: { key: TabKey; label: string; count: number }[] = [
+    { key: "todos", label: "Todos", count: tabCounts.todos },
+    { key: "chamados", label: "Chamados", count: tabCounts.chamados },
+    { key: "projetos", label: "Projetos", count: tabCounts.projetos },
+  ];
 
   const [visaoOpen, setVisaoOpen] = useState(false);
   const [visaoData, setVisaoData] = useState<{ projetos: any[]; kpis: any }>({
