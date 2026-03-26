@@ -11,6 +11,7 @@ export interface ChamadoItem {
   id: string;
   codigo: string;
   titulo: string;
+  descricao: string;
   categoria: string;
   tipo: string;
   responsavel: string;
