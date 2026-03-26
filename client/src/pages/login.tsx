@@ -1,3 +1,4 @@
+import { RenovLogo } from "@/components/renov-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -298,11 +299,7 @@ export default function LoginPage() {
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
             className="mb-8"
           >
-            <img
-              src="/brand/renov-logo-dark.svg"
-              alt="Renov"
-              className="h-16 w-auto mx-auto"
-            />
+            <RenovLogo variant="white" size="xl" className="mx-auto" />
           </motion.div>
 
           <motion.div
@@ -354,11 +351,7 @@ export default function LoginPage() {
               className="inline-flex items-center justify-center rounded-2xl px-6 py-3"
               style={{ background: "#068130" }}
             >
-              <img
-                src="/brand/renov-logo-dark.svg"
-                alt="Renov"
-                className="h-8 w-auto"
-              />
+              <RenovLogo variant="white" size="md" />
             </div>
           </motion.div>
 
