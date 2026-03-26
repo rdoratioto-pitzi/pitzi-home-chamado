@@ -227,6 +227,10 @@ export function ChamadosView() {
             open={drawerOpen}
             item={selectedItem}
             onClose={() => setDrawerOpen(false)}
+            onUpdate={(updated) => {
+              setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i));
+              setSelectedItem(updated);
+            }}
           />
         </>
       )}
