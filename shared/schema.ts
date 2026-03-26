@@ -1603,3 +1603,17 @@ export const insertClaudeCodeUsageSchema = createInsertSchema(claudeCodeUsageRep
 export type InsertClaudeCodeUsage = z.infer<typeof insertClaudeCodeUsageSchema>;
 export type ClaudeCodeUsageReport = typeof claudeCodeUsageReports.$inferSelect;
 
+// ============== WORKSPACE COMENTARIOS ==============
+export const workspaceComentarios = pgTable("workspace_comentarios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  chamadoId: varchar("chamado_id").notNull(),
+  autorId: varchar("autor_id").notNull(),
+  texto: text("texto").notNull(),
+  mencionados: text("mencionados").array().default(sql`'{}'::text[]`),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export const insertWorkspaceComentarioSchema = createInsertSchema(workspaceComentarios).omit({ id: true, criadoEm: true });
+export type InsertWorkspaceComentario = z.infer<typeof insertWorkspaceComentarioSchema>;
+export type WorkspaceComentario = typeof workspaceComentarios.$inferSelect;
+

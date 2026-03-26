@@ -2,7 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import { requireAuth, getSessionUser } from "../middleware/auth";
-import { projects, kanbanCards, kanbanColumns, users } from "@shared/schema";
+import { projects, kanbanCards, kanbanColumns, users, workspaceComentarios } from "@shared/schema";
 import type { Ticket, User, SlaRule, InsertTicket } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
@@ -91,6 +91,7 @@ export function registerWorkspaceRoutes(router: Router) {
           id: t.id,
           codigo: t.code,
           titulo: t.title,
+          descricao: t.description || "",
           categoria: t.category,
           tipo: t.type,
           responsavel: name,
@@ -117,19 +118,32 @@ export function registerWorkspaceRoutes(router: Router) {
   router.post("/api/workspace/chamados", requireAuth, async (req, res) => {
     try {
       const { userId } = getSessionUser(req);
-      const { titulo, descricao } = req.body as { titulo?: string; descricao?: string };
+      const { titulo, descricao, categoria, prioridade } = req.body as {
+        titulo?: string;
+        descricao?: string;
+        categoria?: string;
+        prioridade?: string;
+      };
 
       if (!titulo?.trim()) {
         return res.status(400).json({ error: "Título obrigatório" });
       }
 
+      const prioridadeMap: Record<string, string> = {
+        baixa: "low",
+        media: "medium",
+        alta: "high",
+        critica: "critical",
+      };
+      const mappedPriority = prioridade ? (prioridadeMap[prioridade] || prioridade) : "medium";
+
       const ticket = await storage.createTicket({
         title: titulo.trim(),
         description: descricao || "",
-        category: "geral",
+        category: categoria || "geral",
         type: "bug",
         location: "outros",
-        priority: "medium",
+        priority: mappedPriority,
         impact: "medio",
         status: "open",
         requesterId: userId,
@@ -156,6 +170,7 @@ export function registerWorkspaceRoutes(router: Router) {
         id: String(ticket.id),
         codigo: ticket.code,
         titulo: ticket.title,
+        descricao: ticket.description || "",
         categoria: ticket.category,
         responsavel: name,
         responsavelInitials: initials,
@@ -559,6 +574,215 @@ export function registerWorkspaceRoutes(router: Router) {
     } catch (error: any) {
       const status = error.status || 500;
       res.status(status).json({ error: error.message });
+    }
+  });
+
+  // ─── PATCH chamado ─────────────────────────────────────────────────────────────
+  router.patch("/api/workspace/chamados/:id", requireAuth, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status, prioridade, responsavelId, titulo, descricao } = req.body as {
+        status?: string;
+        prioridade?: string;
+        responsavelId?: string;
+        titulo?: string;
+        descricao?: string;
+      };
+
+      const prioridadeMap: Record<string, string> = {
+        baixa: "low",
+        media: "medium",
+        alta: "high",
+        critica: "critical",
+      };
+      const priorityRevMap: Record<string, string> = {
+        low: "baixa",
+        medium: "media",
+        high: "alta",
+        critical: "critica",
+      };
+
+      const updateData: Partial<Ticket> = {};
+      if (status !== undefined) updateData.status = status;
+      if (prioridade !== undefined) updateData.priority = prioridadeMap[prioridade] || prioridade;
+      if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
+      if (titulo !== undefined) updateData.title = titulo.trim();
+      if (descricao !== undefined) updateData.description = descricao;
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "Nenhum campo para atualizar" });
+      }
+
+      const ticket = await storage.updateTicket(String(id), updateData);
+      if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+
+      const [allUsers, slaRules] = await Promise.all([
+        storage.getUsers(),
+        storage.getSlaRules(),
+      ]);
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const assignee = ticket.assigneeId ? userMap.get(ticket.assigneeId) : null;
+      const name = assignee?.name || "Não atribuído";
+      const initials = name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+      const sla = getSlaForTicket(ticket, slaRules);
+
+      return res.json({
+        id: String(ticket.id),
+        codigo: ticket.code,
+        titulo: ticket.title,
+        descricao: ticket.description || "",
+        categoria: ticket.category,
+        tipo: ticket.type,
+        responsavel: name,
+        responsavelInitials: initials,
+        status: ticket.status,
+        prioridade: priorityRevMap[ticket.priority] || ticket.priority,
+        sla: sla.slaHoras,
+        statusSla: sla.status,
+        abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── PATCH tarefa ──────────────────────────────────────────────────────────────
+  router.patch("/api/workspace/tarefas/:id", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { id } = req.params;
+      const { status, prioridade, responsavelId, dataEntrega, progresso } = req.body as {
+        status?: string;
+        prioridade?: string;
+        responsavelId?: string;
+        dataEntrega?: string;
+        progresso?: number;
+      };
+
+      const ptBrToKanban: Record<string, string> = {
+        "a-fazer": "todo",
+        "em-andamento": "doing",
+        concluido: "done",
+        bloqueado: "blocked",
+      };
+
+      const updateData: Record<string, any> = {};
+      if (status !== undefined) updateData.status = ptBrToKanban[status] || status;
+      if (prioridade !== undefined) updateData.priority = prioridade;
+      if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
+      if (dataEntrega !== undefined) updateData.dueDate = dataEntrega ? new Date(dataEntrega) : null;
+      if (progresso !== undefined) updateData.progress = progresso;
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "Nenhum campo para atualizar" });
+      }
+
+      const [card] = await db
+        .update(kanbanCards)
+        .set(updateData)
+        .where(eq(kanbanCards.id, String(id)))
+        .returning();
+
+      if (!card) return res.status(404).json({ error: "Tarefa não encontrada" });
+
+      const allUsers = await storage.getUsers();
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const tResp = card.assigneeId ? userMap.get(card.assigneeId) : null;
+      const tNome = tResp?.name || "Não atribuído";
+      const tInitials = tNome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+
+      return res.json({
+        id: card.id,
+        codigo: card.code,
+        titulo: card.title,
+        descricao: card.objectives,
+        status: kanbanStatusToPtBr[card.status] || card.status,
+        prioridade: card.priority,
+        responsavelId: card.assigneeId,
+        responsavel: tNome,
+        responsavelInitials: tInitials,
+        dataEntrega: card.dueDate ? String(card.dueDate) : null,
+        progresso: card.progress,
+        criadoEm: card.createdAt ? String(card.createdAt) : null,
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── GET comentarios de chamado ───────────────────────────────────────────────
+  router.get("/api/workspace/chamados/:id/comentarios", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { id } = req.params;
+      const { userId: _userId } = getSessionUser(req);
+
+      const comentarios = await db
+        .select()
+        .from(workspaceComentarios)
+        .where(eq(workspaceComentarios.chamadoId, id))
+        .orderBy(workspaceComentarios.criadoEm);
+
+      const allUsers = await storage.getUsers();
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+      const items = comentarios.map((c) => {
+        const autor = userMap.get(c.autorId);
+        const autorNome = autor?.name || "Usuário";
+        const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+        return {
+          id: c.id,
+          texto: c.texto,
+          autorId: c.autorId,
+          autorNome,
+          autorInitials,
+          criadoEm: c.criadoEm ? String(c.criadoEm) : null,
+        };
+      });
+
+      return res.json({ comentarios: items });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── POST comentario em chamado ───────────────────────────────────────────────
+  router.post("/api/workspace/chamados/:id/comentarios", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { id } = req.params;
+      const { userId } = getSessionUser(req);
+      const { texto } = req.body as { texto?: string; mencionados?: string[] };
+
+      if (!texto?.trim()) {
+        return res.status(400).json({ error: "Texto obrigatório" });
+      }
+
+      const [comentario] = await db
+        .insert(workspaceComentarios)
+        .values({
+          chamadoId: id,
+          autorId: userId,
+          texto: texto.trim(),
+        })
+        .returning();
+
+      const allUsers = await storage.getUsers();
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const autor = userMap.get(comentario.autorId);
+      const autorNome = autor?.name || "Usuário";
+      const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+
+      return res.status(201).json({
+        id: comentario.id,
+        texto: comentario.texto,
+        autorId: comentario.autorId,
+        autorNome,
+        autorInitials,
+        criadoEm: comentario.criadoEm ? String(comentario.criadoEm) : null,
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
     }
   });
 }

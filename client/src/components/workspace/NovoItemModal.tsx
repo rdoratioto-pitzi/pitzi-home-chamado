@@ -163,6 +163,10 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
   const [estimativa, setEstimativa] = useState("");
   const [etapa, setEtapa] = useState("");
 
+  // Chamado chip state
+  const [categoriaChamado, setCategoriaChamado] = useState("");
+  const [prioridadeChamado, setPrioridadeChamado] = useState("media");
+
   // Projeto chip state
   const [statusProjeto, setStatusProjeto] = useState("backlog");
   const [prioridadeProjeto, setPrioridadeProjeto] = useState("");
@@ -187,6 +191,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setDescricao("");
     setAttachments([]);
     setExtraOpen(false);
+    setCategoriaChamado("");
+    setPrioridadeChamado("media");
     setStatusTarefa("a-fazer");
     setProjetoId("");
     setPrioridade("");
@@ -261,6 +267,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setDescricao("");
     setAttachments([]);
     setExtraOpen(false);
+    setCategoriaChamado("");
+    setPrioridadeChamado("media");
     setStatusTarefa("a-fazer");
     setProjetoId("");
     setPrioridade("");
@@ -291,7 +299,12 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
         response = await fetchWithAuth("/api/workspace/chamados", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ titulo: titulo.trim(), descricao }),
+          body: JSON.stringify({
+            titulo: titulo.trim(),
+            descricao,
+            categoria: categoriaChamado || undefined,
+            prioridade: prioridadeChamado || undefined,
+          }),
         });
       } else if (type === "tarefa") {
         response = await fetchWithAuth("/api/workspace/tarefas", {
@@ -494,6 +507,31 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             >
               <span>⏱</span>
               <span>Agente de diagnóstico lerá esta descrição automaticamente</span>
+            </div>
+          )}
+
+          {/* Chips — chamado */}
+          {type === "chamado" && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <ChipSelect
+                value={categoriaChamado}
+                onValueChange={setCategoriaChamado}
+                placeholder="Categoria"
+                options={[
+                  { value: "ti-sistemas", label: "TI/Sistemas" },
+                  { value: "comercial", label: "Comercial" },
+                  { value: "logistica", label: "Logística" },
+                  { value: "financeiro", label: "Financeiro" },
+                  { value: "operacoes", label: "Operações" },
+                  { value: "rh", label: "RH" },
+                ]}
+              />
+              <ChipSelect
+                value={prioridadeChamado}
+                onValueChange={setPrioridadeChamado}
+                placeholder="Prioridade"
+                options={PRIORIDADE_OPTIONS}
+              />
             </div>
           )}
 
