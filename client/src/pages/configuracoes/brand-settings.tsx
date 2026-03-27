@@ -120,9 +120,12 @@ export function BrandSettings() {
         throw new Error("Failed to upload file");
       }
       
-      const fileUrl = normalizeObjectPath(objectPath);
-      
-      await apiRequest("POST", "/api/settings", { key, value: fileUrl });
+      // Save relative path (without API_BASE) to database
+      const relativePath = objectPath.startsWith("/objects/")
+        ? objectPath
+        : `/objects/${objectPath.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
+
+      await apiRequest("POST", "/api/settings", { key, value: relativePath });
       await queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
       await queryClient.invalidateQueries({ queryKey: ["/api/settings", key] });
       
