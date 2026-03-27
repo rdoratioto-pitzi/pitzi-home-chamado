@@ -24,11 +24,11 @@ export function registerTicketRoutes(router: Router) {
       const { userId, isAdmin } = getSessionUser(req);
       
       if (isAdmin) {
-        const tickets = await storage.getTickets();
+        const tickets = await storage.getTicketsForListing();
         return res.json(tickets);
       }
       
-      const tickets = await storage.getTickets({ requesterId: userId, assigneeId: userId });
+      const tickets = await storage.getTicketsForListing({ requesterId: userId, assigneeId: userId });
       res.json(tickets);
     } catch (error: any) {
       const status = error.status || 500;
@@ -39,7 +39,7 @@ export function registerTicketRoutes(router: Router) {
   router.get("/api/tickets/:id", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
-      const ticket = await storage.getTicket(getId(req));
+      const ticket = await storage.getTicketWithNames(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
       if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
         return res.status(404).json({ error: "Ticket not found" });

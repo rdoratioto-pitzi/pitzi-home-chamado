@@ -43,8 +43,7 @@ export function ConfirmFinalizar({
         <div className="py-4">
           <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
             <p className="text-sm text-amber-800">
-              <strong>Atenção:</strong> Esta ação não pode ser desfeita. 
-              Os resultados serão analisados pela equipe administrativa.
+              <strong>Atenção:</strong> Esta ação não pode ser desfeita.
             </p>
           </div>
         </div>
@@ -97,14 +96,13 @@ export function SucessoFinalizacao({
             Contagem Finalizada!
           </DialogTitle>
           <DialogDescription className="pt-2">
-            A contagem foi finalizada com sucesso. 
-            Os resultados serão analisados pela equipe administrativa.
+            A contagem foi finalizada com sucesso.
           </DialogDescription>
         </DialogHeader>
         
         <div className="py-4">
           <p className="text-sm text-muted-foreground text-center">
-            Você receberá uma notificação quando os resultados estiverem disponíveis.
+            Você pode iniciar uma nova contagem ou verificar os relatórios.
           </p>
         </div>
         

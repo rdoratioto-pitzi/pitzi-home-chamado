@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Barcode, Loader2 } from "lucide-react";
+import { validarIMEI } from "@/lib/validators";
 
 interface BarcodeReaderProps {
   onScan: (imei: string) => void;
@@ -11,6 +12,7 @@ interface BarcodeReaderProps {
 export function BarcodeReader({ onScan, disabled }: BarcodeReaderProps) {
   const [isScanning, setIsScanning] = useState(false);
   const [inputValue, setInputValue] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -27,8 +29,11 @@ export function BarcodeReader({ onScan, disabled }: BarcodeReaderProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, ""); // Only numbers
     setInputValue(value);
-
-    // Auto-submit when 15 digits reached
+    // Limpa erro de validação quando usuário começa a digitar
+    if (validationError) {
+      setValidationError(null);
+    }
+    // Auto-submit quando completar 15 dígitos válidos
     if (value.length === 15) {
       handleSubmit(value);
     }
@@ -36,24 +41,31 @@ export function BarcodeReader({ onScan, disabled }: BarcodeReaderProps) {
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && inputValue.length > 0) {
+      // Auto-submit ao detectar Enter (leitor de barcode envia Enter após os dígitos)
       handleSubmit(inputValue);
     } else if (e.key === "Escape") {
       setIsScanning(false);
       setInputValue("");
+      setValidationError(null);
     }
   };
 
   const handleSubmit = (imei: string) => {
-    if (imei.length === 15) {
+    const validacao = validarIMEI(imei);
+    if (validacao.valido) {
       onScan(imei);
       setInputValue("");
-      setIsScanning(false);
+      setValidationError(null);
+      // Mantém o campo aberto para novas leituras
+    } else {
+      setValidationError(validacao.erro || "IMEI inválido");
     }
   };
 
   const handleCancel = () => {
     setIsScanning(false);
     setInputValue("");
+    setValidationError(null);
   };
 
   if (isScanning) {
@@ -82,17 +94,15 @@ export function BarcodeReader({ onScan, disabled }: BarcodeReaderProps) {
               {inputValue.length}/15 dígitos
             </p>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={handleCancel} disabled={disabled}>
-                Cancelar
-              </Button>
-              <Button
-                onClick={() => handleSubmit(inputValue)}
-                disabled={inputValue.length !== 15 || disabled}
-              >
-                Adicionar
-              </Button>
-            </div>
+            {validationError && (
+              <div className="p-2 text-sm text-red-600 bg-red-50 rounded-md">
+                {validationError}
+              </div>
+            )}
+
+            <Button variant="outline" onClick={handleCancel} disabled={disabled}>
+              Cancelar
+            </Button>
           </div>
         </CardContent>
       </Card>
