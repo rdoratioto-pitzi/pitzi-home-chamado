@@ -60,6 +60,7 @@ type Bindings = {
   SENDPULSE_FROM_EMAIL: string;
   SENDPULSE_FROM_NAME: string;
   DEV_TOOLS_TOKEN: string;
+  APP_VERSION: string;
 };
 
 export type AuthUser = {
@@ -105,6 +106,16 @@ app.get("/api/health", async (c) => {
   } catch {
     return c.json({ status: "error", db: "disconnected", timestamp: new Date().toISOString() }, 500);
   }
+});
+
+// Version endpoint
+app.get("/api/version", (c) => {
+  const version = c.env.APP_VERSION || "dev";
+  const parts = version.split("-");
+  const commit = parts.length > 1 ? parts[parts.length - 1] : "local";
+  const buildDate = parts.length > 1 ? parts.slice(0, -1).join("-") : "local";
+  const env = c.env.CORS_ORIGIN?.includes("-dev") ? "development" : "production";
+  return c.json({ version, commit, buildDate, environment: env });
 });
 
 // Mount routes
