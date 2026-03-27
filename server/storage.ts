@@ -84,6 +84,7 @@ import {
  } from "@shared/schema";
  import { db as defaultDb, type Database } from "./db";
  import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
+ import { alias } from "drizzle-orm/pg-core";
  
  export type NotificationPreferences = {
   emailNotificationsEnabled: boolean;
@@ -556,6 +557,23 @@ export class DatabaseStorage implements IStorage {
     const [ticket] = await this.db.select().from(tickets).where(eq(tickets.id, id));
     return ticket;
   }
+  async getTicketWithNames(id: string) {
+    if (!this.db) return undefined;
+    const requester = alias(users, "requester");
+    const assignee = alias(users, "assignee");
+    const [result] = await this.db
+      .select({
+        ticket: tickets,
+        requesterName: requester.name,
+        assigneeName: assignee.name,
+      })
+      .from(tickets)
+      .leftJoin(requester, eq(tickets.requesterId, requester.id))
+      .leftJoin(assignee, eq(tickets.assigneeId, assignee.id))
+      .where(eq(tickets.id, id));
+    if (!result) return undefined;
+    return { ...result.ticket, requesterName: result.requesterName, assigneeName: result.assigneeName };
+  }
   async getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]> {
     if (!this.db) throw new Error("Database not connected");
     try {
@@ -580,6 +598,100 @@ export class DatabaseStorage implements IStorage {
       throw e;
     }
   }
+  async getTicketsForListing(filters?: { requesterId?: string; assigneeId?: string }) {
+    if (!this.db) throw new Error("Database not connected");
+    try {
+      const requester = alias(users, "requester");
+      const assignee = alias(users, "assignee");
+
+      const baseQuery = this.db
+        .select({
+          id: tickets.id,
+          code: tickets.code,
+          title: tickets.title,
+          category: tickets.category,
+          type: tickets.type,
+          location: tickets.location,
+          priority: tickets.priority,
+          status: tickets.status,
+          requesterId: tickets.requesterId,
+          assigneeId: tickets.assigneeId,
+          createdAt: tickets.createdAt,
+          dueDate: tickets.dueDate,
+          dataAbertura: tickets.dataAbertura,
+          dataResolucao: tickets.dataResolucao,
+          requesterName: requester.name,
+          assigneeName: assignee.name,
+        })
+        .from(tickets)
+        .leftJoin(requester, eq(tickets.requesterId, requester.id))
+        .leftJoin(assignee, eq(tickets.assigneeId, assignee.id));
+
+      if (filters) {
+        const conditions: SQL[] = [];
+        if (filters.requesterId && filters.assigneeId) {
+          conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
+        } else if (filters.requesterId) {
+          conditions.push(eq(tickets.requesterId, filters.requesterId));
+        } else if (filters.assigneeId) {
+          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
+        }
+
+        if (conditions.length > 0) {
+          return await baseQuery.where(and(...conditions));
+        }
+      }
+      return await baseQuery;
+    } catch (e) {
+      console.error("[storage] Error fetching tickets for listing:", e);
+      throw e;
+    }
+  }
+  async getTicketsForWorkspace(filters?: { requesterId?: string; assigneeId?: string }) {
+    if (!this.db) throw new Error("Database not connected");
+    try {
+      const baseQuery = this.db
+        .select({
+          id: tickets.id,
+          code: tickets.code,
+          title: tickets.title,
+          description: tickets.description,
+          category: tickets.category,
+          type: tickets.type,
+          location: tickets.location,
+          priority: tickets.priority,
+          status: tickets.status,
+          requesterId: tickets.requesterId,
+          assigneeId: tickets.assigneeId,
+          createdAt: tickets.createdAt,
+          dueDate: tickets.dueDate,
+          dataAbertura: tickets.dataAbertura,
+          dataResolucao: tickets.dataResolucao,
+          impact: tickets.impact,
+          hasAttachments: sql<boolean>`(${tickets.attachments} IS NOT NULL AND ${tickets.attachments} != '' AND ${tickets.attachments} != '[]')`.as("has_attachments"),
+        })
+        .from(tickets);
+
+      if (filters) {
+        const conditions: SQL[] = [];
+        if (filters.requesterId && filters.assigneeId) {
+          conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
+        } else if (filters.requesterId) {
+          conditions.push(eq(tickets.requesterId, filters.requesterId));
+        } else if (filters.assigneeId) {
+          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
+        }
+        if (conditions.length > 0) {
+          return await baseQuery.where(and(...conditions));
+        }
+      }
+      return await baseQuery;
+    } catch (e) {
+      console.error("[storage] Error fetching tickets for workspace:", e);
+      throw e;
+    }
+  }
+
   async createTicket(insertTicket: InsertTicket): Promise<Ticket> {
     if (!this.db) throw new Error("Database not connected");
     // Generate sequential code like CHA-0001

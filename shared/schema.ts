@@ -105,6 +105,10 @@ export const tickets = pgTable("tickets", {
 export const insertTicketSchema = createInsertSchema(tickets).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTicket = z.infer<typeof insertTicketSchema>;
 export type Ticket = typeof tickets.$inferSelect;
+export type TicketListing = Pick<Ticket, 
+  "id" | "code" | "title" | "category" | "type" | "location" | "priority" | "status" | 
+  "requesterId" | "assigneeId" | "createdAt" | "dueDate" | "dataAbertura" | "dataResolucao"
+> & { requesterName: string | null; assigneeName: string | null };
 
 // ============== TICKET RESPONSAVEIS (Assignment Rules) ==============
 export const ticketResponsaveis = pgTable("ticket_responsaveis", {

@@ -12,6 +12,7 @@ import {
   estoquesContagemDivergencias,
   estoquesAjustes,
   users,
+  tenants,
 } from "../../../shared/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
 import { requireAdmin } from "../middleware/auth";
@@ -291,23 +292,49 @@ estoques.get("/api/estoques/contagens/ativa", async (c) => {
   return c.json({ success: true, data: contagem[0] });
 });
 
+// GET /api/estoques/contagens/em-aberto - Listar todas as contagens em aberto do usuário
+estoques.get("/api/estoques/contagens/em-aberto", async (c) => {
+  const db = c.get("db");
+  const userId = c.get("user").userId;
+
+  const contagens = await db
+    .select({
+      id: estoquesContagens.id,
+      codigo: estoquesContagens.codigo,
+      status: estoquesContagens.status,
+      dataInicio: estoquesContagens.dataInicio,
+      totalItensContados: estoquesContagens.totalItensContados,
+      responsavelId: estoquesContagens.responsavelId,
+    })
+    .from(estoquesContagens)
+    .where(and(eq(estoquesContagens.responsavelId, userId), eq(estoquesContagens.status, "em_andamento")))
+    .orderBy(desc(estoquesContagens.dataInicio));
+
+  return c.json({ success: true, data: contagens });
+});
+
 // POST /api/estoques/contagens - Iniciar nova contagem
 estoques.post("/api/estoques/contagens", async (c) => {
   const db = c.get("db");
   const userId = c.get("user").userId;
 
-  // Verificar se já existe contagem em andamento
-  const contagemExistente = await db
-    .select({ id: estoquesContagens.id })
-    .from(estoquesContagens)
-    .where(and(eq(estoquesContagens.responsavelId, userId), eq(estoquesContagens.status, "em_andamento")))
-    .limit(1);
+  // NÃO bloquear - Permite múltiplas sessões de contagem simultâneas
+  // O usuário pode ter várias contagens em andamento ao mesmo tempo
 
-  if (contagemExistente.length > 0) {
-    return c.json(
-      { success: false, error: "Já existe uma contagem em andamento. Finalize ou cancele antes de iniciar uma nova." },
-      400,
-    );
+  // Buscar tenantId do usuário
+  const user = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, userId)).limit(1);
+  
+  let tenantId = user[0]?.tenantId;
+  
+  // Fallback se user não tiver tenant (migration): pegar primeiro tenant ativo
+  if (!tenantId) {
+    console.warn("[Worker] User sem tenantId, buscando tenant default");
+    const defaultTenant = await db.select({ id: tenants.id }).from(tenants).limit(1);
+    if (defaultTenant.length > 0) {
+      tenantId = defaultTenant[0].id;
+    } else {
+      return c.json({ success: false, error: "Erro de configuração: Sistema sem Tenant definido." }, 500);
+    }
   }
 
   // Gerar código: CNT-YYYYMMDD-XXX
@@ -337,6 +364,7 @@ estoques.post("/api/estoques/contagens", async (c) => {
     .values({
       codigo,
       responsavelId: userId,
+      tenantId,
       status: "em_andamento",
       dataInicio: new Date(),
       totalItensContados: 0,
