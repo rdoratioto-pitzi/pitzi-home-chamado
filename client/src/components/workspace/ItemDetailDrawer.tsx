@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send } from "lucide-react";
+import { X, Send, Paperclip } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ChamadoItem, UnifiedItem } from "./WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
+import { RichContent } from "@/components/rich-content";
 
 interface ItemDetailDrawerProps {
   open: boolean;
@@ -231,7 +232,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
             top: 0,
             width: 480,
             height: "100vh",
-            background: "#111411",
+            background: "hsl(var(--background))",
             borderLeft: "1px solid rgba(255,255,255,0.08)",
             display: "flex",
             flexDirection: "column",
@@ -445,13 +446,44 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                   }}
                 >
                   <div style={SECTION_LABEL_STYLE}>Descrição</div>
-                  <p
-                    className="text-sm"
-                    style={{ color: "rgba(255,255,255,0.55)", lineHeight: "1.6" }}
-                  >
-                    {descricao || "—"}
-                  </p>
+                  {descricao ? (
+                    <RichContent
+                      content={descricao}
+                      className="text-sm [&_*]:!text-[rgba(255,255,255,0.55)] !leading-relaxed"
+                    />
+                  ) : (
+                    <p
+                      className="text-sm"
+                      style={{ color: "rgba(255,255,255,0.55)", lineHeight: "1.6" }}
+                    >
+                      —
+                    </p>
+                  )}
                 </div>
+
+                {/* ANEXOS indicator */}
+                {isChamado && (item as ChamadoItem).hasAttachments && (
+                  <div
+                    style={{
+                      marginBottom: 24,
+                      paddingTop: 20,
+                      borderTop: "1px solid rgba(255,255,255,0.05)",
+                    }}
+                  >
+                    <div style={SECTION_LABEL_STYLE}>
+                      <Paperclip size={12} style={{ display: "inline", marginRight: 6 }} />
+                      Anexos
+                    </div>
+                    <a
+                      href={`/chamados/${(item as ChamadoItem).id}`}
+                      className="flex items-center gap-3 p-3 mt-2 rounded-lg border border-white/10 hover:border-white/25 transition-colors"
+                      style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)", textDecoration: "none" }}
+                    >
+                      <Paperclip size={16} style={{ color: "rgba(255,255,255,0.4)" }} />
+                      <span className="text-sm">Ver anexos na página do chamado</span>
+                    </a>
+                  </div>
+                )}
 
                 {/* COMENTÁRIOS section */}
                 <div

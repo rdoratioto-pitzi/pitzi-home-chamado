@@ -15,6 +15,7 @@ vi.mock("../middleware/auth", () => ({
 vi.mock("../storage", () => ({
   storage: {
     getTickets: vi.fn().mockResolvedValue([]),
+    getTicketsForWorkspace: vi.fn().mockResolvedValue([]),
     getUsers: vi.fn().mockResolvedValue([]),
     getSlaRules: vi.fn().mockResolvedValue([]),
     createTicket: vi.fn().mockResolvedValue({

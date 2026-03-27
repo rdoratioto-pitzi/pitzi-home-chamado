@@ -104,14 +104,16 @@ export default function WorkspacePage() {
   const [tabCounts, setTabCounts] = useState({ todos: 0, chamados: 0, projetos: 0 });
 
   useEffect(() => {
-    Promise.allSettled([
-      fetchWithAuth("/api/workspace/chamados?periodo=em-tratativa").then(r => r.json()),
-      fetchWithAuth("/api/workspace/projetos").then(r => r.json()),
-    ]).then(([chamadosRes, projetosRes]) => {
-      const chamados = chamadosRes.status === "fulfilled" ? (chamadosRes.value.kpis?.total ?? 0) : 0;
-      const projetos = projetosRes.status === "fulfilled" ? (projetosRes.value.kpis?.ativos ?? 0) : 0;
-      setTabCounts({ todos: chamados + projetos, chamados, projetos });
-    });
+    fetchWithAuth("/api/workspace/counts")
+      .then(r => r.json())
+      .then(data => {
+        setTabCounts({
+          todos: data.todos ?? 0,
+          chamados: data.chamados ?? 0,
+          projetos: data.projetos ?? 0,
+        });
+      })
+      .catch(() => {});
   }, []);
 
   const tabs: { key: TabKey; label: string; count: number }[] = [

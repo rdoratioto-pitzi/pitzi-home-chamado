@@ -77,6 +77,23 @@ Reviewer obrigatório: **Marcelo (CTO)** — sem aprovação dele, não fazer me
 - [ ] Título segue conventional commits
 - [ ] Reviewer: @marcelo adicionado
 
+## Deployment
+
+- This project deploys to Cloudflare (Workers + Pages + R2). Always distinguish between dev and prod environments.
+- Before deploying, verify which environment (dev/prod) is targeted. Never deploy to production without explicit confirmation.
+- Check wrangler.toml route configuration and ensure secrets are set for the target environment before deploying.
+
+## Bug Fixes
+
+- After applying any fix, verify there are no regressions by building the project and testing affected functionality.
+- When fixing multiple issues in one session, fix and verify ONE at a time before moving to the next.
+- Never remove or change existing ViewBag/data population, filter logic, or namespace imports without confirming the impact.
+
+## Interaction Style
+
+- When asked to plan or brainstorm, engage in dialogue FIRST before exploring the codebase. Ask clarifying questions rather than autonomously reading dozens of files.
+- Do not over-explore. If the user wants a conversation, have a conversation.
+
 ## Arquivos-Chave
 
 | Arquivo                         | Responsabilidade                        |
