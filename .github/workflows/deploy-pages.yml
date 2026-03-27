@@ -29,10 +29,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate version
+        id: version
+        run: echo "APP_VERSION=$(date -u +%Y.%m.%d)-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
       - name: Build frontend
         run: npx vite build --config vite.config.ts
         env:
           VITE_API_BASE_URL: ${{ github.ref == 'refs/heads/main' && vars.VITE_API_URL || vars.VITE_API_URL_DEV }}
+          VITE_APP_VERSION: ${{ steps.version.outputs.APP_VERSION }}
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
