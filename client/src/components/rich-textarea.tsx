@@ -3,7 +3,7 @@ import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
 import { Button } from "@/components/ui/button";
 import { 
-  ImageIcon, X, Loader2, Maximize2, Video, FileText, Paperclip, FileSpreadsheet, File, Download,
+  X, Loader2, Maximize2, Video, FileText, Paperclip, FileSpreadsheet, File, Download,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -18,7 +18,11 @@ import { cn } from "@/lib/utils";
 interface RichTextareaProps {
   value: string;
   onChange: (value: string) => void;
+  attachments?: { name: string; url: string }[];
+  onAttachmentsChange?: (attachments: { name: string; url: string }[]) => void;
+  /** @deprecated Use attachments/onAttachmentsChange instead */
   images?: string[];
+  /** @deprecated Use attachments/onAttachmentsChange instead */
   onImagesChange?: (images: string[]) => void;
   placeholder?: string;
   disabled?: boolean;
@@ -78,13 +82,24 @@ function FileIcon({ type }: { type: string }) {
 export function RichTextarea({
   value,
   onChange,
-  images = [],
+  attachments: attachmentsProp,
+  onAttachmentsChange,
+  images: imagesProp,
   onImagesChange,
   placeholder,
   disabled = false,
   className: externalClassName,
   "data-testid": dataTestId,
 }: RichTextareaProps) {
+  // Support both new (attachments) and legacy (images) props
+  const attachments: { name: string; url: string }[] = attachmentsProp ?? (imagesProp || []).map((url, i) => ({ name: `Arquivo_${i + 1}`, url }));
+  const handleAttachmentsChange = useCallback((newAttachments: { name: string; url: string }[]) => {
+    if (onAttachmentsChange) {
+      onAttachmentsChange(newAttachments);
+    } else if (onImagesChange) {
+      onImagesChange(newAttachments.map(a => a.url));
+    }
+  }, [onAttachmentsChange, onImagesChange]);
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -100,30 +115,8 @@ export function RichTextarea({
         [{ 'list': 'ordered' }, { 'list': 'bullet' }],  // Ordem correta: ordered (1.) primeiro, bullet (•) depois
         ['blockquote'],
         ['link'],
-        ['image'],
         ['clean']
-      ],
-      handlers: {
-        image: function(this: any) {
-          const input = document.createElement('input');
-          input.setAttribute('type', 'file');
-          input.setAttribute('accept', 'image/*');
-          input.click();
-          input.onchange = async () => {
-            if (input.files && input.files[0]) {
-              const file = input.files[0];
-              const reader = new FileReader();
-              reader.onload = () => {
-                const quill = this.quill;
-                const range = quill.getSelection(true);
-                quill.insertEmbed(range.index, 'image', reader.result as string);
-                quill.setSelection(range.index + 1);
-              };
-              reader.readAsDataURL(file);
-            }
-          };
-        }
-      }
+      ]
     },
     keyboard: {
       bindings: {
@@ -165,7 +158,6 @@ export function RichTextarea({
     'bold', 'italic', 'strike', 'code',
     'list', 'blockquote',
     'link',
-    'image',
     'indent',
   ];
 
@@ -200,20 +192,20 @@ export function RichTextarea({
     if (!files || files.length === 0) return;
 
     setIsUploading(true);
-    const newAttachments: string[] = [];
+    const newFiles: { name: string; url: string }[] = [];
 
     for (const file of Array.from(files)) {
       const url = await uploadFile(file);
       if (url) {
-        newAttachments.push(url);
+        newFiles.push({ name: file.name, url });
       }
     }
 
-    if (newAttachments.length > 0 && onImagesChange) {
-      onImagesChange([...images, ...newAttachments]);
+    if (newFiles.length > 0) {
+      handleAttachmentsChange([...attachments, ...newFiles]);
       toast({
         title: "Anexo adicionado",
-        description: `${newAttachments.length} arquivo(s) adicionado(s) com sucesso.`,
+        description: `${newFiles.length} arquivo(s) adicionado(s) com sucesso.`,
       });
     }
 
@@ -221,20 +213,18 @@ export function RichTextarea({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [images, onImagesChange, uploadFile, toast]);
+  }, [attachments, handleAttachmentsChange, uploadFile, toast]);
 
   const removeAttachment = useCallback((index: number) => {
-    if (onImagesChange) {
-      const newImages = [...images];
-      newImages.splice(index, 1);
-      onImagesChange(newImages);
-    }
-  }, [images, onImagesChange]);
+    const newAttachments = [...attachments];
+    newAttachments.splice(index, 1);
+    handleAttachmentsChange(newAttachments);
+  }, [attachments, handleAttachmentsChange]);
 
-  const openFileInNewTab = useCallback((url: string, index: number) => {
-    const fileName = getFileNameFromDataUrl(url, index);
+  const openFileInNewTab = useCallback((att: { name: string; url: string }, index: number) => {
+    const fileName = att.name || getFileNameFromDataUrl(att.url, index);
     const link = document.createElement("a");
-    link.href = url;
+    link.href = att.url;
     link.download = fileName;
     link.target = "_blank";
     document.body.appendChild(link);
@@ -263,35 +253,28 @@ export function RichTextarea({
 
     if (imageFiles.length === 0) return;
 
-    e.preventDefault(); // Prevent Quill's default paste behavior for images
-
+    e.preventDefault();
     setIsUploading(true);
 
-    // Get Quill editor instance
-    const quill = quillRef.current?.getEditor();
-    if (!quill) {
-      setIsUploading(false);
-      return;
-    }
-
-    const range = quill.getSelection(true);
-
+    const newFiles: { name: string; url: string }[] = [];
     for (const file of imageFiles) {
       const url = await uploadFile(file);
       if (url) {
-        // Insert image directly into the editor
-        quill.insertEmbed(range.index, 'image', url);
-        // Move cursor after image
-        quill.setSelection(range.index + 1);
-        toast({
-          title: "Imagem colada",
-          description: "A imagem foi inserida no editor.",
-        });
+        const ext = file.type.split('/')[1] || 'png';
+        newFiles.push({ name: file.name || `imagem_colada.${ext}`, url });
       }
     }
 
+    if (newFiles.length > 0) {
+      handleAttachmentsChange([...attachments, ...newFiles]);
+      toast({
+        title: "Imagem colada",
+        description: "A imagem foi adicionada aos anexos.",
+      });
+    }
+
     setIsUploading(false);
-  }, [uploadFile, toast]);
+  }, [attachments, handleAttachmentsChange, uploadFile, toast]);
 
   const handleBlur = useCallback((e: React.FocusEvent) => {
     if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
@@ -362,19 +345,20 @@ export function RichTextarea({
         </span>
       </div>
 
-      {images.length > 0 && (
+      {attachments.length > 0 && (
         <div className="space-y-2 mt-2">
-          {images.map((url, index) => {
-            const fileType = getFileTypeFromDataUrl(url);
+          {attachments.map((att, index) => {
+            const fileType = getFileTypeFromDataUrl(att.url);
             const isMedia = fileType === "image" || fileType === "video";
+            const displayName = att.name || getFileNameFromDataUrl(att.url, index);
             
             if (isMedia) {
               return (
                 <div key={index} className="relative group rounded-lg overflow-hidden border bg-muted/50 aspect-video flex items-center justify-center" style={{ maxHeight: "200px" }}>
                   {fileType === "video" ? (
-                    <video src={url} className="max-w-full max-h-full object-contain" />
+                    <video src={att.url} className="max-w-full max-h-full object-contain" />
                   ) : (
-                    <img src={url} alt={`Anexo ${index + 1}`} className="max-w-full max-h-full object-contain cursor-pointer" />
+                    <img src={att.url} alt={displayName} className="max-w-full max-h-full object-contain cursor-pointer" />
                   )}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <Dialog>
@@ -388,9 +372,9 @@ export function RichTextarea({
                           <DialogTitle>Visualizacao de {fileType === "video" ? "Video" : "Imagem"}</DialogTitle>
                         </VisuallyHidden>
                         {fileType === "video" ? (
-                          <video src={url} controls autoPlay className="max-w-full max-h-full" />
+                          <video src={att.url} controls autoPlay className="max-w-full max-h-full" />
                         ) : (
-                          <img src={url} alt="Preview" className="max-w-full max-h-full object-contain" />
+                          <img src={att.url} alt="Preview" className="max-w-full max-h-full object-contain" />
                         )}
                       </DialogContent>
                     </Dialog>
@@ -409,6 +393,9 @@ export function RichTextarea({
                       <Video className="h-3 w-3" />
                     </div>
                   )}
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 truncate">
+                    {displayName}
+                  </div>
                 </div>
               );
             }
@@ -417,7 +404,7 @@ export function RichTextarea({
               <div key={index} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 group">
                 <FileIcon type={fileType} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{getFileNameFromDataUrl(url, index)}</p>
+                  <p className="text-sm font-medium truncate">{displayName}</p>
                   <p className="text-[10px] text-muted-foreground uppercase">{fileType === "pdf" ? "PDF" : fileType === "excel" ? "Planilha" : fileType === "document" ? "Documento" : "Arquivo"}</p>
                 </div>
                 <div className="flex items-center gap-1">
@@ -426,7 +413,7 @@ export function RichTextarea({
                     size="icon"
                     variant="ghost"
                     className="h-8 w-8"
-                    onClick={() => openFileInNewTab(url, index)}
+                    onClick={() => openFileInNewTab(att, index)}
                     data-testid={dataTestId ? `${dataTestId}-open-attachment-${index}` : undefined}
                   >
                     <Download className="h-4 w-4" />

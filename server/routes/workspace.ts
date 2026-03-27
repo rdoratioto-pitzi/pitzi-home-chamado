@@ -19,18 +19,49 @@ const ptBrToKanbanStatus: Record<string, string> = {
 };
 
 export function registerWorkspaceRoutes(router: Router) {
+  // Lightweight counts endpoint for tab badges (no item data, fast)
+  router.get("/api/workspace/counts", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+
+      const [allTickets, allCards] = await Promise.all([
+        isAdmin
+          ? storage.getTicketsForWorkspace()
+          : storage.getTicketsForWorkspace({ requesterId: userId, assigneeId: userId }),
+        db.select().from(kanbanCards),
+      ]);
+
+      // Chamados em tratativa
+      const chamados = allTickets.filter(
+        (t) => t.status === "open" || t.status === "in_progress" || t.status === "blocked"
+      ).length;
+
+      // Cards de projeto atribuídos ao usuário (não concluídos)
+      const myCards = allCards.filter(
+        (c: any) => c.assigneeId === userId && c.status !== "done"
+      ).length;
+
+      res.json({ chamados, projetos: myCards, todos: chamados + myCards });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   router.get("/api/workspace/chamados", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
       const periodo = (req.query.periodo as string) || "este-ano";
 
-      // Fetch tickets based on user role
-      const allTickets: Ticket[] = isAdmin
-        ? await storage.getTickets()
-        : await storage.getTickets({ requesterId: userId, assigneeId: userId });
+      // Fetch tickets, users and SLA rules in parallel (avoid sequential DB roundtrips)
+      const ticketsPromise = isAdmin
+        ? storage.getTicketsForWorkspace()
+        : storage.getTicketsForWorkspace({ requesterId: userId, assigneeId: userId });
 
-      const users: User[] = await storage.getUsers();
-      const slaRules: SlaRule[] = await storage.getSlaRules();
+      const [allTickets, users, slaRules] = await Promise.all([
+        ticketsPromise,
+        storage.getUsers() as Promise<User[]>,
+        storage.getSlaRules() as Promise<SlaRule[]>,
+      ]);
 
       // Filter by period
       const now = new Date();
@@ -67,7 +98,7 @@ export function registerWorkspaceRoutes(router: Router) {
       let noPrazo = 0;
       let emAtraso = 0;
       for (const ticket of filtered) {
-        const slaStatus = getSlaStatus(ticket, slaRules);
+        const slaStatus = getSlaStatus(ticket as any, slaRules);
         if (slaStatus === "dentro_prazo") noPrazo++;
         else if (slaStatus === "em_atraso") emAtraso++;
       }
@@ -85,7 +116,7 @@ export function registerWorkspaceRoutes(router: Router) {
           .map((w) => w[0].toUpperCase())
           .join("");
 
-        const sla = getSlaForTicket(t, slaRules);
+        const sla = getSlaForTicket(t as any, slaRules);
 
         return {
           id: t.id,
@@ -101,6 +132,7 @@ export function registerWorkspaceRoutes(router: Router) {
           sla: sla.slaHoras,
           statusSla: sla.status,
           abertura: t.dataAbertura || t.createdAt,
+          hasAttachments: !!(t as any).hasAttachments,
         };
       });
 
@@ -118,11 +150,12 @@ export function registerWorkspaceRoutes(router: Router) {
   router.post("/api/workspace/chamados", requireAuth, async (req, res) => {
     try {
       const { userId } = getSessionUser(req);
-      const { titulo, descricao, categoria, prioridade } = req.body as {
+      const { titulo, descricao, categoria, prioridade, attachments } = req.body as {
         titulo?: string;
         descricao?: string;
         categoria?: string;
         prioridade?: string;
+        attachments?: string;
       };
 
       if (!titulo?.trim()) {
@@ -148,6 +181,7 @@ export function registerWorkspaceRoutes(router: Router) {
         status: "open",
         requesterId: userId,
         tenantId: null,
+        attachments: attachments || null,
       } as InsertTicket);
 
       const [allUsers, slaRules] = await Promise.all([
@@ -469,7 +503,7 @@ export function registerWorkspaceRoutes(router: Router) {
       let noPrazo = 0;
       let emAtraso = 0;
       for (const ticket of allTickets) {
-        const slaStatus = getSlaStatus(ticket, slaRules);
+        const slaStatus = getSlaStatus(ticket as any, slaRules);
         if (slaStatus === "dentro_prazo") noPrazo++;
         else if (slaStatus === "em_atraso") emAtraso++;
       }

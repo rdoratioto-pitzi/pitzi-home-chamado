@@ -21,6 +21,7 @@ export interface ChamadoItem {
   sla: number | null;
   statusSla: "dentro_prazo" | "em_atraso" | null;
   abertura: string | null;
+  hasAttachments: boolean;
 }
 
 export interface UnifiedItem {
@@ -42,8 +43,8 @@ export interface UnifiedItem {
 }
 
 type WorkspaceTableProps =
-  | { variant?: "chamados"; items: ChamadoItem[]; loading?: boolean; onRowClick?: (item: ChamadoItem) => void }
-  | { variant: "todos"; items: UnifiedItem[]; loading?: boolean; onRowClick?: (item: UnifiedItem) => void };
+  | { variant?: "chamados"; items: ChamadoItem[]; loading?: boolean; onRowClick?: (item: ChamadoItem) => void; onDelete?: (item: ChamadoItem) => void }
+  | { variant: "todos"; items: UnifiedItem[]; loading?: boolean; onRowClick?: (item: UnifiedItem) => void; onDelete?: (item: ChamadoItem) => void };
 
 const statusDotColors: Record<string, { bg: string }> = {
   in_progress: { bg: "#00c853" },
@@ -256,6 +257,7 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
   const { items, loading } = props;
   const variant = props.variant ?? "chamados";
   const onRowClick = "onRowClick" in props ? props.onRowClick : undefined;
+  const onDelete = "onDelete" in props ? props.onDelete : undefined;
 
   const col3Header = variant === "todos" ? "Tipo / Contexto" : "Categoria / Tipo";
   const headers = ["Código", "Título", col3Header, "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""];
@@ -313,6 +315,7 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
                     key={(item as ChamadoItem).id}
                     item={item as ChamadoItem}
                     onRowClick={onRowClick as ((item: ChamadoItem) => void) | undefined}
+                    onDelete={onDelete}
                   />
                 ),
               )}
@@ -352,7 +355,7 @@ function HeaderRow({ headers }: { headers: string[] }) {
   );
 }
 
-function ChamadoItemRow({ item, onRowClick }: { item: ChamadoItem; onRowClick?: (item: ChamadoItem) => void }) {
+function ChamadoItemRow({ item, onRowClick, onDelete }: { item: ChamadoItem; onRowClick?: (item: ChamadoItem) => void; onDelete?: (item: ChamadoItem) => void }) {
   const typeColor = typeColors[item.tipo?.toLowerCase()] || "bg-slate-500/10 text-slate-400";
   const prioColor = priorityColors[item.prioridade] || priorityColors.medium;
 
@@ -396,7 +399,10 @@ function ChamadoItemRow({ item, onRowClick }: { item: ChamadoItem; onRowClick?: 
         {item.sla ? `${item.sla}h` : "—"}
       </span>
       <SlaStatusCell statusSla={item.statusSla} className="ws-col-sla" />
-      <ActionsMenu />
+      <ActionsMenu
+        onEdit={() => { window.location.href = `/chamados/${item.id}`; }}
+        onDelete={onDelete ? () => onDelete(item) : undefined}
+      />
     </div>
   );
 }
@@ -452,6 +458,7 @@ function UnifiedItemRow({ item, onRowClick }: { item: UnifiedItem; onRowClick?: 
       <SlaStatusCell statusSla={item.statusSla} className="ws-col-sla" />
       <ActionsMenu />
     </div>
+
   );
 }
 
@@ -497,9 +504,9 @@ function SlaStatusCell({ statusSla, className }: { statusSla: "dentro_prazo" | "
   );
 }
 
-function ActionsMenu() {
+function ActionsMenu({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) {
   return (
-    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+    <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="p-1 rounded hover:bg-white/5">
@@ -507,11 +514,11 @@ function ActionsMenu() {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(); }}>
             <Edit className="h-3.5 w-3.5 mr-2" />
             Editar
           </DropdownMenuItem>
-          <DropdownMenuItem className="text-red-400">
+          <DropdownMenuItem className="text-red-400" onClick={(e) => { e.stopPropagation(); onDelete?.(); }}>
             <Trash2 className="h-3.5 w-3.5 mr-2" />
             Excluir
           </DropdownMenuItem>
