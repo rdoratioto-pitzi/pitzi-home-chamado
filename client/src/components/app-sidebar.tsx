@@ -63,6 +63,7 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { RenovLogo } from "./renov-logo";
+import { VersionBadge } from "./version-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -701,6 +702,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-0 border-t border-border/40">
+        <VersionBadge />
+      </SidebarFooter>
     </Sidebar>
   );
 }
