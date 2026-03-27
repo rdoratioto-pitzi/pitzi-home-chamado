@@ -2,13 +2,13 @@ import { useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Ticket, User } from "@shared/schema";
+import type { Ticket, TicketListing, User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 
 interface TicketKanbanProps {
-  tickets: Ticket[];
+  tickets: TicketListing[];
   users: User[];
-  onTicketClick: (ticket: Ticket) => void;
+  onTicketClick: (ticket: TicketListing) => void;
 }
 
 const columns = [
@@ -76,8 +76,6 @@ export function TicketKanban({ tickets, users, onTicketClick }: TicketKanbanProp
     }
   };
 
-  const getUser = (userId: string | null) => users.find((u) => u.id === userId);
-
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
       {columns.map((column) => {
@@ -100,7 +98,6 @@ export function TicketKanban({ tickets, users, onTicketClick }: TicketKanbanProp
 
             <div className="space-y-3 min-h-[200px] bg-muted/30 rounded-lg p-2">
               {columnTickets.map((ticket) => {
-                const assignee = getUser(ticket.assigneeId || null);
                 return (
                   <Card
                     key={ticket.id}
@@ -134,9 +131,9 @@ export function TicketKanban({ tickets, users, onTicketClick }: TicketKanbanProp
                       <Badge variant="secondary" className="text-xs">
                         {typeLabels[ticket.type || "bug"]}
                       </Badge>
-                      {assignee && (
+                      {ticket.assigneeName && (
                         <span className="truncate max-w-[80px]">
-                          {assignee.name}
+                          {ticket.assigneeName}
                         </span>
                       )}
                     </div>
