@@ -606,7 +606,7 @@ shipments.get("/api/integrations/adm-logistica/recebimentos", async (c) => {
 shipments.get("/api/integrations/adm-logistica/triagem", async (c) => {
   const params = new URLSearchParams();
   const queryParams = [
-    "imei", "serial_number", "categories", "status_recebimento", "redes",
+    "imei", "serial_number", "voucher_code", "categories", "status_recebimento", "redes",
     "responsavel_triagem", "receipt_start", "receipt_end",
     "col_start", "col_end", "triagem_start", "triagem_end",
   ];
