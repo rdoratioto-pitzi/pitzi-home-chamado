@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Keyboard, X } from "lucide-react";
+import { validarIMEI } from "@/lib/validators";
 
 interface ManualInputProps {
   onSubmit: (imei: string) => void;
@@ -40,7 +41,8 @@ export function ManualInput({ onSubmit, disabled, error }: ManualInputProps) {
   };
 
   const handleSubmit = () => {
-    if (inputValue.length === 15) {
+    const validacao = validarIMEI(inputValue);
+    if (validacao.valido) {
       onSubmit(inputValue);
       setInputValue("");
     }
@@ -145,7 +147,7 @@ export function ManualInput({ onSubmit, disabled, error }: ManualInputProps) {
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={inputValue.length !== 15 || disabled}
+              disabled={!validarIMEI(inputValue).valido || disabled}
               className="flex-1"
             >
               Adicionar
