@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { type Setting } from "@shared/schema";
 import { useTheme } from "@/hooks/use-theme";
+import { fetchWithAuth } from "@/lib/queryClient";
 
 interface RenovLogoProps {
   variant?: "light" | "dark" | "white" | "auto";
@@ -16,10 +17,14 @@ const sizeMap = {
   xl: { width: 180, height: 50 },
 };
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
+
 function normalizeObjectPath(path: string): string {
   if (!path) return "";
-  if (path.startsWith("/objects/")) return path;
-  return `/objects/${path.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
+  const normalized = path.startsWith("/objects/")
+    ? path
+    : `/objects/${path.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
+  return `${API_BASE}${normalized}`;
 }
 
 export function RenovLogo({ variant = "auto", size = "md", className = "" }: RenovLogoProps) {
@@ -30,7 +35,7 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
   const { data: logoUrlLight, isLoading: isLoadingLight } = useQuery<Setting>({
     queryKey: ["/api/settings/logo_url_light"],
     queryFn: async () => {
-      const res = await fetch("/api/settings/logo_url_light");
+      const res = await fetchWithAuth("/api/settings/logo_url_light");
       if (!res.ok) return { value: "" };
       return res.json();
     },
@@ -41,7 +46,7 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
   const { data: logoUrlDark, isLoading: isLoadingDark } = useQuery<Setting>({
     queryKey: ["/api/settings/logo_url_dark"],
     queryFn: async () => {
-      const res = await fetch("/api/settings/logo_url_dark");
+      const res = await fetchWithAuth("/api/settings/logo_url_dark");
       if (!res.ok) return { value: "" };
       return res.json();
     },
