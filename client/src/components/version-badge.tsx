@@ -45,7 +45,7 @@ export function VersionBadge() {
                 isError ? "bg-red-500" : "bg-green-500"
               }`}
             />
-            <span>
+            <span className={isError ? "text-red-500" : ""}>
               Back: {isError ? "offline" : (backVersion?.version ?? "...")}
             </span>
           </div>
