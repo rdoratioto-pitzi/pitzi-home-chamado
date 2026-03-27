@@ -6,12 +6,16 @@ import { Label } from "@/components/ui/label";
 import { Upload, Image, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { RenovLogo } from "@/components/renov-logo";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, fetchWithAuth } from "@/lib/queryClient";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
 function normalizeObjectPath(path: string): string {
   if (!path) return "";
-  if (path.startsWith("/objects/")) return path;
-  return `/objects/${path.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
+  const normalized = path.startsWith("/objects/")
+    ? path
+    : `/objects/${path.replace(/^\/objects\/?/, "").replace(/^\//, "")}`;
+  return `${API_BASE}${normalized}`;
 }
 
 export function BrandSettings() {
@@ -25,7 +29,7 @@ export function BrandSettings() {
   const { data: faviconSetting, refetch: refetchFavicon } = useQuery<{ value: string }>({
     queryKey: ["/api/settings/favicon_url"],
     queryFn: async () => {
-      const res = await fetch("/api/settings/favicon_url");
+      const res = await fetchWithAuth("/api/settings/favicon_url");
       if (!res.ok) return { value: "" };
       return res.json();
     },
@@ -35,7 +39,7 @@ export function BrandSettings() {
   const { data: logoUrlLightSetting, refetch: refetchLogoLight } = useQuery<{ value: string }>({
     queryKey: ["/api/settings/logo_url_light"],
     queryFn: async () => {
-      const res = await fetch("/api/settings/logo_url_light");
+      const res = await fetchWithAuth("/api/settings/logo_url_light");
       if (!res.ok) return { value: "" };
       return res.json();
     },
@@ -45,7 +49,7 @@ export function BrandSettings() {
   const { data: logoUrlDarkSetting, refetch: refetchLogoDark } = useQuery<{ value: string }>({
     queryKey: ["/api/settings/logo_url_dark"],
     queryFn: async () => {
-      const res = await fetch("/api/settings/logo_url_dark");
+      const res = await fetchWithAuth("/api/settings/logo_url_dark");
       if (!res.ok) return { value: "" };
       return res.json();
     },
@@ -88,7 +92,7 @@ export function BrandSettings() {
     
     setIsSaving(true);
     try {
-      const requestRes = await fetch("/api/uploads/request-url", {
+      const requestRes = await fetchWithAuth("/api/uploads/request-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
