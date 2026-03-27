@@ -434,8 +434,8 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                 <RichTextarea
                   value={editedDescription}
                   onChange={setEditedDescription}
-                  images={editedAttachments.map(a => a.url)}
-                  onImagesChange={(urls) => setEditedAttachments(urls.map((url, i) => ({ name: `Arquivo_${i + 1}`, url })))}
+                  attachments={editedAttachments}
+                  onAttachmentsChange={setEditedAttachments}
                   placeholder="Edite a descrição do chamado..."
                 />
                 <div className="flex gap-2 justify-end">
@@ -529,14 +529,22 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                         const getFileName = () => {
                           // If we have the actual filename from the object format, use it
                           if (fileName) return fileName;
-                          // Otherwise, extract from URL (backwards compatibility)
+                          // Otherwise, extract from MIME type (backwards compatibility)
                           const mimeMatch = url.match(/^data:([^;]+);/);
                           if (mimeMatch) {
-                            const extMap: Record<string, string> = { "application/pdf": "pdf", "application/vnd.ms-excel": "xls", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx", "text/csv": "csv", "application/msword": "doc", "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx" };
-                            const ext = extMap[mimeMatch[1]] || mimeMatch[1].split("/")[1] || "arquivo";
-                            return `Arquivo_${i + 1}.${ext}`;
+                            const mime = mimeMatch[1];
+                            const extMap: Record<string, string> = {
+                              "application/pdf": "pdf",
+                              "application/vnd.ms-excel": "xls",
+                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+                              "text/csv": "csv",
+                              "application/msword": "doc",
+                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+                            };
+                            const ext = extMap[mime] || mime.split("/")[1] || "arquivo";
+                            return `arquivo_${i + 1}.${ext}`;
                           }
-                          return `Arquivo_${i + 1}`;
+                          return `arquivo_${i + 1}`;
                         };
 
                         const handleOpen = () => {
@@ -861,8 +869,8 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
             placeholder="Adicione um comentário..."
             value={comment}
             onChange={setComment}
-            images={commentImages.map(c => c.url)}
-            onImagesChange={(urls) => setCommentImages(urls.map((url, i) => ({ name: `Arquivo_${i + 1}`, url })))}
+            attachments={commentImages}
+            onAttachmentsChange={setCommentImages}
             className="min-h-[100px]"
           />
           <Button

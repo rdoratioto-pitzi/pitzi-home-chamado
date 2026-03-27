@@ -44,6 +44,8 @@ import {
 } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import type { Ticket, TicketCommentWithUser, User, Setting } from "@shared/schema";
+
+type TicketWithNames = Ticket & { requesterName: string | null; assigneeName: string | null };
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -185,7 +187,7 @@ export default function TicketDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
 
   // Fetch ticket
-  const { data: ticket, isLoading: ticketLoading } = useQuery<Ticket>({
+  const { data: ticket, isLoading: ticketLoading } = useQuery<TicketWithNames>({
     queryKey: ["/api/tickets", id],
     queryFn: async () => {
       const res = await apiRequest("GET", `/api/tickets/${id}`);
@@ -194,9 +196,10 @@ export default function TicketDetailPage() {
     },
   });
 
-  // Fetch users
+  // Fetch users only when editing (needed for UserSelect dropdown)
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
+    enabled: isEditing,
   });
 
   // Fetch comments
@@ -394,7 +397,6 @@ export default function TicketDetailPage() {
     commentMutation.mutate({ content: comment, images: commentImages });
   };
 
-  const getUser = (userId: string | null) => users.find(u => u.id === userId);
   const getInitials = (name: string) => name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
   const timeOpenInfo = ticket ? getTimeOpenInfo(ticket.createdAt) : { text: "-", colorClass: "" };
@@ -439,8 +441,8 @@ export default function TicketDetailPage() {
     );
   }
 
-  const requester = getUser(ticket.requesterId);
-  const assignee = getUser(ticket.assigneeId || null);
+  const requesterName = ticket.requesterName || "N/A";
+  const assigneeName = ticket.assigneeName || "Não atribuído";
 
   return (
     <div className="flex-1 overflow-auto p-6 space-y-6" data-testid="page-ticket-detail">
@@ -669,8 +671,8 @@ export default function TicketDetailPage() {
                       <RichTextarea
                         value={editedDescription}
                         onChange={setEditedDescription}
-                        images={editedAttachments.map(a => a.url)}
-                        onImagesChange={(urls) => setEditedAttachments(urls.map((url, i) => ({ name: `Arquivo_${i + 1}`, url })))}
+                        attachments={editedAttachments}
+                        onAttachmentsChange={setEditedAttachments}
                         className="min-h-[200px]"
                       />
                     </div>
@@ -795,10 +797,19 @@ export default function TicketDetailPage() {
                                   const getFileName = () => {
                                     // If we have the actual filename from the object format, use it
                                     if (fileName) return fileName;
-                                    // Otherwise, extract from URL (backwards compatibility)
+                                    // Otherwise, extract from MIME type (backwards compatibility)
                                     const mimeMatch = url.match(/^data:([^;]+);/);
                                     if (mimeMatch) {
-                                      const ext = mimeMatch[1].split('/')[1];
+                                      const mime = mimeMatch[1];
+                                      const extMap: Record<string, string> = {
+                                        "application/pdf": "pdf",
+                                        "application/vnd.ms-excel": "xls",
+                                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+                                        "text/csv": "csv",
+                                        "application/msword": "doc",
+                                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+                                      };
+                                      const ext = extMap[mime] || mime.split('/')[1] || "arquivo";
                                       return `arquivo_${i + 1}.${ext}`;
                                     }
                                     return `arquivo_${i + 1}`;
@@ -851,17 +862,16 @@ export default function TicketDetailPage() {
                 <p className="text-muted-foreground text-sm">Nenhum comentário ainda.</p>
               ) : (
                 comments.map((c) => {
-                  const commentUser = getUser(c.userId);
                   return (
                     <div key={c.id} className="flex gap-3 p-3 bg-muted/30 rounded-lg">
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="text-xs">
-                          {getInitials(commentUser?.name || "U")}
+                          {getInitials(c.author?.name || "U")}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{commentUser?.name || "Usuário"}</span>
+                          <span className="font-medium text-sm">{c.author?.name || "Usuário"}</span>
                           <span className="text-xs text-muted-foreground">
                             {formatDateTime(c.createdAt)}
                           </span>
@@ -929,10 +939,10 @@ export default function TicketDetailPage() {
                   <div className="flex items-center gap-2 mt-1">
                     <Avatar className="h-6 w-6">
                       <AvatarFallback className="text-xs">
-                        {getInitials(requester?.name || "U")}
+                        {getInitials(requesterName)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm">{requester?.name || "N/A"}</span>
+                    <span className="text-sm">{requesterName}</span>
                   </div>
                 </div>
 
@@ -941,10 +951,10 @@ export default function TicketDetailPage() {
                   <div className="flex items-center gap-2 mt-1">
                     <Avatar className="h-6 w-6">
                       <AvatarFallback className="text-xs">
-                        {getInitials(assignee?.name || "N")}
+                        {getInitials(assigneeName)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-sm">{assignee?.name || "Não atribuído"}</span>
+                    <span className="text-sm">{assigneeName}</span>
                   </div>
                 </div>
 

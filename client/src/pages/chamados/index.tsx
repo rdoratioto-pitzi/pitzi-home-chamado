@@ -52,7 +52,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import type { Ticket, User, SlaRule } from "@shared/schema";
+import type { Ticket, TicketListing, User, SlaRule } from "@shared/schema";
 import { TicketKanban } from "./ticket-kanban";
 import { CSATAnalytics } from "./csat-analytics";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -268,7 +268,7 @@ const calculateTimeOpen = (createdAt: Date | string | null): { text: string; col
 
 // Helper function to get SLA for a ticket
 const getSlaForTicket = (
-  ticket: Ticket,
+  ticket: TicketListing | Ticket,
   slaRules: SlaRule[]
 ): { slaHoras: number | null; status: "dentro_prazo" | "em_atraso" | null } => {
   const tipo = ticket.type?.toLowerCase();
@@ -327,7 +327,7 @@ export default function ChamadosPage() {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.isAdmin || currentUser?.perfilAcesso === "diretor";
 
-  const { data: tickets = [], isLoading } = useQuery<Ticket[]>({
+  const { data: tickets = [], isLoading } = useQuery<TicketListing[]>({
     queryKey: ["/api/tickets"],
   });
 
@@ -359,7 +359,11 @@ export default function ChamadosPage() {
 
   const deleteTicketMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/tickets/${id}`);
+      const res = await apiRequest("DELETE", `/api/tickets/${id}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Erro ao excluir" }));
+        throw new Error(err.error || "Erro ao excluir chamado");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
@@ -370,9 +374,7 @@ export default function ChamadosPage() {
     },
   });
 
-  const getUser = (userId: string | null) => users.find(u => u.id === userId);
-
-  const getPeriodTickets = (allTickets: Ticket[]) => {
+  const getPeriodTickets = (allTickets: TicketListing[]) => {
     return allTickets.filter(t => {
       if (periodFilter === "total") return true;
       const ticketDateStr = t.dataAbertura || t.createdAt;
@@ -402,8 +404,9 @@ export default function ChamadosPage() {
   const filteredTickets = periodTickets
     .filter((ticket) => {
       const matchesSearch = ticket.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ticket.code?.toLowerCase().includes(searchQuery.toLowerCase());
+        ticket.code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.requesterName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.assigneeName?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
       const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter;
       const matchesType = typeFilter === "all" || (ticket.type || "").toLowerCase() === typeFilter.toLowerCase();
@@ -423,8 +426,8 @@ export default function ChamadosPage() {
       return matchesSearch && matchesStatus && matchesPriority && matchesType && matchesAssignee && matchesSla;
     })
     .sort((a, b) => {
-      let valA: any = a[sortField as keyof Ticket];
-      let valB: any = b[sortField as keyof Ticket];
+      let valA: any = a[sortField as keyof TicketListing];
+      let valB: any = b[sortField as keyof TicketListing];
 
       if (sortField === "createdAt") {
         // Ensure we compare the actual time to get precise sort, 
@@ -432,10 +435,8 @@ export default function ChamadosPage() {
         valA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         valB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
       } else if (sortField === "requesterId") {
-        const userA = users.find(u => u.id === a.requesterId)?.name || "";
-        const userB = users.find(u => u.id === b.requesterId)?.name || "";
-        valA = userA.toLowerCase();
-        valB = userB.toLowerCase();
+        valA = (a.requesterName || "").toLowerCase();
+        valB = (b.requesterName || "").toLowerCase();
       }
 
       if (valA === null || valA === undefined) valA = "";
@@ -532,21 +533,18 @@ export default function ChamadosPage() {
 
   const exportToExcel = () => {
     const data = filteredTickets.map((ticket) => {
-      const requester = getUser(ticket.requesterId);
-      const assignee = getUser(ticket.assigneeId || null);
       const timeOpen = calculateTimeOpen(ticket.createdAt);
       const slaInfo = getSlaForTicket(ticket, slaRules);
       return {
         "Código": ticket.code || "",
         "Título": truncateText(ticket.title),
-        "Descrição": truncateText(ticket.description),
         "Categoria": ticket.category,
         "Tipo": ticket.type || "Bug",
         "Local": ticket.location || "",
         "Prioridade": priorityLabels[ticket.priority],
         "Status": statusLabels[ticket.status],
-        "Solicitante": requester?.name || "",
-        "Responsável": assignee?.name || "",
+        "Solicitante": ticket.requesterName || "",
+        "Responsável": ticket.assigneeName || "",
         "Abertura": ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString("pt-BR") : "",
         "Resolução": ticket.dataResolucao ? new Date(ticket.dataResolucao).toLocaleDateString("pt-BR") : "",
         "Tempo Aberto": timeOpen.text,
@@ -1098,13 +1096,13 @@ export default function ChamadosPage() {
                           </TableCell>
                           <TableCell className="text-[13px]">
                             <span className="font-medium text-muted-foreground/80">
-                              {users.find(u => u.id === ticket.requesterId)?.name || "—"}
+                              {ticket.requesterName || "—"}
                             </span>
                           </TableCell>
                           <TableCell className="text-[13px]">
                             {ticket.assigneeId ? (
                               <span className="font-medium">
-                                {users.find(u => u.id === ticket.assigneeId)?.name || "—"}
+                                {ticket.assigneeName || "—"}
                               </span>
                             ) : (
                               <span className="text-muted-foreground">Não atribuído</span>
