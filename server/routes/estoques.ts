@@ -14,6 +14,7 @@ import {
   estoquesContagemDivergencias,
   estoquesAjustes,
   users,
+  tenants,
 } from "@shared/schema";
 import { eq, desc, and, sql, like } from "drizzle-orm";
 import { getCachedProdutos, invalidateEstoqueCache } from "../services/estoque-cache.service";
@@ -135,6 +136,38 @@ export function registerEstoqueRoutes(router: Router) {
     }
   });
   
+  // GET /api/estoques/contagens/em-aberto - Listar todas as contagens em aberto do usuário
+  router.get("/api/estoques/contagens/em-aberto", requireAuth, async (req, res) => {
+    try {
+      const { userId } = getSessionUser(req);
+      
+      console.log('[Estoque Routes] GET /api/estoques/contagens/em-aberto - User:', userId);
+      
+      // Buscar TODAS contagens em andamento do usuário (sem limite)
+      const contagens = await db.select({
+        id: estoquesContagens.id,
+        codigo: estoquesContagens.codigo,
+        status: estoquesContagens.status,
+        dataInicio: estoquesContagens.dataInicio,
+        totalItensContados: estoquesContagens.totalItensContados,
+        responsavelId: estoquesContagens.responsavelId,
+      })
+      .from(estoquesContagens)
+      .where(
+        and(
+          eq(estoquesContagens.responsavelId, userId),
+          eq(estoquesContagens.status, 'em_andamento')
+        )
+      )
+      .orderBy(desc(estoquesContagens.dataInicio));
+      
+      res.json({ success: true, data: contagens });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Error listing contagens em aberto:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+  
   // POST /api/estoques/contagens - Iniciar nova contagem
   router.post("/api/estoques/contagens", requireAuth, async (req, res) => {
     try {
@@ -142,24 +175,25 @@ export function registerEstoqueRoutes(router: Router) {
       
       console.log('[Estoque Routes] POST /api/estoques/contagens - User:', userId);
       
-      // Verificar se já existe contagem em andamento
-      const contagemExistente = await db.select({ id: estoquesContagens.id })
-        .from(estoquesContagens)
-        .where(
-          and(
-            eq(estoquesContagens.responsavelId, userId),
-            eq(estoquesContagens.status, 'em_andamento')
-          )
-        )
-        .limit(1);
+      // NÃO bloquear - Permite múltiplas sessões de contagem simultâneas
+      // O usuário pode ter várias contagens em andamento ao mesmo tempo
       
-      if (contagemExistente.length > 0) {
-        return res.status(400).json({
-          success: false,
-          error: "Já existe uma contagem em andamento. Finalize ou cancele antes de iniciar uma nova."
-        });
+      // Buscar tenantId do usuário
+      const user = await db.select({ tenantId: users.tenantId }).from(users).where(eq(users.id, userId)).limit(1);
+      
+      let tenantId = user[0]?.tenantId;
+      
+      // Fallback se user não tiver tenant (migration): pegar primeiro tenant ativo
+      if (!tenantId) {
+        console.warn('[Estoque Routes] User sem tenantId, buscando tenant default');
+        const defaultTenant = await db.select({ id: tenants.id }).from(tenants).limit(1);
+        if (defaultTenant.length > 0) {
+          tenantId = defaultTenant[0].id;
+        } else {
+           return res.status(500).json({ success: false, error: "Erro de configuração: Sistema sem Tenant definido." });
+        }
       }
-      
+
       // Gerar código: CNT-YYYYMMDD-XXX
       const today = new Date();
       const year = today.getFullYear();
@@ -187,6 +221,7 @@ export function registerEstoqueRoutes(router: Router) {
         .values({
           codigo,
           responsavelId: userId,
+          tenantId, // Adicionado tenantId
           status: 'em_andamento',
           dataInicio: new Date(),
           totalItensContados: 0,
@@ -219,14 +254,6 @@ export function registerEstoqueRoutes(router: Router) {
       const { userId, isAdmin } = getSessionUser(req);
       
       console.log('[Estoque Routes] POST /api/estoques/contagens/:id/item - Contagem:', id, 'IMEI:', imei);
-      
-      // Validar IMEI (15 dígitos numéricos)
-      if (!imei || !/^\d{15}$/.test(imei)) {
-        return res.status(400).json({
-          success: false,
-          error: "IMEI inválido - deve ter 15 dígitos numéricos"
-        });
-      }
       
       // Buscar contagem
       const contagem = await db.select()
@@ -380,6 +407,81 @@ export function registerEstoqueRoutes(router: Router) {
     }
   });
   
+  // DELETE /api/estoques/contagens/:contagemId/item/:itemId - Remover item da contagem
+  router.delete("/api/estoques/contagens/:contagemId/item/:itemId", requireAuth, async (req, res) => {
+    try {
+      const { contagemId, itemId } = req.params;
+      const { userId, isAdmin } = getSessionUser(req);
+      
+      console.log('[Estoque Routes] DELETE /api/estoques/contagens/:contagemId/item/:itemId - Contagem:', contagemId, 'Item:', itemId);
+      
+      // Buscar contagem
+      const contagem = await db.select()
+        .from(estoquesContagens)
+        .where(eq(estoquesContagens.id, contagemId))
+        .limit(1);
+      
+      if (contagem.length === 0) {
+        return res.status(404).json({ success: false, error: "Contagem não encontrada" });
+      }
+      
+      // Verificar permissão (própria contagem ou admin)
+      if (contagem[0].responsavelId !== userId && !isAdmin) {
+        return res.status(403).json({ success: false, error: "Sem permissão para remover itens desta contagem" });
+      }
+      
+      // Verificar se contagem está em andamento
+      if (contagem[0].status !== 'em_andamento') {
+        return res.status(400).json({
+          success: false,
+          error: "Não é possível remover itens - contagem não está mais em andamento"
+        });
+      }
+      
+      // Buscar item
+      const item = await db.select()
+        .from(estoquesContagemItens)
+        .where(and(
+          eq(estoquesContagemItens.id, itemId),
+          eq(estoquesContagemItens.contagemId, contagemId)
+        ))
+        .limit(1);
+      
+      if (item.length === 0) {
+        return res.status(404).json({ success: false, error: "Item não encontrado" });
+      }
+      
+      // Remover item
+      await db.delete(estoquesContagemItens)
+        .where(eq(estoquesContagemItens.id, itemId));
+      
+      // Atualizar total de itens contados
+      await db.update(estoquesContagens)
+        .set({
+          totalItensContados: sql`${estoquesContagens.totalItensContados} - 1`,
+          updatedAt: new Date()
+        })
+        .where(eq(estoquesContagens.id, contagemId));
+      
+      // Criar log
+      await db.insert(estoquesContagemLogs)
+        .values({
+          contagemId,
+          userId,
+          acao: 'item_removido',
+          imei: item[0].imei,
+          detalhes: { itemId },
+        });
+      
+      console.log('[Estoque Routes] Item removido:', item[0].imei);
+      
+      res.json({ success: true, message: "Item removido com sucesso" });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Error removing item:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+   
   // POST /api/estoques/contagens/:id/finalizar - Finalizar contagem
   router.post("/api/estoques/contagens/:id/finalizar", requireAuth, async (req, res) => {
     try {

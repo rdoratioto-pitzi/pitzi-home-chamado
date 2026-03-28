@@ -105,6 +105,10 @@ export const tickets = pgTable("tickets", {
 export const insertTicketSchema = createInsertSchema(tickets).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTicket = z.infer<typeof insertTicketSchema>;
 export type Ticket = typeof tickets.$inferSelect;
+export type TicketListing = Pick<Ticket, 
+  "id" | "code" | "title" | "category" | "type" | "location" | "priority" | "status" | 
+  "requesterId" | "assigneeId" | "createdAt" | "dueDate" | "dataAbertura" | "dataResolucao"
+> & { requesterName: string | null; assigneeName: string | null };
 
 // ============== TICKET RESPONSAVEIS (Assignment Rules) ==============
 export const ticketResponsaveis = pgTable("ticket_responsaveis", {
@@ -1602,4 +1606,18 @@ export const claudeCodeUsageReports = pgTable("claude_code_usage_reports", {
 export const insertClaudeCodeUsageSchema = createInsertSchema(claudeCodeUsageReports).omit({ id: true, reportedAt: true });
 export type InsertClaudeCodeUsage = z.infer<typeof insertClaudeCodeUsageSchema>;
 export type ClaudeCodeUsageReport = typeof claudeCodeUsageReports.$inferSelect;
+
+// ============== WORKSPACE COMENTARIOS ==============
+export const workspaceComentarios = pgTable("workspace_comentarios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  chamadoId: varchar("chamado_id").notNull(),
+  autorId: varchar("autor_id").notNull(),
+  texto: text("texto").notNull(),
+  mencionados: text("mencionados").array().default(sql`'{}'::text[]`),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export const insertWorkspaceComentarioSchema = createInsertSchema(workspaceComentarios).omit({ id: true, criadoEm: true });
+export type InsertWorkspaceComentario = z.infer<typeof insertWorkspaceComentarioSchema>;
+export type WorkspaceComentario = typeof workspaceComentarios.$inferSelect;
 
