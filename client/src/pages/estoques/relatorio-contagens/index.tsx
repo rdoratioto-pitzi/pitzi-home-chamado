@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { FileSpreadsheet, Eye } from "lucide-react";
+import { FileSpreadsheet, Eye, Play, RotateCw } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { STATUS_CONTAGEM_MAP } from "../utils";
@@ -47,10 +47,11 @@ export default function EstoquesRelatorioContagensPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
-  const { data: contagens = [], isLoading } = useQuery({
+  const { data: contagens = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ["contagens-lista"],
     queryFn: fetchContagens,
     enabled: user?.isAdmin === true,
+    refetchOnWindowFocus: true,
   });
 
   if (!user?.isAdmin) {
@@ -67,10 +68,21 @@ export default function EstoquesRelatorioContagensPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
-      <PageHeader
-        title="Relatório de Contagens"
-        description="Análise comparativa sistema vs físico — acesso restrito a administradores"
-      />
+      <div className="flex items-center justify-between">
+        <PageHeader
+          title="Relatório de Contagens"
+          description="Análise comparativa sistema vs físico — acesso restrito a administradores"
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+        >
+          <RotateCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
+          {isFetching ? "Atualizando..." : "Atualizar"}
+        </Button>
+      </div>
 
       <Card>
         <CardContent className="p-0">
@@ -154,6 +166,17 @@ export default function EstoquesRelatorioContagensPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
+                          {c.status === "em_andamento" && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="bg-orange-500 hover:bg-orange-600"
+                              onClick={() => navigate("/estoques/contagem")}
+                            >
+                              <Play className="h-4 w-4 mr-1" />
+                              Continuar
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
@@ -162,12 +185,14 @@ export default function EstoquesRelatorioContagensPage() {
                             <Eye className="h-4 w-4 mr-1" />
                             Ver Detalhes
                           </Button>
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={`/api/estoques/contagens/${c.id}/export`} download>
-                              <FileSpreadsheet className="h-4 w-4 mr-1" />
-                              Excel
-                            </a>
-                          </Button>
+                          {c.status !== "em_andamento" && (
+                            <Button variant="outline" size="sm" asChild>
+                              <a href={`/api/estoques/contagens/${c.id}/export`} download>
+                                <FileSpreadsheet className="h-4 w-4 mr-1" />
+                                Excel
+                              </a>
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

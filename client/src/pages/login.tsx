@@ -1,3 +1,4 @@
+import { RenovLogo } from "@/components/renov-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -25,7 +26,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { fetchWithAuth } from "@/lib/queryClient";
-import { RenovLogo } from "@/components/renov-logo";
 import { Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
 import { PasswordRequirements } from "@/components/auth/password-requirements";
 
@@ -67,18 +67,49 @@ const itemVariants = {
   },
 };
 
-const logoVariants = {
-  hidden: { opacity: 0, scale: 0.8, y: -20 },
+const leftPanelVariants = {
+  hidden: { opacity: 0, x: -40 },
   visible: {
     opacity: 1,
-    scale: 1,
-    y: 0,
-    transition: {
-      duration: 0.6,
-      ease: "easeOut",
-    },
+    x: 0,
+    transition: { duration: 0.6, ease: "easeOut" },
   },
 };
+
+// Decorative recycling arrows for green panel
+function RecycleIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg
+      className={className}
+      style={style}
+      viewBox="0 0 120 120"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      {/* Arrow 1 — top */}
+      <path
+        d="M60 14L74 32H66V50L46 30L66 10V28L60 14Z"
+        fill="white"
+      />
+      {/* Arrow 2 — bottom-right */}
+      <path
+        d="M60 14L74 32H66V50L46 30L66 10V28L60 14Z"
+        fill="white"
+        transform="rotate(120 60 60)"
+      />
+      {/* Arrow 3 — bottom-left */}
+      <path
+        d="M60 14L74 32H66V50L46 30L66 10V28L60 14Z"
+        fill="white"
+        transform="rotate(240 60 60)"
+      />
+    </svg>
+  );
+}
+
+// Dark input classes — always dark regardless of app theme
+const darkInputClass =
+  "h-[52px] bg-white/[0.08] border-white/[0.12] rounded-xl text-white placeholder:text-white/30 focus-visible:ring-1 focus-visible:ring-[#00A137] focus-visible:border-[#00A137] text-sm";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -91,8 +122,7 @@ export default function LoginPage() {
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [loginSuccess, setLoginSuccess] = useState(false);
-
-  // Auto-focus on email input when page loads - using callback ref
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
   // Countdown timer for forgot password
   useEffect(() => {
@@ -109,7 +139,7 @@ export default function LoginPage() {
       password: "",
       rememberMe: false,
     },
-    mode: "onChange", // Validate on change for real-time feedback
+    mode: "onChange",
   });
 
   const forgotForm = useForm<ForgotPasswordData>({
@@ -124,17 +154,13 @@ export default function LoginPage() {
     try {
       const response = await fetchWithAuth("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       });
       const result = await response.json();
-      
+
       if (result.success) {
         setLoginSuccess(true);
-        
-        // Store user in auth context (cookie-based session)
         auth.login(result.user);
-        
-        // Show success animation before redirect
         setTimeout(() => {
           toast({ title: "Login realizado com sucesso!" });
           setLocation("/");
@@ -143,14 +169,14 @@ export default function LoginPage() {
         toast({
           title: "Erro no login",
           description: result.message || "Email ou senha incorretos",
-          variant: "destructive"
+          variant: "destructive",
         });
       }
     } catch (error: any) {
       toast({
         title: "Erro no login",
         description: error.message || "Email ou senha incorretos",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -159,18 +185,18 @@ export default function LoginPage() {
 
   const onForgotPasswordSubmit = async (data: ForgotPasswordData) => {
     if (countdown > 0) return;
-    
+
     setForgotPasswordLoading(true);
     try {
       const response = await fetchWithAuth("/api/auth/forgot-password", {
         method: "POST",
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
       });
       const result = await response.json();
 
       if (result.success) {
         setForgotPasswordSent(true);
-        setCountdown(60); // 60 seconds countdown
+        setCountdown(60);
       } else {
         toast({
           title: "Erro",
@@ -204,7 +230,7 @@ export default function LoginPage() {
     forgotForm.reset();
   };
 
-  // Handle Enter key navigation
+  // Enter key navigates from email to password
   const handleEmailKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -213,76 +239,178 @@ export default function LoginPage() {
     }
   };
 
+  const passwordValue = form.watch("password");
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-8 relative overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-primary/5 dark:from-background dark:via-background dark:to-primary/10" />
-      
-      {/* Decorative circles */}
-      <div className="absolute top-1/4 -left-32 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 -right-32 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
-      
-      {/* Success overlay */}
+    <div className="min-h-screen flex" style={{ background: "#0A0A0A" }}>
+
+      {/* Login success overlay */}
       <AnimatePresence>
         {loginSuccess && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center"
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.85)" }}
           >
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", damping: 15, stiffness: 300 }}
             >
-              <CheckCircle2 className="w-24 h-24 text-green-500" />
+              <CheckCircle2 className="w-24 h-24" style={{ color: "#00A137" }} />
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* ── LEFT PANEL — Desktop only ── */}
       <motion.div
-        variants={containerVariants}
+        variants={leftPanelVariants}
         initial="hidden"
         animate="visible"
-        className="w-full max-w-md relative z-10"
+        className="hidden md:flex relative flex-col items-center justify-center overflow-hidden"
+        style={{ width: "50%", minHeight: "100vh", background: "#068130" }}
       >
-        {/* Card container */}
+        {/* Decorative recycling icons */}
+        <RecycleIcon
+          className="absolute w-32 h-32 pointer-events-none"
+          style={{ top: "10%", left: "8%", opacity: 0.12 }}
+        />
+        <RecycleIcon
+          className="absolute w-20 h-20 pointer-events-none"
+          style={{ top: "22%", right: "9%", opacity: 0.09 }}
+        />
+        <RecycleIcon
+          className="absolute w-28 h-28 pointer-events-none"
+          style={{ bottom: "14%", left: "14%", opacity: 0.12 }}
+        />
+        <RecycleIcon
+          className="absolute w-16 h-16 pointer-events-none"
+          style={{ bottom: "32%", right: "7%", opacity: 0.07 }}
+        />
+
+        {/* Content */}
+        <div className="relative z-10 flex flex-col items-center text-center px-12">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.85, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
+            className="mb-8"
+          >
+            <RenovLogo variant="white" size="xl" className="mx-auto" />
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut", delay: 0.4 }}
+            className="space-y-2"
+          >
+            <p
+              className="text-white"
+              style={{
+                fontFamily: "Montserrat, sans-serif",
+                fontSize: "16px",
+                fontWeight: 400,
+                opacity: 0.9,
+              }}
+            >
+              Sua Troca Inteligente.
+            </p>
+            <p
+              className="text-white"
+              style={{
+                fontFamily: "Montserrat, sans-serif",
+                fontSize: "14px",
+                fontWeight: 300,
+                opacity: 0.6,
+              }}
+            >
+              Plataforma de Gestão Interna
+            </p>
+          </motion.div>
+        </div>
+      </motion.div>
+
+      {/* ── RIGHT PANEL — Form ── */}
+      <div
+        className="flex-1 flex flex-col items-center justify-center px-6 md:px-14"
+        style={{ background: "#0A0A0A", minHeight: "100vh" }}
+      >
         <motion.div
-          variants={itemVariants}
-          className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl shadow-xl p-6 sm:p-8"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="w-full max-w-sm"
         >
-          {/* Logo and title */}
-          <div className="flex flex-col items-center space-y-6 mb-8">
-            <motion.div variants={logoVariants}>
-              <RenovLogo size="xl" variant="auto" className="scale-110" />
-            </motion.div>
-            <motion.div variants={itemVariants} className="space-y-2 text-center">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Bem-vindo</h1>
-              <p className="text-muted-foreground text-sm sm:text-base">
-                Acesse sua conta para continuar
-              </p>
-            </motion.div>
-          </div>
+          {/* Mobile logo pill — hidden on desktop */}
+          <motion.div variants={itemVariants} className="flex justify-center mb-8 md:hidden">
+            <div
+              className="inline-flex items-center justify-center rounded-2xl px-6 py-3"
+              style={{ background: "#068130" }}
+            >
+              <RenovLogo variant="white" size="md" />
+            </div>
+          </motion.div>
+
+          {/* Heading */}
+          <motion.div variants={itemVariants} className="mb-8">
+            <h1
+              className="text-white font-bold mb-1"
+              style={{
+                fontFamily: "Montserrat, sans-serif",
+                fontSize: "24px",
+              }}
+            >
+              Bem-vindo
+            </h1>
+            <p
+              style={{
+                fontFamily: "Montserrat, sans-serif",
+                fontSize: "14px",
+                fontWeight: 400,
+                color: "rgba(255,255,255,0.5)",
+              }}
+            >
+              Faça login para continuar
+            </p>
+          </motion.div>
 
           {/* Login form */}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+
+              {/* Email */}
               <motion.div variants={itemVariants}>
                 <FormField
                   control={form.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium">Email</FormLabel>
+                      <FormLabel
+                        style={{
+                          fontFamily: "Montserrat, sans-serif",
+                          fontSize: "10px",
+                          fontWeight: 600,
+                          letterSpacing: "0.6px",
+                          textTransform: "uppercase",
+                          color: "rgba(255,255,255,0.5)",
+                        }}
+                      >
+                        Email
+                      </FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input 
+                          <Mail
+                            className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none"
+                            style={{ color: "rgba(255,255,255,0.35)" }}
+                          />
+                          <Input
                             type="email"
-                            placeholder="seuemail@renovsmart.com.br" 
-                            className="pl-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                            placeholder="seuemail@renovsmart.com.br"
+                            className={`${darkInputClass} pl-10`}
                             data-testid="input-login-email"
                             onKeyDown={handleEmailKeyDown}
                             aria-label="Email para login"
@@ -292,7 +420,7 @@ export default function LoginPage() {
                           />
                         </div>
                       </FormControl>
-                      <FormMessage className="text-xs" />
+                      <FormMessage className="text-xs" style={{ color: "#C53030" }} />
                       <span id="email-description" className="sr-only">
                         Digite seu email corporativo
                       </span>
@@ -301,20 +429,37 @@ export default function LoginPage() {
                 />
               </motion.div>
 
+              {/* Password */}
               <motion.div variants={itemVariants}>
                 <FormField
                   control={form.control}
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-                        <FormLabel className="text-sm font-medium">Senha</FormLabel>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <FormLabel
+                          style={{
+                            fontFamily: "Montserrat, sans-serif",
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            letterSpacing: "0.6px",
+                            textTransform: "uppercase",
+                            color: "rgba(255,255,255,0.5)",
+                          }}
+                        >
+                          Senha
+                        </FormLabel>
                         <button
                           type="button"
-                          className="text-xs text-muted-foreground hover:text-primary underline-offset-4 hover:underline transition-colors"
+                          className="transition-colors duration-150 hover:underline underline-offset-4"
+                          style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}
                           data-testid="button-forgot-password"
                           onClick={handleOpenForgotPassword}
                           aria-label="Esqueceu sua senha? Clique para recuperar"
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "#00A137")}
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.color = "rgba(255,255,255,0.5)")
+                          }
                         >
                           Esqueceu a senha?
                         </button>
@@ -325,35 +470,52 @@ export default function LoginPage() {
                             id="password-input"
                             type={showPassword ? "text" : "password"}
                             placeholder="Digite sua senha"
-                            className="pr-10 transition-all duration-200 focus:ring-2 focus:ring-primary/20"
+                            className={`${darkInputClass} pr-10`}
                             data-testid="input-login-password"
                             aria-label="Senha para login"
+                            onFocus={() => setPasswordFocused(true)}
                             {...field}
+                            onBlur={() => {
+                              field.onBlur();
+                              setPasswordFocused(false);
+                            }}
                           />
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1 top-1 hover:bg-transparent h-8 w-8"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-150"
+                            style={{
+                              color: "rgba(255,255,255,0.35)",
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              padding: "4px",
+                            }}
                             onClick={() => setShowPassword(!showPassword)}
                             data-testid="button-toggle-password"
                             aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                           >
                             {showPassword ? (
-                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              <EyeOff className="h-4 w-4" />
                             ) : (
-                              <Eye className="h-4 w-4 text-muted-foreground" />
+                              <Eye className="h-4 w-4" />
                             )}
-                          </Button>
+                          </button>
                         </div>
                       </FormControl>
-                      <FormMessage className="text-xs" />
-                      
+                      <FormMessage className="text-xs" style={{ color: "#C53030" }} />
+
+                      {/* Password requirements — show on focus when has content */}
+                      <AnimatePresence>
+                        {passwordFocused && passwordValue.length > 0 && (
+                          <PasswordRequirements password={passwordValue} className="mt-2" />
+                        )}
+                      </AnimatePresence>
                     </FormItem>
                   )}
                 />
               </motion.div>
 
+              {/* Remember me */}
               <motion.div variants={itemVariants}>
                 <FormField
                   control={form.control}
@@ -368,32 +530,54 @@ export default function LoginPage() {
                           aria-label="Lembrar de mim neste dispositivo"
                         />
                       </FormControl>
-                      <FormLabel className="text-sm font-normal cursor-pointer select-none">
-                        Lembrar de mim
+                      <FormLabel
+                        className="font-normal cursor-pointer select-none"
+                        style={{
+                          fontSize: "13px",
+                          color: "rgba(255,255,255,0.7)",
+                        }}
+                      >
+                        Lembrar-me
                       </FormLabel>
                     </FormItem>
                   )}
                 />
               </motion.div>
 
+              {/* Submit */}
               <motion.div variants={itemVariants}>
-                <Button 
-                  type="submit" 
-                  size="lg"
-                  className="w-full bg-primary hover:bg-primary/90 text-white font-semibold h-11 transition-all duration-200 hover:shadow-lg hover:shadow-primary/20"
+                <Button
+                  type="submit"
                   disabled={isLoading}
                   data-testid="button-login-submit"
                   aria-busy={isLoading}
+                  className="w-full font-semibold text-white transition-colors duration-200 rounded-xl"
+                  style={{
+                    background: "#00A137",
+                    height: "48px",
+                    fontSize: "16px",
+                    fontWeight: 600,
+                    fontFamily: "Montserrat, sans-serif",
+                    border: "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isLoading)
+                      (e.currentTarget as HTMLButtonElement).style.background = "#068130";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isLoading)
+                      (e.currentTarget as HTMLButtonElement).style.background = "#00A137";
+                  }}
                 >
                   {isLoading ? (
-                    <motion.div
+                    <motion.span
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
-                      className="flex items-center gap-2"
+                      className="flex items-center justify-center gap-2"
                     >
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      <span>Entrando...</span>
-                    </motion.div>
+                      Entrando...
+                    </motion.span>
                   ) : (
                     "Entrar"
                   )}
@@ -402,24 +586,23 @@ export default function LoginPage() {
             </form>
           </Form>
 
-          {/* Terms and privacy */}
+          {/* Version footer */}
           <motion.p
             variants={itemVariants}
-            className="text-center text-xs text-muted-foreground mt-6"
+            className="text-center mt-10"
+            style={{
+              fontFamily: "Montserrat, sans-serif",
+              fontSize: "12px",
+              fontWeight: 300,
+              color: "rgba(255,255,255,0.3)",
+            }}
           >
-            Ao continuar, você concorda com nossos{" "}
-            <button className="text-primary hover:underline underline-offset-4 transition-colors" data-testid="link-terms-of-service">
-              Termos de Serviço
-            </button>{" "}
-            e{" "}
-            <button className="text-primary hover:underline underline-offset-4 transition-colors" data-testid="link-privacy-policy">
-              Política de Privacidade
-            </button>
+            Renov Home v1.0
           </motion.p>
         </motion.div>
-      </motion.div>
+      </div>
 
-      {/* Forgot password dialog */}
+      {/* ── Forgot password dialog ── */}
       <Dialog open={forgotPasswordOpen} onOpenChange={handleCloseForgotPassword}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -441,9 +624,10 @@ export default function LoginPage() {
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", damping: 15, stiffness: 300, delay: 0.1 }}
-                className="flex items-center justify-center w-16 h-16 rounded-full bg-primary/10"
+                className="flex items-center justify-center w-16 h-16 rounded-full"
+                style={{ background: "rgba(0,161,55,0.1)" }}
               >
-                <Mail className="w-8 h-8 text-primary" />
+                <Mail className="w-8 h-8" style={{ color: "#00A137" }} />
               </motion.div>
               <div className="text-center space-y-2">
                 <p className="text-sm text-muted-foreground">

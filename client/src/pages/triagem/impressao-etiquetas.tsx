@@ -28,9 +28,11 @@ interface DeviceData {
 function getLabelDisplayConfig(device: DeviceData) {
   const status = device.statusRecebimento?.toLowerCase().trim() || "";
   const isTriado = status === "triado";
+  const isBloqueado = status === "bloqueado";
 
   return {
     isTriado,
+    isBloqueado,
     gradingText: isTriado ? device.grading : "\u00A0", // \u00A0 = espaço em branco (React/HTML)
     gradingZPL: isTriado ? device.grading : " ",      // espaço em branco (ZPL)
     codText: isTriado ? `Cód: ${device.deviceErpCode}` : "\u00A0",
@@ -72,7 +74,8 @@ function downloadZPL(zpl: string, imei: string) {
 }
 
 function getHtmlForDirectPrint(device: DeviceData, primaryImei: string) {
-  const { gradingText, codText } = getLabelDisplayConfig(device);
+  const { gradingText, codText, isBloqueado } = getLabelDisplayConfig(device);
+  const statusRecebimento = (device.statusRecebimento || "Não informado").toUpperCase();
   
   return `
     <!DOCTYPE html>
@@ -83,7 +86,8 @@ function getHtmlForDirectPrint(device: DeviceData, primaryImei: string) {
         @page { size: 100mm 50mm; margin: 0; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; width: 100mm; height: 50mm; background: white; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .label { width: 100mm; height: 50mm; display: flex; flex-direction: column; padding: 0.5mm; }
+        .label { width: 100mm; height: 50mm; display: flex; flex-direction: column; padding: 0.5mm; position: relative; overflow: hidden; }
+        .watermark { position: absolute; top: 48%; left: 50%; transform: translate(-50%, -50%) rotate(-24deg); font-size: 13mm; font-weight: 900; letter-spacing: 1.2mm; color: rgba(75, 85, 99, 0.35); z-index: 30; pointer-events: none; user-select: none; white-space: nowrap; }
         .header-row { display: flex; width: 100%; height: 11mm; border-bottom: 0.5mm solid #000; }
         .description-box { flex: 1; padding: 1mm 2mm; font-weight: bold; font-size: 5mm; display: flex; align-items: center; line-height: 1.1; overflow: hidden; }
         .grading-box { width: 16mm; min-width: 16mm; background: black; color: white; display: flex; align-items: center; justify-content: center; font-size: 9mm; font-weight: bold; }
@@ -96,12 +100,13 @@ function getHtmlForDirectPrint(device: DeviceData, primaryImei: string) {
     </head>
     <body>
       <div class="label">
+        ${isBloqueado ? '<div class="watermark">BLOQUEADO</div>' : ''}
         <div class="header-row">
           <div class="description-box">${device.deviceDescription}</div>
           <div class="grading-box">${gradingText}</div>
         </div>
         <div class="content-area">
-          <div class="info-line">Marca: ${device.marca}</div>
+          <div class="info-line">Status: ${statusRecebimento}</div>
           <div class="info-line">${codText}</div>
           <div class="info-line">Triador: ${device.triador}</div>
           <div class="barcode-area">
@@ -175,10 +180,28 @@ async function fetchDeviceFromApi(searchTerm: string): Promise<DeviceData> {
 // 4. SUB-COMPONENTE: VISUAL DA ETIQUETA
 // ==========================================
 const LabelPreview = ({ device, barcodeUrl }: { device: DeviceData, barcodeUrl: string | null }) => {
-  const { gradingText, codText } = getLabelDisplayConfig(device);
+  const { gradingText, codText, isBloqueado } = getLabelDisplayConfig(device);
+  const statusRecebimento = device.statusRecebimento || "Não informado";
 
   return (
-    <div className="bg-white mx-auto" style={{ width: "100mm", height: "50mm" }} data-testid="label-preview">
+    <div className="bg-white mx-auto relative overflow-hidden" style={{ width: "100mm", height: "50mm" }} data-testid="label-preview">
+      {isBloqueado && (
+        <div
+          className="absolute select-none pointer-events-none z-30"
+          style={{
+            top: "48%",
+            left: "50%",
+            transform: "translate(-50%, -50%) rotate(-24deg)",
+            fontSize: "13mm",
+            fontWeight: 900,
+            letterSpacing: "1.2mm",
+            color: "rgba(75, 85, 99, 0.35)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          BLOQUEADO
+        </div>
+      )}
       <div className="bg-white flex flex-col overflow-hidden border border-gray-300" style={{ width: "100mm", height: "50mm", padding: "0.5mm" }}>
         
         <div className="flex" style={{ width: "100%", height: "11mm", borderBottom: "0.5mm solid #000" }}>
@@ -191,7 +214,7 @@ const LabelPreview = ({ device, barcodeUrl }: { device: DeviceData, barcodeUrl: 
         </div>
 
         <div className="flex-1 flex flex-col" style={{ padding: "1.5mm 2mm 0 2mm" }}>
-          <div className="font-bold text-black text-left" style={{ fontSize: "4mm", margin: "0.5mm 0", lineHeight: "1.2" }}>Marca: {device.marca}</div>
+          <div className="font-bold text-black text-left" style={{ fontSize: "4mm", margin: "0.5mm 0", lineHeight: "1.2" }}>Status: {statusRecebimento}</div>
           <div className="font-bold text-black text-left" style={{ fontSize: "4mm", margin: "0.5mm 0", lineHeight: "1.2" }}>{codText}</div>
           <div className="font-bold text-black text-left" style={{ fontSize: "4mm", margin: "0.5mm 0", lineHeight: "1.2" }}>Triador: {device.triador}</div>
           

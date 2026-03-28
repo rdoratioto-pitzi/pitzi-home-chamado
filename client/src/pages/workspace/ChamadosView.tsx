@@ -222,11 +222,30 @@ export function ChamadosView() {
             items={filteredItems}
             loading={loading}
             onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
+            onDelete={async (item) => {
+              if (!confirm(`Excluir chamado ${item.codigo}?`)) return;
+              try {
+                const res = await fetchWithAuth(`/api/tickets/${item.id}`, { method: "DELETE" });
+                if (!res.ok) {
+                  const err = await res.json().catch(() => ({ error: "Erro ao excluir" }));
+                  throw new Error(err.error || "Erro ao excluir");
+                }
+                setItems((prev) => prev.filter((i) => i.id !== item.id));
+                toast({ title: `Chamado ${item.codigo} excluído` });
+              } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : "Erro desconhecido";
+                toast({ title: "Erro ao excluir", description: msg, variant: "destructive" });
+              }
+            }}
           />
           <ItemDetailDrawer
             open={drawerOpen}
             item={selectedItem}
             onClose={() => setDrawerOpen(false)}
+            onUpdate={(updated) => {
+              setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i));
+              setSelectedItem(updated);
+            }}
           />
         </>
       )}

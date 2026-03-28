@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Paperclip, Image, Video, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Paperclip, X, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchWithAuth } from "@/lib/queryClient";
 
@@ -18,8 +18,7 @@ export type ItemType = "chamado" | "tarefa" | "projeto";
 
 interface Attachment {
   name: string;
-  preview: string;
-  isImage: boolean;
+  url: string;
 }
 
 interface UserOption {
@@ -163,6 +162,10 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
   const [estimativa, setEstimativa] = useState("");
   const [etapa, setEtapa] = useState("");
 
+  // Chamado chip state
+  const [categoriaChamado, setCategoriaChamado] = useState("");
+  const [prioridadeChamado, setPrioridadeChamado] = useState("media");
+
   // Projeto chip state
   const [statusProjeto, setStatusProjeto] = useState("backlog");
   const [prioridadeProjeto, setPrioridadeProjeto] = useState("");
@@ -176,8 +179,6 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
   const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // Reset form and sync type when modal opens
   useEffect(() => {
@@ -187,6 +188,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setDescricao("");
     setAttachments([]);
     setExtraOpen(false);
+    setCategoriaChamado("");
+    setPrioridadeChamado("media");
     setStatusTarefa("a-fazer");
     setProjetoId("");
     setPrioridade("");
@@ -235,18 +238,35 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
   }, [open]);
 
   function readAttachment(file: File) {
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({ title: "Arquivo muito grande", description: "Tamanho máximo: 50MB.", variant: "destructive" });
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (e) => {
       setAttachments((prev) => [
         ...prev,
         {
-          name: file.name || "imagem",
-          preview: e.target?.result as string,
-          isImage: file.type.startsWith("image"),
+          name: file.name || "arquivo",
+          url: e.target?.result as string,
         },
       ]);
     };
     reader.readAsDataURL(file);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+    Array.from(files).forEach(readAttachment);
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -261,6 +281,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setDescricao("");
     setAttachments([]);
     setExtraOpen(false);
+    setCategoriaChamado("");
+    setPrioridadeChamado("media");
     setStatusTarefa("a-fazer");
     setProjetoId("");
     setPrioridade("");
@@ -291,7 +313,13 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
         response = await fetchWithAuth("/api/workspace/chamados", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ titulo: titulo.trim(), descricao }),
+          body: JSON.stringify({
+            titulo: titulo.trim(),
+            descricao,
+            categoria: categoriaChamado || undefined,
+            prioridade: prioridadeChamado || undefined,
+            attachments: attachments.length > 0 ? JSON.stringify(attachments) : undefined,
+          }),
         });
       } else if (type === "tarefa") {
         response = await fetchWithAuth("/api/workspace/tarefas", {
@@ -366,30 +394,15 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
           background: "#0d1117",
           border: "1px solid rgba(255,255,255,0.08)",
         }}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
         // hide the default X button from shadcn
         hideClose
       >
-        {/* Hidden file inputs */}
+        {/* Hidden file input */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*,video/*,.pdf,.zip"
-          multiple
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <input
-          ref={videoInputRef}
-          type="file"
-          accept="video/*"
           multiple
           className="hidden"
           onChange={handleFileChange}
@@ -497,6 +510,31 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             </div>
           )}
 
+          {/* Chips — chamado */}
+          {type === "chamado" && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <ChipSelect
+                value={categoriaChamado}
+                onValueChange={setCategoriaChamado}
+                placeholder="Categoria"
+                options={[
+                  { value: "ti-sistemas", label: "TI/Sistemas" },
+                  { value: "comercial", label: "Comercial" },
+                  { value: "logistica", label: "Logística" },
+                  { value: "financeiro", label: "Financeiro" },
+                  { value: "operacoes", label: "Operações" },
+                  { value: "rh", label: "RH" },
+                ]}
+              />
+              <ChipSelect
+                value={prioridadeChamado}
+                onValueChange={setPrioridadeChamado}
+                placeholder="Prioridade"
+                options={PRIORIDADE_OPTIONS}
+              />
+            </div>
+          )}
+
           {/* Attachment row */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
@@ -507,28 +545,12 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
               <Paperclip className="h-3 w-3" />
               Anexar
             </button>
-            <button
-              onClick={() => imageInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors hover:bg-white/5"
-              style={{ border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)" }}
-            >
-              <Image className="h-3 w-3" />
-              Imagem
-            </button>
-            <button
-              onClick={() => videoInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors hover:bg-white/5"
-              style={{ border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)" }}
-            >
-              <Video className="h-3 w-3" />
-              Vídeo
-            </button>
 
             {attachments.map((att, idx) => (
-              <div key={idx} className="relative group">
-                {att.isImage ? (
+              <div key={idx} className="relative group" title={att.name}>
+                {att.url.startsWith("data:image/") ? (
                   <img
-                    src={att.preview}
+                    src={att.url}
                     alt={att.name}
                     className="w-11 h-11 object-cover rounded"
                     style={{ border: "1px solid rgba(255,255,255,0.1)" }}
@@ -552,7 +574,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             ))}
 
             <span className="text-xs ml-1" style={{ color: "rgba(255,255,255,0.2)" }}>
-              Ctrl+V para colar print
+              Ctrl+V ou arraste arquivos
             </span>
           </div>
 
