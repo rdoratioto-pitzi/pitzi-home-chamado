@@ -19,7 +19,7 @@ const ptBrToKanbanStatus: Record<string, string> = {
 };
 
 export function registerWorkspaceRoutes(router: Router) {
-  // Lightweight counts endpoint for tab badges (no item data, fast)
+  // ─── Counts (lightweight) ──────────────────────────────────────────────────
   router.get("/api/workspace/counts", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
@@ -28,22 +28,20 @@ export function registerWorkspaceRoutes(router: Router) {
         isAdmin
           ? storage.getTicketsForWorkspace()
           : storage.getTicketsForWorkspace({ requesterId: userId, assigneeId: userId }),
-        db.select().from(kanbanCards),
+        db ? db.select().from(kanbanCards) : Promise.resolve([]),
       ]);
 
-      // Chamados em tratativa
       const chamados = allTickets.filter(
         (t) => t.status === "open" || t.status === "in_progress" || t.status === "blocked"
       ).length;
 
-      // Cards de projeto atribuídos ao usuário (não concluídos)
       const myCards = allCards.filter(
         (c: any) => c.assigneeId === userId && c.status !== "done"
       ).length;
 
       res.json({ chamados, projetos: myCards, todos: chamados + myCards });
     } catch (error: any) {
-      res.status(500).json({ error: error.message });
+      res.status(error.status || 500).json({ error: error.message });
     }
   });
 
