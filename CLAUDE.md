@@ -114,6 +114,7 @@ Reviewer obrigatório: **Marcelo (CTO)** — sem aprovação dele, não fazer me
 - **shadcn/ui + Tailwind** — não criar componentes do zero se já existe
 - **Reuniões** usam `tasks` com `type="meeting_note"` e `meetingData` (JSON como TEXT)
 - **Timezone** — sempre `America/Sao_Paulo` em jobs de recorrência
+- **Rotas API — dual runtime** — toda rota criada/modificada em `server/routes/` DEVE ser espelhada em `worker/src/routes/`. O Express roda em dev local, o Worker Hono roda em produção (Cloudflare). Esquecer um dos dois causa 404 em produção.
 
 ## Módulo Estoques — Contexto Atual (Prioridade #1)
 

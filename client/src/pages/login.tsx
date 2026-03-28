@@ -27,7 +27,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
-import { PasswordRequirements } from "@/components/auth/password-requirements";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -122,7 +121,6 @@ export default function LoginPage() {
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [loginSuccess, setLoginSuccess] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
 
   // Countdown timer for forgot password
   useEffect(() => {
@@ -473,23 +471,11 @@ export default function LoginPage() {
                             className={`${darkInputClass} pr-10`}
                             data-testid="input-login-password"
                             aria-label="Senha para login"
-                            onFocus={() => setPasswordFocused(true)}
                             {...field}
-                            onBlur={() => {
-                              field.onBlur();
-                              setPasswordFocused(false);
-                            }}
                           />
                           <button
                             type="button"
-                            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-150"
-                            style={{
-                              color: "rgba(255,255,255,0.35)",
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              padding: "4px",
-                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-150 text-muted-foreground hover:text-foreground p-1 bg-transparent border-none cursor-pointer"
                             onClick={() => setShowPassword(!showPassword)}
                             data-testid="button-toggle-password"
                             aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
@@ -504,12 +490,6 @@ export default function LoginPage() {
                       </FormControl>
                       <FormMessage className="text-xs" style={{ color: "#C53030" }} />
 
-                      {/* Password requirements — show on focus when has content */}
-                      <AnimatePresence>
-                        {passwordFocused && passwordValue.length > 0 && (
-                          <PasswordRequirements password={passwordValue} className="mt-2" />
-                        )}
-                      </AnimatePresence>
                     </FormItem>
                   )}
                 />
