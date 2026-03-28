@@ -290,10 +290,10 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="px-3 py-4">
+      <SidebarContent className="px-3 py-2">
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1.5">
+            <SidebarMenu className="gap-0.5">
               {menuItems.map((item) => {
                 const isActive = location === item.url || (item.url !== "/" && location.startsWith(item.url + "/"));
 
@@ -308,7 +308,7 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
-                      className="h-11 px-3"
+                      className="h-9 px-3"
                     >
                       <Link href={item.url} data-testid={`link-${item.url.slice(1)}`} onClick={handleClick}>
                         <item.icon className="h-[20px] w-[20px]" />
@@ -323,7 +323,7 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>
                     <SidebarMenuButton
-                      className="h-11 px-3"
+                      className="h-9 px-3"
                       isActive={isWorkspaceActive}
                       data-testid="link-workspace"
                     >
@@ -342,13 +342,13 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
+                    <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
                       {workspaceSubItems.map((subItem) => {
                         const isSubActive = location === subItem.url ||
                           (subItem.url !== "/workspace" && location.startsWith(subItem.url + "/"));
                         return (
                           <SidebarMenuSubItem key={subItem.url}>
-                            <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                            <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
                               <Link href={subItem.url} data-testid={`link-workspace-${subItem.title.toLowerCase()}`}>
                                 <subItem.icon className="h-4 w-4 mr-2" />
                                 <span className="text-[12px]">{subItem.title}</span>
@@ -367,7 +367,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className="h-11 px-3"
+                        className="h-9 px-3"
                         isActive={isEstoquesActive}
                         data-testid="link-estoques"
                       >
@@ -381,12 +381,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
                         {estoquesSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -406,7 +406,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className="h-11 px-3"
+                        className="h-9 px-3"
                         isActive={isMetasActive}
                         data-testid="link-metas"
                       >
@@ -420,12 +420,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
                         {metasSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url || location.startsWith(subItem.url + "/");
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-metas-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -445,7 +445,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className="h-11 px-3"
+                        className="h-9 px-3"
                         isActive={isLogisticaActive}
                         data-testid="link-logistica"
                       >
@@ -459,12 +459,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
                         {logisticaSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -484,7 +484,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className="h-11 px-3"
+                        className="h-9 px-3"
                         isActive={isTriagemActive}
                         data-testid="link-triagem"
                       >
@@ -498,12 +498,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
                         {triagemSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -523,7 +523,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className="h-11 px-3"
+                        className="h-9 px-3"
                         isActive={isPricingActive}
                         data-testid="link-pricing"
                       >
@@ -537,12 +537,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
                         {pricingSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -562,7 +562,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className="h-11 px-3"
+                        className="h-9 px-3"
                         isActive={isBibliotecaActive}
                         data-testid="link-biblioteca"
                       >
@@ -576,12 +576,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
                         {bibliotecaSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-biblioteca-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -601,7 +601,7 @@ export function AppSidebar() {
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
                       <SidebarMenuButton
-                        className="h-11 px-3"
+                        className="h-9 px-3"
                         isActive={isApisActive}
                         data-testid="link-integracoes"
                       >
@@ -615,12 +615,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
+                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
                         {apisSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -639,7 +639,7 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={location === "/git-analytics"}
-                  className="h-11 px-3"
+                  className="h-9 px-3"
                 >
                   <Link href="/git-analytics" data-testid="link-git-analytics">
                     <GitBranch className="h-[20px] w-[20px]" />
@@ -653,7 +653,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={location === "/configuracoes" || location.startsWith("/configuracoes/")}
-                    className="h-11 px-3"
+                    className="h-9 px-3"
                   >
                     <Link href="/configuracoes" data-testid="link-configuracoes">
                       <Settings className="h-[20px] w-[20px]" />
