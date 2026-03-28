@@ -378,14 +378,14 @@ function ProjectsKanbanView({ projetos }: { projetos: ProjetoComTarefas[] }) {
                   textTransform: "uppercase",
                   fontSize: "10px",
                   letterSpacing: "0.05em",
-                  color: "rgba(255,255,255,0.5)",
+                  color: "rgba(255,255,255,0.85)",
                 }}
               >
                 {col.label}
               </span>
               <span
                 className="text-xs px-1.5 py-0.5 rounded-full"
-                style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)", fontSize: "10px" }}
+                style={{ background: "rgba(255,255,255,0.06)", color: "#00c853", fontSize: "10px" }}
               >
                 {columnTarefas.length}
               </span>
