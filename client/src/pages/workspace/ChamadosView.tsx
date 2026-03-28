@@ -250,7 +250,24 @@ export function ChamadosView() {
         </>
       )}
       {viewMode === "kanban" && !loading && (
-        <KanbanView items={filteredItems} variant="chamados" />
+        <KanbanView
+          items={filteredItems}
+          variant="chamados"
+          onStatusChange={async (itemId, newStatus) => {
+            try {
+              const res = await fetchWithAuth(`/api/workspace/chamados/${itemId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+              });
+              if (!res.ok) throw new Error("Erro ao atualizar");
+              const updated: ChamadoItem = await res.json();
+              setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i));
+            } catch {
+              toast({ title: "Erro ao mover chamado", variant: "destructive" });
+            }
+          }}
+        />
       )}
       {viewMode !== "lista" && viewMode !== "kanban" && (
         <div style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "14px" }}>

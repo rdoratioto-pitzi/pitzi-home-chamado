@@ -12,11 +12,14 @@ import {
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
 
-function parseAnexos(raw: string | null | undefined): string[] {
+interface Anexo { name: string; url: string }
+
+function parseAnexos(raw: string | null | undefined): Anexo[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((a: any) => a && typeof a.url === "string");
   } catch {
     return [];
   }
