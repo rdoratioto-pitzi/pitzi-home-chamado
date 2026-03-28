@@ -9,6 +9,7 @@ import { ProjetosView } from "./ProjetosView";
 import { VisaoEstrategica } from "@/components/workspace/VisaoEstrategica";
 import { NovoItemModal, type ItemType } from "@/components/workspace/NovoItemModal";
 import { fetchWithAuth } from "@/lib/queryClient";
+import { useWorkspaceCounts } from "@/hooks/use-workspace-counts";
 
 type TabKey = "todos" | "chamados" | "projetos";
 
@@ -101,23 +102,12 @@ export default function WorkspacePage() {
   const activeTab: TabKey = (params?.tab as TabKey) || "todos";
   const ActiveView = viewMap[activeTab] ?? viewMap.todos;
 
-  const [tabCounts, setTabCounts] = useState({ todos: 0, chamados: 0, projetos: 0 });
-
-  useEffect(() => {
-    Promise.allSettled([
-      fetchWithAuth("/api/workspace/chamados?periodo=em-tratativa").then(r => r.json()),
-      fetchWithAuth("/api/workspace/projetos").then(r => r.json()),
-    ]).then(([chamadosRes, projetosRes]) => {
-      const chamados = chamadosRes.status === "fulfilled" ? (chamadosRes.value.kpis?.total ?? 0) : 0;
-      const projetos = projetosRes.status === "fulfilled" ? (projetosRes.value.kpis?.ativos ?? 0) : 0;
-      setTabCounts({ todos: chamados + projetos, chamados, projetos });
-    });
-  }, []);
+  const { data: tabCounts } = useWorkspaceCounts();
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
-    { key: "todos", label: "Todos", count: tabCounts.todos },
-    { key: "chamados", label: "Chamados", count: tabCounts.chamados },
-    { key: "projetos", label: "Projetos", count: tabCounts.projetos },
+    { key: "todos", label: "Todos", count: tabCounts?.todos ?? 0 },
+    { key: "chamados", label: "Chamados", count: tabCounts?.chamados ?? 0 },
+    { key: "projetos", label: "Projetos", count: tabCounts?.projetos ?? 0 },
   ];
 
   const [visaoOpen, setVisaoOpen] = useState(false);

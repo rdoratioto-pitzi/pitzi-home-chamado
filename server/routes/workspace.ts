@@ -19,6 +19,32 @@ const ptBrToKanbanStatus: Record<string, string> = {
 };
 
 export function registerWorkspaceRoutes(router: Router) {
+  // ─── Counts (lightweight) ──────────────────────────────────────────────────
+  router.get("/api/workspace/counts", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+
+      const [allTickets, allProjects] = await Promise.all([
+        isAdmin
+          ? storage.getTickets()
+          : storage.getTickets({ requesterId: userId, assigneeId: userId }),
+        db ? db.select().from(projects) : Promise.resolve([]),
+      ]);
+
+      const chamados = allTickets.filter(
+        (t) => t.status === "open" || t.status === "in_progress" || t.status === "blocked"
+      ).length;
+
+      const projetos = allProjects.filter(
+        (p) => p.status !== "concluido" && p.status !== "cancelado" && p.status !== "completed"
+      ).length;
+
+      res.json({ todos: chamados + projetos, chamados, projetos });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
   router.get("/api/workspace/chamados", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
