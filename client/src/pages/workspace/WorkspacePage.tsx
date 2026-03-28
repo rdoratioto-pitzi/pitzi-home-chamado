@@ -186,19 +186,15 @@ export default function WorkspacePage() {
               )}
               <button
                 onClick={() => handleTabClick(tab.key)}
-                className="relative px-4 py-3 text-sm font-medium transition-colors"
-                style={{
-                  color: isActive ? "#00c853" : "rgba(255,255,255,0.3)",
-                  borderBottom: isActive ? "2px solid #00c853" : "2px solid transparent",
-                }}
+                className={`relative px-4 py-3 text-sm font-medium transition-colors ${
+                  isActive ? "text-[#00c853] border-b-2 border-[#00c853]" : "text-muted-foreground border-b-2 border-transparent"
+                }`}
               >
                 {tab.label}
                 <span
-                  className="ml-2 text-xs px-1.5 py-0.5 rounded-full"
-                  style={{
-                    background: isActive ? "rgba(0,200,83,0.15)" : "rgba(255,255,255,0.05)",
-                    color: isActive ? "#00c853" : "rgba(255,255,255,0.3)",
-                  }}
+                  className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
+                    isActive ? "bg-[#00c853]/15 text-[#00c853]" : "bg-muted text-muted-foreground"
+                  }`}
                 >
                   {tab.count}
                 </span>
