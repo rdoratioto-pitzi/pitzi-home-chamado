@@ -577,7 +577,7 @@ export default function LoginPage() {
               color: "rgba(255,255,255,0.3)",
             }}
           >
-            Renov Home v1.0
+            Renov Home v{import.meta.env.VITE_APP_VERSION || "1.0.0"}
           </motion.p>
         </motion.div>
       </div>
