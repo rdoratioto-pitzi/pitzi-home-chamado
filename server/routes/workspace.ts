@@ -406,6 +406,65 @@ export function registerWorkspaceRoutes(router: Router) {
     }
   });
 
+  // ─── PATCH projetos ───────────────────────────────────────────────────────────
+  router.patch("/api/workspace/projetos/:id", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+
+      const { id } = req.params;
+      const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria } =
+        req.body as {
+          nome?: string;
+          descricao?: string;
+          status?: string;
+          prioridade?: string;
+          responsavelId?: string;
+          dataInicio?: string | null;
+          dataFim?: string | null;
+          categoria?: string;
+        };
+
+      const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
+      if (status && !validStatuses.includes(status)) {
+        return res.status(400).json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` });
+      }
+
+      const updateData: Record<string, any> = {};
+      if (nome !== undefined) updateData.name = nome.trim();
+      if (descricao !== undefined) updateData.description = descricao;
+      if (status !== undefined) updateData.status = status;
+      if (prioridade !== undefined) updateData.priority = prioridade;
+      if (responsavelId !== undefined) updateData.ownerId = responsavelId;
+      if (dataInicio !== undefined) updateData.startDate = dataInicio ? new Date(dataInicio) : null;
+      if (dataFim !== undefined) updateData.endDate = dataFim ? new Date(dataFim) : null;
+      if (categoria !== undefined) updateData.category = categoria;
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "Nenhum campo para atualizar" });
+      }
+
+      const [updated] = await db
+        .update(projects)
+        .set(updateData)
+        .where(eq(projects.id, parseInt(id)))
+        .returning();
+
+      if (!updated) {
+        return res.status(404).json({ error: "Projeto não encontrado" });
+      }
+
+      return res.json({
+        id: updated.id,
+        codigo: updated.code,
+        nome: updated.name,
+        status: updated.status,
+        prioridade: updated.priority,
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
   // ─── Todos (visão unificada) ──────────────────────────────────────────────────
   router.get("/api/workspace/todos", requireAuth, async (req, res) => {
     try {

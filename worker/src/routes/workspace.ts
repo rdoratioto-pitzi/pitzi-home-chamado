@@ -765,6 +765,55 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
   }
 });
 
+// ─── PATCH projetos ───────────────────────────────────────────────────────────
+workspace.patch("/api/workspace/projetos/:id", async (c) => {
+  try {
+    const db = c.get("db");
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria } = body;
+
+    const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
+    if (status && !validStatuses.includes(status)) {
+      return c.json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` }, 400);
+    }
+
+    const updateData: Record<string, any> = {};
+    if (nome !== undefined) updateData.name = nome.trim();
+    if (descricao !== undefined) updateData.description = descricao;
+    if (status !== undefined) updateData.status = status;
+    if (prioridade !== undefined) updateData.priority = prioridade;
+    if (responsavelId !== undefined) updateData.ownerId = responsavelId;
+    if (dataInicio !== undefined) updateData.startDate = dataInicio ? new Date(dataInicio) : null;
+    if (dataFim !== undefined) updateData.endDate = dataFim ? new Date(dataFim) : null;
+    if (categoria !== undefined) updateData.category = categoria;
+
+    if (Object.keys(updateData).length === 0) {
+      return c.json({ error: "Nenhum campo para atualizar" }, 400);
+    }
+
+    const [updated] = await db
+      .update(projects)
+      .set(updateData)
+      .where(eq(projects.id, parseInt(id)))
+      .returning();
+
+    if (!updated) {
+      return c.json({ error: "Projeto não encontrado" }, 404);
+    }
+
+    return c.json({
+      id: updated.id,
+      codigo: updated.code,
+      nome: updated.name,
+      status: updated.status,
+      prioridade: updated.priority,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
 // ─── GET comentarios de chamado ───────────────────────────────────────────────
 workspace.get("/api/workspace/chamados/:id/comentarios", async (c) => {
   try {
