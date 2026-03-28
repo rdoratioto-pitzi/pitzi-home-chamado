@@ -8,6 +8,7 @@ import {
   kanbanCards,
   kanbanColumns,
   users,
+  workspaceComentarios,
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
 
@@ -131,6 +132,7 @@ workspace.get("/api/workspace/chamados", async (c) => {
         id: t.id,
         codigo: t.code,
         titulo: t.title,
+        descricao: t.description || "",
         categoria: t.category,
         tipo: t.type,
         responsavel: name,
@@ -629,6 +631,198 @@ workspace.get("/api/workspace/projetos", async (c) => {
       kpis: { ativos, tarefasAbertas, emAndamento, concluidas, atrasadas },
       projetos: projetosComTarefas,
     });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── PATCH chamado ────────────────────────────────────────────────────────────
+workspace.patch("/api/workspace/chamados/:id", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const { status, prioridade, responsavelId, titulo, descricao } = await c.req.json();
+    const db = c.get("db");
+    const storage = getStorage(db);
+
+    const prioridadeMap: Record<string, string> = {
+      baixa: "low", media: "medium", alta: "high", critica: "critical",
+    };
+    const priorityRevMap: Record<string, string> = {
+      low: "baixa", medium: "media", high: "alta", critical: "critica",
+    };
+
+    const updateData: Partial<Ticket> = {};
+    if (status !== undefined) updateData.status = status;
+    if (prioridade !== undefined) updateData.priority = prioridadeMap[prioridade] || prioridade;
+    if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
+    if (titulo !== undefined) updateData.title = titulo.trim();
+    if (descricao !== undefined) updateData.description = descricao;
+
+    if (Object.keys(updateData).length === 0) {
+      return c.json({ error: "Nenhum campo para atualizar" }, 400);
+    }
+
+    const ticket = await storage.updateTicket(String(id), updateData);
+    if (!ticket) return c.json({ error: "Chamado não encontrado" }, 404);
+
+    const [allUsers, slaRules] = await Promise.all([
+      storage.getUsers(),
+      storage.getSlaRules(),
+    ]);
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const assignee = ticket.assigneeId ? userMap.get(ticket.assigneeId) : null;
+    const name = assignee?.name || "Não atribuído";
+    const initials = name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+    const sla = getSlaForTicket(ticket, slaRules);
+
+    return c.json({
+      id: String(ticket.id),
+      codigo: ticket.code,
+      titulo: ticket.title,
+      descricao: ticket.description || "",
+      categoria: ticket.category,
+      tipo: ticket.type,
+      responsavel: name,
+      responsavelInitials: initials,
+      status: ticket.status,
+      prioridade: priorityRevMap[ticket.priority] || ticket.priority,
+      sla: sla.slaHoras,
+      statusSla: sla.status,
+      abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── PATCH tarefa ─────────────────────────────────────────────────────────────
+workspace.patch("/api/workspace/tarefas/:id", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const { status, prioridade, responsavelId, dataEntrega, progresso } = await c.req.json();
+    const db = c.get("db");
+    const storage = getStorage(db);
+
+    const ptBrToKanban: Record<string, string> = {
+      "a-fazer": "todo", "em-andamento": "doing", concluido: "done", bloqueado: "blocked",
+    };
+
+    const updateData: Record<string, any> = {};
+    if (status !== undefined) updateData.status = ptBrToKanban[status] || status;
+    if (prioridade !== undefined) updateData.priority = prioridade;
+    if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
+    if (dataEntrega !== undefined) updateData.dueDate = dataEntrega ? new Date(dataEntrega) : null;
+    if (progresso !== undefined) updateData.progress = progresso;
+
+    if (Object.keys(updateData).length === 0) {
+      return c.json({ error: "Nenhum campo para atualizar" }, 400);
+    }
+
+    const [card] = await db
+      .update(kanbanCards)
+      .set(updateData)
+      .where(eq(kanbanCards.id, String(id)))
+      .returning();
+
+    if (!card) return c.json({ error: "Tarefa não encontrada" }, 404);
+
+    const allUsers = await storage.getUsers();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const tResp = card.assigneeId ? userMap.get(card.assigneeId) : null;
+    const tNome = tResp?.name || "Não atribuído";
+    const tInitials = tNome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+
+    return c.json({
+      id: card.id,
+      codigo: card.code,
+      titulo: card.title,
+      descricao: card.objectives,
+      status: kanbanStatusToPtBr[card.status] || card.status,
+      prioridade: card.priority,
+      responsavelId: card.assigneeId,
+      responsavel: tNome,
+      responsavelInitials: tInitials,
+      dataEntrega: card.dueDate ? String(card.dueDate) : null,
+      progresso: card.progress,
+      criadoEm: card.createdAt ? String(card.createdAt) : null,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── GET comentarios de chamado ───────────────────────────────────────────────
+workspace.get("/api/workspace/chamados/:id/comentarios", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const db = c.get("db");
+    const storage = getStorage(db);
+
+    const comentarios = await db
+      .select()
+      .from(workspaceComentarios)
+      .where(eq(workspaceComentarios.chamadoId, id))
+      .orderBy(workspaceComentarios.criadoEm);
+
+    const allUsers = await storage.getUsers();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+    const items = comentarios.map((row) => {
+      const autor = userMap.get(row.autorId);
+      const autorNome = autor?.name || "Usuário";
+      const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+      return {
+        id: row.id,
+        texto: row.texto,
+        autorId: row.autorId,
+        autorNome,
+        autorInitials,
+        criadoEm: row.criadoEm ? String(row.criadoEm) : null,
+      };
+    });
+
+    return c.json({ comentarios: items });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── POST comentario em chamado ───────────────────────────────────────────────
+workspace.post("/api/workspace/chamados/:id/comentarios", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const { userId } = c.get("user");
+    const db = c.get("db");
+    const storage = getStorage(db);
+    const { texto } = await c.req.json();
+
+    if (!texto?.trim()) {
+      return c.json({ error: "Texto obrigatório" }, 400);
+    }
+
+    const [comentario] = await db
+      .insert(workspaceComentarios)
+      .values({
+        chamadoId: id,
+        autorId: userId,
+        texto: texto.trim(),
+      })
+      .returning();
+
+    const allUsers = await storage.getUsers();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const autor = userMap.get(comentario.autorId);
+    const autorNome = autor?.name || "Usuário";
+    const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+
+    return c.json({
+      id: comentario.id,
+      texto: comentario.texto,
+      autorId: comentario.autorId,
+      autorNome,
+      autorInitials,
+      criadoEm: comentario.criadoEm ? String(comentario.criadoEm) : null,
+    }, 201);
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
   }
