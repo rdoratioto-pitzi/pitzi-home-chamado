@@ -3,7 +3,7 @@
 */
 import { Link, useLocation } from "wouter";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { fetchWithAuth } from "@/lib/queryClient";
+import { useWorkspaceCounts } from "@/hooks/use-workspace-counts";
 import {
   Ticket,
   FolderKanban,
@@ -194,23 +194,13 @@ export function AppSidebar() {
   const [bibliotecaOpen, setBibliotecaOpen] = useState(location.startsWith("/biblioteca"));
   const [estoquesOpen, setEstoquesOpen] = useState(location.startsWith("/estoques"));
 
-  const [workspaceCount, setWorkspaceCount] = useState<number | null>(null);
+  const { data: workspaceCounts } = useWorkspaceCounts();
+  const workspaceCount = workspaceCounts?.todos ?? null;
 
   useEffect(() => {
     if (location.startsWith("/estoques")) setEstoquesOpen(true);
     if (location.startsWith("/workspace")) setWorkspaceOpen(true);
   }, [location]);
-
-  useEffect(() => {
-    Promise.allSettled([
-      fetchWithAuth("/api/workspace/chamados?periodo=em-tratativa").then(r => r.json()),
-      fetchWithAuth("/api/workspace/projetos").then(r => r.json()),
-    ]).then(([chamadosRes, projetosRes]) => {
-      const chamados = chamadosRes.status === "fulfilled" ? (chamadosRes.value.kpis?.total ?? 0) : 0;
-      const projetos = projetosRes.status === "fulfilled" ? (projetosRes.value.kpis?.ativos ?? 0) : 0;
-      setWorkspaceCount(chamados + projetos);
-    });
-  }, []);
 
   const isWorkspaceActive = location.startsWith("/workspace");
   const isMetasActive = location.startsWith("/metas");
