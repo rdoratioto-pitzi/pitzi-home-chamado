@@ -668,7 +668,7 @@ export class DatabaseStorage implements IStorage {
           dataAbertura: tickets.dataAbertura,
           dataResolucao: tickets.dataResolucao,
           impact: tickets.impact,
-          hasAttachments: sql<boolean>`(${tickets.attachments} IS NOT NULL AND ${tickets.attachments} != '' AND ${tickets.attachments} != '[]')`.as("has_attachments"),
+          attachments: tickets.attachments,
         })
         .from(tickets);
 
