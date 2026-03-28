@@ -85,34 +85,10 @@ const allMenuItems = [
     module: null,
   },
   {
-title: "Chat IA",
-url: "/chat-ia",
+    title: "Chat IA",
+    url: "/chat-ia",
     icon: Bot,
     module: null,
-  },
-  {
-    title: "Tarefas",
-    url: "/tarefas",
-    icon: CheckSquare,
-    module: "tarefas" as keyof ModulePermissions,
-  },
-  {
-    title: "Reuniões",
-    url: "/reunioes",
-    icon: Video,
-    module: "tarefas" as keyof ModulePermissions,
-  },
-  {
-    title: "Fluxogramas",
-    url: "/fluxogramas",
-    icon: Workflow,
-    module: "fluxogramas" as keyof ModulePermissions,
-  },
-  {
-    title: "Diagramas",
-    url: "/diagramas",
-    icon: PenLine,
-    module: "diagramas" as keyof ModulePermissions,
   },
 ];
 
@@ -120,11 +96,16 @@ const workspaceSubItems = [
   { title: "Todos", url: "/workspace", icon: LayoutGrid },
   { title: "Chamados", url: "/workspace/chamados", icon: Ticket },
   { title: "Projetos", url: "/workspace/projetos", icon: FolderKanban },
+  { title: "Tarefas", url: "/tarefas", icon: CheckSquare },
+  { title: "Reuniões", url: "/reunioes", icon: Video },
+  { title: "Fluxogramas", url: "/fluxogramas", icon: Workflow },
+  { title: "Diagramas", url: "/diagramas", icon: PenLine },
 ];
 
 const metasSubItems = [
   { title: "Visão Geral", url: "/metas", icon: LayoutDashboard },
   { title: "Gestão de Metas", url: "/metas/gestao", icon: Target },
+  { title: "OKRs", url: "/okrs", icon: Target },
 ];
 
 const logisticaSubItems = [
@@ -185,8 +166,13 @@ export function AppSidebar() {
   const { toast } = useToast();
   const { user: currentUser, logout } = useAuth();
 
-  const [workspaceOpen, setWorkspaceOpen] = useState(location.startsWith("/workspace"));
-  const [metasOpen, setMetasOpen] = useState(location.startsWith("/metas"));
+  const isWorkspaceRoute = (loc: string) =>
+    loc.startsWith("/workspace") || loc.startsWith("/tarefas") || loc.startsWith("/reunioes") || loc.startsWith("/fluxogramas") || loc.startsWith("/diagramas");
+  const isMetasRoute = (loc: string) =>
+    loc.startsWith("/metas") || loc.startsWith("/okrs");
+
+  const [workspaceOpen, setWorkspaceOpen] = useState(isWorkspaceRoute(location));
+  const [metasOpen, setMetasOpen] = useState(isMetasRoute(location));
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
   const [triagemOpen, setTriagemOpen] = useState(location.startsWith("/triagem"));
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
@@ -199,11 +185,12 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (location.startsWith("/estoques")) setEstoquesOpen(true);
-    if (location.startsWith("/workspace")) setWorkspaceOpen(true);
+    if (isWorkspaceRoute(location)) setWorkspaceOpen(true);
+    if (isMetasRoute(location)) setMetasOpen(true);
   }, [location]);
 
-  const isWorkspaceActive = location.startsWith("/workspace");
-  const isMetasActive = location.startsWith("/metas");
+  const isWorkspaceActive = isWorkspaceRoute(location);
+  const isMetasActive = isMetasRoute(location);
   const isLogisticaActive = location.startsWith("/logistica");
   const isTriagemActive = location.startsWith("/triagem");
   const isApisActive = location.startsWith("/apis");
@@ -358,7 +345,7 @@ export function AppSidebar() {
                     <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
                       {workspaceSubItems.map((subItem) => {
                         const isSubActive = location === subItem.url ||
-                          (subItem.url === "/workspace" && location === "/workspace");
+                          (subItem.url !== "/workspace" && location.startsWith(subItem.url + "/"));
                         return (
                           <SidebarMenuSubItem key={subItem.url}>
                             <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
@@ -435,7 +422,7 @@ export function AppSidebar() {
                     <CollapsibleContent>
                       <SidebarMenuSub className="ml-4 mt-1.5 border-l pl-2 gap-1">
                         {metasSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
+                          const isSubActive = location === subItem.url || location.startsWith(subItem.url + "/");
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-10 px-3 rounded-md">
@@ -452,19 +439,6 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 </Collapsible>
               )}
-
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild
-                  isActive={location === "/okrs"}
-                  className="h-11 px-3"
-                >
-                  <Link href="/okrs" data-testid="link-okrs">
-                    <Target className="h-[20px] w-[20px]" />
-                    <span className="text-[12px]">OKRs</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
 
               {hasLogisticaAccess && (
                 <Collapsible open={logisticaOpen} onOpenChange={setLogisticaOpen}>
