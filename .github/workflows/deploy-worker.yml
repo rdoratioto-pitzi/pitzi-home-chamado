@@ -34,7 +34,7 @@ jobs:
 
       - name: Generate version
         id: version
-        run: echo "APP_VERSION=$(date -u +%Y.%m.%d)-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: echo "APP_VERSION=$(TZ=America/Sao_Paulo date +%Y.%m.%d-%H.%M)-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
