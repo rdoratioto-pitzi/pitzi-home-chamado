@@ -12,6 +12,16 @@ import {
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
 
+function parseAnexos(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 const kanbanStatusToPtBr: Record<string, string> = {
   todo: "a-fazer",
   doing: "em-andamento",
@@ -142,6 +152,7 @@ workspace.get("/api/workspace/chamados", async (c) => {
         sla: sla.slaHoras,
         statusSla: sla.status,
         abertura: t.dataAbertura || t.createdAt,
+        anexos: parseAnexos(t.attachments),
       };
     });
 
