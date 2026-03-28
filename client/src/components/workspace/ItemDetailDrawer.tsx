@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Paperclip, ExternalLink, Download } from "lucide-react";
+import { X, Send, Paperclip, ExternalLink, Download, Maximize2 } from "lucide-react";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import type { ChamadoItem, UnifiedItem } from "./WorkspaceTable";
@@ -499,20 +501,33 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     <div className="grid grid-cols-2 gap-2 mt-2">
                       {(item as ChamadoItem).anexos.map((anexo, idx) =>
                         isImageAnexo(anexo) ? (
-                          <a
-                            key={idx}
-                            href={anexo.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors"
-                            style={{ background: "rgba(255,255,255,0.04)" }}
-                          >
-                            <img
-                              src={anexo.url}
-                              alt={anexo.name || `Anexo ${idx + 1}`}
-                              className="w-full h-32 object-cover"
-                            />
-                          </a>
+                          <Dialog key={idx}>
+                            <DialogTrigger asChild>
+                              <div
+                                className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors cursor-pointer relative group"
+                                style={{ background: "rgba(255,255,255,0.04)" }}
+                              >
+                                <img
+                                  src={anexo.url}
+                                  alt={anexo.name || `Anexo ${idx + 1}`}
+                                  className="w-full h-32 object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Maximize2 className="h-5 w-5 text-white" />
+                                </div>
+                              </div>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                              <VisuallyHidden>
+                                <DialogTitle>Visualização de Imagem</DialogTitle>
+                              </VisuallyHidden>
+                              <img
+                                src={anexo.url}
+                                alt={anexo.name || `Anexo ${idx + 1}`}
+                                className="max-w-full max-h-full object-contain"
+                              />
+                            </DialogContent>
+                          </Dialog>
                         ) : (
                           <a
                             key={idx}
