@@ -13,6 +13,7 @@ import {
 import { Paperclip, X, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchWithAuth } from "@/lib/queryClient";
+import { UserSelect } from "@/components/ui/user-select";
 
 export type ItemType = "chamado" | "tarefa" | "projeto";
 
@@ -622,12 +623,12 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                 placeholder="Prioridade"
                 options={PRIORIDADE_OPTIONS}
               />
-              <ChipSelect
-                value={responsavelId}
-                onValueChange={setResponsavelId}
-                placeholder="Responsável"
-                options={users.map((u) => ({ value: u.id, label: u.name }))}
-              />
+              <div style={{ minWidth: 160 }}>
+                <UserSelect
+                  value={responsavelId}
+                  onValueChange={setResponsavelId}
+                />
+              </div>
               <ChipDate value={dataEntrega} onChange={setDataEntrega} placeholder="Data Entrega" />
               <input
                 type="text"
@@ -663,12 +664,12 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                 placeholder="Prioridade"
                 options={PRIORIDADE_OPTIONS}
               />
-              <ChipSelect
-                value={responsavelProjeto}
-                onValueChange={setResponsavelProjeto}
-                placeholder="Responsável"
-                options={users.map((u) => ({ value: u.id, label: u.name }))}
-              />
+              <div style={{ minWidth: 160 }}>
+                <UserSelect
+                  value={responsavelProjeto}
+                  onValueChange={setResponsavelProjeto}
+                />
+              </div>
               <ChipDate value={dataInicio} onChange={setDataInicio} placeholder="Data Início" />
               <ChipDate value={dataFim} onChange={setDataFim} placeholder="Data Fim" />
               <input
