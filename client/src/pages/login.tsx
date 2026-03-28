@@ -475,14 +475,7 @@ export default function LoginPage() {
                           />
                           <button
                             type="button"
-                            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-150"
-                            style={{
-                              color: "rgba(255,255,255,0.35)",
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              padding: "4px",
-                            }}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors duration-150 text-muted-foreground hover:text-foreground p-1 bg-transparent border-none cursor-pointer"
                             onClick={() => setShowPassword(!showPassword)}
                             data-testid="button-toggle-password"
                             aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
