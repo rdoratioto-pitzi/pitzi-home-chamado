@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Paperclip } from "lucide-react";
+import { X, Send, Paperclip, ExternalLink, Download } from "lucide-react";
+import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import type { ChamadoItem, UnifiedItem } from "./WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
@@ -106,7 +107,14 @@ const PRIORIDADE_OPTIONS_EDIT = [
   { value: "critica", label: "Crítica" },
 ];
 
+function isImageAnexo(anexo: { name: string; url: string }): boolean {
+  if (anexo.url.startsWith("data:image/")) return true;
+  const ext = anexo.name.split(".").pop()?.toLowerCase() || "";
+  return ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"].includes(ext);
+}
+
 export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDrawerProps) {
+  const [, setLocation] = useLocation();
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [novoComentario, setNovoComentario] = useState("");
   const [enviandoComentario, setEnviandoComentario] = useState(false);
@@ -277,15 +285,29 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                 </>
               )}
             </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded transition-colors"
-              style={{ color: "rgba(255,255,255,0.4)" }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              {isChamado && (
+                <button
+                  onClick={() => { onClose(); setLocation(`/chamados/${item!.id}`); }}
+                  className="p-1.5 rounded transition-colors"
+                  style={{ color: "rgba(255,255,255,0.4)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  title="Editar chamado"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded transition-colors"
+                style={{ color: "rgba(255,255,255,0.4)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
           {/* Body — scrollable */}
@@ -475,35 +497,35 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                       Anexos ({(item as ChamadoItem).anexos.length})
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-2">
-                      {(item as ChamadoItem).anexos.map((url, idx) => (
-                        <a
-                          key={idx}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors"
-                          style={{ background: "rgba(255,255,255,0.04)" }}
-                        >
-                          <img
-                            src={url}
-                            alt={`Anexo ${idx + 1}`}
-                            className="w-full h-32 object-cover"
-                            onError={(e) => {
-                              const target = e.currentTarget;
-                              target.style.display = "none";
-                              const fallback = target.nextElementSibling as HTMLElement;
-                              if (fallback) fallback.style.display = "flex";
-                            }}
-                          />
-                          <div
-                            className="hidden items-center justify-center h-32 text-xs"
-                            style={{ color: "rgba(255,255,255,0.4)" }}
+                      {(item as ChamadoItem).anexos.map((anexo, idx) =>
+                        isImageAnexo(anexo) ? (
+                          <a
+                            key={idx}
+                            href={anexo.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors"
+                            style={{ background: "rgba(255,255,255,0.04)" }}
                           >
-                            <Paperclip size={16} className="mr-1" />
-                            Arquivo {idx + 1}
-                          </div>
-                        </a>
-                      ))}
+                            <img
+                              src={anexo.url}
+                              alt={anexo.name || `Anexo ${idx + 1}`}
+                              className="w-full h-32 object-cover"
+                            />
+                          </a>
+                        ) : (
+                          <a
+                            key={idx}
+                            href={anexo.url}
+                            download={anexo.name}
+                            className="flex items-center gap-2 p-3 rounded-lg border border-white/10 hover:border-white/30 transition-colors h-32"
+                            style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)" }}
+                          >
+                            <Download size={16} className="flex-shrink-0" />
+                            <span className="text-xs truncate">{anexo.name || `Arquivo ${idx + 1}`}</span>
+                          </a>
+                        )
+                      )}
                     </div>
                   </div>
                 )}

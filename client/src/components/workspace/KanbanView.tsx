@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 interface KanbanViewProps {
   items: (ChamadoItem | UnifiedItem)[];
   variant?: "chamados" | "todos";
+  onStatusChange?: (itemId: string, newStatus: string) => void;
 }
 
 interface KanbanColumn {
@@ -15,16 +16,16 @@ interface KanbanColumn {
 
 const COLUMNS: KanbanColumn[] = [
   {
-    key: "em_andamento",
-    label: "Em Andamento",
-    dotColor: "#00c853",
-    statuses: ["in_progress", "em-andamento"],
-  },
-  {
     key: "abertos",
     label: "Abertos / A Fazer",
     dotColor: "#f59e0b",
     statuses: ["open", "a-fazer"],
+  },
+  {
+    key: "em_andamento",
+    label: "Em Andamento",
+    dotColor: "#00c853",
+    statuses: ["in_progress", "em-andamento"],
   },
   {
     key: "bloqueados",
@@ -74,7 +75,7 @@ function getItemTipoBadge(item: ChamadoItem | UnifiedItem): { label: string; col
   return null;
 }
 
-function KanbanCard({ item }: { item: ChamadoItem | UnifiedItem }) {
+function KanbanCard({ item, draggable }: { item: ChamadoItem | UnifiedItem; draggable?: boolean }) {
   const badge = getItemTipoBadge(item);
   const date = getItemDate(item);
 
@@ -93,13 +94,18 @@ function KanbanCard({ item }: { item: ChamadoItem | UnifiedItem }) {
 
   return (
     <div
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData("itemId", item.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
       style={{
         background: "#111411",
         border: "1px solid rgba(255,255,255,0.07)",
         borderRadius: 8,
         padding: "10px 12px",
         marginBottom: 8,
-        cursor: "pointer",
+        cursor: draggable ? "grab" : "pointer",
       }}
     >
       {/* Top row: codigo + badge */}
@@ -266,11 +272,28 @@ function KanbanColumnHeader({ column, count }: { column: KanbanColumn; count: nu
   );
 }
 
-export function KanbanView({ items }: KanbanViewProps) {
+export function KanbanView({ items, onStatusChange }: KanbanViewProps) {
   const columnItems = COLUMNS.map((col) => ({
     column: col,
     items: items.filter((item) => col.statuses.includes(item.status)),
   }));
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }
+
+  function handleDrop(e: React.DragEvent, targetStatuses: string[]) {
+    e.preventDefault();
+    const itemId = e.dataTransfer.getData("itemId");
+    if (!itemId || !onStatusChange) return;
+    const item = items.find((i) => i.id === itemId);
+    if (item && !targetStatuses.includes(item.status)) {
+      onStatusChange(itemId, targetStatuses[0]);
+    }
+  }
+
+  const isDraggable = !!onStatusChange;
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -286,16 +309,19 @@ export function KanbanView({ items }: KanbanViewProps) {
           <div
             key={column.key}
             style={{ width: 260, flexShrink: 0 }}
+            onDragOver={isDraggable ? handleDragOver : undefined}
+            onDrop={isDraggable ? (e) => handleDrop(e, column.statuses) : undefined}
           >
             <KanbanColumnHeader column={column} count={colItems.length} />
             <div
               style={{
                 overflowY: "auto",
                 maxHeight: "calc(100vh - 300px)",
+                minHeight: 60,
               }}
             >
               {colItems.map((item) => (
-                <KanbanCard key={item.id} item={item} />
+                <KanbanCard key={item.id} item={item} draggable={isDraggable} />
               ))}
               {colItems.length === 0 && (
                 <div
