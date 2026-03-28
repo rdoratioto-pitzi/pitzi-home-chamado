@@ -19,6 +19,35 @@ const kanbanStatusToPtBr: Record<string, string> = {
 
 const workspace = new Hono<AppEnv>();
 
+// ─── Counts (lightweight) ──────────────────────────────────────────────────
+workspace.get("/api/workspace/counts", async (c) => {
+  try {
+    const { userId, role } = c.get("user");
+    const isAdmin = role === "admin";
+    const db = c.get("db");
+    const storage = getStorage(db);
+
+    const [allTickets, allCards] = await Promise.all([
+      isAdmin
+        ? storage.getTickets()
+        : storage.getTickets({ requesterId: userId, assigneeId: userId }),
+      db.select().from(kanbanCards),
+    ]);
+
+    const chamados = allTickets.filter(
+      (t) => t.status === "open" || t.status === "in_progress" || t.status === "blocked"
+    ).length;
+
+    const myCards = allCards.filter(
+      (card) => card.assigneeId === userId && card.status !== "done"
+    ).length;
+
+    return c.json({ chamados, projetos: myCards, todos: chamados + myCards });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
 // ─── GET chamados ─────────────────────────────────────────────────────────────
 
 workspace.get("/api/workspace/chamados", async (c) => {
