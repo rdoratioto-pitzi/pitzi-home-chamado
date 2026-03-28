@@ -9,6 +9,7 @@ import { ProjetosView } from "./ProjetosView";
 import { VisaoEstrategica } from "@/components/workspace/VisaoEstrategica";
 import { NovoItemModal, type ItemType } from "@/components/workspace/NovoItemModal";
 import { fetchWithAuth } from "@/lib/queryClient";
+import { useWorkspaceCounts } from "@/hooks/use-workspace-counts";
 
 type TabKey = "todos" | "chamados" | "projetos";
 
@@ -101,25 +102,12 @@ export default function WorkspacePage() {
   const activeTab: TabKey = (params?.tab as TabKey) || "todos";
   const ActiveView = viewMap[activeTab] ?? viewMap.todos;
 
-  const [tabCounts, setTabCounts] = useState({ todos: 0, chamados: 0, projetos: 0 });
-
-  useEffect(() => {
-    fetchWithAuth("/api/workspace/counts")
-      .then(r => r.json())
-      .then(data => {
-        setTabCounts({
-          todos: data.todos ?? 0,
-          chamados: data.chamados ?? 0,
-          projetos: data.projetos ?? 0,
-        });
-      })
-      .catch(() => {});
-  }, []);
+  const { data: tabCounts } = useWorkspaceCounts();
 
   const tabs: { key: TabKey; label: string; count: number }[] = [
-    { key: "todos", label: "Todos", count: tabCounts.todos },
-    { key: "chamados", label: "Chamados", count: tabCounts.chamados },
-    { key: "projetos", label: "Projetos", count: tabCounts.projetos },
+    { key: "todos", label: "Todos", count: tabCounts?.todos ?? 0 },
+    { key: "chamados", label: "Chamados", count: tabCounts?.chamados ?? 0 },
+    { key: "projetos", label: "Projetos", count: tabCounts?.projetos ?? 0 },
   ];
 
   const [visaoOpen, setVisaoOpen] = useState(false);
