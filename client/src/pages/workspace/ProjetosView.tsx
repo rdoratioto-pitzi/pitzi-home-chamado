@@ -9,7 +9,11 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil } from "lucide-react";
 import { KpiStrip } from "@/components/workspace/KpiStrip";
 import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import type { UnifiedItem } from "@/components/workspace/WorkspaceTable";
@@ -103,13 +107,13 @@ const priorityColors: Record<string, string> = {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function ProjectGroupHeader({ projeto }: { projeto: ProjetoComTarefas }) {
+function ProjectGroupHeader({ projeto, onEdit }: { projeto: ProjetoComTarefas; onEdit?: () => void }) {
   const cor = projeto.cor || "#00c853";
   const prog = projeto.progresso ?? 0;
 
   return (
     <div
-      className="flex items-center gap-2 px-4 py-2"
+      className="flex items-center gap-2 px-4 py-2 group"
       style={{ background: "rgba(255,255,255,0.02)" }}
     >
       <span
@@ -153,6 +157,15 @@ function ProjectGroupHeader({ projeto }: { projeto: ProjetoComTarefas }) {
       >
         {projeto.codigo}
       </span>
+      {onEdit && (
+        <button
+          onClick={onEdit}
+          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10"
+          title="Editar projeto"
+        >
+          <Pencil size={12} style={{ color: "rgba(255,255,255,0.5)" }} />
+        </button>
+      )}
     </div>
   );
 }
@@ -461,6 +474,96 @@ function ProjectsKanbanView({ projetos }: { projetos: ProjetoComTarefas[] }) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
+function ProjectEditDialog({
+  projeto,
+  open,
+  onOpenChange,
+  onSave,
+  saving,
+}: {
+  projeto: ProjetoComTarefas | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (data: { nome: string; descricao: string; status: string; prioridade: string; categoria: string }) => void;
+  saving: boolean;
+}) {
+  const [nome, setNome] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [status, setStatus] = useState("backlog");
+  const [prioridade, setPrioridade] = useState("media");
+  const [categoria, setCategoria] = useState("");
+
+  useEffect(() => {
+    if (projeto) {
+      setNome(projeto.nome);
+      setDescricao(projeto.descricao || "");
+      setStatus(projeto.status || "backlog");
+      setPrioridade(projeto.prioridade || "media");
+      setCategoria(projeto.categoria || "");
+    }
+  }, [projeto]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar Projeto</DialogTitle>
+          <DialogDescription>
+            {projeto?.codigo} — Altere os campos desejados
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 py-2">
+          <div>
+            <Label className="text-xs">Nome</Label>
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-xs">Descrição</Label>
+            <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} className="mt-1" rows={3} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Status</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="backlog">Backlog</SelectItem>
+                  <SelectItem value="ativo">Ativo</SelectItem>
+                  <SelectItem value="pausado">Pausado</SelectItem>
+                  <SelectItem value="concluido">Concluído</SelectItem>
+                  <SelectItem value="inativo">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Prioridade</Label>
+              <Select value={prioridade} onValueChange={setPrioridade}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="baixa">Baixa</SelectItem>
+                  <SelectItem value="media">Média</SelectItem>
+                  <SelectItem value="alta">Alta</SelectItem>
+                  <SelectItem value="critica">Crítica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Categoria</Label>
+            <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} className="mt-1" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={() => onSave({ nome, descricao, status, prioridade, categoria })} disabled={saving || !nome.trim()}>
+            {saving ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function toUnifiedItem(tarefa: TarefaItem, projetoNome: string): UnifiedItem {
   return {
     tipo: "tarefa",
@@ -500,6 +603,38 @@ export function ProjetosView() {
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [selectedTarefa, setSelectedTarefa] = useState<UnifiedItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editProjeto, setEditProjeto] = useState<ProjetoComTarefas | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSaveEdit = async (formData: {
+    nome: string;
+    descricao: string;
+    status: string;
+    prioridade: string;
+    categoria: string;
+  }) => {
+    if (!editProjeto) return;
+    setSaving(true);
+    try {
+      const res = await fetchWithAuth(`/api/workspace/projetos/${editProjeto.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) throw new Error("Falha ao salvar");
+      toast({ title: "Projeto atualizado com sucesso" });
+      setEditOpen(false);
+      const dataRes = await fetchWithAuth("/api/workspace/projetos");
+      const data: WorkspaceProjetosResponse = await dataRes.json();
+      setKpis(data.kpis);
+      setProjetos(data.projetos);
+    } catch {
+      toast({ title: "Erro ao atualizar projeto", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const viewIcons: Record<ViewMode, React.ReactNode> = {
     lista: <List className="h-4 w-4" />,
@@ -712,7 +847,13 @@ export function ProjetosView() {
           ) : (
             filteredProjetos.map((projeto) => (
               <div key={projeto.id}>
-                <ProjectGroupHeader projeto={projeto} />
+                <ProjectGroupHeader
+                  projeto={projeto}
+                  onEdit={() => {
+                    setEditProjeto(projeto);
+                    setEditOpen(true);
+                  }}
+                />
                 {projeto.tarefas.length === 0 ? (
                   <EmptyTarefasRow />
                 ) : (
@@ -746,6 +887,13 @@ export function ProjetosView() {
         open={drawerOpen}
         item={selectedTarefa}
         onClose={() => setDrawerOpen(false)}
+      />
+      <ProjectEditDialog
+        projeto={editProjeto}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSave={handleSaveEdit}
+        saving={saving}
       />
     </div>
   );
