@@ -18,6 +18,16 @@ const ptBrToKanbanStatus: Record<string, string> = {
   concluido: "done",
 };
 
+function parseAnexos(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export function registerWorkspaceRoutes(router: Router) {
   // ─── Counts (lightweight) ──────────────────────────────────────────────────
   router.get("/api/workspace/counts", requireAuth, async (req, res) => {
@@ -130,7 +140,7 @@ export function registerWorkspaceRoutes(router: Router) {
           sla: sla.slaHoras,
           statusSla: sla.status,
           abertura: t.dataAbertura || t.createdAt,
-          hasAttachments: !!(t as any).hasAttachments,
+          anexos: parseAnexos((t as any).attachments),
         };
       });
 

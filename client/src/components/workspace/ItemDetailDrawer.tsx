@@ -461,8 +461,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                   )}
                 </div>
 
-                {/* ANEXOS indicator */}
-                {isChamado && (item as ChamadoItem).hasAttachments && (
+                {/* ANEXOS */}
+                {isChamado && (item as ChamadoItem).anexos?.length > 0 && (
                   <div
                     style={{
                       marginBottom: 24,
@@ -472,16 +472,39 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                   >
                     <div style={SECTION_LABEL_STYLE}>
                       <Paperclip size={12} style={{ display: "inline", marginRight: 6 }} />
-                      Anexos
+                      Anexos ({(item as ChamadoItem).anexos.length})
                     </div>
-                    <a
-                      href={`/chamados/${(item as ChamadoItem).id}`}
-                      className="flex items-center gap-3 p-3 mt-2 rounded-lg border border-white/10 hover:border-white/25 transition-colors"
-                      style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)", textDecoration: "none" }}
-                    >
-                      <Paperclip size={16} style={{ color: "rgba(255,255,255,0.4)" }} />
-                      <span className="text-sm">Ver anexos na página do chamado</span>
-                    </a>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {(item as ChamadoItem).anexos.map((url, idx) => (
+                        <a
+                          key={idx}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors"
+                          style={{ background: "rgba(255,255,255,0.04)" }}
+                        >
+                          <img
+                            src={url}
+                            alt={`Anexo ${idx + 1}`}
+                            className="w-full h-32 object-cover"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = "none";
+                              const fallback = target.nextElementSibling as HTMLElement;
+                              if (fallback) fallback.style.display = "flex";
+                            }}
+                          />
+                          <div
+                            className="hidden items-center justify-center h-32 text-xs"
+                            style={{ color: "rgba(255,255,255,0.4)" }}
+                          >
+                            <Paperclip size={16} className="mr-1" />
+                            Arquivo {idx + 1}
+                          </div>
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
 
