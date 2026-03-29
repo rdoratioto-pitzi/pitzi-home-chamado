@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Paperclip, ExternalLink, Download, Maximize2 } from "lucide-react";
+import { X, Send, Paperclip, ExternalLink, Download, Maximize2, FileText, FileSpreadsheet, FileImage, File, FileArchive } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useLocation } from "wouter";
@@ -113,6 +113,16 @@ function isImageAnexo(anexo: { name: string; url: string }): boolean {
   if (anexo.url.startsWith("data:image/")) return true;
   const ext = anexo.name.split(".").pop()?.toLowerCase() || "";
   return ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"].includes(ext);
+}
+
+function getFileIcon(name: string) {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  if (["xls", "xlsx", "csv"].includes(ext)) return { Icon: FileSpreadsheet, color: "#22c55e" };
+  if (["doc", "docx"].includes(ext)) return { Icon: FileText, color: "#3b82f6" };
+  if (["pdf"].includes(ext)) return { Icon: FileText, color: "#ef4444" };
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { Icon: FileArchive, color: "#f59e0b" };
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return { Icon: FileImage, color: "#8b5cf6" };
+  return { Icon: File, color: "rgba(255,255,255,0.5)" };
 }
 
 export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDrawerProps) {
@@ -533,11 +543,12 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                             key={idx}
                             href={anexo.url}
                             download={anexo.name}
-                            className="flex items-center gap-2 p-3 rounded-lg border border-white/10 hover:border-white/30 transition-colors h-32"
-                            style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)" }}
+                            className="flex items-center gap-3 p-3 rounded-lg border border-white/10 hover:border-white/30 transition-colors"
+                            style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.7)" }}
                           >
-                            <Download size={16} className="flex-shrink-0" />
-                            <span className="text-xs truncate">{anexo.name || `Arquivo ${idx + 1}`}</span>
+                            {(() => { const { Icon, color } = getFileIcon(anexo.name); return <Icon size={20} style={{ color }} className="flex-shrink-0" />; })()}
+                            <span className="text-xs truncate flex-1">{anexo.name || `Arquivo ${idx + 1}`}</span>
+                            <Download size={14} className="flex-shrink-0 opacity-40" />
                           </a>
                         )
                       )}
