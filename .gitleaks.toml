@@ -1,0 +1,71 @@
+title = "Renov Home — Gitleaks Config"
+
+[extend]
+useDefault = true
+
+# ══════════════════════════════════════════════
+# REGRAS CUSTOMIZADAS RENOV HOME
+# Herda 150+ regras padrão + adiciona Renov-específicas
+# ══════════════════════════════════════════════
+
+# Omie ERP credentials
+[[rules]]
+id = "renov-omie-appkey"
+description = "Omie ERP App Key exposta"
+regex = '''(?i)(omie[_-]?app[_-]?key\s*[=:]\s*['"]?\d{10,}['"]?)'''
+tags = ["renov", "omie", "credentials"]
+
+[[rules]]
+id = "renov-omie-appsecret"
+description = "Omie ERP App Secret exposto"
+regex = '''(?i)(omie[_-]?app[_-]?secret\s*[=:]\s*['"][a-zA-Z0-9]{20,}['"])'''
+tags = ["renov", "omie", "credentials"]
+
+# Neon Postgres connection strings
+[[rules]]
+id = "renov-neon-connection"
+description = "Neon Postgres connection string exposta"
+regex = '''postgres(?:ql)?://[^:]+:[^@]+@[a-z0-9-]+\.neon\.tech[^\s'"]*'''
+tags = ["renov", "database", "neon"]
+
+# Express session secret
+[[rules]]
+id = "renov-express-session-secret"
+description = "Express session secret hardcoded"
+regex = '''(?i)(session[_-]?secret\s*[=:]\s*['"][^'"$\s]{8,}['"])'''
+tags = ["renov", "express", "session"]
+
+# Cloudflare tokens (Home usa Cloudflare para deploy)
+[[rules]]
+id = "renov-cloudflare-token"
+description = "Cloudflare API token exposto"
+regex = '''(?i)(cloudflare[_-]?(?:api[_-]?)?token\s*[=:]\s*['"][a-zA-Z0-9_-]{40,}['"])'''
+tags = ["renov", "cloudflare", "credentials"]
+
+# ══════════════════════════════════════════════
+# ALLOWLIST GLOBAL — falsos positivos conhecidos
+# ══════════════════════════════════════════════
+
+[[allowlists]]
+description = "Ignorar arquivos que nunca contêm secrets reais"
+paths = [
+  '''\.gitleaks\.toml''',
+  '''(?:^|/)node_modules/''',
+  '''(?:^|/)dist/''',
+  '''(?:^|/)build/''',
+  '''(?:^|/)\.claude/skills/''',
+  '''(?i)\.(jpg|jpeg|png|gif|svg|ico|woff2?|ttf|eot)$''',
+  '''(?:^|/)package-lock\.json$''',
+  '''(?:^|/)yarn\.lock$''',
+]
+
+[[allowlists]]
+description = "Ignorar valores de exemplo e placeholders"
+regexTarget = "match"
+regexes = [
+  '''your[_-]?(?:api[_-]?key|secret|token)''',
+  '''example[_-]?(?:key|secret|token)''',
+  '''\$\{[A-Z_]+\}''',
+  '''process\.env\.[A-Z_]+''',
+  '''placeholder''',
+]
