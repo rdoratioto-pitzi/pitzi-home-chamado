@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { FilterCombobox } from "@/components/ui/filter-combobox";
 import {
   Search,
   List,
@@ -187,19 +188,14 @@ export function TodosView() {
         </Select>
 
         {/* Responsável filter */}
-        <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
-          <SelectTrigger className="h-8 w-[150px] text-xs">
-            <SelectValue placeholder="Responsável" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {responsaveis.map((r) => (
-              <SelectItem key={r} value={r}>
-                {r}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FilterCombobox
+          value={responsavelFilter}
+          onValueChange={setResponsavelFilter}
+          options={responsaveis}
+          allLabel="Todos"
+          searchPlaceholder="Buscar colaborador..."
+          className="w-[150px]"
+        />
 
         {/* View mode toggle */}
         <div
