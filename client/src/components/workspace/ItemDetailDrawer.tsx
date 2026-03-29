@@ -115,6 +115,27 @@ function isImageAnexo(anexo: { name: string; url: string }): boolean {
   return ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"].includes(ext);
 }
 
+function downloadAnexo(url: string, filename: string) {
+  if (url.startsWith("data:")) {
+    const [header, b64] = url.split(",");
+    const mime = header.match(/data:(.*?);/)?.[1] || "application/octet-stream";
+    const byteChars = atob(b64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  } else {
+    window.open(url, "_blank");
+  }
+}
+
 function getFileIcon(name: string) {
   const ext = name.split(".").pop()?.toLowerCase() || "";
   if (["xls", "xlsx", "csv"].includes(ext)) return { Icon: FileSpreadsheet, color: "#22c55e" };
@@ -539,17 +560,16 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                             </DialogContent>
                           </Dialog>
                         ) : (
-                          <a
+                          <button
                             key={idx}
-                            href={anexo.url}
-                            download={anexo.name}
-                            className="flex items-center gap-3 p-3 rounded-lg border border-white/10 hover:border-white/30 transition-colors"
+                            onClick={() => downloadAnexo(anexo.url, anexo.name || `Arquivo_${idx + 1}`)}
+                            className="flex items-center gap-3 p-3 rounded-lg border border-white/10 hover:border-white/30 transition-colors text-left w-full cursor-pointer"
                             style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.7)" }}
                           >
                             {(() => { const { Icon, color } = getFileIcon(anexo.name); return <Icon size={20} style={{ color }} className="flex-shrink-0" />; })()}
                             <span className="text-xs truncate flex-1">{anexo.name || `Arquivo ${idx + 1}`}</span>
                             <Download size={14} className="flex-shrink-0 opacity-40" />
-                          </a>
+                          </button>
                         )
                       )}
                     </div>

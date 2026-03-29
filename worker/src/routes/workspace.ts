@@ -14,12 +14,38 @@ import type { Ticket, SlaRule } from "../../../shared/schema";
 
 interface Anexo { name: string; url: string }
 
+function mimeToName(mime: string, idx: number): string {
+  const map: Record<string, string> = {
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "planilha.xlsx",
+    "application/vnd.ms-excel": "planilha.xls",
+    "application/pdf": "documento.pdf",
+    "application/zip": "arquivo.zip",
+    "application/msword": "documento.doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "documento.docx",
+    "text/csv": "dados.csv",
+  };
+  if (map[mime]) return map[mime];
+  if (mime.startsWith("image/")) return `imagem.${mime.split("/")[1] || "png"}`;
+  return `arquivo_${idx + 1}`;
+}
+
 function parseAnexos(raw: string | null | undefined): Anexo[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((a: any) => a && typeof a.url === "string");
+    return parsed
+      .map((a: any, idx: number) => {
+        if (typeof a === "string" && a.startsWith("data:")) {
+          const mime = a.substring(5, a.indexOf(";")) || "application/octet-stream";
+          return { name: mimeToName(mime, idx), url: a };
+        }
+        if (a && typeof a.url === "string") {
+          return { name: a.name || mimeToName("", idx), url: a.url };
+        }
+        return null;
+      })
+      .filter(Boolean) as Anexo[];
   } catch {
     return [];
   }
@@ -100,12 +126,15 @@ workspace.get("/api/workspace/chamados", async (c) => {
             created.getFullYear() === prev.getFullYear()
           );
         }
-        case "em-tratativa":
-          return (
-            t.status === "open" ||
-            t.status === "in_progress" ||
-            t.status === "blocked"
-          );
+        case "em-tratativa": {
+          if (t.status === "open" || t.status === "in_progress" || t.status === "blocked") return true;
+          if (t.status === "resolved" || t.status === "closed") {
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const closedDate = (t as any).dataFechamento ? new Date((t as any).dataFechamento) : created;
+            return closedDate ? closedDate >= thirtyDaysAgo : false;
+          }
+          return false;
+        }
         case "este-ano":
         default:
           return created.getFullYear() === now.getFullYear();
