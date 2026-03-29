@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
+import { VersionBadge } from "@/components/version-badge";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -121,17 +122,6 @@ export default function LoginPage() {
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [loginSuccess, setLoginSuccess] = useState(false);
-  const [backendOnline, setBackendOnline] = useState(false);
-  const [backendVersion, setBackendVersion] = useState("");
-
-  // Backend health check
-  useEffect(() => {
-    fetch("/api/version")
-      .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((d) => { setBackendOnline(true); setBackendVersion(d.version ?? "ok"); })
-      .catch(() => setBackendOnline(false));
-  }, []);
-
   // Countdown timer for forgot password
   useEffect(() => {
     if (countdown > 0) {
@@ -576,22 +566,9 @@ export default function LoginPage() {
             </form>
           </Form>
 
-          {/* Version / status footer */}
-          <motion.div
-            variants={itemVariants}
-            className="mt-10 flex flex-col items-center gap-1"
-            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", fontWeight: 400 }}
-          >
-            <div className="flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.4)" }}>
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400" />
-              <span>Front: {import.meta.env.VITE_APP_VERSION || __APP_VERSION__ || "dev"}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className={`inline-block w-1.5 h-1.5 rounded-full ${backendOnline ? "bg-green-500" : "bg-red-500"}`} />
-              <span style={{ color: backendOnline ? "rgba(255,255,255,0.4)" : "#ef4444" }}>
-                Back: {backendOnline ? (backendVersion || "...") : "offline"}
-              </span>
-            </div>
+          {/* Version / status footer — same component as sidebar */}
+          <motion.div variants={itemVariants} className="mt-10 flex justify-center">
+            <VersionBadge />
           </motion.div>
         </motion.div>
       </div>
