@@ -301,7 +301,7 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="px-3 py-2">
+      <SidebarContent className="px-2 py-2">
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
@@ -353,13 +353,13 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
+                    <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
                       {workspaceSubItems.map((subItem) => {
                         const isSubActive = location === subItem.url ||
                           (subItem.url !== "/workspace" && location.startsWith(subItem.url + "/"));
                         return (
                           <SidebarMenuSubItem key={subItem.url}>
-                            <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
+                            <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                               <Link href={subItem.url} data-testid={`link-workspace-${subItem.title.toLowerCase()}`}>
                                 <subItem.icon className="h-4 w-4 mr-2" />
                                 <span className="text-[12px]">{subItem.title}</span>
@@ -392,12 +392,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
+                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
                         {hasEstoquesAccess && estoquesSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -410,7 +410,7 @@ export function AppSidebar() {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -423,7 +423,7 @@ export function AppSidebar() {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -436,7 +436,7 @@ export function AppSidebar() {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -470,12 +470,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
+                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
                         {metasSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url || location.startsWith(subItem.url + "/");
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-metas-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -509,12 +509,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
+                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
                         {bibliotecaSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-biblioteca-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
@@ -548,12 +548,12 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
-                      <SidebarMenuSub className="ml-4 mt-1 border-l pl-2 gap-0.5">
+                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
                         {apisSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
                             <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-3 rounded-md">
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
