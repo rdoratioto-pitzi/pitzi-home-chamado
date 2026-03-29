@@ -121,6 +121,16 @@ export default function LoginPage() {
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [loginSuccess, setLoginSuccess] = useState(false);
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [backendVersion, setBackendVersion] = useState("");
+
+  // Backend health check
+  useEffect(() => {
+    fetch("/api/version")
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((d) => { setBackendOnline(true); setBackendVersion(d.version ?? "ok"); })
+      .catch(() => setBackendOnline(false));
+  }, []);
 
   // Countdown timer for forgot password
   useEffect(() => {
@@ -566,19 +576,23 @@ export default function LoginPage() {
             </form>
           </Form>
 
-          {/* Version footer */}
-          <motion.p
+          {/* Version / status footer */}
+          <motion.div
             variants={itemVariants}
-            className="text-center mt-10"
-            style={{
-              fontFamily: "Montserrat, sans-serif",
-              fontSize: "12px",
-              fontWeight: 300,
-              color: "rgba(255,255,255,0.3)",
-            }}
+            className="mt-10 flex flex-col items-center gap-1"
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "10px", fontWeight: 400 }}
           >
-            Renov Home v{import.meta.env.VITE_APP_VERSION || __APP_VERSION__}
-          </motion.p>
+            <div className="flex items-center gap-1.5" style={{ color: "rgba(255,255,255,0.4)" }}>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span>Front: {import.meta.env.VITE_APP_VERSION || __APP_VERSION__ || "dev"}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${backendOnline ? "bg-green-500" : "bg-red-500"}`} />
+              <span style={{ color: backendOnline ? "rgba(255,255,255,0.4)" : "#ef4444" }}>
+                Back: {backendOnline ? (backendVersion || "...") : "offline"}
+              </span>
+            </div>
+          </motion.div>
         </motion.div>
       </div>
 
