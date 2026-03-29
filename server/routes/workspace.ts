@@ -446,7 +446,7 @@ export function registerWorkspaceRoutes(router: Router) {
       const [updated] = await db
         .update(projects)
         .set(updateData)
-        .where(eq(projects.id, parseInt(id)))
+        .where(eq(projects.id, id))
         .returning();
 
       if (!updated) {
