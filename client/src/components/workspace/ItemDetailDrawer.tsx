@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Paperclip, ExternalLink, Download } from "lucide-react";
+import { X, Send, Paperclip, ExternalLink, Download, Maximize2, FileText, FileSpreadsheet, FileImage, File, FileArchive } from "lucide-react";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import type { ChamadoItem, UnifiedItem } from "./WorkspaceTable";
@@ -111,6 +113,37 @@ function isImageAnexo(anexo: { name: string; url: string }): boolean {
   if (anexo.url.startsWith("data:image/")) return true;
   const ext = anexo.name.split(".").pop()?.toLowerCase() || "";
   return ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"].includes(ext);
+}
+
+function downloadAnexo(url: string, filename: string) {
+  if (url.startsWith("data:")) {
+    const [header, b64] = url.split(",");
+    const mime = header.match(/data:(.*?);/)?.[1] || "application/octet-stream";
+    const byteChars = atob(b64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(blobUrl);
+  } else {
+    window.open(url, "_blank");
+  }
+}
+
+function getFileIcon(name: string) {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  if (["xls", "xlsx", "csv"].includes(ext)) return { Icon: FileSpreadsheet, color: "#22c55e" };
+  if (["doc", "docx"].includes(ext)) return { Icon: FileText, color: "#3b82f6" };
+  if (["pdf"].includes(ext)) return { Icon: FileText, color: "#ef4444" };
+  if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { Icon: FileArchive, color: "#f59e0b" };
+  if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return { Icon: FileImage, color: "#8b5cf6" };
+  return { Icon: File, color: "rgba(255,255,255,0.5)" };
 }
 
 export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDrawerProps) {
@@ -499,31 +532,44 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     <div className="grid grid-cols-2 gap-2 mt-2">
                       {(item as ChamadoItem).anexos.map((anexo, idx) =>
                         isImageAnexo(anexo) ? (
-                          <a
-                            key={idx}
-                            href={anexo.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors"
-                            style={{ background: "rgba(255,255,255,0.04)" }}
-                          >
-                            <img
-                              src={anexo.url}
-                              alt={anexo.name || `Anexo ${idx + 1}`}
-                              className="w-full h-32 object-cover"
-                            />
-                          </a>
+                          <Dialog key={idx}>
+                            <DialogTrigger asChild>
+                              <div
+                                className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors cursor-pointer relative group"
+                                style={{ background: "rgba(255,255,255,0.04)" }}
+                              >
+                                <img
+                                  src={anexo.url}
+                                  alt={anexo.name || `Anexo ${idx + 1}`}
+                                  className="w-full h-32 object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Maximize2 className="h-5 w-5 text-white" />
+                                </div>
+                              </div>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-4xl w-[95vw] h-[95vh] p-0 overflow-hidden bg-black/95 border-none flex items-center justify-center">
+                              <VisuallyHidden>
+                                <DialogTitle>Visualização de Imagem</DialogTitle>
+                              </VisuallyHidden>
+                              <img
+                                src={anexo.url}
+                                alt={anexo.name || `Anexo ${idx + 1}`}
+                                className="max-w-full max-h-full object-contain"
+                              />
+                            </DialogContent>
+                          </Dialog>
                         ) : (
-                          <a
+                          <button
                             key={idx}
-                            href={anexo.url}
-                            download={anexo.name}
-                            className="flex items-center gap-2 p-3 rounded-lg border border-white/10 hover:border-white/30 transition-colors h-32"
-                            style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.6)" }}
+                            onClick={() => downloadAnexo(anexo.url, anexo.name || `Arquivo_${idx + 1}`)}
+                            className="flex items-center gap-3 p-3 rounded-lg border border-white/10 hover:border-white/30 transition-colors text-left w-full cursor-pointer"
+                            style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.7)" }}
                           >
-                            <Download size={16} className="flex-shrink-0" />
-                            <span className="text-xs truncate">{anexo.name || `Arquivo ${idx + 1}`}</span>
-                          </a>
+                            {(() => { const { Icon, color } = getFileIcon(anexo.name); return <Icon size={20} style={{ color }} className="flex-shrink-0" />; })()}
+                            <span className="text-xs truncate flex-1">{anexo.name || `Arquivo ${idx + 1}`}</span>
+                            <Download size={14} className="flex-shrink-0 opacity-40" />
+                          </button>
                         )
                       )}
                     </div>

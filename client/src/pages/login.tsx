@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
+import { VersionBadge } from "@/components/version-badge";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -121,7 +122,6 @@ export default function LoginPage() {
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [loginSuccess, setLoginSuccess] = useState(false);
-
   // Countdown timer for forgot password
   useEffect(() => {
     if (countdown > 0) {
@@ -566,19 +566,10 @@ export default function LoginPage() {
             </form>
           </Form>
 
-          {/* Version footer */}
-          <motion.p
-            variants={itemVariants}
-            className="text-center mt-10"
-            style={{
-              fontFamily: "Montserrat, sans-serif",
-              fontSize: "12px",
-              fontWeight: 300,
-              color: "rgba(255,255,255,0.3)",
-            }}
-          >
-            Renov Home v1.0
-          </motion.p>
+          {/* Version / status footer — same component as sidebar */}
+          <motion.div variants={itemVariants} className="mt-10 flex justify-center">
+            <VersionBadge />
+          </motion.div>
         </motion.div>
       </div>
 

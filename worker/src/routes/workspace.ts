@@ -14,12 +14,38 @@ import type { Ticket, SlaRule } from "../../../shared/schema";
 
 interface Anexo { name: string; url: string }
 
+function mimeToName(mime: string, idx: number): string {
+  const map: Record<string, string> = {
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "planilha.xlsx",
+    "application/vnd.ms-excel": "planilha.xls",
+    "application/pdf": "documento.pdf",
+    "application/zip": "arquivo.zip",
+    "application/msword": "documento.doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "documento.docx",
+    "text/csv": "dados.csv",
+  };
+  if (map[mime]) return map[mime];
+  if (mime.startsWith("image/")) return `imagem.${mime.split("/")[1] || "png"}`;
+  return `arquivo_${idx + 1}`;
+}
+
 function parseAnexos(raw: string | null | undefined): Anexo[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((a: any) => a && typeof a.url === "string");
+    return parsed
+      .map((a: any, idx: number) => {
+        if (typeof a === "string" && a.startsWith("data:")) {
+          const mime = a.substring(5, a.indexOf(";")) || "application/octet-stream";
+          return { name: mimeToName(mime, idx), url: a };
+        }
+        if (a && typeof a.url === "string") {
+          return { name: a.name || mimeToName("", idx), url: a.url };
+        }
+        return null;
+      })
+      .filter(Boolean) as Anexo[];
   } catch {
     return [];
   }
@@ -100,12 +126,15 @@ workspace.get("/api/workspace/chamados", async (c) => {
             created.getFullYear() === prev.getFullYear()
           );
         }
-        case "em-tratativa":
-          return (
-            t.status === "open" ||
-            t.status === "in_progress" ||
-            t.status === "blocked"
-          );
+        case "em-tratativa": {
+          if (t.status === "open" || t.status === "in_progress" || t.status === "blocked") return true;
+          if (t.status === "resolved" || t.status === "closed") {
+            const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+            const closedDate = (t as any).dataFechamento ? new Date((t as any).dataFechamento) : created;
+            return closedDate ? closedDate >= thirtyDaysAgo : false;
+          }
+          return false;
+        }
         case "este-ano":
         default:
           return created.getFullYear() === now.getFullYear();
@@ -759,6 +788,55 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
       dataEntrega: card.dueDate ? String(card.dueDate) : null,
       progresso: card.progress,
       criadoEm: card.createdAt ? String(card.createdAt) : null,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── PATCH projetos ───────────────────────────────────────────────────────────
+workspace.patch("/api/workspace/projetos/:id", async (c) => {
+  try {
+    const db = c.get("db");
+    const id = c.req.param("id");
+    const body = await c.req.json();
+    const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria } = body;
+
+    const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
+    if (status && !validStatuses.includes(status)) {
+      return c.json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` }, 400);
+    }
+
+    const updateData: Record<string, any> = {};
+    if (nome !== undefined) updateData.name = nome.trim();
+    if (descricao !== undefined) updateData.description = descricao;
+    if (status !== undefined) updateData.status = status;
+    if (prioridade !== undefined) updateData.priority = prioridade;
+    if (responsavelId !== undefined) updateData.ownerId = responsavelId;
+    if (dataInicio !== undefined) updateData.startDate = dataInicio ? new Date(dataInicio) : null;
+    if (dataFim !== undefined) updateData.endDate = dataFim ? new Date(dataFim) : null;
+    if (categoria !== undefined) updateData.category = categoria;
+
+    if (Object.keys(updateData).length === 0) {
+      return c.json({ error: "Nenhum campo para atualizar" }, 400);
+    }
+
+    const [updated] = await db
+      .update(projects)
+      .set(updateData)
+      .where(eq(projects.id, id))
+      .returning();
+
+    if (!updated) {
+      return c.json({ error: "Projeto não encontrado" }, 404);
+    }
+
+    return c.json({
+      id: updated.id,
+      codigo: updated.code,
+      nome: updated.name,
+      status: updated.status,
+      prioridade: updated.priority,
     });
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
