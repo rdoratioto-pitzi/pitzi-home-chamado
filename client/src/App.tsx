@@ -433,7 +433,7 @@ function AppContent() {
   useAuthSync();
 
   const sidebarStyle = {
-    "--sidebar-width": "14rem",
+    "--sidebar-width": "15.5rem",
     "--sidebar-width-icon": "3.375rem",
   };
 

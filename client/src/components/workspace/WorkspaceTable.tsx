@@ -178,7 +178,7 @@ function GroupHeader({ status, count }: { status: string; count: number }) {
           textTransform: "uppercase",
           fontSize: "10px",
           letterSpacing: "0.05em",
-          color: "rgba(255,255,255,0.5)",
+          color: "rgba(255,255,255,0.85)",
         }}
       >
         {statusGroupLabels[status] || status}
@@ -187,7 +187,7 @@ function GroupHeader({ status, count }: { status: string; count: number }) {
         className="text-xs px-1.5 py-0.5 rounded-full"
         style={{
           background: "rgba(255,255,255,0.06)",
-          color: "rgba(255,255,255,0.4)",
+          color: "#00c853",
           fontSize: "10px",
         }}
       >
