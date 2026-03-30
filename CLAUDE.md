@@ -201,6 +201,40 @@ Rotas legadas redirecionam automaticamente: `/chamados` → `/workspace/chamados
 - `server/routes/workspace.test.ts` — 6 testes de integração (vitest + supertest)
 - Rodar: `npm test`
 
+## Skills de Segurança e Workflow (instaladas nesta sessão)
+
+### renov-security ← OBRIGATÓRIA PRÉ-PR
+Auditoria de segurança customizada para o Home (Express + React 18).
+Executa varredura de credenciais, analisa o diff do branch, verifica
+branch/repo correto e emite relatório com status.
+
+**REGRA INVIOLÁVEL:** Antes de abrir qualquer PR no Home, execute:
+"Use a skill renov-security para auditar este PR — projeto Home, branch develop"
+
+Status possíveis:
+- ✅ APROVADO → PR pode ser aberto normalmente
+- ⚠️ APROVADO COM RESSALVAS → PR pode prosseguir, informar Marcelo
+- 🚨 BLOQUEADO → corrigir os críticos antes de qualquer ação
+
+### .gitleaks.toml (instalado na raiz)
+Configuração customizada do Gitleaks para o Home. Herda as 150+ regras
+padrão e adiciona detecção específica: Omie, Neon, Cloudflare tokens,
+Express session secrets.
+
+Para rodar manualmente (se Gitleaks instalado):
+  gitleaks detect --staged -c .gitleaks.toml
+
+### gstack
+Suite de workflow do Garry Tan. Slash commands disponíveis:
+/office-hours, /plan-ceo-review, /plan-eng-review, /plan-design-review,
+/design-consultation, /review, /ship, /land-and-deploy, /canary,
+/benchmark, /browse, /qa, /qa-only, /design-review, /setup-browser-cookies,
+/setup-deploy, /retro, /investigate, /document-release, /codex, /cso,
+/careful, /freeze, /guard, /unfreeze, /gstack-upgrade
+
+⚠️ Para navegação web: usar SEMPRE /browse — NUNCA mcp__claude-in-chrome__*
+Se skills não funcionarem: cd .claude/skills/gstack && ./setup
+
 ## Time
 
 | Pessoa  | Papel                                                         |
