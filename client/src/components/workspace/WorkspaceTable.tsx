@@ -243,8 +243,8 @@ function SkeletonRows({ colTemplate }: { colTemplate: string }) {
   );
 }
 
-const COL_TEMPLATE = "96px 1fr 175px 140px 115px 110px 62px 98px 30px";
-const COL_TEMPLATE_MOBILE = "96px 1fr 175px 140px 115px 110px 30px";
+const COL_TEMPLATE = "96px 1fr 220px 140px 115px 85px 62px 78px 30px";
+const COL_TEMPLATE_MOBILE = "96px 1fr 220px 140px 115px 85px 30px";
 
 const responsiveStyles = `
 @media (max-width: 767px) {
