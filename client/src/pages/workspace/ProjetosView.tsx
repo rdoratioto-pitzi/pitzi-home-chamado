@@ -8,8 +8,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { FilterCombobox } from "@/components/ui/filter-combobox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil } from "lucide-react";
 import { KpiStrip } from "@/components/workspace/KpiStrip";
 import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import type { UnifiedItem } from "@/components/workspace/WorkspaceTable";
@@ -103,13 +108,13 @@ const priorityColors: Record<string, string> = {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function ProjectGroupHeader({ projeto }: { projeto: ProjetoComTarefas }) {
+function ProjectGroupHeader({ projeto, onEdit }: { projeto: ProjetoComTarefas; onEdit?: () => void }) {
   const cor = projeto.cor || "#00c853";
   const prog = projeto.progresso ?? 0;
 
   return (
     <div
-      className="flex items-center gap-2 px-4 py-2"
+      className="flex items-center gap-2 px-4 py-2 group"
       style={{ background: "rgba(255,255,255,0.02)" }}
     >
       <span
@@ -153,6 +158,15 @@ function ProjectGroupHeader({ projeto }: { projeto: ProjetoComTarefas }) {
       >
         {projeto.codigo}
       </span>
+      {onEdit && (
+        <button
+          onClick={onEdit}
+          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10"
+          title="Editar projeto"
+        >
+          <Pencil size={12} style={{ color: "rgba(255,255,255,0.5)" }} />
+        </button>
+      )}
     </div>
   );
 }
@@ -351,7 +365,10 @@ function SkeletonRows() {
 
 // ─── Kanban View ─────────────────────────────────────────────────────────────
 
-function ProjectsKanbanView({ projetos }: { projetos: ProjetoComTarefas[] }) {
+function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoComTarefas[]; onStatusChange?: () => void }) {
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+
   const columns = [
     { key: "a-fazer", label: "A Fazer", color: "#f59e0b" },
     { key: "em-andamento", label: "Em Andamento", color: "#00c853" },
@@ -363,12 +380,35 @@ function ProjectsKanbanView({ projetos }: { projetos: ProjetoComTarefas[] }) {
     p.tarefas.map((t) => ({ ...t, projetoCor: p.cor || "#00c853", projetoNome: p.nome }))
   );
 
+  const handleDrop = async (targetStatus: string) => {
+    setDragOverCol(null);
+    if (!draggingId) return;
+    const tarefa = allTarefas.find((t) => t.id === draggingId);
+    if (!tarefa || (tarefa.status || "a-fazer") === targetStatus) { setDraggingId(null); return; }
+    setDraggingId(null);
+    try {
+      await fetchWithAuth(`/api/workspace/tarefas/${draggingId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: targetStatus }),
+      });
+      onStatusChange?.();
+    } catch { /* silently fail */ }
+  };
+
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
       {columns.map((col) => {
         const columnTarefas = allTarefas.filter((t) => (t.status || "a-fazer") === col.key);
+        const isOver = dragOverCol === col.key;
         return (
-          <div key={col.key} style={{ minWidth: 240, width: 240 }}>
+          <div
+            key={col.key}
+            style={{ minWidth: 240, width: 240 }}
+            onDragOver={(e) => { e.preventDefault(); setDragOverCol(col.key); }}
+            onDragLeave={() => setDragOverCol(null)}
+            onDrop={(e) => { e.preventDefault(); handleDrop(col.key); }}
+          >
             {/* Column header */}
             <div className="flex items-center gap-2 mb-2 px-1">
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: col.color, display: "inline-block" }} />
@@ -378,27 +418,34 @@ function ProjectsKanbanView({ projetos }: { projetos: ProjetoComTarefas[] }) {
                   textTransform: "uppercase",
                   fontSize: "10px",
                   letterSpacing: "0.05em",
-                  color: "rgba(255,255,255,0.5)",
+                  color: "rgba(255,255,255,0.85)",
                 }}
               >
                 {col.label}
               </span>
               <span
                 className="text-xs px-1.5 py-0.5 rounded-full"
-                style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.4)", fontSize: "10px" }}
+                style={{ background: "rgba(255,255,255,0.06)", color: "#00c853", fontSize: "10px" }}
               >
                 {columnTarefas.length}
               </span>
             </div>
             {/* Cards */}
-            <div className="flex flex-col gap-2">
+            <div
+              className="flex flex-col gap-2 rounded-lg p-1 min-h-[60px] transition-colors"
+              style={{ background: isOver ? "rgba(0,200,83,0.08)" : "transparent", border: isOver ? "1px dashed rgba(0,200,83,0.3)" : "1px dashed transparent" }}
+            >
               {columnTarefas.map((t) => (
                 <div
                   key={t.id}
-                  className="p-3 rounded"
+                  draggable
+                  onDragStart={() => setDraggingId(t.id)}
+                  onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }}
+                  className="p-3 rounded cursor-grab active:cursor-grabbing"
                   style={{
-                    background: "rgba(255,255,255,0.03)",
-                    border: "1px solid rgba(255,255,255,0.06)",
+                    background: draggingId === t.id ? "rgba(0,200,83,0.1)" : "rgba(255,255,255,0.03)",
+                    border: draggingId === t.id ? "1px solid rgba(0,200,83,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                    opacity: draggingId === t.id ? 0.6 : 1,
                   }}
                 >
                   <div className="flex items-center gap-1.5 mb-1.5">
@@ -443,12 +490,12 @@ function ProjectsKanbanView({ projetos }: { projetos: ProjetoComTarefas[] }) {
                 <div
                   className="p-4 rounded text-center text-xs italic"
                   style={{
-                    background: "rgba(255,255,255,0.01)",
+                    background: isOver ? "rgba(0,200,83,0.05)" : "rgba(255,255,255,0.01)",
                     border: "1px dashed rgba(255,255,255,0.06)",
                     color: "rgba(255,255,255,0.2)",
                   }}
                 >
-                  Vazio
+                  {isOver ? "Soltar aqui" : "Vazio"}
                 </div>
               )}
             </div>
@@ -460,6 +507,96 @@ function ProjectsKanbanView({ projetos }: { projetos: ProjetoComTarefas[] }) {
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
+
+function ProjectEditDialog({
+  projeto,
+  open,
+  onOpenChange,
+  onSave,
+  saving,
+}: {
+  projeto: ProjetoComTarefas | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (data: { nome: string; descricao: string; status: string; prioridade: string; categoria: string }) => void;
+  saving: boolean;
+}) {
+  const [nome, setNome] = useState("");
+  const [descricao, setDescricao] = useState("");
+  const [status, setStatus] = useState("backlog");
+  const [prioridade, setPrioridade] = useState("media");
+  const [categoria, setCategoria] = useState("");
+
+  useEffect(() => {
+    if (projeto) {
+      setNome(projeto.nome);
+      setDescricao(projeto.descricao || "");
+      setStatus(projeto.status || "backlog");
+      setPrioridade(projeto.prioridade || "media");
+      setCategoria(projeto.categoria || "");
+    }
+  }, [projeto]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar Projeto</DialogTitle>
+          <DialogDescription>
+            {projeto?.codigo} — Altere os campos desejados
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 py-2">
+          <div>
+            <Label className="text-xs">Nome</Label>
+            <Input value={nome} onChange={(e) => setNome(e.target.value)} className="mt-1" />
+          </div>
+          <div>
+            <Label className="text-xs">Descrição</Label>
+            <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} className="mt-1" rows={3} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Status</Label>
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="backlog">Backlog</SelectItem>
+                  <SelectItem value="ativo">Ativo</SelectItem>
+                  <SelectItem value="pausado">Pausado</SelectItem>
+                  <SelectItem value="concluido">Concluído</SelectItem>
+                  <SelectItem value="inativo">Inativo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Prioridade</Label>
+              <Select value={prioridade} onValueChange={setPrioridade}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="baixa">Baixa</SelectItem>
+                  <SelectItem value="media">Média</SelectItem>
+                  <SelectItem value="alta">Alta</SelectItem>
+                  <SelectItem value="critica">Crítica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Categoria</Label>
+            <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} className="mt-1" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={() => onSave({ nome, descricao, status, prioridade, categoria })} disabled={saving || !nome.trim()}>
+            {saving ? "Salvando..." : "Salvar"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function toUnifiedItem(tarefa: TarefaItem, projetoNome: string): UnifiedItem {
   return {
@@ -500,6 +637,38 @@ export function ProjetosView() {
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [selectedTarefa, setSelectedTarefa] = useState<UnifiedItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editProjeto, setEditProjeto] = useState<ProjetoComTarefas | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSaveEdit = async (formData: {
+    nome: string;
+    descricao: string;
+    status: string;
+    prioridade: string;
+    categoria: string;
+  }) => {
+    if (!editProjeto) return;
+    setSaving(true);
+    try {
+      const res = await fetchWithAuth(`/api/workspace/projetos/${editProjeto.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) throw new Error("Falha ao salvar");
+      toast({ title: "Projeto atualizado com sucesso" });
+      setEditOpen(false);
+      const dataRes = await fetchWithAuth("/api/workspace/projetos");
+      const data: WorkspaceProjetosResponse = await dataRes.json();
+      setKpis(data.kpis);
+      setProjetos(data.projetos);
+    } catch {
+      toast({ title: "Erro ao atualizar projeto", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const viewIcons: Record<ViewMode, React.ReactNode> = {
     lista: <List className="h-4 w-4" />,
@@ -534,6 +703,13 @@ export function ProjetosView() {
       cancelled = true;
     };
   }, []);
+
+  const refreshData = () => {
+    fetchWithAuth("/api/workspace/projetos")
+      .then((res) => res.json())
+      .then((data: WorkspaceProjetosResponse) => { setKpis(data.kpis); setProjetos(data.projetos); })
+      .catch(() => {});
+  };
 
   // Map KPIs to the WorkspaceKpis shape expected by KpiStrip
   const kpiStripData = {
@@ -668,17 +844,14 @@ export function ProjetosView() {
         </Select>
 
         {/* Responsável filter */}
-        <Select value={responsavelFilter} onValueChange={setResponsavelFilter}>
-          <SelectTrigger className="h-8 w-[150px] text-xs">
-            <SelectValue placeholder="Todos" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            {responsaveis.map((r) => (
-              <SelectItem key={r} value={r}>{r}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FilterCombobox
+          value={responsavelFilter}
+          onValueChange={setResponsavelFilter}
+          options={responsaveis}
+          allLabel="Todos"
+          searchPlaceholder="Buscar colaborador..."
+          className="w-[150px]"
+        />
 
         {/* View mode toggle */}
         <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
@@ -712,7 +885,13 @@ export function ProjetosView() {
           ) : (
             filteredProjetos.map((projeto) => (
               <div key={projeto.id}>
-                <ProjectGroupHeader projeto={projeto} />
+                <ProjectGroupHeader
+                  projeto={projeto}
+                  onEdit={() => {
+                    setEditProjeto(projeto);
+                    setEditOpen(true);
+                  }}
+                />
                 {projeto.tarefas.length === 0 ? (
                   <EmptyTarefasRow />
                 ) : (
@@ -734,7 +913,7 @@ export function ProjetosView() {
         </div>
       )}
       {viewMode === "kanban" && !loading && (
-        <ProjectsKanbanView projetos={filteredProjetos} />
+        <ProjectsKanbanView projetos={filteredProjetos} onStatusChange={refreshData} />
       )}
       {viewMode !== "lista" && viewMode !== "kanban" && (
         <div style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "14px" }}>
@@ -746,6 +925,13 @@ export function ProjetosView() {
         open={drawerOpen}
         item={selectedTarefa}
         onClose={() => setDrawerOpen(false)}
+      />
+      <ProjectEditDialog
+        projeto={editProjeto}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSave={handleSaveEdit}
+        saving={saving}
       />
     </div>
   );
