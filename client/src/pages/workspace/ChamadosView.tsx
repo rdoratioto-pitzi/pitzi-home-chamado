@@ -108,6 +108,8 @@ export function ChamadosView() {
   // Client-side filtering
   const filteredItems = items.filter((item) => {
     if (!applyKpiFilter(item, filtroKpi)) return false;
+    // Em tratativa: ocultar resolvidos da listagem (KPI totalizador continua mostrando)
+    if (periodo === "em-tratativa" && filtroKpi !== "Resolvidos" && (item.status === "resolved" || item.status === "closed")) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const matches =
