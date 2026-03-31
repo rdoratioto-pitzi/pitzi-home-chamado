@@ -43,7 +43,7 @@ function TopbarActions({ activeTab, onVisaoEstrategica, onNewItem }: TopbarActio
           onClick={() => onNewItem("tarefa")}
         >
           <Plus className="h-4 w-4 mr-1" />
-          Nova Tarefa
+          Nova Atividade
         </Button>
         <Button
           size="sm"
@@ -76,7 +76,7 @@ function TopbarActions({ activeTab, onVisaoEstrategica, onNewItem }: TopbarActio
       </Button>
       <Button size="sm" variant="outline" onClick={() => onNewItem("tarefa")}>
         <Plus className="h-4 w-4 mr-1" />
-        Nova Tarefa
+        Nova Atividade
       </Button>
       <Button
         size="sm"
