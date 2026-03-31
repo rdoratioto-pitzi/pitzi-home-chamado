@@ -40,7 +40,7 @@ const statusLabels: Record<string, string> = {
 
 const kpiConfig = [
   { key: "ativos" as const, label: "Projetos Ativos" },
-  { key: "tarefasAbertas" as const, label: "Tarefas Abertas" },
+  { key: "tarefasAbertas" as const, label: "Atividades Abertas" },
   { key: "emAndamento" as const, label: "Em Andamento" },
   { key: "concluidas" as const, label: "Concluídas" },
 ];
@@ -134,7 +134,7 @@ function ProjetoCard({ projeto }: { projeto: ProjetoItem }) {
           className="text-[10px]"
           style={{ fontFamily: "'JetBrains Mono', monospace", color: "rgba(255,255,255,0.4)" }}
         >
-          {prog}% concluído · {projeto.tarefas.length} tarefas
+          {prog}% concluído · {projeto.tarefas.length} atividades
         </span>
       </div>
 
@@ -238,7 +238,9 @@ export function VisaoEstrategica({ open, projetos, kpis, onClose }: VisaoEstrate
               Nenhum projeto cadastrado
             </div>
           ) : (
-            projetos.map((p) => <ProjetoCard key={p.id} projeto={p} />)
+            <>
+              {projetos.map((p) => <ProjetoCard key={p.id} projeto={p} />)}
+            </>
           )}
         </div>
       </div>

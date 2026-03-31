@@ -326,7 +326,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                   style={{ color: "rgba(255,255,255,0.4)" }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  title="Editar chamado"
+                  title="Abrir detalhe"
                 >
                   <ExternalLink className="h-4 w-4" />
                 </button>
