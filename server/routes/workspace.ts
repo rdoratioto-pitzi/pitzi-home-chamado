@@ -846,6 +846,25 @@ export function registerWorkspaceRoutes(router: Router) {
     }
   });
 
+  // ─── DELETE tarefa ─────────────────────────────────────────────────────────────
+  router.delete("/api/workspace/tarefas/:id", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { id } = req.params;
+
+      const [deleted] = await db
+        .delete(kanbanCards)
+        .where(eq(kanbanCards.id, String(id)))
+        .returning({ id: kanbanCards.id });
+
+      if (!deleted) return res.status(404).json({ error: "Tarefa não encontrada" });
+
+      return res.json({ ok: true });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
   // ─── GET comentarios de chamado ───────────────────────────────────────────────
   router.get("/api/workspace/chamados/:id/comentarios", requireAuth, async (req, res) => {
     try {
