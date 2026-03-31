@@ -28,15 +28,17 @@ interface DeviceData {
 function getLabelDisplayConfig(device: DeviceData) {
   const status = device.statusRecebimento?.toLowerCase().trim() || "";
   const isTriado = status === "triado";
+  const isVendido = status === "vendido";
+  const isTriadoOuVendido = isTriado || isVendido;
   const isBloqueado = status === "bloqueado";
 
   return {
-    isTriado,
+    isTriado: isTriadoOuVendido,
     isBloqueado,
-    gradingText: isTriado ? device.grading : "\u00A0", // \u00A0 = espaço em branco (React/HTML)
-    gradingZPL: isTriado ? device.grading : " ",      // espaço em branco (ZPL)
-    codText: isTriado ? `Cód: ${device.deviceErpCode}` : "\u00A0",
-    codZPL: isTriado ? `^FO30,180^A0N,28,28^FDCod: ${device.deviceErpCode}^FS` : ""
+    gradingText: isTriadoOuVendido ? device.grading : "\u00A0", // \u00A0 = espaço em branco (React/HTML)
+    gradingZPL: isTriadoOuVendido ? device.grading : " ",      // espaço em branco (ZPL)
+    codText: isTriadoOuVendido ? `Cód: ${device.deviceErpCode}` : "\u00A0",
+    codZPL: isTriadoOuVendido ? `^FO30,180^A0N,28,28^FDCod: ${device.deviceErpCode}^FS` : ""
   };
 }
 
@@ -162,17 +164,24 @@ async function fetchDeviceFromApi(searchTerm: string): Promise<DeviceData> {
   const serial = tri["Serial Number"] || tri["Numero de Serie"] || tri["Serial"] || "";
   
   const primaryId = imei1 || serial || searchTerm;
-  const codigoErp = tri["Código ERP"] || tri["Codigo ERP"] || "";
-  const rawTriador = tri["Responsável pela triagem"] || tri["Responsavel pela triagem"];
+  // Nota: a API pode retornar a chave com encoding errado (ex: "CÃ³digo ERP" em vez de "Código ERP")
+  const codigoErp = tri["Código ERP"] || tri["Codigo ERP"] || tri["CÃ³digo ERP"] || tri["Codigo"] || "";
+  const rawTriador = tri["Responsável pela triagem"] || tri["Responsavel pela triagem"] || tri["ResponsÃ¡vel pela triagem"] || "";
 
+  const statusRecebimento = tri["Status de recebimento"] || tri["Status de Recebimento"] || tri["status_recebimento"] || "";
+  
+  // A grade é o penúltimo caractere do código ERP (a letra da avaliação: A, B, C, etc.)
+  // Formato típico: XXXXXA0 (ex: 10290A0, 10381A0)
+  const grading = codigoErp && codigoErp.length >= 2 ? codigoErp.slice(-2, -1) : "";
+  
   return {
     imei: imei2 ? `${primaryId} / ${imei2}` : primaryId,
     deviceDescription: (tri["Modelo"] || "DISPOSITIVO NÃO IDENTIFICADO").toUpperCase(),
-    deviceErpCode: codigoErp || "—",
-    grading: codigoErp.length >= 2 ? codigoErp.slice(-2) : "??",
+    deviceErpCode: codigoErp || "",
+    grading: grading,
     triador: rawTriador ? rawTriador.toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()) : "Aguardando Triagem",
     marca: (tri["Marca"] || "N/A").toUpperCase(),
-    statusRecebimento: tri["Status de recebimento"] || tri["Status de Recebimento"] || tri["status_recebimento"] || ""
+    statusRecebimento
   };
 }
 
