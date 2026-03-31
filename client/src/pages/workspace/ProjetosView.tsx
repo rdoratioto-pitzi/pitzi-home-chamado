@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -14,7 +15,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil, ChevronRight, MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { KpiStrip } from "@/components/workspace/KpiStrip";
 import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import type { UnifiedItem } from "@/components/workspace/WorkspaceTable";
@@ -108,15 +115,35 @@ const priorityColors: Record<string, string> = {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function ProjectGroupHeader({ projeto, onEdit }: { projeto: ProjetoComTarefas; onEdit?: () => void }) {
+function ProjectGroupHeader({
+  projeto,
+  collapsed,
+  onToggle,
+  onEdit,
+}: {
+  projeto: ProjetoComTarefas;
+  collapsed: boolean;
+  onToggle: () => void;
+  onEdit?: () => void;
+}) {
   const cor = projeto.cor || "#00c853";
   const prog = projeto.progresso ?? 0;
+  const tarefaCount = projeto.tarefas.length;
 
   return (
     <div
-      className="flex items-center gap-2 px-4 py-2 group"
+      className="flex items-center gap-2 px-4 py-2 group cursor-pointer select-none"
       style={{ background: "rgba(255,255,255,0.02)" }}
+      onClick={onToggle}
     >
+      <ChevronRight
+        size={14}
+        className="transition-transform duration-200 flex-shrink-0"
+        style={{
+          color: "rgba(255,255,255,0.3)",
+          transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
+        }}
+      />
       <span
         style={{
           width: 7,
@@ -158,9 +185,21 @@ function ProjectGroupHeader({ projeto, onEdit }: { projeto: ProjetoComTarefas; o
       >
         {projeto.codigo}
       </span>
+      {collapsed && tarefaCount > 0 && (
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded-full"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            color: "rgba(255,255,255,0.35)",
+            fontFamily: "'JetBrains Mono', monospace",
+          }}
+        >
+          {tarefaCount} {tarefaCount === 1 ? "atividade" : "atividades"}
+        </span>
+      )}
       {onEdit && (
         <button
-          onClick={onEdit}
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
           className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10"
           title="Editar projeto"
         >
@@ -217,13 +256,13 @@ function EmptyTarefasRow() {
       style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
     >
       <span className="text-xs italic" style={{ color: "rgba(255,255,255,0.2)", paddingLeft: 18 }}>
-        Nenhuma tarefa neste projeto
+        Nenhuma atividade neste projeto
       </span>
     </div>
   );
 }
 
-function TarefaRow({ tarefa, projetoCor, onClick }: { tarefa: TarefaItem; projetoCor: string; onClick?: () => void }) {
+function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: TarefaItem; projetoCor: string; onClick?: () => void; onEdit?: () => void; onDelete?: () => void }) {
   const status = tarefa.status || "a-fazer";
   const dotColor = statusDotColors[status] || "rgba(255,255,255,0.2)";
   const prioridade = tarefa.prioridade || "media";
@@ -271,7 +310,7 @@ function TarefaRow({ tarefa, projetoCor, onClick }: { tarefa: TarefaItem; projet
         </span>
         <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
         <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-slate-500/10 text-slate-400">
-          tarefa
+          atividade
         </Badge>
       </div>
 
@@ -330,8 +369,26 @@ function TarefaRow({ tarefa, projetoCor, onClick }: { tarefa: TarefaItem; projet
           : "—"}
       </span>
 
-      {/* Spacer */}
-      <div />
+      {/* Actions */}
+      <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="p-1 rounded hover:bg-white/5">
+              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(); }}>
+              <Edit className="h-3.5 w-3.5 mr-2" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-red-400" onClick={(e) => { e.stopPropagation(); onDelete?.(); }}>
+              <Trash2 className="h-3.5 w-3.5 mr-2" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }
@@ -606,7 +663,7 @@ function toUnifiedItem(tarefa: TarefaItem, projetoNome: string): UnifiedItem {
     titulo: tarefa.titulo,
     contexto: projetoNome,
     corContexto: null,
-    badgeLabel: "TAREFA",
+    badgeLabel: "ATIVIDADE",
     badgeVariant: "tarefa",
     responsavel: tarefa.responsavel,
     responsavelInitials: tarefa.responsavelInitials,
@@ -620,6 +677,7 @@ function toUnifiedItem(tarefa: TarefaItem, projetoNome: string): UnifiedItem {
 
 export function ProjetosView() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<ProjetosKpis>({
     ativos: 0,
@@ -640,6 +698,7 @@ export function ProjetosView() {
   const [editProjeto, setEditProjeto] = useState<ProjetoComTarefas | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
 
   const handleSaveEdit = async (formData: {
     nome: string;
@@ -703,6 +762,17 @@ export function ProjetosView() {
       cancelled = true;
     };
   }, []);
+
+  const handleDeleteTarefa = async (tarefaId: string) => {
+    try {
+      const res = await fetchWithAuth(`/api/workspace/tarefas/${tarefaId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Falha ao excluir");
+      toast({ title: "Atividade excluída com sucesso" });
+      refreshData();
+    } catch {
+      toast({ title: "Erro ao excluir atividade", variant: "destructive" });
+    }
+  };
 
   const refreshData = () => {
     fetchWithAuth("/api/workspace/projetos")
@@ -807,7 +877,7 @@ export function ProjetosView() {
         <div className="relative flex-1 min-w-[200px] max-w-[300px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar tarefas..."
+            placeholder="Buscar atividades..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8 h-8 text-sm"
@@ -883,32 +953,58 @@ export function ProjetosView() {
               Nenhum projeto encontrado
             </div>
           ) : (
-            filteredProjetos.map((projeto) => (
-              <div key={projeto.id}>
-                <ProjectGroupHeader
-                  projeto={projeto}
-                  onEdit={() => {
-                    setEditProjeto(projeto);
-                    setEditOpen(true);
-                  }}
-                />
-                {projeto.tarefas.length === 0 ? (
-                  <EmptyTarefasRow />
-                ) : (
-                  projeto.tarefas.map((tarefa) => (
-                    <TarefaRow
-                      key={tarefa.id}
-                      tarefa={tarefa}
-                      projetoCor={projeto.cor || "#00c853"}
-                      onClick={() => {
-                        setSelectedTarefa(toUnifiedItem(tarefa, projeto.nome));
-                        setDrawerOpen(true);
+            <>
+              {filteredProjetos.map((projeto) => {
+                const isCollapsed = collapsedProjects.has(projeto.id);
+                return (
+                  <div key={projeto.id}>
+                    <ProjectGroupHeader
+                      projeto={projeto}
+                      collapsed={isCollapsed}
+                      onToggle={() => {
+                        setCollapsedProjects((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(projeto.id)) {
+                            next.delete(projeto.id);
+                          } else {
+                            next.add(projeto.id);
+                          }
+                          return next;
+                        });
+                      }}
+                      onEdit={() => {
+                        setEditProjeto(projeto);
+                        setEditOpen(true);
                       }}
                     />
-                  ))
-                )}
-              </div>
-            ))
+                    {!isCollapsed && (
+                      <>
+                        {projeto.tarefas.length === 0 ? (
+                          <EmptyTarefasRow />
+                        ) : (
+                          projeto.tarefas.map((tarefa) => (
+                            <TarefaRow
+                              key={tarefa.id}
+                              tarefa={tarefa}
+                              projetoCor={projeto.cor || "#00c853"}
+                              onClick={() => {
+                                setSelectedTarefa(toUnifiedItem(tarefa, projeto.nome));
+                                setDrawerOpen(true);
+                              }}
+                              onEdit={() => {
+                                setSelectedTarefa(toUnifiedItem(tarefa, projeto.nome));
+                                setDrawerOpen(true);
+                              }}
+                              onDelete={() => handleDeleteTarefa(tarefa.id)}
+                            />
+                          ))
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           )}
         </div>
       )}

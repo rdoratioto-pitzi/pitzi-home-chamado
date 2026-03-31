@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -5,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, ChevronRight } from "lucide-react";
 
 export interface ChamadoItem {
   id: string;
@@ -144,13 +145,32 @@ function StatusDot({ status }: { status: string }) {
   );
 }
 
-function GroupHeader({ status, count }: { status: string; count: number }) {
+function GroupHeader({
+  status,
+  count,
+  collapsed,
+  onToggle,
+}: {
+  status: string;
+  count: number;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   const dotStyle = statusDotColors[status];
   return (
     <div
-      className="flex items-center gap-2 px-4 py-2"
+      className="flex items-center gap-2 px-4 py-2 cursor-pointer select-none"
       style={{ background: "rgba(255,255,255,0.02)" }}
+      onClick={onToggle}
     >
+      <ChevronRight
+        size={14}
+        className="transition-transform duration-200 flex-shrink-0"
+        style={{
+          color: "rgba(255,255,255,0.3)",
+          transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
+        }}
+      />
       {dotStyle ? (
         <span
           style={{
@@ -292,6 +312,20 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
     }
   }
 
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (group: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(group)) {
+        next.delete(group);
+      } else {
+        next.add(group);
+      }
+      return next;
+    });
+  };
+
   return (
     <div style={{ overflowX: "auto" }}>
       <style>{responsiveStyles}</style>
@@ -300,24 +334,34 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
         {statusGroupOrder.map((status) => {
           const groupItems = grouped.get(status) || [];
           if (groupItems.length === 0) return null;
+          const isCollapsed = collapsedGroups.has(status);
           return (
             <div key={status}>
-              <GroupHeader status={status} count={groupItems.length} />
-              {groupItems.map((item) =>
-                variant === "todos" ? (
-                  <UnifiedItemRow
-                    key={item.id}
-                    item={item as UnifiedItem}
-                    onRowClick={onRowClick as ((item: UnifiedItem) => void) | undefined}
-                  />
-                ) : (
-                  <ChamadoItemRow
-                    key={(item as ChamadoItem).id}
-                    item={item as ChamadoItem}
-                    onRowClick={onRowClick as ((item: ChamadoItem) => void) | undefined}
-                    onDelete={onDelete}
-                  />
-                ),
+              <GroupHeader
+                status={status}
+                count={groupItems.length}
+                collapsed={isCollapsed}
+                onToggle={() => toggleGroup(status)}
+              />
+              {!isCollapsed && (
+                <>
+                  {groupItems.map((item) =>
+                    variant === "todos" ? (
+                      <UnifiedItemRow
+                        key={item.id}
+                        item={item as UnifiedItem}
+                        onRowClick={onRowClick as ((item: UnifiedItem) => void) | undefined}
+                      />
+                    ) : (
+                      <ChamadoItemRow
+                        key={(item as ChamadoItem).id}
+                        item={item as ChamadoItem}
+                        onRowClick={onRowClick as ((item: ChamadoItem) => void) | undefined}
+                        onDelete={onDelete}
+                      />
+                    ),
+                  )}
+                </>
               )}
             </div>
           );
