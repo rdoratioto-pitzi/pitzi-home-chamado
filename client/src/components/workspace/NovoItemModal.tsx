@@ -43,14 +43,14 @@ interface NovoItemModalProps {
 
 const TYPE_CONFIG: Record<ItemType, { prefix: string; label: string; titlePlaceholder: string }> = {
   chamado: { prefix: "REN", label: "Novo Chamado", titlePlaceholder: "Título do chamado..." },
-  tarefa: { prefix: "PRO", label: "Nova Tarefa", titlePlaceholder: "Título da tarefa..." },
+  tarefa: { prefix: "PRO", label: "Nova Atividade", titlePlaceholder: "Título da atividade..." },
   projeto: { prefix: "PRO", label: "Novo Projeto", titlePlaceholder: "Nome do projeto..." },
 };
 
 const DESC_PLACEHOLDER: Record<ItemType, string> = {
   chamado:
     "Descreva detalhadamente: o que ocorreu, onde, quando e como reproduzir.\nQuanto mais contexto, mais rápido o diagnóstico por IA.",
-  tarefa: "Descreva o que precisa ser feito e os critérios de aceite.",
+  tarefa: "Descreva o que precisa ser feito e os critérios de aceite da atividade.",
   projeto: "Descreva o objetivo e escopo do projeto.",
 };
 
@@ -364,7 +364,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
         toastTitle = codigo ? `Chamado ${codigo} criado com sucesso` : "Chamado criado com sucesso";
       } else if (type === "tarefa") {
         const projetoCtx = created.contexto && created.contexto !== "Sem projeto" ? ` no projeto ${created.contexto}` : "";
-        toastTitle = `Tarefa criada${projetoCtx}`;
+        toastTitle = `Atividade criada${projetoCtx}`;
       } else {
         toastTitle = codigo ? `Projeto ${codigo} criado com sucesso` : "Projeto criado com sucesso";
       }
@@ -385,7 +385,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     }
   }
 
-  const submitLabel = type === "chamado" ? "Criar Chamado" : type === "tarefa" ? "Criar Tarefa" : "Criar Projeto";
+  const submitLabel = type === "chamado" ? "Criar Chamado" : type === "tarefa" ? "Criar Atividade" : "Criar Projeto";
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -438,7 +438,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                     }
               }
             >
-              {t === "chamado" ? "Chamado" : t === "tarefa" ? "Tarefa" : "Projeto"}
+              {t === "chamado" ? "Chamado" : t === "tarefa" ? "Atividade" : "Projeto"}
             </button>
           ))}
         </div>
