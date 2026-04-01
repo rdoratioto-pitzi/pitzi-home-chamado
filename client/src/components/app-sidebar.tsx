@@ -109,7 +109,16 @@ const metasSubItems = [
   { title: "OKRs", url: "/okrs", icon: Target },
 ];
 
-const logisticaSubItems = [
+// Submenu Logística (4 abas do dashboard)
+const logisticaDashboardItems = [
+  { title: "Dispositivos", url: "/logistica/dispositivos", icon: Warehouse },
+  { title: "Coletas", url: "/logistica/coletas", icon: Truck },
+  { title: "Consulta", url: "/logistica/consulta", icon: Search },
+  { title: "Fechamentos", url: "/logistica/fechamentos", icon: Calculator },
+];
+
+// Submenu Outros (itens originais de logística)
+const logisticaOutrosItems = [
   { title: "Visão Geral", url: "/logistica/dashboard", icon: LayoutDashboard },
   { title: "Simular Frete", url: "/logistica/simular-frete", icon: Calculator },
   { title: "Operadores", url: "/logistica/operadores", icon: Users },
@@ -118,6 +127,9 @@ const logisticaSubItems = [
   { title: "Romaneios", url: "/logistica/romaneios", icon: ClipboardList },
   { title: "Eficiência Avaliações IA", url: "/logistica/avaliacoes-ia", icon: Bot },
 ];
+
+// Mantido para compatibilidade temporária
+const logisticaSubItems = logisticaDashboardItems;
 
 const triagemSubItems = [
   { title: "Impressão Etiquetas", url: "/triagem/impressao-etiquetas", icon: Printer },
@@ -176,6 +188,8 @@ export function AppSidebar() {
   const [workspaceOpen, setWorkspaceOpen] = useState(isWorkspaceRoute(location));
   const [metasOpen, setMetasOpen] = useState(isMetasRoute(location));
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
+  const [logisticaDashboardOpen, setLogisticaDashboardOpen] = useState(location.startsWith("/logistica/dispositivos") || location.startsWith("/logistica/coletas") || location.startsWith("/logistica/consulta") || location.startsWith("/logistica/fechamentos"));
+  const [logisticaOutrosOpen, setLogisticaOutrosOpen] = useState(location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios") || location.startsWith("/logistica/avaliacoes-ia"));
   const [triagemOpen, setTriagemOpen] = useState(location.startsWith("/triagem"));
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
@@ -194,6 +208,8 @@ export function AppSidebar() {
   useEffect(() => {
     if (location.startsWith("/estoques")) setEstoquesOpen(true);
     if (location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/pricing")) setOperacoesOpen(true);
+    if (location.startsWith("/logistica/dispositivos") || location.startsWith("/logistica/coletas") || location.startsWith("/logistica/consulta") || location.startsWith("/logistica/fechamentos")) setLogisticaDashboardOpen(true);
+    if (location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios") || location.startsWith("/logistica/avaliacoes-ia")) setLogisticaOutrosOpen(true);
     if (isWorkspaceRoute(location)) setWorkspaceOpen(true);
     if (isMetasRoute(location)) setMetasOpen(true);
   }, [location]);
@@ -406,19 +422,76 @@ export function AppSidebar() {
                             </SidebarMenuSubItem>
                           );
                         })}
-                        {hasLogisticaAccess && logisticaSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
+                        {/* Submenu Logística (Dashboard) */}
+                        {hasLogisticaAccess && (
+                          <Collapsible open={logisticaDashboardOpen} onOpenChange={setLogisticaDashboardOpen} className="mt-1">
+                            <SidebarMenuSubItem>
+                              <CollapsibleTrigger asChild>
+                                <SidebarMenuSubButton className="h-8 px-2 rounded-md">
+                                  <Truck className="h-4 w-4 mr-2" />
+                                  <span className="text-[12px]">Logística</span>
+                                  {logisticaDashboardOpen ? (
+                                    <ChevronDown className="ml-auto h-3 w-3 opacity-50" />
+                                  ) : (
+                                    <ChevronRight className="ml-auto h-3 w-3 opacity-50" />
+                                  )}
+                                </SidebarMenuSubButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <SidebarMenuSub className="ml-4 mt-1 border-l pl-1.5 gap-0.5">
+                                  {logisticaDashboardItems.map((subItem) => {
+                                    const isSubActive = location === subItem.url;
+                                    return (
+                                      <SidebarMenuSubItem key={subItem.url}>
+                                        <SidebarMenuSubButton asChild isActive={isSubActive} className="h-7 px-2 rounded-md">
+                                          <Link href={subItem.url} data-testid={`link-logistica-dashboard-${subItem.url.split("/").pop()}`}>
+                                            <subItem.icon className="h-3.5 w-3.5 mr-2" />
+                                            <span className="text-[11px]">{subItem.title}</span>
+                                          </Link>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    );
+                                  })}
+                                </SidebarMenuSub>
+                              </CollapsibleContent>
                             </SidebarMenuSubItem>
-                          );
-                        })}
+                          </Collapsible>
+                        )}
+                        {/* Submenu Outros de Logística */}
+                        {hasLogisticaAccess && (
+                          <Collapsible open={logisticaOutrosOpen} onOpenChange={setLogisticaOutrosOpen} className="mt-1">
+                            <SidebarMenuSubItem>
+                              <CollapsibleTrigger asChild>
+                                <SidebarMenuSubButton className="h-8 px-2 rounded-md">
+                                  <Settings className="h-4 w-4 mr-2" />
+                                  <span className="text-[12px]">Outros</span>
+                                  {logisticaOutrosOpen ? (
+                                    <ChevronDown className="ml-auto h-3 w-3 opacity-50" />
+                                  ) : (
+                                    <ChevronRight className="ml-auto h-3 w-3 opacity-50" />
+                                  )}
+                                </SidebarMenuSubButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <SidebarMenuSub className="ml-4 mt-1 border-l pl-1.5 gap-0.5">
+                                  {logisticaOutrosItems.map((subItem) => {
+                                    const isSubActive = location === subItem.url;
+                                    return (
+                                      <SidebarMenuSubItem key={subItem.url}>
+                                        <SidebarMenuSubButton asChild isActive={isSubActive} className="h-7 px-2 rounded-md">
+                                          <Link href={subItem.url} data-testid={`link-logistica-outros-${subItem.url.split("/").pop()}`}>
+                                            <subItem.icon className="h-3.5 w-3.5 mr-2" />
+                                            <span className="text-[11px]">{subItem.title}</span>
+                                          </Link>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    );
+                                  })}
+                                </SidebarMenuSub>
+                              </CollapsibleContent>
+                            </SidebarMenuSubItem>
+                          </Collapsible>
+                        )}
                         {hasTriagemAccess && triagemSubItems.map((subItem) => {
                           const isSubActive = location === subItem.url;
                           return (
