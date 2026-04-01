@@ -32,6 +32,10 @@ const MeetingDetailPage                = lazy(() => import("@/pages/reunioes/det
 const OKRsPage                         = lazy(() => import("@/pages/okrs/index"));
 const LogisticaPage                    = lazy(() => import("@/pages/logistica/index"));
 const LogisticsDashboard               = lazy(() => import("@/pages/logistica/dashboard"));
+const DispositivosPage                 = lazy(() => import("@/pages/logistica/dispositivos"));
+const ColetasPage                      = lazy(() => import("@/pages/logistica/coletas"));
+const ConsultaPage                     = lazy(() => import("@/pages/logistica/consulta"));
+const FechamentosPage                  = lazy(() => import("@/pages/logistica/fechamentos"));
 const OperadoresPage                   = lazy(() => import("@/pages/logistica/operadores"));
 const SolicitacoesPage                 = lazy(() => import("@/pages/logistica/solicitacoes"));
 const LogisticaReversaPage             = lazy(() => import("@/pages/logistica/logistica-reversa"));
@@ -200,6 +204,26 @@ function Router() {
       <Route path="/logistica/dashboard">
         <ProtectedRoute requiredPermission="logistica">
           <LogisticsDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/dispositivos">
+        <ProtectedRoute requiredPermission="logistica">
+          <DispositivosPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/coletas">
+        <ProtectedRoute requiredPermission="logistica">
+          <ColetasPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/consulta">
+        <ProtectedRoute requiredPermission="logistica">
+          <ConsultaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/logistica/fechamentos">
+        <ProtectedRoute requiredPermission="logistica">
+          <FechamentosPage />
         </ProtectedRoute>
       </Route>
       <Route path="/logistica/simular-frete">

@@ -672,6 +672,25 @@ shipments.get("/api/integrations/adm-logistica/divergentes", async (c) => {
   return c.json(data);
 });
 
+// GET /api/integrations/adm-logistica/fechamentos/aggregates
+shipments.get("/api/integrations/adm-logistica/fechamentos/aggregates", async (c) => {
+  const params = new URLSearchParams();
+  const rede = c.req.query("rede");
+  const dataCorte = c.req.query("data_corte");
+
+  if (rede) params.append("rede", rede);
+  if (dataCorte) params.append("data_corte", dataCorte);
+
+  const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/fechamentos/aggregates?${params.toString()}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+  const data = await response.json();
+  return c.json(data);
+});
+
 // ============== CORREIOS LOGISTICA REVERSA ==============
 
 // GET /api/correios/config
