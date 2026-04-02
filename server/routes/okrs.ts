@@ -4,32 +4,96 @@ import {
   insertObjectiveSchema,
   insertKeyResultSchema,
   insertKeyResultUpdateSchema,
+  type Objective,
 } from "@shared/schema";
 import { getSessionUser, requireAuth } from "../middleware/auth";
 import { z } from "zod";
 
+type OkrNode = Objective & { children: OkrNode[] };
+
+// Which levels a parent can have as children
+const PARENT_LEVEL_RULES: Record<string, string[]> = {
+  company: ["area", "team"],
+  area: ["team"],
+  team: [],
+};
+
+function buildOkrTree(flatList: Objective[]): OkrNode[] {
+  const map = new Map<string, OkrNode>();
+  const roots: OkrNode[] = [];
+
+  for (const obj of flatList) {
+    map.set(obj.id, { ...obj, children: [] });
+  }
+
+  for (const node of map.values()) {
+    if (node.parentOkrId && map.has(node.parentOkrId)) {
+      map.get(node.parentOkrId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  return roots;
+}
+
+async function validateParentOkr(
+  parentOkrId: string,
+  childLevel: string,
+  childId?: string
+): Promise<string | null> {
+  if (childId && parentOkrId === childId) {
+    return "Um OKR não pode ser pai de si mesmo";
+  }
+
+  const parent = await storage.getObjective(parentOkrId);
+  if (!parent) {
+    return "Objetivo pai não encontrado";
+  }
+
+  const allowedChildren = PARENT_LEVEL_RULES[parent.level] ?? [];
+  if (!allowedChildren.includes(childLevel)) {
+    return `Um objetivo de nível "${parent.level}" não pode ser pai de um objetivo de nível "${childLevel}"`;
+  }
+
+  return null;
+}
+
 export function registerOkrRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
+
   // ============== OKRs ==============
   router.get("/api/objectives", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
       const objectives = await storage.getObjectives();
-      if (isAdmin) return res.json(objectives);
-      const keyResults = await storage.getKeyResults();
-      const filtered = objectives.filter(obj => {
-        if (obj.ownerId === userId) return true;
-        return keyResults.some(kr => {
-          if (kr.objectiveId !== obj.id) return false;
-          try {
-            const ids = typeof kr.responsibleIds === 'string' ? JSON.parse(kr.responsibleIds) : kr.responsibleIds;
-            return Array.isArray(ids) && ids.includes(userId);
-          } catch {
-            return false;
-          }
+
+      let list: Objective[];
+      if (isAdmin) {
+        list = objectives;
+      } else {
+        const keyResults = await storage.getKeyResults();
+        list = objectives.filter(obj => {
+          if (obj.ownerId === userId) return true;
+          return keyResults.some(kr => {
+            if (kr.objectiveId !== obj.id) return false;
+            try {
+              const ids = typeof kr.responsibleIds === "string"
+                ? JSON.parse(kr.responsibleIds)
+                : kr.responsibleIds;
+              return Array.isArray(ids) && ids.includes(userId);
+            } catch {
+              return false;
+            }
+          });
         });
-      });
-      res.json(filtered);
+      }
+
+      if (req.query.tree === "true") {
+        return res.json(buildOkrTree(list));
+      }
+
+      res.json(list);
     } catch (error) {
       console.error("Error fetching objectives:", error);
       res.status(500).json({ error: "Failed to fetch objectives" });
@@ -46,7 +110,9 @@ export function registerOkrRoutes(router: Router) {
         const hasAccess = keyResults.some(kr => {
           if (kr.objectiveId !== objective.id) return false;
           try {
-            const ids = typeof kr.responsibleIds === 'string' ? JSON.parse(kr.responsibleIds) : kr.responsibleIds;
+            const ids = typeof kr.responsibleIds === "string"
+              ? JSON.parse(kr.responsibleIds)
+              : kr.responsibleIds;
             return Array.isArray(ids) && ids.includes(userId);
           } catch {
             return false;
@@ -63,6 +129,12 @@ export function registerOkrRoutes(router: Router) {
   router.post("/api/objectives", requireAuth, async (req, res) => {
     try {
       const validated = insertObjectiveSchema.parse(req.body);
+
+      if (validated.parentOkrId) {
+        const err = await validateParentOkr(validated.parentOkrId, validated.level ?? "company");
+        if (err) return res.status(400).json({ error: err });
+      }
+
       const objective = await storage.createObjective(validated);
       res.status(201).json(objective);
     } catch (error) {
@@ -81,8 +153,16 @@ export function registerOkrRoutes(router: Router) {
       if (!isAdmin && existing.ownerId !== userId) {
         return res.status(403).json({ error: "Access denied" });
       }
+
       const partialSchema = insertObjectiveSchema.partial();
       const validated = partialSchema.parse(req.body);
+
+      if (validated.parentOkrId) {
+        const level = validated.level ?? existing.level;
+        const err = await validateParentOkr(validated.parentOkrId, level, getId(req));
+        if (err) return res.status(400).json({ error: err });
+      }
+
       const objective = await storage.updateObjective(getId(req), validated);
       if (!objective) return res.status(404).json({ error: "Objective not found" });
       res.json(objective);
@@ -159,7 +239,7 @@ export function registerOkrRoutes(router: Router) {
 
     const updatesWithUser = updates.map(update => ({
       ...update,
-      user: users.find(u => u.id === update.userId)
+      user: users.find(u => u.id === update.userId),
     }));
 
     res.json(updatesWithUser);
@@ -176,24 +256,23 @@ export function registerOkrRoutes(router: Router) {
         previousValue: kr.currentValue,
       });
 
-      // Calculate progress percentage based on measurement type
       const startVal = parseFloat(kr.startValue || "0");
       const targetVal = parseFloat(kr.targetValue || "100");
       const newVal = parseFloat(validated.newValue || "0");
 
       let progressPercentage: number;
       if (kr.measurementType === "decreasing") {
-        // For decreasing: progress = (start - current) / (start - target) * 100
-        progressPercentage = targetVal !== startVal ? ((startVal - newVal) / (startVal - targetVal)) * 100 : 0;
+        progressPercentage = targetVal !== startVal
+          ? ((startVal - newVal) / (startVal - targetVal)) * 100
+          : 0;
       } else if (kr.measurementType === "binary") {
-        // For binary: 0 or 100
         progressPercentage = newVal > 0 ? 100 : 0;
       } else {
-        // For percentage, absolute, monetary, temporal
-        progressPercentage = targetVal !== startVal ? ((newVal - startVal) / (targetVal - startVal)) * 100 : 0;
+        progressPercentage = targetVal !== startVal
+          ? ((newVal - startVal) / (targetVal - startVal)) * 100
+          : 0;
       }
 
-      // Clamp between 0 and 100
       progressPercentage = Math.max(0, Math.min(100, progressPercentage));
 
       const updateData = {
@@ -203,7 +282,6 @@ export function registerOkrRoutes(router: Router) {
 
       const update = await storage.createKeyResultUpdate(updateData);
 
-      // Update the key result current value and deadline status
       const now = new Date();
       let deadlineStatus = kr.deadlineStatus;
       if (kr.dueDate) {
