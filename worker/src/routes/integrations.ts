@@ -169,6 +169,20 @@ for (const endpoint of aiEndpoints) {
   });
 }
 
+integrations.get("/api/avaliacoes-ia/imei", async (c) => {
+  const params = new URLSearchParams();
+  const limitDate = c.req.query("limit_date") || new Date().toISOString().slice(0, 10);
+  params.append("limit_date", limitDate);
+
+  const imei = c.req.query("imei");
+  if (imei) {
+    params.append("imei", imei);
+  }
+
+  const data = await fetchAiEvaluation("imei", Object.fromEntries(params.entries()) as any);
+  return c.json(data);
+});
+
 // ============== ESTOQUES ==============
 
 // GET /api/estoques (public)
