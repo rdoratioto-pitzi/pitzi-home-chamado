@@ -563,6 +563,29 @@ export function registerShipmentRoutes(router: Router) {
     }
   });
 
+  // Adm Logística - Coletas (Aggregates para dashboard)
+  router.get("/api/integrations/adm-logistica/coletas/aggregates", requireAuth, async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      const queryParams = ["start_date", "end_date", "tsp", "status_controle", "responsavel"];
+      queryParams.forEach(param => {
+        if (req.query[param]) params.append(param, req.query[param] as string);
+      });
+
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas/aggregates?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística coletas aggregates error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar agregados de coletas" });
+    }
+  });
+
   router.get("/api/integrations/adm-logistica/coleta-detalhes", requireAuth, async (req, res) => {
     try {
       const code = req.query.code as string;
@@ -730,6 +753,86 @@ export function registerShipmentRoutes(router: Router) {
     } catch (error: any) {
       console.error("Adm Logística divergentes error:", error);
       res.status(500).json({ error: error.message || "Falha ao buscar divergentes" });
+    }
+  });
+
+  // Adm Logística - Dispositivos Aggregates (Dashboard)
+  router.get("/api/integrations/adm-logistica/dispositivos/aggregates", requireAuth, async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      const queryParams = ["start_date", "end_date", "rede", "filial", "status_coleta", "transportadora", "responsavel", "imei", "voucher"];
+      queryParams.forEach(param => {
+        if (req.query[param]) params.append(param, req.query[param] as string);
+      });
+
+      // API Python espera "quinzena".
+      const quinzena = (req.query.quinzena ?? req.query.quincena) as string | undefined;
+      if (quinzena) {
+        params.append("quinzena", quinzena);
+      }
+
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/dispositivos/aggregates?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística dispositivos aggregates error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar dados de dispositivos" });
+    }
+  });
+
+  // Adm Logística - Consulta Aggregates (Dashboard - Aba Consulta)
+  router.get("/api/integrations/adm-logistica/consulta/aggregates", requireAuth, async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      
+      // codigos pode ser uma lista separada por vírgula de IMEIs/Vouchers
+      if (req.query.codigos) {
+        params.append("codigos", req.query.codigos as string);
+      }
+      if (req.query.rede) {
+        params.append("rede", req.query.rede as string);
+      }
+
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/consulta/aggregates?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística consulta aggregates error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar dados de consulta" });
+    }
+  });
+
+  // Adm Logística - Fechamentos Aggregates (Dashboard - Aba Fechamentos)
+  router.get("/api/integrations/adm-logistica/fechamentos/aggregates", requireAuth, async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+
+      if (req.query.rede) {
+        params.append("rede", req.query.rede as string);
+      }
+      if (req.query.data_corte) {
+        params.append("data_corte", req.query.data_corte as string);
+      }
+
+      const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/fechamentos/aggregates?${params.toString()}`, {
+        method: "GET",
+        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+      const data = await response.json();
+      res.json(data);
+    } catch (error: any) {
+      console.error("Adm Logística fechamentos aggregates error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar dados de fechamentos" });
     }
   });
 
