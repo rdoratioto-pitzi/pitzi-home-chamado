@@ -40,6 +40,8 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  Network,
+  LayoutGrid,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Objective, KeyResult, User } from "@shared/schema";
@@ -48,6 +50,7 @@ import { ObjectiveEditDialog } from "./objective-edit-dialog";
 import { KeyResultDialog } from "./key-result-dialog";
 import { KeyResultEditDialog } from "./key-result-edit-dialog";
 import { KeyResultUpdateDialog } from "./key-result-update-dialog";
+import { OkrHierarchyView } from "@/components/okrs/OkrHierarchyView";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -129,6 +132,7 @@ export default function OKRsPage() {
   const [selectedKeyResult, setSelectedKeyResult] = useState<KeyResult | null>(null);
   const [cycleFilter, setCycleFilter] = useState<string>(getInitialQuarter);
   const [levelFilter, setLevelFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"list" | "hierarchy">("list");
 
   const quarters = getQuarterOptions();
 
@@ -207,8 +211,12 @@ export default function OKRsPage() {
     setIsUpdateDialogOpen(true);
   };
 
-  const getOwnerNames = (ownerIds: string[] | null): string[] => {
-    if (!ownerIds) return [];
+  const parseResponsibleIds = (raw: string | null): string[] => {
+    if (!raw) return [];
+    try { return JSON.parse(raw); } catch { return []; }
+  };
+
+  const getOwnerNames = (ownerIds: string[]): string[] => {
     return ownerIds
       .map((id) => users.find((u) => u.id === id)?.name)
       .filter((name): name is string => !!name);
@@ -235,36 +243,72 @@ export default function OKRsPage() {
               Acompanhe o progresso dos objetivos da empresa
             </p>
           </div>
-          <Card className="shadow-sm border-border/60 p-1 flex gap-2">
-            <Select
-              value={cycleFilter}
-              onValueChange={setCycleFilter}
-            >
-              <SelectTrigger className="w-[140px] border-0 h-9 bg-transparent" data-testid="select-cycle-filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {quarters.map((q) => (
-                  <SelectItem key={q} value={q}>{q}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="w-px h-4 bg-border/60 self-center" />
-            <Select value={levelFilter} onValueChange={setLevelFilter}>
-              <SelectTrigger className="w-[140px] border-0 h-9 bg-transparent" data-testid="select-level-filter">
-                <SelectValue placeholder="Nível" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Níveis</SelectItem>
-                <SelectItem value="company">Empresa</SelectItem>
-                <SelectItem value="team">Time</SelectItem>
-                <SelectItem value="area">Área</SelectItem>
-              </SelectContent>
-            </Select>
-          </Card>
+          <div className="flex items-center gap-2">
+            <Card className="shadow-sm border-border/60 p-1 flex gap-2">
+              <Select
+                value={cycleFilter}
+                onValueChange={setCycleFilter}
+              >
+                <SelectTrigger className="w-[140px] border-0 h-9 bg-transparent" data-testid="select-cycle-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {quarters.map((q) => (
+                    <SelectItem key={q} value={q}>{q}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="w-px h-4 bg-border/60 self-center" />
+              <Select value={levelFilter} onValueChange={setLevelFilter}>
+                <SelectTrigger className="w-[140px] border-0 h-9 bg-transparent" data-testid="select-level-filter">
+                  <SelectValue placeholder="Nível" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos Níveis</SelectItem>
+                  <SelectItem value="company">Empresa</SelectItem>
+                  <SelectItem value="team">Time</SelectItem>
+                  <SelectItem value="area">Área</SelectItem>
+                </SelectContent>
+              </Select>
+            </Card>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={viewMode === "hierarchy" ? "default" : "outline"}
+                  size="icon"
+                  className="h-10 w-10"
+                  onClick={() => setViewMode((m) => (m === "list" ? "hierarchy" : "list"))}
+                  data-testid="button-toggle-hierarchy"
+                >
+                  {viewMode === "hierarchy" ? (
+                    <LayoutGrid className="h-4 w-4" />
+                  ) : (
+                    <Network className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {viewMode === "hierarchy" ? "Ver como cards" : "Ver hierarquia"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
 
-        {objectivesLoading ? (
+        {viewMode === "hierarchy" ? (
+          objectivesLoading ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-48 rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <OkrHierarchyView
+              objectives={filteredObjectives}
+              keyResults={keyResults}
+              users={users}
+            />
+          )
+        ) : objectivesLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-64 rounded-xl" />
@@ -398,7 +442,7 @@ export default function OKRsPage() {
                           }
                           krProgress = Math.min(100, Math.max(0, Math.round(krProgress)));
 
-                          const ownerNames = getOwnerNames(kr.ownerIds);
+                          const ownerNames = getOwnerNames(parseResponsibleIds(kr.responsibleIds));
                           const deadlineStatus = kr.deadlineStatus || "on_track";
 
                           return (

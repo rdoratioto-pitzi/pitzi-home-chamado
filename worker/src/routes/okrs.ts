@@ -7,7 +7,46 @@ import {
   insertObjectiveSchema,
   insertKeyResultSchema,
   insertKeyResultUpdateSchema,
+  type Objective,
 } from "../../../shared/schema";
+
+type OkrNode = Objective & { children: OkrNode[] };
+
+const PARENT_LEVEL_RULES: Record<string, string[]> = {
+  company: ["area", "team"],
+  area: ["team"],
+  team: [],
+};
+
+function buildOkrTree(flatList: Objective[]): OkrNode[] {
+  const map = new Map<string, OkrNode>();
+  const roots: OkrNode[] = [];
+  for (const obj of flatList) map.set(obj.id, { ...obj, children: [] });
+  for (const node of map.values()) {
+    if (node.parentOkrId && map.has(node.parentOkrId)) {
+      map.get(node.parentOkrId)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
+}
+
+async function validateParentOkr(
+  storage: ReturnType<typeof getStorage>,
+  parentOkrId: string,
+  childLevel: string,
+  childId?: string
+): Promise<string | null> {
+  if (childId && parentOkrId === childId) return "Um OKR não pode ser pai de si mesmo";
+  const parent = await storage.getObjective(parentOkrId);
+  if (!parent) return "Objetivo pai não encontrado";
+  const allowed = PARENT_LEVEL_RULES[parent.level] ?? [];
+  if (!allowed.includes(childLevel)) {
+    return `Um objetivo de nível "${parent.level}" não pode ser pai de um objetivo de nível "${childLevel}"`;
+  }
+  return null;
+}
 
 const okrs = new Hono<AppEnv>();
 
@@ -19,25 +58,30 @@ okrs.get("/api/objectives", async (c) => {
   const storage = getStorage(c.get("db"));
   const objectives = await storage.getObjectives();
 
-  if (user.role === "admin") return c.json(objectives);
-
-  const keyResults = await storage.getKeyResults();
-  const filtered = objectives.filter((obj) => {
-    if (obj.ownerId === user.userId) return true;
-    return keyResults.some((kr) => {
-      if (kr.objectiveId !== obj.id) return false;
-      try {
-        const ids =
-          typeof kr.responsibleIds === "string"
-            ? JSON.parse(kr.responsibleIds)
-            : kr.responsibleIds;
-        return Array.isArray(ids) && ids.includes(user.userId);
-      } catch {
-        return false;
-      }
+  let list: Objective[];
+  if (user.role === "admin") {
+    list = objectives;
+  } else {
+    const keyResults = await storage.getKeyResults();
+    list = objectives.filter((obj) => {
+      if (obj.ownerId === user.userId) return true;
+      return keyResults.some((kr) => {
+        if (kr.objectiveId !== obj.id) return false;
+        try {
+          const ids =
+            typeof kr.responsibleIds === "string"
+              ? JSON.parse(kr.responsibleIds)
+              : kr.responsibleIds;
+          return Array.isArray(ids) && ids.includes(user.userId);
+        } catch {
+          return false;
+        }
+      });
     });
-  });
-  return c.json(filtered);
+  }
+
+  if (c.req.query("tree") === "true") return c.json(buildOkrTree(list));
+  return c.json(list);
 });
 
 // GET /api/objectives/:id
@@ -72,6 +116,10 @@ okrs.post("/api/objectives", async (c) => {
   const storage = getStorage(c.get("db"));
   const body = await c.req.json();
   const validated = insertObjectiveSchema.parse(body);
+  if (validated.parentOkrId) {
+    const err = await validateParentOkr(storage, validated.parentOkrId, validated.level);
+    if (err) return c.json({ error: err }, 400);
+  }
   const objective = await storage.createObjective(validated);
   return c.json(objective, 201);
 });
@@ -88,6 +136,11 @@ okrs.patch("/api/objectives/:id", async (c) => {
   }
   const body = await c.req.json();
   const validated = insertObjectiveSchema.partial().parse(body);
+  if (validated.parentOkrId) {
+    const level = validated.level ?? existing.level;
+    const err = await validateParentOkr(storage, validated.parentOkrId, level, id);
+    if (err) return c.json({ error: err }, 400);
+  }
   const objective = await storage.updateObjective(id, validated);
   if (!objective) return c.json({ error: "Objective not found" }, 404);
   return c.json(objective);

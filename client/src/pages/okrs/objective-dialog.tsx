@@ -1,7 +1,7 @@
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -30,12 +30,25 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import type { Objective } from "@shared/schema";
+
+const PARENT_LEVELS: Record<string, string[]> = {
+  area: ["company"],
+  team: ["company", "area"],
+};
+
+const levelLabels: Record<string, string> = {
+  company: "Empresa",
+  team: "Time",
+  area: "Área",
+};
 
 const formSchema = z.object({
   title: z.string().min(3, "Título deve ter no mínimo 3 caracteres"),
   description: z.string().optional(),
   level: z.string().min(1, "Selecione um nível"),
   cycle: z.string().min(1, "Selecione um ciclo"),
+  parentOkrId: z.string().nullable().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -59,13 +72,28 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
       description: "",
       level: "company",
       cycle: defaultCycle,
+      parentOkrId: null,
     },
   });
+
+  const selectedLevel = useWatch({ control: form.control, name: "level" });
+  const selectedCycle = useWatch({ control: form.control, name: "cycle" });
+
+  const { data: allObjectives = [] } = useQuery<Objective[]>({
+    queryKey: ["/api/objectives"],
+  });
+
+  const validParentLevels = PARENT_LEVELS[selectedLevel] ?? [];
+  const parentOptions = allObjectives.filter(
+    (obj) => validParentLevels.includes(obj.level) && obj.cycle === selectedCycle
+  );
+  const showParentField = selectedLevel !== "company";
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
       return apiRequest("POST", "/api/objectives", {
         ...data,
+        parentOkrId: data.parentOkrId || null,
         ownerId: "admin",
         status: "on_track",
       });
@@ -111,10 +139,10 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
                 <FormItem>
                   <FormLabel>Objetivo</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="Ex: Aumentar a satisfação do cliente" 
+                    <Input
+                      placeholder="Ex: Aumentar a satisfação do cliente"
                       data-testid="input-objective-title"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -149,7 +177,13 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nível</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        form.setValue("parentOkrId", null);
+                      }}
+                      defaultValue={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger data-testid="select-objective-level">
                           <SelectValue />
@@ -191,16 +225,50 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
               />
             </div>
 
+            {showParentField && (
+              <FormField
+                control={form.control}
+                name="parentOkrId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Objetivo Pai{" "}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </FormLabel>
+                    <Select
+                      onValueChange={(val) => field.onChange(val === "__none__" ? null : val)}
+                      value={field.value ?? "__none__"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-objective-parent">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Sem objetivo pai —</SelectItem>
+                        {parentOptions.map((obj) => (
+                          <SelectItem key={obj.id} value={obj.id}>
+                            {obj.title} — {levelLabels[obj.level]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => onOpenChange(false)}
               >
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={mutation.isPending}
                 data-testid="button-submit-objective"
               >
