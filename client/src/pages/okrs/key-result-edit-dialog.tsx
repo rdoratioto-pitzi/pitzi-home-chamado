@@ -70,9 +70,9 @@ export function KeyResultEditDialog({ open, onOpenChange, keyResult }: KeyResult
   const { data: users = [] } = useQuery<User[]>({ queryKey: ["/api/users"] });
 
   const parseOwnerIds = (): string[] => {
-    if (!keyResult.ownerIds) return [];
-    if (Array.isArray(keyResult.ownerIds)) return keyResult.ownerIds as string[];
-    try { return JSON.parse(keyResult.ownerIds as unknown as string); } catch { return []; }
+    if (!keyResult.responsibleIds) return [];
+    if (Array.isArray(keyResult.responsibleIds)) return keyResult.responsibleIds as string[];
+    try { return JSON.parse(keyResult.responsibleIds); } catch { return []; }
   };
 
   const form = useForm<FormData>({

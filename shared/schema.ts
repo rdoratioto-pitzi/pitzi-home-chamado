@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique, bigint, date } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique, bigint, date, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -306,6 +306,7 @@ export const objectives = pgTable("objectives", {
   level: text("level").notNull().default("company"),
   cycle: text("cycle").notNull(),
   status: text("status").notNull().default("on_track"),
+  parentOkrId: varchar("parent_okr_id").references((): AnyPgColumn => objectives.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

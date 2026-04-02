@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -34,12 +34,24 @@ import { apiRequest } from "@/lib/queryClient";
 import { getQuarterOptions } from "@/lib/quarter";
 import type { Objective } from "@shared/schema";
 
+const PARENT_LEVELS: Record<string, string[]> = {
+  area: ["company"],
+  team: ["company", "area"],
+};
+
+const levelLabels: Record<string, string> = {
+  company: "Empresa",
+  team: "Time",
+  area: "Área",
+};
+
 const formSchema = z.object({
   title: z.string().min(3, "Título deve ter no mínimo 3 caracteres"),
   description: z.string().optional(),
   level: z.string().min(1, "Selecione um nível"),
   cycle: z.string().min(1, "Selecione um ciclo"),
   status: z.string().min(1, "Selecione um status"),
+  parentOkrId: z.string().nullable().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -63,8 +75,25 @@ export function ObjectiveEditDialog({ open, onOpenChange, objective }: Objective
       level: objective.level,
       cycle: objective.cycle,
       status: objective.status,
+      parentOkrId: objective.parentOkrId ?? null,
     },
   });
+
+  const selectedLevel = useWatch({ control: form.control, name: "level" });
+  const selectedCycle = useWatch({ control: form.control, name: "cycle" });
+
+  const { data: allObjectives = [] } = useQuery<Objective[]>({
+    queryKey: ["/api/objectives"],
+  });
+
+  const validParentLevels = PARENT_LEVELS[selectedLevel] ?? [];
+  const parentOptions = allObjectives.filter(
+    (obj) =>
+      validParentLevels.includes(obj.level) &&
+      obj.cycle === selectedCycle &&
+      obj.id !== objective.id
+  );
+  const showParentField = selectedLevel !== "company";
 
   useEffect(() => {
     if (open) {
@@ -74,13 +103,17 @@ export function ObjectiveEditDialog({ open, onOpenChange, objective }: Objective
         level: objective.level,
         cycle: objective.cycle,
         status: objective.status,
+        parentOkrId: objective.parentOkrId ?? null,
       });
     }
   }, [open, objective, form]);
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      return apiRequest("PATCH", `/api/objectives/${objective.id}`, data);
+      return apiRequest("PATCH", `/api/objectives/${objective.id}`, {
+        ...data,
+        parentOkrId: data.parentOkrId || null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/objectives"] });
@@ -142,7 +175,13 @@ export function ObjectiveEditDialog({ open, onOpenChange, objective }: Objective
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Nível</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        form.setValue("parentOkrId", null);
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue />
@@ -205,6 +244,40 @@ export function ObjectiveEditDialog({ open, onOpenChange, objective }: Objective
                 </FormItem>
               )}
             />
+
+            {showParentField && (
+              <FormField
+                control={form.control}
+                name="parentOkrId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Objetivo Pai{" "}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </FormLabel>
+                    <Select
+                      onValueChange={(val) => field.onChange(val === "__none__" ? null : val)}
+                      value={field.value ?? "__none__"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Sem objetivo pai —</SelectItem>
+                        {parentOptions.map((obj) => (
+                          <SelectItem key={obj.id} value={obj.id}>
+                            {obj.title} — {levelLabels[obj.level]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

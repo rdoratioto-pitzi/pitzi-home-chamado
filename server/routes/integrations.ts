@@ -207,6 +207,25 @@ export function registerIntegrationRoutes(router: Router) {
     }
   });
 
+  // 7. Últimas Avaliações por IMEI
+  router.get("/api/avaliacoes-ia/imei", async (req, res) => {
+    try {
+      const params = new URLSearchParams();
+      const limitDate = (req.query.limit_date as string) || new Date().toISOString().slice(0, 10);
+      params.append("limit_date", limitDate);
+
+      if (req.query.imei) {
+        params.append("imei", req.query.imei as string);
+      }
+
+      const data = await fetchAiEvaluation("imei", Object.fromEntries(params.entries()));
+      res.json(data);
+    } catch (error: any) {
+      console.error("AI Evaluation imei error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar avaliações por IMEI" });
+    }
+  });
+
   // ============== ESTOQUE API INTEGRATION ==============
 
   // Helper method for Estoque API calls
