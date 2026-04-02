@@ -71,6 +71,17 @@ interface DetalheAvaliacao {
   Status_Assertividade: string;
 }
 
+interface AvaliacaoImei {
+  Imei: string;
+  Codigo_Voucher: string;
+  Criacao_Pedido: string;
+  Descricao_Captura: string;
+  Nota_IA: string;
+  Nota_Humana: string;
+  Tags_IA: string | null;
+  Tags_Humana: string | null;
+}
+
 interface AssertividadeFotos {
   Acertos: number;
   Mes_Avaliacao: string;
@@ -141,6 +152,9 @@ export default function EficienciaAvaliacoesIaPage() {
   const [evolucaoCategoriaData, setEvolucaoCategoriaData] = useState<EvolucaoCategoria[]>([]);
   const [dispositivosData, setDispositivosData] = useState<DispositivoData[]>([]);
   const [detalhesData, setDetalhesData] = useState<DetalheAvaliacao[]>([]);
+  const [imeiData, setImeiData] = useState<AvaliacaoImei[]>([]);
+  const [imeiPageIndex, setImeiPageIndex] = useState<number>(0);
+  const [imeiFilter, setImeiFilter] = useState<string>('');
   const [assertividadeFotosData, setAssertividadeFotosData] = useState<AssertividadeFotos[]>([]);
   const [categoriasData, setCategoriasData] = useState<CategoriaMetrica[]>([]);
   
@@ -242,6 +256,7 @@ export default function EficienciaAvaliacoesIaPage() {
         resEvolucaoCat, 
         resDispositivos, 
         resDetalhes,
+        resImei,
         resAssertividadeFotos,
         resCategorias
       ] = await Promise.all([
@@ -250,6 +265,7 @@ export default function EficienciaAvaliacoesIaPage() {
         fetch(`${API_BASE_URL}/evolucao-categoria?${queryString}`),
         fetch(`${API_BASE_URL}/dispositivos?${queryString}`),
         fetch(`${API_BASE_URL}/detalhes?${queryString}`),
+        fetch(`${API_BASE_URL}/imei?${new URLSearchParams({ limit_date: dateRange.end }).toString()}`),
         fetch(`${API_BASE_URL}/assertividade-fotos?${queryString}`),
         fetch(`${API_BASE_URL}/categorias?${queryString}`)
       ]);
@@ -260,6 +276,7 @@ export default function EficienciaAvaliacoesIaPage() {
         dataEvolucaoCat, 
         dataDispositivos, 
         dataDetalhes,
+        dataImei,
         dataAssertividadeFotos,
         dataCategorias
       ] = await Promise.all([
@@ -268,6 +285,7 @@ export default function EficienciaAvaliacoesIaPage() {
         resEvolucaoCat.ok ? resEvolucaoCat.json() : [], 
         resDispositivos.ok ? resDispositivos.json() : [], 
         resDetalhes.ok ? resDetalhes.json() : [],
+        resImei.ok ? resImei.json() : [],
         resAssertividadeFotos.ok ? resAssertividadeFotos.json() : [],
         resCategorias.ok ? resCategorias.json() : []
       ]);
@@ -278,6 +296,7 @@ export default function EficienciaAvaliacoesIaPage() {
       setEvolucaoCategoriaData(Array.isArray(dataEvolucaoCat) ? dataEvolucaoCat : []);
       setDispositivosData(Array.isArray(dataDispositivos) ? dataDispositivos : []);
       setDetalhesData(Array.isArray(dataDetalhes) ? dataDetalhes : []);
+      setImeiData(Array.isArray(dataImei) ? dataImei : []);
       setAssertividadeFotosData(Array.isArray(dataAssertividadeFotos) ? dataAssertividadeFotos : []);
       setCategoriasData(Array.isArray(dataCategorias) ? dataCategorias : []);
 
@@ -1038,40 +1057,93 @@ export default function EficienciaAvaliacoesIaPage() {
           </CardContent>
        </Card>
 
-       {/* Detalhes Preview */}
+         {/* Últimas avaliações por IMEI */}
        <Card>
         <CardHeader>
-          <CardTitle>Últimas Avaliações</CardTitle>
+          <CardTitle>Últimas Avaliações por IMEI</CardTitle>
         </CardHeader>
         <CardContent>
-           <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Modelo</TableHead>
-                        <TableHead>Categoria</TableHead>
-                        <TableHead>Grade Humano</TableHead>
-                        <TableHead>Grade IA</TableHead>
-                        <TableHead>Status</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {detalhesData.slice(0, 10).map((d, i) => (
+           {/* Filtro de IMEI */}
+           <div className="mb-4">
+             <Input
+               placeholder="Filtrar por IMEI..."
+               value={imeiFilter}
+               onChange={(e) => {
+                 setImeiFilter(e.target.value);
+                 setImeiPageIndex(0);
+               }}
+               className="max-w-xs"
+             />
+           </div>
+           {(() => {
+             const itemsPerPage = 10;
+             // Filtrar dados por IMEI
+             const filteredData = imeiData.filter(d => 
+               (d.Imei || '').toLowerCase().includes(imeiFilter.toLowerCase())
+             );
+             const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+             const startIdx = imeiPageIndex * itemsPerPage;
+             const endIdx = startIdx + itemsPerPage;
+             const paginatedData = filteredData.slice(startIdx, endIdx);
+
+             return (
+               <div className="space-y-4">
+                 <Table>
+                      <TableHeader>
+                          <TableRow>
+                              <TableHead>Data</TableHead>
+                      <TableHead>IMEI</TableHead>
+                      <TableHead>Voucher</TableHead>
+                      <TableHead>Captura</TableHead>
+                      <TableHead>Nota IA</TableHead>
+                      <TableHead>Nota Humana</TableHead>
+                      <TableHead>Tags IA</TableHead>
+                      <TableHead>Tags Humana</TableHead>
+                          </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                    {paginatedData.map((d, i) => (
                         <TableRow key={i}>
-                            <TableCell>{d.Data_Avaliacao ? format(new Date(d.Data_Avaliacao), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
-                            <TableCell className="text-xs truncate max-w-[200px]" title={d.Modelo}>{d.Modelo}</TableCell>
-                            <TableCell className="text-xs">{d.Categoria}</TableCell>
-                            <TableCell>{d.Grade_Humano}</TableCell>
-                            <TableCell>{d.Grade_IA}</TableCell>
-                            <TableCell>
-                                <Badge variant={d.Status_Assertividade === 'ACERTOU' ? 'default' : 'destructive'} className={d.Status_Assertividade === 'ACERTOU' ? 'bg-green-600' : 'bg-red-600'}>
-                                    {d.Status_Assertividade}
-                                </Badge>
-                            </TableCell>
+                  <TableCell>{d.Criacao_Pedido ? format(new Date(d.Criacao_Pedido), 'dd/MM/yyyy HH:mm') : '-'}</TableCell>
+                  <TableCell className="text-xs font-medium">{d.Imei || '-'}</TableCell>
+                  <TableCell className="text-xs truncate max-w-[160px]" title={d.Codigo_Voucher || '-'}>{d.Codigo_Voucher || '-'}</TableCell>
+                  <TableCell className="text-xs truncate max-w-[240px]" title={d.Descricao_Captura || '-'}>{d.Descricao_Captura || '-'}</TableCell>
+                  <TableCell>{d.Nota_IA || '-'}</TableCell>
+                  <TableCell>{d.Nota_Humana || '-'}</TableCell>
+                  <TableCell className="text-xs truncate max-w-[200px]" title={d.Tags_IA || '-'}>{d.Tags_IA || '-'}</TableCell>
+                  <TableCell className="text-xs truncate max-w-[200px]" title={d.Tags_Humana || '-'}>{d.Tags_Humana || '-'}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
             </Table>
+
+               {/* Paginação */}
+               <div className="flex items-center justify-between pt-4 border-t mt-4">
+                 <span className="text-sm text-muted-foreground">
+                   Página {imeiPageIndex + 1} de {totalPages > 0 ? totalPages : 1}
+                 </span>
+                 <div className="flex gap-2">
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setImeiPageIndex(Math.max(0, imeiPageIndex - 1))}
+                     disabled={imeiPageIndex === 0}
+                   >
+                     Anterior
+                   </Button>
+                   <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setImeiPageIndex(Math.min(totalPages - 1, imeiPageIndex + 1))}
+                     disabled={imeiPageIndex >= totalPages - 1}
+                   >
+                     Próximo
+                   </Button>
+                 </div>
+               </div>
+             </div>
+           );
+         })()}
         </CardContent>
        </Card>
 
