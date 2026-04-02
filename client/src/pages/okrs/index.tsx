@@ -288,7 +288,7 @@ export default function OKRsPage() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                {viewMode === "hierarchy" ? "Ver como cards" : "Ver hierarquia"}
+                {viewMode === "hierarchy" ? "Bullets" : "Organograma"}
               </TooltipContent>
             </Tooltip>
           </div>
