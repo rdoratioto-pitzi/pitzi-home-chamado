@@ -41,6 +41,10 @@ export interface UnifiedItem {
   sla: number | null;
   statusSla: "dentro_prazo" | "em_atraso" | null;
   criadoEm: string | null;
+  descricao?: string | null;
+  progresso?: number | null;
+  sprint?: string | null;
+  dataEntrega?: string | null;
 }
 
 type WorkspaceTableProps =
