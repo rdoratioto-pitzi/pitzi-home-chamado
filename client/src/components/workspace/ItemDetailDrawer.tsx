@@ -238,7 +238,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
   const descricao = item
     ? isChamado
       ? (item as ChamadoItem).descricao
-      : (item as UnifiedItem).contexto
+      : (item as UnifiedItem).descricao || null
     : "";
 
   return (
@@ -412,7 +412,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                       )}
                     </div>
 
-                    {/* Tipo */}
+                    {/* Tipo — só chamados */}
                     {isChamado && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>Tipo</span>
@@ -422,12 +422,32 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                       </div>
                     )}
 
-                    {/* Categoria */}
+                    {/* Categoria — só chamados */}
                     {isChamado && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>Categoria</span>
                         <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
                           {(item as ChamadoItem).categoria || "—"}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Projeto — só tarefas */}
+                    {!isChamado && (item as UnifiedItem).contexto && (
+                      <div className="flex items-center gap-3">
+                        <span style={ROW_LABEL_STYLE}>Projeto</span>
+                        <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>
+                          {(item as UnifiedItem).contexto}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Sprint — só tarefas */}
+                    {!isChamado && (item as UnifiedItem).sprint && (
+                      <div className="flex items-center gap-3">
+                        <span style={ROW_LABEL_STYLE}>Sprint</span>
+                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                          {(item as UnifiedItem).sprint}
                         </span>
                       </div>
                     )}
@@ -471,24 +491,52 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     {/* Abertura */}
                     <div className="flex items-center gap-3">
                       <span style={ROW_LABEL_STYLE}>Abertura</span>
-                      <span
-                        className="text-xs"
-                        style={{ color: "rgba(255,255,255,0.55)" }}
-                      >
+                      <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
                         {abertura}
                       </span>
                     </div>
 
-                    {/* SLA */}
-                    <div className="flex items-center gap-3">
-                      <span style={ROW_LABEL_STYLE}>SLA</span>
-                      <span
-                        className="text-xs"
-                        style={{ color: "rgba(255,255,255,0.55)" }}
-                      >
-                        {item.sla ? `${item.sla}h` : "—"}
-                      </span>
-                    </div>
+                    {/* Data Entrega — só tarefas */}
+                    {!isChamado && (
+                      <div className="flex items-center gap-3">
+                        <span style={ROW_LABEL_STYLE}>Entrega</span>
+                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+                          {formatDate((item as UnifiedItem).dataEntrega)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Progresso — só tarefas */}
+                    {!isChamado && (
+                      <div className="flex items-center gap-3">
+                        <span style={ROW_LABEL_STYLE}>Progresso</span>
+                        <div className="flex items-center gap-2">
+                          <div style={{ width: 80, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.08)" }}>
+                            <div
+                              style={{
+                                width: `${Math.min((item as UnifiedItem).progresso ?? 0, 100)}%`,
+                                height: "100%",
+                                borderRadius: 3,
+                                background: "#00c853",
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "'JetBrains Mono', monospace" }}>
+                            {(item as UnifiedItem).progresso ?? 0}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SLA — só chamados */}
+                    {isChamado && (
+                      <div className="flex items-center gap-3">
+                        <span style={ROW_LABEL_STYLE}>SLA</span>
+                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+                          {item.sla ? `${item.sla}h` : "—"}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -576,52 +624,52 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                   </div>
                 )}
 
-                {/* COMENTÁRIOS section */}
-                <div
-                  style={{
-                    paddingTop: 20,
-                    borderTop: "1px solid rgba(255,255,255,0.05)",
-                  }}
-                >
-                  <div style={SECTION_LABEL_STYLE}>Comentários</div>
+                {/* COMENTÁRIOS section — só chamados */}
+                {isChamado && (
+                  <div
+                    style={{
+                      paddingTop: 20,
+                      borderTop: "1px solid rgba(255,255,255,0.05)",
+                    }}
+                  >
+                    <div style={SECTION_LABEL_STYLE}>Comentários</div>
 
-                  {/* Existing comments */}
-                  <div className="flex flex-col gap-3 mb-4">
-                    {comentarios.length === 0 ? (
-                      <p className="text-xs italic" style={{ color: "rgba(255,255,255,0.25)" }}>
-                        Nenhum comentário ainda
-                      </p>
-                    ) : (
-                      comentarios.map((c) => (
-                        <div key={c.id} className="flex gap-2">
-                          <div
-                            className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold mt-0.5"
-                            style={{ width: 24, height: 24, background: "rgba(0,200,83,0.15)", color: "#00c853" }}
-                          >
-                            {c.autorInitials}
-                          </div>
-                          <div className="flex flex-col gap-0.5 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
-                                {c.autorNome}
-                              </span>
-                              {c.criadoEm && (
-                                <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>
-                                  {new Date(c.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                                </span>
-                              )}
+                    {/* Existing comments */}
+                    <div className="flex flex-col gap-3 mb-4">
+                      {comentarios.length === 0 ? (
+                        <p className="text-xs italic" style={{ color: "rgba(255,255,255,0.25)" }}>
+                          Nenhum comentário ainda
+                        </p>
+                      ) : (
+                        comentarios.map((c) => (
+                          <div key={c.id} className="flex gap-2">
+                            <div
+                              className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold mt-0.5"
+                              style={{ width: 24, height: 24, background: "rgba(0,200,83,0.15)", color: "#00c853" }}
+                            >
+                              {c.autorInitials}
                             </div>
-                            <p className="text-xs" style={{ color: "rgba(255,255,255,0.55)", lineHeight: "1.5" }}>
-                              {c.texto}
-                            </p>
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
+                                  {c.autorNome}
+                                </span>
+                                {c.criadoEm && (
+                                  <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>
+                                    {new Date(c.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs" style={{ color: "rgba(255,255,255,0.55)", lineHeight: "1.5" }}>
+                                {c.texto}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                        ))
+                      )}
+                    </div>
 
-                  {/* New comment input */}
-                  {isChamado && (
+                    {/* New comment input */}
                     <div className="flex gap-2 mt-2">
                       <textarea
                         ref={textareaRef}
@@ -655,8 +703,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                         <Send className="h-4 w-4" />
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </>
             )}
           </div>
