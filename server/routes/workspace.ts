@@ -444,7 +444,7 @@ export function registerWorkspaceRoutes(router: Router) {
       if (!db) return res.status(500).json({ error: "Database not available" });
 
       const { id } = req.params;
-      const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria } =
+      const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso } =
         req.body as {
           nome?: string;
           descricao?: string;
@@ -454,6 +454,8 @@ export function registerWorkspaceRoutes(router: Router) {
           dataInicio?: string | null;
           dataFim?: string | null;
           categoria?: string;
+          cor?: string;
+          progresso?: number;
         };
 
       const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
@@ -470,6 +472,8 @@ export function registerWorkspaceRoutes(router: Router) {
       if (dataInicio !== undefined) updateData.startDate = dataInicio ? new Date(dataInicio) : null;
       if (dataFim !== undefined) updateData.endDate = dataFim ? new Date(dataFim) : null;
       if (categoria !== undefined) updateData.category = categoria;
+      if (cor !== undefined) updateData.color = cor;
+      if (progresso !== undefined) updateData.progress = Math.max(0, Math.min(100, progresso));
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ error: "Nenhum campo para atualizar" });
