@@ -565,6 +565,19 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
+interface ProjectEditFormData {
+  nome: string;
+  descricao: string;
+  status: string;
+  prioridade: string;
+  categoria: string;
+  responsavelId?: string;
+  dataInicio: string;
+  dataFim: string;
+  cor: string;
+  progresso: number;
+}
+
 function ProjectEditDialog({
   projeto,
   open,
@@ -575,7 +588,7 @@ function ProjectEditDialog({
   projeto: ProjetoComTarefas | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSave: (data: { nome: string; descricao: string; status: string; prioridade: string; categoria: string }) => void;
+  onSave: (data: ProjectEditFormData) => void;
   saving: boolean;
 }) {
   const [nome, setNome] = useState("");
@@ -583,6 +596,12 @@ function ProjectEditDialog({
   const [status, setStatus] = useState("backlog");
   const [prioridade, setPrioridade] = useState("media");
   const [categoria, setCategoria] = useState("");
+  const [responsavelId, setResponsavelId] = useState("");
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+  const [cor, setCor] = useState("#00c853");
+  const [progresso, setProgresso] = useState(0);
+  const [users, setUsers] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     if (projeto) {
@@ -591,16 +610,32 @@ function ProjectEditDialog({
       setStatus(projeto.status || "backlog");
       setPrioridade(projeto.prioridade || "media");
       setCategoria(projeto.categoria || "");
+      setCor(projeto.cor || "#00c853");
+      setProgresso(projeto.progresso ?? 0);
+      setDataInicio(projeto.dataInicio ? projeto.dataInicio.split("T")[0] : "");
+      setDataFim(projeto.dataFim ? projeto.dataFim.split("T")[0] : "");
+      setResponsavelId("");
     }
   }, [projeto]);
 
+  useEffect(() => {
+    if (!open) return;
+    fetchWithAuth("/api/users")
+      .then((r) => r.json())
+      .then((data: Array<{ id: string; name: string }>) => setUsers(data || []))
+      .catch(() => {});
+  }, [open]);
+
+  const formatDate = (d: string | null) =>
+    d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Projeto</DialogTitle>
           <DialogDescription>
-            {projeto?.codigo} — Altere os campos desejados
+            {projeto?.codigo} — Criado em {formatDate(projeto?.criadoEm ?? null)}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 py-2">
@@ -639,14 +674,71 @@ function ProjectEditDialog({
               </Select>
             </div>
           </div>
-          <div>
-            <Label className="text-xs">Categoria</Label>
-            <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} className="mt-1" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Responsável</Label>
+              <Select value={responsavelId} onValueChange={setResponsavelId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder={projeto?.responsavel || "Manter atual"} /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Manter atual ({projeto?.responsavel})</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Categoria</Label>
+              <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Data Início</Label>
+              <Input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="mt-1" />
+            </div>
+            <div>
+              <Label className="text-xs">Data Fim</Label>
+              <Input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="mt-1" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Cor do Projeto</Label>
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="color"
+                  value={cor}
+                  onChange={(e) => setCor(e.target.value)}
+                  className="h-8 w-10 rounded border border-white/10 cursor-pointer bg-transparent"
+                />
+                <Input value={cor} onChange={(e) => setCor(e.target.value)} className="flex-1 font-mono text-xs" maxLength={7} />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Progresso ({progresso}%)</Label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={progresso}
+                onChange={(e) => setProgresso(Number(e.target.value))}
+                className="w-full mt-2 accent-[#00c853]"
+              />
+            </div>
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => onSave({ nome, descricao, status, prioridade, categoria })} disabled={saving || !nome.trim()}>
+          <Button
+            onClick={() => onSave({
+              nome, descricao, status, prioridade, categoria,
+              responsavelId: responsavelId || undefined,
+              dataInicio, dataFim, cor, progresso,
+            })}
+            disabled={saving || !nome.trim()}
+          >
             {saving ? "Salvando..." : "Salvar"}
           </Button>
         </div>
@@ -672,6 +764,10 @@ function toUnifiedItem(tarefa: TarefaItem, projetoNome: string): UnifiedItem {
     sla: null,
     statusSla: null,
     criadoEm: tarefa.criadoEm,
+    descricao: tarefa.descricao,
+    progresso: tarefa.progresso,
+    sprint: tarefa.sprint,
+    dataEntrega: tarefa.dataEntrega,
   };
 }
 
@@ -700,13 +796,7 @@ export function ProjetosView() {
   const [saving, setSaving] = useState(false);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
 
-  const handleSaveEdit = async (formData: {
-    nome: string;
-    descricao: string;
-    status: string;
-    prioridade: string;
-    categoria: string;
-  }) => {
+  const handleSaveEdit = async (formData: ProjectEditFormData) => {
     if (!editProjeto) return;
     setSaving(true);
     try {
