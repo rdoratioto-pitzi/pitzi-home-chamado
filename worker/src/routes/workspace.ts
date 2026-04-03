@@ -800,7 +800,7 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     const db = c.get("db");
     const id = c.req.param("id");
     const body = await c.req.json();
-    const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria } = body;
+    const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso } = body;
 
     const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
     if (status && !validStatuses.includes(status)) {
@@ -816,6 +816,8 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     if (dataInicio !== undefined) updateData.startDate = dataInicio ? new Date(dataInicio) : null;
     if (dataFim !== undefined) updateData.endDate = dataFim ? new Date(dataFim) : null;
     if (categoria !== undefined) updateData.category = categoria;
+    if (cor !== undefined) updateData.color = cor;
+    if (progresso !== undefined) updateData.progress = Math.max(0, Math.min(100, progresso));
 
     if (Object.keys(updateData).length === 0) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
