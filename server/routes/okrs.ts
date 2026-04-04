@@ -4,6 +4,7 @@ import {
   insertObjectiveSchema,
   insertKeyResultSchema,
   insertKeyResultUpdateSchema,
+  insertInitiativeSchema,
   type Objective,
 } from "@shared/schema";
 import { getSessionUser, requireAuth } from "../middleware/auth";
@@ -11,7 +12,7 @@ import { z } from "zod";
 
 type OkrNode = Objective & { children: OkrNode[] };
 
-// Which levels a parent can have as children
+// Objectives only support 'company' level going forward; 'area' and 'team' kept for DB compat
 const PARENT_LEVEL_RULES: Record<string, string[]> = {
   company: ["area", "team"],
   area: ["team"],
@@ -229,6 +230,58 @@ export function registerOkrRoutes(router: Router) {
   router.delete("/api/key-results/:id", requireAuth, async (req, res) => {
     const deleted = await storage.deleteKeyResult(getId(req));
     if (!deleted) return res.status(404).json({ error: "Key result not found" });
+    res.status(204).send();
+  });
+
+  // ============== INITIATIVES ==============
+  router.get("/api/initiatives", requireAuth, async (req, res) => {
+    try {
+      const keyResultId = req.query.keyResultId as string | undefined;
+      if (!keyResultId) return res.status(400).json({ error: "keyResultId is required" });
+      const list = await storage.getInitiativesByKeyResult(keyResultId);
+      res.json(list);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch initiatives" });
+    }
+  });
+
+  router.post("/api/initiatives", requireAuth, async (req, res) => {
+    try {
+      const validated = insertInitiativeSchema.parse(req.body);
+      const kr = await storage.getKeyResult(validated.keyResultId);
+      if (!kr) return res.status(400).json({ error: "Key result não encontrado" });
+      const initiative = await storage.createInitiative(validated);
+      res.status(201).json(initiative);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to create initiative" });
+    }
+  });
+
+  router.patch("/api/initiatives/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getInitiative(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Initiative not found" });
+      const partialSchema = insertInitiativeSchema.partial();
+      const validated = partialSchema.parse(req.body);
+      const initiative = await storage.updateInitiative(req.params.id, validated);
+      if (!initiative) return res.status(404).json({ error: "Initiative not found" });
+      res.json(initiative);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validation failed", details: error.errors });
+      }
+      res.status(400).json({ error: "Failed to update initiative" });
+    }
+  });
+
+  router.delete("/api/initiatives/:id", requireAuth, async (req, res) => {
+    const existing = await storage.getInitiative(req.params.id);
+    if (!existing) return res.status(404).json({ error: "Initiative not found" });
+    const deleted = await storage.deleteInitiative(req.params.id);
+    if (!deleted) return res.status(404).json({ error: "Initiative not found" });
     res.status(204).send();
   });
 
