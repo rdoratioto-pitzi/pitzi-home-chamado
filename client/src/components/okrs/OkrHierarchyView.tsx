@@ -1,7 +1,10 @@
 import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronDown, ChevronUp, Target, Square, CheckSquare, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronRight, Target, Square, CheckSquare, Clock } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { formatKRRange } from "@/lib/kr-format";
 import type { Objective, KeyResult, User, Initiative } from "@shared/schema";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -221,64 +224,82 @@ function OrgChartCard({
                         className="rounded-md border border-border/40 border-l-[2px] border-l-[#378ADD] bg-muted/10 px-2.5 py-2"
                       >
                         {/* KR header */}
-                        <div className="flex items-start gap-1.5">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-semibold leading-snug line-clamp-2">
-                              {kr.title}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">
-                              {parseFloat(kr.startValue || "0")} → {parseFloat(kr.targetValue || "100")}
-                              {kr.unit ? ` ${kr.unit}` : ""}
-                            </p>
-                            {/* KR progress */}
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <div className="flex-1 h-[3px] bg-border/40 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full transition-all duration-400"
-                                  style={{ width: `${krProgress}%`, background: "#378ADD" }}
-                                />
-                              </div>
-                              <span className="text-[10px] font-bold text-[#378ADD]">{krProgress}%</span>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold leading-snug line-clamp-2">
+                            {kr.title}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {formatKRRange(kr.startValue, kr.targetValue, kr.measurementType, kr.unit)}
+                          </p>
+                          {/* KR progress */}
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div className="flex-1 h-[3px] bg-border/40 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-400"
+                                style={{ width: `${krProgress}%`, background: "#378ADD" }}
+                              />
                             </div>
-                            {/* Subtitle */}
-                            {initiatives.length > 0 ? (
-                              <p className="text-[10px] text-muted-foreground mt-0.5">
-                                {completedCount}/{initiatives.length} iniciativas concluídas
-                              </p>
-                            ) : owner ? (
-                              <p className="text-[10px] text-muted-foreground mt-0.5">{owner.name}</p>
-                            ) : null}
+                            <span className="text-[10px] font-bold text-[#378ADD]">{krProgress}%</span>
                           </div>
-                          {initiatives.length > 0 && (
-                            <button
-                              onClick={() => toggleKR(kr.id)}
-                              className="text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5"
-                            >
-                              {isKRExpanded
-                                ? <ChevronUp className="h-3 w-3" />
-                                : <ChevronDown className="h-3 w-3" />}
-                            </button>
+                          {owner && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{owner.name}</p>
                           )}
                         </div>
 
-                        {/* Initiatives */}
+                        {/* Initiatives toggle — full-width clickable row */}
+                        {initiatives.length > 0 && (
+                          <button
+                            onClick={() => toggleKR(kr.id)}
+                            className="mt-1.5 w-full flex items-center gap-1 text-[10px] font-medium text-[#378ADD] hover:text-[#378ADD]/80 transition-colors"
+                            data-testid={`btn-toggle-initiatives-${kr.id}`}
+                          >
+                            {isKRExpanded
+                              ? <ChevronDown className="h-3 w-3" />
+                              : <ChevronRight className="h-3 w-3" />}
+                            <span>
+                              {completedCount}/{initiatives.length} iniciativa{initiatives.length !== 1 ? "s" : ""} concluída{initiatives.length !== 1 ? "s" : ""}
+                            </span>
+                          </button>
+                        )}
+
+                        {/* Initiatives list */}
                         {isKRExpanded && initiatives.length > 0 && (
-                          <div className="mt-1.5 space-y-0.5 pl-1">
-                            {initiatives.map((init) => (
-                              <div key={init.id} className="flex items-center gap-1.5">
-                                <button
-                                  onClick={() => onToggleInitiative(init.id, !init.completed)}
-                                  className="shrink-0 text-muted-foreground hover:text-[#378ADD] transition-colors"
+                          <div className="mt-1.5 space-y-1 pl-1 border-l border-border/40">
+                            {initiatives.map((init) => {
+                              const initOwner = users.find((u) => u.id === init.ownerId);
+                              return (
+                                <div
+                                  key={init.id}
+                                  className="flex items-start gap-1.5 pl-2 py-0.5 rounded hover:bg-muted/20 group"
+                                  data-testid={`row-organogram-initiative-${init.id}`}
                                 >
-                                  {init.completed
-                                    ? <CheckSquare className="h-3 w-3 text-[#378ADD]" />
-                                    : <Square className="h-3 w-3" />}
-                                </button>
-                                <p className={`text-[10px] leading-snug ${init.completed ? "line-through opacity-50" : ""}`}>
-                                  {init.title}
-                                </p>
-                              </div>
-                            ))}
+                                  <button
+                                    onClick={() => onToggleInitiative(init.id, !init.completed)}
+                                    className="shrink-0 mt-0.5 text-muted-foreground hover:text-[#378ADD] transition-colors"
+                                  >
+                                    {init.completed
+                                      ? <CheckSquare className="h-3 w-3 text-[#378ADD]" />
+                                      : <Square className="h-3 w-3" />}
+                                  </button>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-[10px] leading-snug ${init.completed ? "line-through opacity-50" : ""}`}>
+                                      {init.title}
+                                    </p>
+                                    {(initOwner || init.dueDate) && (
+                                      <div className="flex items-center gap-2 mt-0.5 text-[9px] text-muted-foreground">
+                                        {initOwner && <span className="truncate">{initOwner.name}</span>}
+                                        {init.dueDate && (
+                                          <span className="flex items-center gap-0.5 whitespace-nowrap">
+                                            <Clock className="h-2.5 w-2.5" />
+                                            {format(new Date(init.dueDate), "dd/MM/yy", { locale: ptBR })}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
