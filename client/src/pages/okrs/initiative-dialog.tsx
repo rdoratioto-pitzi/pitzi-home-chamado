@@ -46,9 +46,10 @@ interface InitiativeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultCycle?: string;
+  defaultKeyResultId?: string;
 }
 
-export function InitiativeDialog({ open, onOpenChange, defaultCycle }: InitiativeDialogProps) {
+export function InitiativeDialog({ open, onOpenChange, defaultCycle, defaultKeyResultId }: InitiativeDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -79,7 +80,7 @@ export function InitiativeDialog({ open, onOpenChange, defaultCycle }: Initiativ
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      keyResultId: "",
+      keyResultId: defaultKeyResultId ?? "",
       title: "",
       description: "",
       ownerId: undefined,
@@ -89,13 +90,13 @@ export function InitiativeDialog({ open, onOpenChange, defaultCycle }: Initiativ
   useEffect(() => {
     if (open) {
       form.reset({
-        keyResultId: "",
+        keyResultId: defaultKeyResultId ?? "",
         title: "",
         description: "",
         ownerId: undefined,
       });
     }
-  }, [open, form]);
+  }, [open, defaultKeyResultId, form]);
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {

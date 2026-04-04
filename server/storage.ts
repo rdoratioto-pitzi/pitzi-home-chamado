@@ -199,6 +199,7 @@ import {
 
   // Initiatives
   getInitiative(id: string): Promise<Initiative | undefined>;
+  getInitiatives(): Promise<Initiative[]>;
   getInitiativesByKeyResult(keyResultId: string): Promise<Initiative[]>;
   createInitiative(initiative: InsertInitiative): Promise<Initiative>;
   updateInitiative(id: string, data: Partial<Initiative>): Promise<Initiative | undefined>;
@@ -1079,6 +1080,10 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) return undefined;
     const [initiative] = await this.db.select().from(initiatives).where(eq(initiatives.id, id));
     return initiative;
+  }
+  async getInitiatives(): Promise<Initiative[]> {
+    if (!this.db) return [];
+    return await this.db.select().from(initiatives);
   }
   async getInitiativesByKeyResult(keyResultId: string): Promise<Initiative[]> {
     if (!this.db) return [];

@@ -1,9 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   Select,
   SelectContent,
@@ -34,7 +33,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Users,
   RefreshCw,
   CalendarClock,
   MoreHorizontal,
@@ -42,9 +40,13 @@ import {
   Trash2,
   Network,
   LayoutGrid,
+  ChevronDown,
+  ChevronUp,
+  Square,
+  CheckSquare,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Objective, KeyResult, User } from "@shared/schema";
+import type { Objective, KeyResult, User, Initiative } from "@shared/schema";
 import { ObjectiveDialog } from "./objective-dialog";
 import { ObjectiveEditDialog } from "./objective-edit-dialog";
 import { KeyResultDialog } from "./key-result-dialog";
@@ -63,6 +65,8 @@ import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { getCurrentQuarter, getQuarterOptions } from "@/lib/quarter";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const LS_QUARTER_KEY = "okr_quarter_filter";
 
@@ -96,19 +100,10 @@ const deadlineStatusLabels: Record<string, string> = {
   overdue: "Atrasado",
 };
 
-const measurementTypeLabels: Record<string, string> = {
-  percentage: "%",
-  absolute: "Absoluto",
-  monetary: "R$",
-  temporal: "Temporal",
-  binary: "Sim/Não",
-  decreasing: "Decrescente",
-};
-
 const levelLabels: Record<string, string> = {
   company: "Empresa",
   team: "Time",
-  area: "Área", // legacy — mantido para exibir dados existentes
+  area: "Área", // legacy
 };
 
 function getInitialQuarter(): string {
@@ -116,14 +111,53 @@ function getInitialQuarter(): string {
   return saved || getCurrentQuarter();
 }
 
+// ─── Progress helpers ─────────────────────────────────────────────────────────
+
+function calcKRProgress(kr: KeyResult, initiatives: Initiative[]): number {
+  if (initiatives.length > 0) {
+    const done = initiatives.filter((i) => i.completed).length;
+    return Math.round((done / initiatives.length) * 100);
+  }
+  const start = parseFloat(kr.startValue || "0");
+  const target = parseFloat(kr.targetValue || "100");
+  const current = parseFloat(kr.currentValue || "0");
+  let p: number;
+  if (kr.measurementType === "decreasing") {
+    p = target !== start ? ((start - current) / (start - target)) * 100 : 0;
+  } else if (kr.measurementType === "binary") {
+    p = current > 0 ? 100 : 0;
+  } else {
+    p = target !== start ? ((current - start) / (target - start)) * 100 : 0;
+  }
+  return Math.min(100, Math.max(0, Math.round(p)));
+}
+
+function calcObjectiveProgress(
+  objectiveId: string,
+  keyResults: KeyResult[],
+  initiativesByKR: Map<string, Initiative[]>,
+): number {
+  const krs = keyResults.filter((kr) => kr.objectiveId === objectiveId);
+  if (krs.length === 0) return 0;
+  const total = krs.reduce(
+    (sum, kr) => sum + calcKRProgress(kr, initiativesByKR.get(kr.id) ?? []),
+    0,
+  );
+  return Math.round(total / krs.length);
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default function OKRsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // ── Dialog state ────────────────────────────────────────────────────────────
   const [isObjectiveDialogOpen, setIsObjectiveDialogOpen] = useState(false);
   const [isKRDialogOpen, setIsKRDialogOpen] = useState(false);
   const [isGlobalKRDialogOpen, setIsGlobalKRDialogOpen] = useState(false);
   const [isInitiativeDialogOpen, setIsInitiativeDialogOpen] = useState(false);
+  const [isInlineInitiativeDialogOpen, setIsInlineInitiativeDialogOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
 
   const [editingObjective, setEditingObjective] = useState<Objective | null>(null);
@@ -133,9 +167,16 @@ export default function OKRsPage() {
 
   const [selectedObjectiveId, setSelectedObjectiveId] = useState<string | null>(null);
   const [selectedKeyResult, setSelectedKeyResult] = useState<KeyResult | null>(null);
+  const [inlineInitiativeKRId, setInlineInitiativeKRId] = useState<string | null>(null);
+
+  // ── Filter + view state ─────────────────────────────────────────────────────
   const [cycleFilter, setCycleFilter] = useState<string>(getInitialQuarter);
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"list" | "hierarchy">("list");
+
+  // Per-card collapse state (default: all expanded)
+  const [collapsedObjectives, setCollapsedObjectives] = useState<Set<string>>(new Set());
+  const [collapsedKRs, setCollapsedKRs] = useState<Set<string>>(new Set());
 
   const quarters = getQuarterOptions();
 
@@ -143,18 +184,38 @@ export default function OKRsPage() {
     localStorage.setItem(LS_QUARTER_KEY, cycleFilter);
   }, [cycleFilter]);
 
+  // ── Queries ─────────────────────────────────────────────────────────────────
   const { data: objectives = [], isLoading: objectivesLoading } = useQuery<Objective[]>({
     queryKey: ["/api/objectives"],
   });
-
   const { data: keyResults = [] } = useQuery<KeyResult[]>({
     queryKey: ["/api/key-results"],
   });
-
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
+  const { data: allInitiatives = [] } = useQuery<Initiative[]>({
+    queryKey: ["/api/initiatives"],
+  });
 
+  // ── Derived data ─────────────────────────────────────────────────────────────
+  const initiativesByKR = useMemo(() => {
+    const map = new Map<string, Initiative[]>();
+    for (const init of allInitiatives) {
+      const list = map.get(init.keyResultId) ?? [];
+      list.push(init);
+      map.set(init.keyResultId, list);
+    }
+    return map;
+  }, [allInitiatives]);
+
+  const filteredObjectives = objectives.filter((obj) => {
+    const matchesCycle = obj.cycle === cycleFilter;
+    const matchesLevel = levelFilter === "all" || obj.level === levelFilter;
+    return matchesCycle && matchesLevel;
+  });
+
+  // ── Mutations ────────────────────────────────────────────────────────────────
   const deleteObjectiveMutation = useMutation({
     mutationFn: async (id: string) => apiRequest("DELETE", `/api/objectives/${id}`),
     onSuccess: () => {
@@ -178,32 +239,18 @@ export default function OKRsPage() {
     },
   });
 
-  const filteredObjectives = objectives.filter((obj) => {
-    const matchesCycle = obj.cycle === cycleFilter;
-    const matchesLevel = levelFilter === "all" || obj.level === levelFilter;
-    return matchesCycle && matchesLevel;
+  const toggleInitiativeMutation = useMutation({
+    mutationFn: async ({ id, completed }: { id: string; completed: boolean }) =>
+      apiRequest("PATCH", `/api/initiatives/${id}`, { completed }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/initiatives"] });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível atualizar a iniciativa.", variant: "destructive" });
+    },
   });
 
-  const getProgress = (objectiveId: string): number => {
-    const krs = keyResults.filter((kr) => kr.objectiveId === objectiveId);
-    if (krs.length === 0) return 0;
-    const totalProgress = krs.reduce((sum, kr) => {
-      const startVal = parseFloat(kr.startValue || "0");
-      const targetVal = parseFloat(kr.targetValue || "100");
-      const currentVal = parseFloat(kr.currentValue || "0");
-      let progress: number;
-      if (kr.measurementType === "decreasing") {
-        progress = targetVal !== startVal ? ((startVal - currentVal) / (startVal - targetVal)) * 100 : 0;
-      } else if (kr.measurementType === "binary") {
-        progress = currentVal > 0 ? 100 : 0;
-      } else {
-        progress = targetVal !== startVal ? ((currentVal - startVal) / (targetVal - startVal)) * 100 : 0;
-      }
-      return sum + Math.min(100, Math.max(0, progress));
-    }, 0);
-    return Math.round(totalProgress / krs.length);
-  };
-
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   const openKRDialog = (objectiveId: string) => {
     setSelectedObjectiveId(objectiveId);
     setIsKRDialogOpen(true);
@@ -214,17 +261,31 @@ export default function OKRsPage() {
     setIsUpdateDialogOpen(true);
   };
 
+  const openInlineInitiativeDialog = (krId: string) => {
+    setInlineInitiativeKRId(krId);
+    setIsInlineInitiativeDialogOpen(true);
+  };
+
+  const toggleObjectiveCollapse = (id: string) =>
+    setCollapsedObjectives((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const toggleKRCollapse = (id: string) =>
+    setCollapsedKRs((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
   const parseResponsibleIds = (raw: string | null): string[] => {
     if (!raw) return [];
     try { return JSON.parse(raw); } catch { return []; }
   };
 
-  const getOwnerNames = (ownerIds: string[]): string[] => {
-    return ownerIds
-      .map((id) => users.find((u) => u.id === id)?.name)
-      .filter((name): name is string => !!name);
-  };
-
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col min-h-full">
       <PageHeader
@@ -262,6 +323,7 @@ export default function OKRsPage() {
       />
 
       <main className="flex-1 p-6 space-y-6">
+        {/* Filters + toggle */}
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <div>
             <h2 className="text-[22px] font-bold tracking-tight">Objetivos e Resultados-Chave</h2>
@@ -271,10 +333,7 @@ export default function OKRsPage() {
           </div>
           <div className="flex items-center gap-2">
             <Card className="shadow-sm border-border/60 p-1 flex gap-2">
-              <Select
-                value={cycleFilter}
-                onValueChange={setCycleFilter}
-              >
+              <Select value={cycleFilter} onValueChange={setCycleFilter}>
                 <SelectTrigger className="w-[140px] border-0 h-9 bg-transparent" data-testid="select-cycle-filter">
                   <SelectValue />
                 </SelectTrigger>
@@ -319,6 +378,7 @@ export default function OKRsPage() {
           </div>
         </div>
 
+        {/* ── Organograma view ──────────────────────────────────────────────── */}
         {viewMode === "hierarchy" ? (
           objectivesLoading ? (
             <div className="space-y-4">
@@ -331,12 +391,18 @@ export default function OKRsPage() {
               objectives={filteredObjectives}
               keyResults={keyResults}
               users={users}
+              initiativesByKR={initiativesByKR}
+              onToggleInitiative={(id, completed) =>
+                toggleInitiativeMutation.mutate({ id, completed })
+              }
             />
           )
+
+        /* ── Bullets view ─────────────────────────────────────────────────── */
         ) : objectivesLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <Skeleton key={i} className="h-64 rounded-xl" />
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <Skeleton key={i} className="h-48 rounded-xl" />
             ))}
           </div>
         ) : filteredObjectives.length === 0 ? (
@@ -354,233 +420,305 @@ export default function OKRsPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-3">
             {filteredObjectives.map((objective) => {
-              const progress = getProgress(objective.id);
               const krs = keyResults.filter((kr) => kr.objectiveId === objective.id);
-              const StatusIcon = statusIcons[objective.status];
+              const progress = calcObjectiveProgress(objective.id, keyResults, initiativesByKR);
+              const StatusIcon = statusIcons[objective.status] ?? CheckCircle2;
+              const isObjCollapsed = collapsedObjectives.has(objective.id);
 
               return (
-                <Card
+                <div
                   key={objective.id}
-                  className="shadow-sm border-border/60 overflow-hidden hover:border-primary/20 transition-all duration-200"
+                  className="rounded-xl border border-border/60 border-l-[3px] border-l-[#00E676] bg-background shadow-sm overflow-hidden"
+                  data-testid={`card-objective-${objective.id}`}
                 >
-                  {/* Card header */}
-                  <div className="px-5 pt-5 pb-4">
+                  {/* ── Objective header ─────────────────────────────────── */}
+                  <div className="px-5 pt-4 pb-3">
                     <div className="flex items-start gap-3">
-                      <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center ${statusColors[objective.status]}`}>
-                        <StatusIcon className="h-5 w-5" />
+                      <div className={`h-9 w-9 shrink-0 rounded-xl flex items-center justify-center ${statusColors[objective.status]}`}>
+                        <StatusIcon className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="text-[15px] font-bold text-foreground leading-tight">
-                            {objective.title}
-                          </h3>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-                                data-testid={`btn-menu-objective-${objective.id}`}
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setEditingObjective(objective)}>
-                                <Pencil className="h-3.5 w-3.5 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={() => setDeletingObjectiveId(objective.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                Excluir
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-start gap-2 flex-wrap">
+                            <Badge variant="secondary" className="font-bold text-[10px] uppercase tracking-wider bg-[#00E676]/10 text-[#00E676] border-[#00E676]/20 border">
+                              {levelLabels[objective.level]}
+                            </Badge>
+                            <h3 className="text-[15px] font-bold text-foreground leading-tight">
+                              {objective.title}
+                            </h3>
+                            <Badge variant="outline" className={`font-bold text-[10px] uppercase tracking-wider ${statusColors[objective.status]}`}>
+                              {statusLabels[objective.status]}
+                            </Badge>
+                            <Badge variant="outline" className="font-bold text-[10px] uppercase tracking-wider">
+                              {objective.cycle}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground"
+                              onClick={() => toggleObjectiveCollapse(objective.id)}
+                            >
+                              {isObjCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                  data-testid={`btn-menu-objective-${objective.id}`}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setEditingObjective(objective)}>
+                                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => setDeletingObjectiveId(objective.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 flex-wrap mt-1.5">
-                          <Badge variant="outline" className={`font-bold text-[10px] uppercase tracking-wider ${statusColors[objective.status]}`}>
-                            {statusLabels[objective.status]}
-                          </Badge>
-                          <Badge variant="secondary" className="font-bold text-[10px] uppercase tracking-wider bg-muted/50">
-                            {levelLabels[objective.level]}
-                          </Badge>
-                          <Badge variant="outline" className="font-bold text-[10px] uppercase tracking-wider">
-                            {objective.cycle}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Progress bar */}
-                    <div className="mt-4 flex items-center gap-3">
-                      <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-primary h-full transition-all duration-500 rounded-full"
-                          style={{ width: `${progress}%` }}
-                        />
+                        {/* Objective progress bar */}
+                        <div className="mt-3 flex items-center gap-3">
+                          <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-400"
+                              style={{ width: `${progress}%`, background: "#00E676" }}
+                            />
+                          </div>
+                          <span className="text-[13px] font-bold min-w-[35px] text-right" style={{ color: "#00E676" }}>
+                            {progress}%
+                          </span>
+                        </div>
                       </div>
-                      <span className="text-[13px] font-bold text-primary min-w-[35px] text-right">{progress}%</span>
                     </div>
                   </div>
 
-                  {/* KRs section */}
-                  <div className="px-5 pb-5 border-t border-border/40 pt-3 bg-muted/5">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-                        Resultados-Chave ({krs.length})
-                      </h4>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-[11px] text-primary font-bold hover:bg-primary/10"
-                        onClick={() => openKRDialog(objective.id)}
-                        data-testid={`button-add-kr-${objective.id}`}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        Novo KR
-                      </Button>
-                    </div>
-
-                    {krs.length === 0 ? (
-                      <div className="text-center py-5 rounded-lg border border-dashed border-border/60">
-                        <p className="text-[12px] text-muted-foreground">Nenhum resultado-chave cadastrado.</p>
-                      </div>
-                    ) : (
+                  {/* ── KRs section (collapsible) ────────────────────────── */}
+                  {!isObjCollapsed && (
+                    <div className="border-t border-border/40 bg-muted/5 px-5 pb-4 pt-3">
                       <div className="space-y-2">
                         {krs.map((kr) => {
-                          const startVal = parseFloat(kr.startValue || "0");
-                          const targetVal = parseFloat(kr.targetValue || "100");
-                          const currentVal = parseFloat(kr.currentValue || "0");
-                          let krProgress: number;
-
-                          if (kr.measurementType === "decreasing") {
-                            krProgress = targetVal !== startVal ? ((startVal - currentVal) / (startVal - targetVal)) * 100 : 0;
-                          } else if (kr.measurementType === "binary") {
-                            krProgress = currentVal > 0 ? 100 : 0;
-                          } else {
-                            krProgress = targetVal !== startVal ? ((currentVal - startVal) / (targetVal - startVal)) * 100 : 0;
-                          }
-                          krProgress = Math.min(100, Math.max(0, Math.round(krProgress)));
-
-                          const ownerNames = getOwnerNames(parseResponsibleIds(kr.responsibleIds));
+                          const initiatives = initiativesByKR.get(kr.id) ?? [];
+                          const krProgress = calcKRProgress(kr, initiatives);
+                          const isKRCollapsed = collapsedKRs.has(kr.id);
+                          const completedCount = initiatives.filter((i) => i.completed).length;
                           const deadlineStatus = kr.deadlineStatus || "on_track";
+                          const ownerIds = parseResponsibleIds(kr.responsibleIds);
 
                           return (
-                            <div
-                              key={kr.id}
-                              className="group relative rounded-lg border border-border/40 bg-background p-3 hover:border-primary/20 transition-all"
-                              data-testid={`card-kr-${kr.id}`}
-                            >
-                              {/* KR action buttons — visible on hover */}
-                              <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                                  onClick={(e) => { e.stopPropagation(); setEditingKR(kr); }}
-                                  data-testid={`btn-edit-kr-${kr.id}`}
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                  onClick={(e) => { e.stopPropagation(); setDeletingKRId(kr.id); }}
-                                  data-testid={`btn-delete-kr-${kr.id}`}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-
-                              <div className="flex items-start gap-3 pr-14">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                                    <p className="text-[13px] font-semibold text-foreground leading-snug">{kr.title}</p>
-                                    {kr.dueDate && (
-                                      <Badge
-                                        variant="outline"
-                                        className={`text-[9px] uppercase font-bold ${deadlineStatusColors[deadlineStatus]}`}
-                                      >
-                                        <CalendarClock className="h-2.5 w-2.5 mr-1" />
-                                        {deadlineStatusLabels[deadlineStatus]}
+                            <div key={kr.id}>
+                              {/* ── KR card (indented 20px, blue border) ── */}
+                              <div
+                                className="ml-5 rounded-lg border border-border/40 border-l-[3px] border-l-[#378ADD] bg-background p-3 hover:border-primary/20 transition-all"
+                                data-testid={`card-kr-${kr.id}`}
+                              >
+                                <div className="flex items-start gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    {/* KR title row */}
+                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                      <Badge variant="outline" className="font-bold text-[9px] uppercase bg-[#378ADD]/10 text-[#378ADD] border-[#378ADD]/20">
+                                        KR
                                       </Badge>
-                                    )}
-                                  </div>
-
-                                  <div className="flex items-center gap-3 mb-1.5">
-                                    <div className="flex-1 bg-muted rounded-full h-1.5">
-                                      <div className="bg-primary h-full rounded-full" style={{ width: `${krProgress}%` }} />
+                                      <p className="text-[13px] font-semibold text-foreground leading-snug">
+                                        {kr.title}
+                                      </p>
+                                      {kr.dueDate && (
+                                        <Badge
+                                          variant="outline"
+                                          className={`text-[9px] uppercase font-bold ${deadlineStatusColors[deadlineStatus]}`}
+                                        >
+                                          <CalendarClock className="h-2.5 w-2.5 mr-1" />
+                                          {deadlineStatusLabels[deadlineStatus]}
+                                        </Badge>
+                                      )}
                                     </div>
-                                    <span className="text-[11px] font-bold text-primary whitespace-nowrap">
-                                      {krProgress}%
-                                    </span>
+
+                                    {/* De X → Para Y [unit] */}
+                                    <p className="text-[11px] text-muted-foreground mb-2">
+                                      De {parseFloat(kr.startValue || "0")} → Para {parseFloat(kr.targetValue || "100")}
+                                      {kr.unit ? ` ${kr.unit}` : ""}
+                                    </p>
+
+                                    {/* KR progress bar (blue) */}
+                                    <div className="flex items-center gap-3 mb-1.5">
+                                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full rounded-full transition-all duration-400"
+                                          style={{ width: `${krProgress}%`, background: "#378ADD" }}
+                                        />
+                                      </div>
+                                      <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: "#378ADD" }}>
+                                        {krProgress}%
+                                      </span>
+                                    </div>
+
+                                    {/* Subtitle */}
+                                    {initiatives.length > 0 ? (
+                                      <p className="text-[11px] text-muted-foreground">
+                                        {completedCount} de {initiatives.length} iniciativa{initiatives.length !== 1 ? "s" : ""} concluída{initiatives.length !== 1 ? "s" : ""}
+                                      </p>
+                                    ) : (
+                                      <p className="text-[11px] text-muted-foreground">
+                                        {parseFloat(kr.currentValue || "0")} / {parseFloat(kr.targetValue || "100")}
+                                        {kr.unit ? ` ${kr.unit}` : ""}
+                                      </p>
+                                    )}
                                   </div>
 
-                                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                                    <span className="font-medium">{currentVal} / {targetVal} {kr.unit || ""}</span>
-                                    {ownerNames.length > 0 && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <div className="flex items-center gap-1">
-                                            <Users className="h-3 w-3" />
-                                            <span>{ownerNames.length} resp.</span>
-                                          </div>
-                                        </TooltipTrigger>
-                                        <TooltipContent>{ownerNames.join(", ")}</TooltipContent>
-                                      </Tooltip>
+                                  {/* KR actions */}
+                                  <div className="flex items-center gap-0.5 shrink-0">
+                                    {initiatives.length > 0 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-muted-foreground"
+                                        onClick={() => toggleKRCollapse(kr.id)}
+                                      >
+                                        {isKRCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+                                      </Button>
                                     )}
-                                    {kr.dueDate && (
-                                      <div className="flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        <span>{format(new Date(kr.dueDate), "dd/MM/yyyy", { locale: ptBR })}</span>
-                                      </div>
-                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                                      onClick={() => openUpdateDialog(kr)}
+                                      data-testid={`button-update-kr-${kr.id}`}
+                                    >
+                                      <RefreshCw className="h-3 w-3 mr-1" />
+                                      Check-in
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                      onClick={() => setEditingKR(kr)}
+                                      data-testid={`btn-edit-kr-${kr.id}`}
+                                    >
+                                      <Pencil className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                      onClick={() => setDeletingKRId(kr.id)}
+                                      data-testid={`btn-delete-kr-${kr.id}`}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
                                   </div>
                                 </div>
-
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 px-2 text-[10px] shrink-0 mt-0.5"
-                                  onClick={() => openUpdateDialog(kr)}
-                                  data-testid={`button-update-kr-${kr.id}`}
-                                >
-                                  <RefreshCw className="h-3 w-3 mr-1" />
-                                  Check-in
-                                </Button>
                               </div>
+
+                              {/* ── Initiatives (indented 40px) ──────────── */}
+                              {!isKRCollapsed && (
+                                <div className="ml-10 mt-1 space-y-0.5">
+                                  {initiatives.map((initiative) => {
+                                    const owner = users.find((u) => u.id === initiative.ownerId);
+                                    return (
+                                      <div
+                                        key={initiative.id}
+                                        className="flex items-center gap-2 py-1.5 px-3 rounded-md hover:bg-muted/30 group"
+                                        data-testid={`row-initiative-${initiative.id}`}
+                                      >
+                                        <button
+                                          onClick={() =>
+                                            toggleInitiativeMutation.mutate({
+                                              id: initiative.id,
+                                              completed: !initiative.completed,
+                                            })
+                                          }
+                                          className="shrink-0 text-muted-foreground hover:text-[#378ADD] transition-colors"
+                                        >
+                                          {initiative.completed ? (
+                                            <CheckSquare className="h-4 w-4 text-[#378ADD]" />
+                                          ) : (
+                                            <Square className="h-4 w-4" />
+                                          )}
+                                        </button>
+                                        <p
+                                          className={`flex-1 text-[13px] transition-all ${
+                                            initiative.completed
+                                              ? "line-through opacity-50"
+                                              : "text-foreground"
+                                          }`}
+                                        >
+                                          {initiative.title}
+                                        </p>
+                                        {owner && (
+                                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                            {owner.name}
+                                          </span>
+                                        )}
+                                        {initiative.dueDate && (
+                                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                            <Clock className="h-3 w-3 inline mr-0.5" />
+                                            {format(new Date(initiative.dueDate), "dd/MM/yy", { locale: ptBR })}
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+
+                                  {/* + Adicionar iniciativa */}
+                                  <button
+                                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary py-1 px-3 rounded-md hover:bg-muted/20 transition-colors"
+                                    onClick={() => openInlineInitiativeDialog(kr.id)}
+                                    data-testid={`button-add-initiative-${kr.id}`}
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                    Adicionar iniciativa
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
                       </div>
-                    )}
-                  </div>
-                </Card>
+
+                      {/* + Adicionar KR */}
+                      <button
+                        className="ml-5 mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary py-1 px-2 rounded-md hover:bg-muted/20 transition-colors"
+                        onClick={() => openKRDialog(objective.id)}
+                        data-testid={`button-add-kr-${objective.id}`}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Adicionar KR
+                      </button>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
         )}
       </main>
 
-      {/* Create dialogs */}
+      {/* ── Dialogs ─────────────────────────────────────────────────────────── */}
       <ObjectiveDialog
         open={isObjectiveDialogOpen}
         onOpenChange={setIsObjectiveDialogOpen}
         defaultCycle={cycleFilter}
       />
-      {/* Global KR dialog — with objective selector */}
       <KeyResultDialog
         open={isGlobalKRDialogOpen}
         onOpenChange={setIsGlobalKRDialogOpen}
         defaultCycle={cycleFilter}
       />
-      {/* Inline KR dialog — pre-selected objective from card */}
       <KeyResultDialog
         open={isKRDialogOpen}
         onOpenChange={setIsKRDialogOpen}
@@ -592,13 +730,17 @@ export default function OKRsPage() {
         onOpenChange={setIsInitiativeDialogOpen}
         defaultCycle={cycleFilter}
       />
+      <InitiativeDialog
+        open={isInlineInitiativeDialogOpen}
+        onOpenChange={setIsInlineInitiativeDialogOpen}
+        defaultCycle={cycleFilter}
+        defaultKeyResultId={inlineInitiativeKRId ?? undefined}
+      />
       <KeyResultUpdateDialog
         open={isUpdateDialogOpen}
         onOpenChange={setIsUpdateDialogOpen}
         keyResult={selectedKeyResult}
       />
-
-      {/* Edit dialogs */}
       {editingObjective && (
         <ObjectiveEditDialog
           open={!!editingObjective}
@@ -614,7 +756,7 @@ export default function OKRsPage() {
         />
       )}
 
-      {/* Delete confirmations */}
+      {/* ── Delete confirmations ─────────────────────────────────────────────── */}
       <AlertDialog open={!!deletingObjectiveId} onOpenChange={(open) => { if (!open) setDeletingObjectiveId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
