@@ -60,3 +60,9 @@ agents/logs/
 # ─── MCP (Model Context Protocol) ────────────────────────────────
 # Estado interno do Memory MCP — não versionar dados pessoais de sessão
 .mcp-memory.json
+
+# gstack - manter apenas SKILL.md, nunca binários
+.claude/skills/gstack/bin/
+.claude/skills/gstack/browse/
+.claude/skills/gstack/design/
+.claude/skills/gstack/node_modules/
