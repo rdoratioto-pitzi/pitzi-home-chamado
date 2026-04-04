@@ -1,4 +1,5 @@
-import { useForm, useWatch } from "react-hook-form";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,25 +31,15 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { Objective } from "@shared/schema";
-
-const PARENT_LEVELS: Record<string, string[]> = {
-  area: ["company"],
-  team: ["company", "area"],
-};
-
-const levelLabels: Record<string, string> = {
-  company: "Empresa",
-  team: "Time",
-  area: "Área",
-};
+import { getQuarterOptions } from "@/lib/quarter";
+import type { User } from "@shared/schema";
 
 const formSchema = z.object({
   title: z.string().min(3, "Título deve ter no mínimo 3 caracteres"),
   description: z.string().optional(),
-  level: z.string().min(1, "Selecione um nível"),
   cycle: z.string().min(1, "Selecione um ciclo"),
-  parentOkrId: z.string().nullable().optional(),
+  ownerId: z.string().optional(),
+  status: z.string().default("on_track"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -59,66 +50,63 @@ interface ObjectiveDialogProps {
   defaultCycle: string;
 }
 
-const currentYear = new Date().getFullYear();
-
 export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const quarters = getQuarterOptions();
+
+  const { data: users = [] } = useQuery<User[]>({ queryKey: ["/api/users"] });
+  const activeUsers = users
+    .filter((u) => u.status === "active")
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: "",
       description: "",
-      level: "company",
       cycle: defaultCycle,
-      parentOkrId: null,
+      ownerId: undefined,
+      status: "on_track",
     },
   });
 
-  const selectedLevel = useWatch({ control: form.control, name: "level" });
-  const selectedCycle = useWatch({ control: form.control, name: "cycle" });
-
-  const { data: allObjectives = [] } = useQuery<Objective[]>({
-    queryKey: ["/api/objectives"],
-  });
-
-  const validParentLevels = PARENT_LEVELS[selectedLevel] ?? [];
-  const parentOptions = allObjectives.filter(
-    (obj) => validParentLevels.includes(obj.level) && obj.cycle === selectedCycle
-  );
-  const showParentField = selectedLevel !== "company";
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        title: "",
+        description: "",
+        cycle: defaultCycle,
+        ownerId: undefined,
+        status: "on_track",
+      });
+    }
+  }, [open, defaultCycle, form]);
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
+      const ownerId = data.ownerId && data.ownerId !== "__none__"
+        ? data.ownerId
+        : activeUsers[0]?.id ?? "admin";
       return apiRequest("POST", "/api/objectives", {
-        ...data,
-        parentOkrId: data.parentOkrId || null,
-        ownerId: "admin",
-        status: "on_track",
+        title: data.title,
+        description: data.description || null,
+        cycle: data.cycle,
+        status: data.status,
+        level: "company",
+        ownerId,
+        parentOkrId: null,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/objectives"] });
-      toast({
-        title: "Objetivo criado",
-        description: "O objetivo foi criado com sucesso.",
-      });
-      form.reset();
+      toast({ title: "Objetivo criado", description: "O objetivo foi criado com sucesso." });
       onOpenChange(false);
     },
     onError: () => {
-      toast({
-        title: "Erro",
-        description: "Não foi possível criar o objetivo.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Não foi possível criar o objetivo.", variant: "destructive" });
     },
   });
-
-  const onSubmit = (data: FormData) => {
-    mutation.mutate(data);
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -126,12 +114,12 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
         <DialogHeader>
           <DialogTitle>Novo Objetivo</DialogTitle>
           <DialogDescription>
-            Defina um novo objetivo para a empresa, time ou área.
+            Defina um objetivo estratégico para a empresa.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
             <FormField
               control={form.control}
               name="title"
@@ -155,7 +143,10 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Descrição (opcional)</FormLabel>
+                  <FormLabel>
+                    Descrição{" "}
+                    <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </FormLabel>
                   <FormControl>
                     <RichTextarea
                       placeholder="Descreva mais detalhes sobre o objetivo..."
@@ -173,26 +164,20 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="level"
+                name="cycle"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nível</FormLabel>
-                    <Select
-                      onValueChange={(val) => {
-                        field.onChange(val);
-                        form.setValue("parentOkrId", null);
-                      }}
-                      defaultValue={field.value}
-                    >
+                    <FormLabel>Ciclo</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-objective-level">
+                        <SelectTrigger data-testid="select-objective-cycle">
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="company">Empresa</SelectItem>
-                        <SelectItem value="team">Time</SelectItem>
-                        <SelectItem value="area">Área</SelectItem>
+                        {quarters.map((q) => (
+                          <SelectItem key={q} value={q}>{q}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -202,21 +187,20 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
 
               <FormField
                 control={form.control}
-                name="cycle"
+                name="status"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Ciclo</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-objective-cycle">
+                        <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value={`${currentYear} Q1`}>{currentYear} Q1</SelectItem>
-                        <SelectItem value={`${currentYear} Q2`}>{currentYear} Q2</SelectItem>
-                        <SelectItem value={`${currentYear} Q3`}>{currentYear} Q3</SelectItem>
-                        <SelectItem value={`${currentYear} Q4`}>{currentYear} Q4</SelectItem>
+                        <SelectItem value="on_track">No Caminho</SelectItem>
+                        <SelectItem value="at_risk">Em Risco</SelectItem>
+                        <SelectItem value="off_track">Atrasado</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -225,46 +209,40 @@ export function ObjectiveDialog({ open, onOpenChange, defaultCycle }: ObjectiveD
               />
             </div>
 
-            {showParentField && (
-              <FormField
-                control={form.control}
-                name="parentOkrId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>
-                      Objetivo Pai{" "}
-                      <span className="text-muted-foreground font-normal">(opcional)</span>
-                    </FormLabel>
-                    <Select
-                      onValueChange={(val) => field.onChange(val === "__none__" ? null : val)}
-                      value={field.value ?? "__none__"}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-objective-parent">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="__none__">— Sem objetivo pai —</SelectItem>
-                        {parentOptions.map((obj) => (
-                          <SelectItem key={obj.id} value={obj.id}>
-                            {obj.title} — {levelLabels[obj.level]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            <FormField
+              control={form.control}
+              name="ownerId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Responsável{" "}
+                    <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value ?? "__none__"}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o responsável" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Sem responsável —</SelectItem>
+                      {activeUsers.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {user.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
               <Button

@@ -7,6 +7,7 @@ import {
   insertObjectiveSchema,
   insertKeyResultSchema,
   insertKeyResultUpdateSchema,
+  insertInitiativeSchema,
   type Objective,
 } from "../../../shared/schema";
 
@@ -202,6 +203,53 @@ okrs.delete("/api/key-results/:id", async (c) => {
   const storage = getStorage(c.get("db"));
   const deleted = await storage.deleteKeyResult(c.req.param("id"));
   if (!deleted) return c.json({ error: "Key result not found" }, 404);
+  return c.body(null, 204);
+});
+
+// ============== INITIATIVES ==============
+
+// GET /api/initiatives?keyResultId=... (keyResultId optional — returns all if omitted)
+okrs.get("/api/initiatives", async (c) => {
+  const storage = getStorage(c.get("db"));
+  const keyResultId = c.req.query("keyResultId");
+  const list = keyResultId
+    ? await storage.getInitiativesByKeyResult(keyResultId)
+    : await storage.getInitiatives();
+  return c.json(list);
+});
+
+// POST /api/initiatives
+okrs.post("/api/initiatives", async (c) => {
+  const storage = getStorage(c.get("db"));
+  const body = await c.req.json();
+  const validated = insertInitiativeSchema.parse(body);
+  const kr = await storage.getKeyResult(validated.keyResultId);
+  if (!kr) return c.json({ error: "Key result não encontrado" }, 400);
+  const initiative = await storage.createInitiative(validated);
+  return c.json(initiative, 201);
+});
+
+// PATCH /api/initiatives/:id
+okrs.patch("/api/initiatives/:id", async (c) => {
+  const storage = getStorage(c.get("db"));
+  const id = c.req.param("id");
+  const existing = await storage.getInitiative(id);
+  if (!existing) return c.json({ error: "Initiative not found" }, 404);
+  const body = await c.req.json();
+  const validated = insertInitiativeSchema.partial().parse(body);
+  const initiative = await storage.updateInitiative(id, validated);
+  if (!initiative) return c.json({ error: "Initiative not found" }, 404);
+  return c.json(initiative);
+});
+
+// DELETE /api/initiatives/:id
+okrs.delete("/api/initiatives/:id", async (c) => {
+  const storage = getStorage(c.get("db"));
+  const id = c.req.param("id");
+  const existing = await storage.getInitiative(id);
+  if (!existing) return c.json({ error: "Initiative not found" }, 404);
+  const deleted = await storage.deleteInitiative(id);
+  if (!deleted) return c.json({ error: "Initiative not found" }, 404);
   return c.body(null, 204);
 });
 
