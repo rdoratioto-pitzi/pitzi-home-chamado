@@ -237,8 +237,9 @@ export function registerOkrRoutes(router: Router) {
   router.get("/api/initiatives", requireAuth, async (req, res) => {
     try {
       const keyResultId = req.query.keyResultId as string | undefined;
-      if (!keyResultId) return res.status(400).json({ error: "keyResultId is required" });
-      const list = await storage.getInitiativesByKeyResult(keyResultId);
+      const list = keyResultId
+        ? await storage.getInitiativesByKeyResult(keyResultId)
+        : await storage.getInitiatives();
       res.json(list);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch initiatives" });

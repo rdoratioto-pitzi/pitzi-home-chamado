@@ -208,12 +208,13 @@ okrs.delete("/api/key-results/:id", async (c) => {
 
 // ============== INITIATIVES ==============
 
-// GET /api/initiatives?keyResultId=...
+// GET /api/initiatives?keyResultId=... (keyResultId optional — returns all if omitted)
 okrs.get("/api/initiatives", async (c) => {
   const storage = getStorage(c.get("db"));
   const keyResultId = c.req.query("keyResultId");
-  if (!keyResultId) return c.json({ error: "keyResultId is required" }, 400);
-  const list = await storage.getInitiativesByKeyResult(keyResultId);
+  const list = keyResultId
+    ? await storage.getInitiativesByKeyResult(keyResultId)
+    : await storage.getInitiatives();
   return c.json(list);
 });
 
