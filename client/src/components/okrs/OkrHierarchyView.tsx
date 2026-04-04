@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronDown, ChevronUp, Target } from "lucide-react";
-import type { Objective, KeyResult, User } from "@shared/schema";
+import { ChevronDown, ChevronUp, Target, Square, CheckSquare, Plus } from "lucide-react";
+import type { Objective, KeyResult, User, Initiative } from "@shared/schema";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -12,17 +12,24 @@ export interface OkrHierarchyViewProps {
   objectives: Objective[];
   keyResults: KeyResult[];
   users: User[];
+  initiativesByKR?: Map<string, Initiative[]>;
+  onToggleInitiative?: (id: string, completed: boolean) => void;
 }
 
 interface OrgChartNodeProps {
   node: OkrNode;
   keyResults: KeyResult[];
   users: User[];
+  initiativesByKR: Map<string, Initiative[]>;
+  onToggleInitiative: (id: string, completed: boolean) => void;
 }
 
 interface OrgChartCardProps {
   node: OkrNode;
   keyResults: KeyResult[];
+  users: User[];
+  initiativesByKR: Map<string, Initiative[]>;
+  onToggleInitiative: (id: string, completed: boolean) => void;
   expanded: boolean;
   hasChildren: boolean;
   onToggle: () => void;
@@ -30,7 +37,7 @@ interface OrgChartCardProps {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const CARD_WIDTH = 280;
+const CARD_WIDTH = 300;
 const CHILD_GAP = 24;
 const CONNECTOR_H = 30;
 
@@ -41,15 +48,21 @@ const levelBorderLeft: Record<string, string> = {
 };
 
 const levelBadgeStyle: Record<string, { label: string; cls: string }> = {
-  company: { label: "Empresa", cls: "bg-[#00E676]/10 text-[#00E676] border-[#00E676]/20" },
-  area:    { label: "Área",    cls: "bg-[#378ADD]/10 text-[#378ADD] border-[#378ADD]/20" },
-  team:    { label: "Time",    cls: "bg-[#7F77DD]/10 text-[#7F77DD] border-[#7F77DD]/20" },
+  company: { label: "Empresa",  cls: "bg-[#00E676]/10 text-[#00E676] border-[#00E676]/20" },
+  area:    { label: "Área",     cls: "bg-[#378ADD]/10 text-[#378ADD] border-[#378ADD]/20" },
+  team:    { label: "Time",     cls: "bg-[#7F77DD]/10 text-[#7F77DD] border-[#7F77DD]/20" },
+};
+
+const levelProgressColor: Record<string, string> = {
+  company: "#00E676",
+  area: "#378ADD",
+  team: "#7F77DD",
 };
 
 const statusBadgeStyle: Record<string, { label: string; cls: string }> = {
-  on_track: { label: "NO CAMINHO", cls: "bg-green-500/10 text-green-500 border-green-500/20" },
-  at_risk:  { label: "EM RISCO",   cls: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" },
-  off_track: { label: "ATRASADO",  cls: "bg-red-500/10 text-red-500 border-red-500/20" },
+  on_track:  { label: "NO CAMINHO", cls: "bg-green-500/10 text-green-500 border-green-500/20" },
+  at_risk:   { label: "EM RISCO",   cls: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20" },
+  off_track: { label: "ATRASADO",   cls: "bg-red-500/10 text-red-500 border-red-500/20" },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -57,11 +70,7 @@ const statusBadgeStyle: Record<string, { label: string; cls: string }> = {
 function buildTree(flatList: Objective[]): OkrNode[] {
   const map = new Map<string, OkrNode>();
   const roots: OkrNode[] = [];
-
-  for (const obj of flatList) {
-    map.set(obj.id, { ...obj, children: [] });
-  }
-
+  for (const obj of flatList) map.set(obj.id, { ...obj, children: [] });
   for (const node of map.values()) {
     if (node.parentOkrId && map.has(node.parentOkrId)) {
       map.get(node.parentOkrId)!.children.push(node);
@@ -69,35 +78,42 @@ function buildTree(flatList: Objective[]): OkrNode[] {
       roots.push(node);
     }
   }
-
   return roots;
 }
 
-function calcProgress(objectiveId: string, keyResults: KeyResult[]): number {
+function calcKRProgress(kr: KeyResult, initiatives: Initiative[]): number {
+  if (initiatives.length > 0) {
+    const done = initiatives.filter((i) => i.completed).length;
+    return Math.round((done / initiatives.length) * 100);
+  }
+  const start = parseFloat(kr.startValue || "0");
+  const target = parseFloat(kr.targetValue || "100");
+  const current = parseFloat(kr.currentValue || "0");
+  let p: number;
+  if (kr.measurementType === "decreasing") {
+    p = target !== start ? ((start - current) / (start - target)) * 100 : 0;
+  } else if (kr.measurementType === "binary") {
+    p = current > 0 ? 100 : 0;
+  } else {
+    p = target !== start ? ((current - start) / (target - start)) * 100 : 0;
+  }
+  return Math.min(100, Math.max(0, Math.round(p)));
+}
+
+function calcObjectiveProgress(
+  objectiveId: string,
+  keyResults: KeyResult[],
+  initiativesByKR: Map<string, Initiative[]>,
+): number {
   const krs = keyResults.filter((kr) => kr.objectiveId === objectiveId);
   if (krs.length === 0) return 0;
-  const total = krs.reduce((sum, kr) => {
-    const start = parseFloat(kr.startValue || "0");
-    const target = parseFloat(kr.targetValue || "100");
-    const current = parseFloat(kr.currentValue || "0");
-    let p: number;
-    if (kr.measurementType === "decreasing") {
-      p = target !== start ? ((start - current) / (start - target)) * 100 : 0;
-    } else if (kr.measurementType === "binary") {
-      p = current > 0 ? 100 : 0;
-    } else {
-      p = target !== start ? ((current - start) / (target - start)) * 100 : 0;
-    }
-    return sum + Math.min(100, Math.max(0, p));
-  }, 0);
+  const total = krs.reduce(
+    (sum, kr) => sum + calcKRProgress(kr, initiativesByKR.get(kr.id) ?? []),
+    0,
+  );
   return Math.round(total / krs.length);
 }
 
-/**
- * Calculates the full width a subtree occupies so connectors can be aligned.
- * A leaf node occupies exactly CARD_WIDTH. A parent occupies the sum of its
- * children subtree widths plus the gaps between them.
- */
 function calcSubtreeWidth(node: OkrNode): number {
   if (!node.children.length) return CARD_WIDTH;
   return node.children.reduce(
@@ -108,12 +124,32 @@ function calcSubtreeWidth(node: OkrNode): number {
 
 // ─── OrgChartCard ─────────────────────────────────────────────────────────────
 
-function OrgChartCard({ node, keyResults, expanded, hasChildren, onToggle }: OrgChartCardProps) {
-  const progress = calcProgress(node.id, keyResults);
-  const krCount = keyResults.filter((kr) => kr.objectiveId === node.id).length;
+function OrgChartCard({
+  node,
+  keyResults,
+  users,
+  initiativesByKR,
+  onToggleInitiative,
+  expanded,
+  hasChildren,
+  onToggle,
+}: OrgChartCardProps) {
+  const [krsExpanded, setKrsExpanded] = useState(true);
+  const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
+
+  const progress = calcObjectiveProgress(node.id, keyResults, initiativesByKR);
+  const nodeKRs = keyResults.filter((kr) => kr.objectiveId === node.id);
   const levelInfo = levelBadgeStyle[node.level] ?? levelBadgeStyle.company;
   const statusInfo = statusBadgeStyle[node.status] ?? statusBadgeStyle.on_track;
   const borderCls = levelBorderLeft[node.level] ?? "";
+  const progressColor = levelProgressColor[node.level] ?? "#00E676";
+
+  const toggleKR = (id: string) =>
+    setExpandedKRs((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   return (
     <Card
@@ -131,7 +167,7 @@ function OrgChartCard({ node, keyResults, expanded, hasChildren, onToggle }: Org
           </Badge>
 
           {/* Title */}
-          <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2 mt-2 mb-2">
+          <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2 mt-1 mb-2">
             {node.title}
           </p>
 
@@ -147,36 +183,122 @@ function OrgChartCard({ node, keyResults, expanded, hasChildren, onToggle }: Org
           <div className="mt-3">
             <div className="h-[4px] w-full bg-border/40 rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${progress}%`, background: "#00E676" }}
+                className="h-full rounded-full transition-all duration-400"
+                style={{ width: `${progress}%`, background: progressColor }}
               />
             </div>
             <p className="text-[11px] text-muted-foreground text-right mt-1">{progress}%</p>
           </div>
 
-          {/* KR counter */}
-          {krCount > 0 && (
-            <p className="text-[11px] text-muted-foreground mt-2">
-              ● {krCount} key result{krCount !== 1 ? "s" : ""}
-            </p>
+          {/* KRs inline (toggleable) */}
+          {nodeKRs.length > 0 && (
+            <div className="mt-2">
+              <button
+                onClick={() => setKrsExpanded((v) => !v)}
+                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {krsExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                {nodeKRs.length} key result{nodeKRs.length !== 1 ? "s" : ""}
+              </button>
+
+              {krsExpanded && (
+                <div className="mt-2 space-y-2">
+                  {nodeKRs.map((kr) => {
+                    const initiatives = initiativesByKR.get(kr.id) ?? [];
+                    const krProgress = calcKRProgress(kr, initiatives);
+                    const isKRExpanded = expandedKRs.has(kr.id);
+                    const completedCount = initiatives.filter((i) => i.completed).length;
+                    const owner = users.find((u) => {
+                      try {
+                        const ids = JSON.parse(kr.responsibleIds ?? "[]");
+                        return Array.isArray(ids) && ids.includes(u.id);
+                      } catch { return false; }
+                    });
+
+                    return (
+                      <div
+                        key={kr.id}
+                        className="rounded-md border border-border/40 border-l-[2px] border-l-[#378ADD] bg-muted/10 px-2.5 py-2"
+                      >
+                        {/* KR header */}
+                        <div className="flex items-start gap-1.5">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-semibold leading-snug line-clamp-2">
+                              {kr.title}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">
+                              {parseFloat(kr.startValue || "0")} → {parseFloat(kr.targetValue || "100")}
+                              {kr.unit ? ` ${kr.unit}` : ""}
+                            </p>
+                            {/* KR progress */}
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <div className="flex-1 h-[3px] bg-border/40 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all duration-400"
+                                  style={{ width: `${krProgress}%`, background: "#378ADD" }}
+                                />
+                              </div>
+                              <span className="text-[10px] font-bold text-[#378ADD]">{krProgress}%</span>
+                            </div>
+                            {/* Subtitle */}
+                            {initiatives.length > 0 ? (
+                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                {completedCount}/{initiatives.length} iniciativas concluídas
+                              </p>
+                            ) : owner ? (
+                              <p className="text-[10px] text-muted-foreground mt-0.5">{owner.name}</p>
+                            ) : null}
+                          </div>
+                          {initiatives.length > 0 && (
+                            <button
+                              onClick={() => toggleKR(kr.id)}
+                              className="text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5"
+                            >
+                              {isKRExpanded
+                                ? <ChevronUp className="h-3 w-3" />
+                                : <ChevronDown className="h-3 w-3" />}
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Initiatives */}
+                        {isKRExpanded && initiatives.length > 0 && (
+                          <div className="mt-1.5 space-y-0.5 pl-1">
+                            {initiatives.map((init) => (
+                              <div key={init.id} className="flex items-center gap-1.5">
+                                <button
+                                  onClick={() => onToggleInitiative(init.id, !init.completed)}
+                                  className="shrink-0 text-muted-foreground hover:text-[#378ADD] transition-colors"
+                                >
+                                  {init.completed
+                                    ? <CheckSquare className="h-3 w-3 text-[#378ADD]" />
+                                    : <Square className="h-3 w-3" />}
+                                </button>
+                                <p className={`text-[10px] leading-snug ${init.completed ? "line-through opacity-50" : ""}`}>
+                                  {init.title}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           )}
 
-          {/* Expand / collapse children button */}
+          {/* Expand / collapse objective children */}
           {hasChildren && (
             <button
               onClick={onToggle}
               className="flex items-center gap-1 mt-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
               {expanded ? (
-                <>
-                  <ChevronUp className="h-3 w-3" />
-                  Ocultar filhos
-                </>
+                <><ChevronUp className="h-3 w-3" /> Ocultar filhos</>
               ) : (
-                <>
-                  <ChevronDown className="h-3 w-3" />
-                  {node.children.length} filho{node.children.length !== 1 ? "s" : ""}
-                </>
+                <><ChevronDown className="h-3 w-3" /> {node.children.length} filho{node.children.length !== 1 ? "s" : ""}</>
               )}
             </button>
           )}
@@ -188,77 +310,57 @@ function OrgChartCard({ node, keyResults, expanded, hasChildren, onToggle }: Org
 
 // ─── OrgChartNode ─────────────────────────────────────────────────────────────
 
-function OrgChartNode({ node, keyResults, users }: OrgChartNodeProps) {
+function OrgChartNode({ node, keyResults, users, initiativesByKR, onToggleInitiative }: OrgChartNodeProps) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
   const subtreeWidth = calcSubtreeWidth(node);
 
   return (
-    <div
-      style={{
-        width: subtreeWidth,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-      }}
-    >
-      {/* Card */}
+    <div style={{ width: subtreeWidth, display: "flex", flexDirection: "column", alignItems: "center" }}>
       <OrgChartCard
         node={node}
         keyResults={keyResults}
+        users={users}
+        initiativesByKR={initiativesByKR}
+        onToggleInitiative={onToggleInitiative}
         expanded={expanded}
         hasChildren={hasChildren}
         onToggle={() => setExpanded((v) => !v)}
       />
 
-      {/* Connectors + children */}
       {hasChildren && expanded && (
         <div style={{ width: "100%" }}>
-          {/* Vertical line down from card */}
           <div style={{ display: "flex", justifyContent: "center", height: CONNECTOR_H }}>
             <div className="w-px bg-border/40" style={{ height: CONNECTOR_H }} />
           </div>
-
-          {/* Horizontal bar connecting children centers */}
           {node.children.length > 1 && (
             <div style={{ position: "relative", height: 1, width: "100%" }}>
               {(() => {
                 const leftOffset = calcSubtreeWidth(node.children[0]) / 2;
-                const rightOffset =
-                  calcSubtreeWidth(node.children[node.children.length - 1]) / 2;
+                const rightOffset = calcSubtreeWidth(node.children[node.children.length - 1]) / 2;
                 return (
                   <div
                     className="bg-border/40"
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: leftOffset,
-                      right: rightOffset,
-                      height: 1,
-                    }}
+                    style={{ position: "absolute", top: 0, left: leftOffset, right: rightOffset, height: 1 }}
                   />
                 );
               })()}
             </div>
           )}
-
-          {/* Children row */}
           <div style={{ display: "flex", gap: CHILD_GAP }}>
             {node.children.map((child) => (
               <div
                 key={child.id}
-                style={{
-                  width: calcSubtreeWidth(child),
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                }}
+                style={{ width: calcSubtreeWidth(child), display: "flex", flexDirection: "column", alignItems: "center" }}
               >
-                {/* Vertical line up to horizontal bar */}
                 <div className="w-px bg-border/40" style={{ height: CONNECTOR_H }} />
-
-                {/* Recursive subtree */}
-                <OrgChartNode node={child} keyResults={keyResults} users={users} />
+                <OrgChartNode
+                  node={child}
+                  keyResults={keyResults}
+                  users={users}
+                  initiativesByKR={initiativesByKR}
+                  onToggleInitiative={onToggleInitiative}
+                />
               </div>
             ))}
           </div>
@@ -270,7 +372,13 @@ function OrgChartNode({ node, keyResults, users }: OrgChartNodeProps) {
 
 // ─── OkrHierarchyView (main export) ──────────────────────────────────────────
 
-export function OkrHierarchyView({ objectives, keyResults, users }: OkrHierarchyViewProps) {
+export function OkrHierarchyView({
+  objectives,
+  keyResults,
+  users,
+  initiativesByKR = new Map(),
+  onToggleInitiative = () => {},
+}: OkrHierarchyViewProps) {
   const tree = useMemo(() => buildTree(objectives), [objectives]);
 
   if (tree.length === 0) {
@@ -298,6 +406,8 @@ export function OkrHierarchyView({ objectives, keyResults, users }: OkrHierarchy
             node={root}
             keyResults={keyResults}
             users={users}
+            initiativesByKR={initiativesByKR}
+            onToggleInitiative={onToggleInitiative}
           />
         ))}
       </div>

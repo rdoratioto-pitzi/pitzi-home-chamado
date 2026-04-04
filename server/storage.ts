@@ -12,6 +12,7 @@ import {
   type Objective, type InsertObjective,
   type KeyResult, type InsertKeyResult,
   type KeyResultUpdate, type InsertKeyResultUpdate,
+  type Initiative, type InsertInitiative,
   type Shipment, type InsertShipment,
   type ShipmentEvent, type InsertShipmentEvent,
   type Setting, type InsertSetting,
@@ -67,7 +68,7 @@ import {
   type KanbanCardDependency, type InsertKanbanCardDependency,
   users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   kanbanLabels, kanbanCardDependencies,
-  objectives, keyResults, keyResultUpdates, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
+  objectives, keyResults, keyResultUpdates, initiatives, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
   taskAreas, taskAreaMembers,
   tasks, taskComments, taskReactions, taskAttachments, taskTemplates, logisticOperators,
@@ -195,6 +196,14 @@ import {
   // Key Result Updates (Check-ins)
   getKeyResultUpdates(keyResultId: string): Promise<KeyResultUpdate[]>;
   createKeyResultUpdate(update: InsertKeyResultUpdate): Promise<KeyResultUpdate>;
+
+  // Initiatives
+  getInitiative(id: string): Promise<Initiative | undefined>;
+  getInitiatives(): Promise<Initiative[]>;
+  getInitiativesByKeyResult(keyResultId: string): Promise<Initiative[]>;
+  createInitiative(initiative: InsertInitiative): Promise<Initiative>;
+  updateInitiative(id: string, data: Partial<Initiative>): Promise<Initiative | undefined>;
+  deleteInitiative(id: string): Promise<boolean>;
 
   // Shipments
   getShipment(id: string): Promise<Shipment | undefined>;
@@ -1064,6 +1073,36 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) throw new Error("Database not connected");
     const [u] = await this.db.insert(keyResultUpdates).values(update).returning();
     return u;
+  }
+
+  // Initiatives
+  async getInitiative(id: string): Promise<Initiative | undefined> {
+    if (!this.db) return undefined;
+    const [initiative] = await this.db.select().from(initiatives).where(eq(initiatives.id, id));
+    return initiative;
+  }
+  async getInitiatives(): Promise<Initiative[]> {
+    if (!this.db) return [];
+    return await this.db.select().from(initiatives);
+  }
+  async getInitiativesByKeyResult(keyResultId: string): Promise<Initiative[]> {
+    if (!this.db) return [];
+    return await this.db.select().from(initiatives).where(eq(initiatives.keyResultId, keyResultId));
+  }
+  async createInitiative(data: InsertInitiative): Promise<Initiative> {
+    if (!this.db) throw new Error("Database not connected");
+    const [initiative] = await this.db.insert(initiatives).values(data).returning();
+    return initiative;
+  }
+  async updateInitiative(id: string, data: Partial<Initiative>): Promise<Initiative | undefined> {
+    if (!this.db) return undefined;
+    const [initiative] = await this.db.update(initiatives).set(data).where(eq(initiatives.id, id)).returning();
+    return initiative;
+  }
+  async deleteInitiative(id: string): Promise<boolean> {
+    if (!this.db) return false;
+    const result = await this.db.delete(initiatives).where(eq(initiatives.id, id)).returning();
+    return result.length > 0;
   }
 
   // Shipments
