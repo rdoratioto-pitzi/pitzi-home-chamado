@@ -67,6 +67,40 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { getCurrentQuarter, getQuarterOptions } from "@/lib/quarter";
 import { formatKRRange, formatKRCurrentOverTarget } from "@/lib/kr-format";
+import { useAuth } from "@/contexts/auth-context";
+
+// ─── OwnerChip ────────────────────────────────────────────────────────────────
+// Exibe avatar (iniciais) + nome do responsável. Mostra "Você" quando o
+// usuário logado é o responsável. Não renderiza nada se userId estiver vazio
+// ou se o usuário não for encontrado na lista.
+function OwnerChip({
+  userId,
+  users,
+  currentUserId,
+}: {
+  userId: string | null | undefined;
+  users: User[];
+  currentUserId: string | undefined;
+}) {
+  if (!userId) return null;
+  const user = users.find((u) => u.id === userId);
+  if (!user) return null;
+  const label = userId === currentUserId ? "Você" : user.name;
+  const initials = user.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  return (
+    <div className="flex items-center gap-1.5" data-testid={`owner-chip-${userId}`}>
+      <div className="h-6 w-6 rounded-full bg-muted/60 flex items-center justify-center text-[9px] font-semibold text-muted-foreground">
+        {initials}
+      </div>
+      <span className="text-[12px] text-muted-foreground">{label}</span>
+    </div>
+  );
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -153,6 +187,8 @@ function calcObjectiveProgress(
 export default function OKRsPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?.id;
 
   // ── Dialog state ────────────────────────────────────────────────────────────
   const [isObjectiveDialogOpen, setIsObjectiveDialogOpen] = useState(false);
@@ -495,6 +531,17 @@ export default function OKRsPage() {
                           </div>
                         </div>
 
+                        {/* Responsável */}
+                        {objective.ownerId && (
+                          <div className="mt-2">
+                            <OwnerChip
+                              userId={objective.ownerId}
+                              users={users}
+                              currentUserId={currentUserId}
+                            />
+                          </div>
+                        )}
+
                         {/* Objective progress bar */}
                         <div className="mt-3 flex items-center gap-3">
                           <div className="flex-1 bg-muted rounded-full h-2 overflow-hidden">
@@ -569,16 +616,25 @@ export default function OKRsPage() {
                                       </span>
                                     </div>
 
-                                    {/* Subtitle */}
-                                    {initiatives.length > 0 ? (
-                                      <p className="text-[11px] text-muted-foreground">
-                                        {completedCount} de {initiatives.length} iniciativa{initiatives.length !== 1 ? "s" : ""} concluída{initiatives.length !== 1 ? "s" : ""}
-                                      </p>
-                                    ) : (
-                                      <p className="text-[11px] text-muted-foreground">
-                                        {formatKRCurrentOverTarget(kr.currentValue, kr.targetValue, kr.measurementType, kr.unit)}
-                                      </p>
-                                    )}
+                                    {/* Subtitle + Responsável */}
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      {initiatives.length > 0 ? (
+                                        <p className="text-[11px] text-muted-foreground">
+                                          {completedCount} de {initiatives.length} iniciativa{initiatives.length !== 1 ? "s" : ""} concluída{initiatives.length !== 1 ? "s" : ""}
+                                        </p>
+                                      ) : (
+                                        <p className="text-[11px] text-muted-foreground">
+                                          {formatKRCurrentOverTarget(kr.currentValue, kr.targetValue, kr.measurementType, kr.unit)}
+                                        </p>
+                                      )}
+                                      {ownerIds[0] && (
+                                        <OwnerChip
+                                          userId={ownerIds[0]}
+                                          users={users}
+                                          currentUserId={currentUserId}
+                                        />
+                                      )}
+                                    </div>
                                   </div>
 
                                   {/* KR actions */}
@@ -662,7 +718,7 @@ export default function OKRsPage() {
                                         </p>
                                         {owner && (
                                           <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                                            {owner.name}
+                                            {owner.id === currentUserId ? "Você" : owner.name}
                                           </span>
                                         )}
                                         {initiative.dueDate && (
