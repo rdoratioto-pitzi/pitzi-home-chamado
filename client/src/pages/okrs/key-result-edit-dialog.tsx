@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { RichTextarea } from "@/components/rich-textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { formatCurrencyInputValue, parseCurrencyInputValue } from "@/lib/kr-format";
 import type { KeyResult, Objective, User } from "@shared/schema";
 
 const measurementTypes = [
@@ -278,87 +279,125 @@ export function KeyResultEditDialog({
               )}
             />
 
-            {/* Valores: baseline → atual → meta */}
-            {measurementType !== "binary" && (
-              <div className="grid grid-cols-3 gap-3">
-                <FormField
-                  control={form.control}
-                  name="startValue"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Baseline</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          value={field.value}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                {hasInitiatives ? (
-                  <div className="flex flex-col gap-1">
-                    <p className="text-[12px] font-medium">Valor Atual</p>
-                    <div className="flex items-center h-9 px-3 rounded-md border border-border/40 bg-muted/30">
-                      <span className="text-[12px] text-muted-foreground">
-                        {parseFloat(keyResult.currentValue || "0")}
-                      </span>
+            {/* Valores: baseline → atual → meta (formatação por tipo de medição) */}
+            {measurementType !== "binary" && (() => {
+              const renderValueInput = (
+                field: { value: number; onChange: (v: number) => void; onBlur: () => void; name: string; ref: React.Ref<HTMLInputElement> },
+                testId?: string,
+              ) => {
+                if (measurementType === "monetary") {
+                  return (
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground pointer-events-none">R$</span>
+                      <Input
+                        type="text"
+                        inputMode="numeric"
+                        className="pl-9"
+                        data-testid={testId}
+                        value={formatCurrencyInputValue(field.value)}
+                        onChange={(e) => field.onChange(parseCurrencyInputValue(e.target.value))}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                        placeholder="0"
+                      />
                     </div>
-                    <p className="text-[10px] text-muted-foreground leading-snug">
-                      Calculado pelas iniciativas
-                    </p>
-                  </div>
-                ) : (
+                  );
+                }
+                if (measurementType === "percentage") {
+                  return (
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        className="pr-8"
+                        data-testid={testId}
+                        value={field.value}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground pointer-events-none">%</span>
+                    </div>
+                  );
+                }
+                return (
+                  <Input
+                    type="number"
+                    data-testid={testId}
+                    value={field.value}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
+                  />
+                );
+              };
+
+              return (
+                <div className="grid grid-cols-3 gap-3">
                   <FormField
                     control={form.control}
-                    name="currentValue"
+                    name="startValue"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Valor Atual</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            value={field.value}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
-                            onBlur={field.onBlur}
-                            name={field.name}
-                            ref={field.ref}
-                          />
-                        </FormControl>
+                        <FormLabel>
+                          Baseline
+                          {measurementType === "decreasing" && (
+                            <span className="ml-1 text-[10px] font-normal text-muted-foreground">(inicial)</span>
+                          )}
+                        </FormLabel>
+                        <FormControl>{renderValueInput(field, "input-kr-edit-start")}</FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
 
-                <FormField
-                  control={form.control}
-                  name="targetValue"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Meta</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          value={field.value}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                  {hasInitiatives ? (
+                    <div className="flex flex-col gap-1">
+                      <p className="text-[12px] font-medium">Valor Atual</p>
+                      <div className="flex items-center h-9 px-3 rounded-md border border-border/40 bg-muted/30">
+                        <span className="text-[12px] text-muted-foreground">
+                          {parseFloat(keyResult.currentValue || "0")}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-snug">
+                        Calculado pelas iniciativas
+                      </p>
+                    </div>
+                  ) : (
+                    <FormField
+                      control={form.control}
+                      name="currentValue"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Valor Atual</FormLabel>
+                          <FormControl>{renderValueInput(field, "input-kr-edit-current")}</FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
-                />
-              </div>
-            )}
+
+                  <FormField
+                    control={form.control}
+                    name="targetValue"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Meta
+                          {measurementType === "decreasing" && (
+                            <span className="ml-1 text-[10px] font-normal text-muted-foreground">(menos é melhor)</span>
+                          )}
+                        </FormLabel>
+                        <FormControl>{renderValueInput(field, "input-kr-edit-target")}</FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              );
+            })()}
 
             {measurementType === "binary" && (
               <div className="p-3 bg-muted/30 rounded-lg border border-border/40">
