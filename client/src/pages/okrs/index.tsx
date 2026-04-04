@@ -50,6 +50,7 @@ import { ObjectiveEditDialog } from "./objective-edit-dialog";
 import { KeyResultDialog } from "./key-result-dialog";
 import { KeyResultEditDialog } from "./key-result-edit-dialog";
 import { KeyResultUpdateDialog } from "./key-result-update-dialog";
+import { InitiativeDialog } from "./initiative-dialog";
 import { OkrHierarchyView } from "@/components/okrs/OkrHierarchyView";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -107,7 +108,7 @@ const measurementTypeLabels: Record<string, string> = {
 const levelLabels: Record<string, string> = {
   company: "Empresa",
   team: "Time",
-  area: "Área",
+  area: "Área", // legacy — mantido para exibir dados existentes
 };
 
 function getInitialQuarter(): string {
@@ -121,6 +122,8 @@ export default function OKRsPage() {
 
   const [isObjectiveDialogOpen, setIsObjectiveDialogOpen] = useState(false);
   const [isKRDialogOpen, setIsKRDialogOpen] = useState(false);
+  const [isGlobalKRDialogOpen, setIsGlobalKRDialogOpen] = useState(false);
+  const [isInitiativeDialogOpen, setIsInitiativeDialogOpen] = useState(false);
   const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
 
   const [editingObjective, setEditingObjective] = useState<Objective | null>(null);
@@ -228,10 +231,33 @@ export default function OKRsPage() {
         title="OKRs"
         breadcrumbs={[{ label: "OKRs" }]}
         actions={
-          <Button onClick={() => setIsObjectiveDialogOpen(true)} data-testid="button-new-objective">
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Objetivo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setIsInitiativeDialogOpen(true)}
+              data-testid="button-new-initiative"
+              className="text-primary hover:text-primary hover:bg-primary/10"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              Nova Iniciativa
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsGlobalKRDialogOpen(true)}
+              data-testid="button-new-kr-global"
+              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo KR
+            </Button>
+            <Button
+              onClick={() => setIsObjectiveDialogOpen(true)}
+              data-testid="button-new-objective"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Objetivo
+            </Button>
+          </div>
         }
       />
 
@@ -267,7 +293,6 @@ export default function OKRsPage() {
                   <SelectItem value="all">Todos Níveis</SelectItem>
                   <SelectItem value="company">Empresa</SelectItem>
                   <SelectItem value="team">Time</SelectItem>
-                  <SelectItem value="area">Área</SelectItem>
                 </SelectContent>
               </Select>
             </Card>
@@ -549,10 +574,23 @@ export default function OKRsPage() {
         onOpenChange={setIsObjectiveDialogOpen}
         defaultCycle={cycleFilter}
       />
+      {/* Global KR dialog — with objective selector */}
+      <KeyResultDialog
+        open={isGlobalKRDialogOpen}
+        onOpenChange={setIsGlobalKRDialogOpen}
+        defaultCycle={cycleFilter}
+      />
+      {/* Inline KR dialog — pre-selected objective from card */}
       <KeyResultDialog
         open={isKRDialogOpen}
         onOpenChange={setIsKRDialogOpen}
-        objectiveId={selectedObjectiveId || ""}
+        objectiveId={selectedObjectiveId || undefined}
+        defaultCycle={cycleFilter}
+      />
+      <InitiativeDialog
+        open={isInitiativeDialogOpen}
+        onOpenChange={setIsInitiativeDialogOpen}
+        defaultCycle={cycleFilter}
       />
       <KeyResultUpdateDialog
         open={isUpdateDialogOpen}
