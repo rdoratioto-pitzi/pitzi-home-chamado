@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { formatCurrencyInputValue, parseCurrencyInputValue } from "@/lib/kr-format";
 import type { Objective, User } from "@shared/schema";
 
 const measurementTypes = [
@@ -272,17 +273,54 @@ export function KeyResultDialog({
                   name="startValue"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>De (baseline)</FormLabel>
+                      <FormLabel>
+                        De (baseline)
+                        {measurementType === "decreasing" && (
+                          <span className="ml-1 text-[10px] font-normal text-muted-foreground">— ponto de partida</span>
+                        )}
+                      </FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          data-testid="input-kr-start"
-                          value={field.value}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
+                        {measurementType === "monetary" ? (
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground pointer-events-none">R$</span>
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              data-testid="input-kr-start"
+                              className="pl-9"
+                              value={formatCurrencyInputValue(field.value)}
+                              onChange={(e) => field.onChange(parseCurrencyInputValue(e.target.value))}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                              placeholder="0"
+                            />
+                          </div>
+                        ) : measurementType === "percentage" ? (
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              data-testid="input-kr-start"
+                              className="pr-8"
+                              value={field.value}
+                              onChange={(e) => field.onChange(Number(e.target.value))}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground pointer-events-none">%</span>
+                          </div>
+                        ) : (
+                          <Input
+                            type="number"
+                            data-testid="input-kr-start"
+                            value={field.value}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        )}
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -293,17 +331,54 @@ export function KeyResultDialog({
                   name="targetValue"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Para (meta)</FormLabel>
+                      <FormLabel>
+                        Para (meta)
+                        {measurementType === "decreasing" && (
+                          <span className="ml-1 text-[10px] font-normal text-muted-foreground">— menos é melhor</span>
+                        )}
+                      </FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          data-testid="input-kr-target"
-                          value={field.value}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
+                        {measurementType === "monetary" ? (
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground pointer-events-none">R$</span>
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              data-testid="input-kr-target"
+                              className="pl-9"
+                              value={formatCurrencyInputValue(field.value)}
+                              onChange={(e) => field.onChange(parseCurrencyInputValue(e.target.value))}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                              placeholder="0"
+                            />
+                          </div>
+                        ) : measurementType === "percentage" ? (
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              data-testid="input-kr-target"
+                              className="pr-8"
+                              value={field.value}
+                              onChange={(e) => field.onChange(Number(e.target.value))}
+                              onBlur={field.onBlur}
+                              name={field.name}
+                              ref={field.ref}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-muted-foreground pointer-events-none">%</span>
+                          </div>
+                        ) : (
+                          <Input
+                            type="number"
+                            data-testid="input-kr-target"
+                            value={field.value}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                            onBlur={field.onBlur}
+                            name={field.name}
+                            ref={field.ref}
+                          />
+                        )}
                       </FormControl>
                       <FormMessage />
                     </FormItem>
