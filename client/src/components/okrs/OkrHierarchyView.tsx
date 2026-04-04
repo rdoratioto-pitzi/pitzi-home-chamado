@@ -5,7 +5,38 @@ import { ChevronDown, ChevronUp, ChevronRight, Target, Square, CheckSquare, Cloc
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatKRRange } from "@/lib/kr-format";
+import { useAuth } from "@/contexts/auth-context";
 import type { Objective, KeyResult, User, Initiative } from "@shared/schema";
+
+// ─── OwnerChip (organogram variant) ──────────────────────────────────────────
+function OwnerChip({
+  userId,
+  users,
+  currentUserId,
+}: {
+  userId: string | null | undefined;
+  users: User[];
+  currentUserId: string | undefined;
+}) {
+  if (!userId) return null;
+  const user = users.find((u) => u.id === userId);
+  if (!user) return null;
+  const label = userId === currentUserId ? "Você" : user.name;
+  const initials = user.name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  return (
+    <div className="flex items-center gap-1 min-w-0">
+      <div className="h-5 w-5 shrink-0 rounded-full bg-muted/60 flex items-center justify-center text-[8px] font-semibold text-muted-foreground">
+        {initials}
+      </div>
+      <span className="text-[10px] text-muted-foreground truncate">{label}</span>
+    </div>
+  );
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -25,6 +56,7 @@ interface OrgChartNodeProps {
   users: User[];
   initiativesByKR: Map<string, Initiative[]>;
   onToggleInitiative: (id: string, completed: boolean) => void;
+  currentUserId: string | undefined;
 }
 
 interface OrgChartCardProps {
@@ -36,6 +68,7 @@ interface OrgChartCardProps {
   expanded: boolean;
   hasChildren: boolean;
   onToggle: () => void;
+  currentUserId: string | undefined;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -136,6 +169,7 @@ function OrgChartCard({
   expanded,
   hasChildren,
   onToggle,
+  currentUserId,
 }: OrgChartCardProps) {
   const [krsExpanded, setKrsExpanded] = useState(true);
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
@@ -174,6 +208,13 @@ function OrgChartCard({
             {node.title}
           </p>
 
+          {/* Responsável */}
+          {node.ownerId && (
+            <div className="mb-2">
+              <OwnerChip userId={node.ownerId} users={users} currentUserId={currentUserId} />
+            </div>
+          )}
+
           {/* Status badge */}
           <Badge
             variant="outline"
@@ -211,12 +252,14 @@ function OrgChartCard({
                     const krProgress = calcKRProgress(kr, initiatives);
                     const isKRExpanded = expandedKRs.has(kr.id);
                     const completedCount = initiatives.filter((i) => i.completed).length;
-                    const owner = users.find((u) => {
+                    const krOwnerId = (() => {
                       try {
                         const ids = JSON.parse(kr.responsibleIds ?? "[]");
-                        return Array.isArray(ids) && ids.includes(u.id);
-                      } catch { return false; }
-                    });
+                        return Array.isArray(ids) && ids.length > 0 ? (ids[0] as string) : null;
+                      } catch {
+                        return null;
+                      }
+                    })();
 
                     return (
                       <div
@@ -241,8 +284,14 @@ function OrgChartCard({
                             </div>
                             <span className="text-[10px] font-bold text-[#378ADD]">{krProgress}%</span>
                           </div>
-                          {owner && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5">{owner.name}</p>
+                          {krOwnerId && (
+                            <div className="mt-1">
+                              <OwnerChip
+                                userId={krOwnerId}
+                                users={users}
+                                currentUserId={currentUserId}
+                              />
+                            </div>
                           )}
                         </div>
 
@@ -287,7 +336,11 @@ function OrgChartCard({
                                     </p>
                                     {(initOwner || init.dueDate) && (
                                       <div className="flex items-center gap-2 mt-0.5 text-[9px] text-muted-foreground">
-                                        {initOwner && <span className="truncate">{initOwner.name}</span>}
+                                        {initOwner && (
+                                          <span className="truncate">
+                                            {initOwner.id === currentUserId ? "Você" : initOwner.name}
+                                          </span>
+                                        )}
                                         {init.dueDate && (
                                           <span className="flex items-center gap-0.5 whitespace-nowrap">
                                             <Clock className="h-2.5 w-2.5" />
@@ -331,7 +384,7 @@ function OrgChartCard({
 
 // ─── OrgChartNode ─────────────────────────────────────────────────────────────
 
-function OrgChartNode({ node, keyResults, users, initiativesByKR, onToggleInitiative }: OrgChartNodeProps) {
+function OrgChartNode({ node, keyResults, users, initiativesByKR, onToggleInitiative, currentUserId }: OrgChartNodeProps) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
   const subtreeWidth = calcSubtreeWidth(node);
@@ -347,6 +400,7 @@ function OrgChartNode({ node, keyResults, users, initiativesByKR, onToggleInitia
         expanded={expanded}
         hasChildren={hasChildren}
         onToggle={() => setExpanded((v) => !v)}
+        currentUserId={currentUserId}
       />
 
       {hasChildren && expanded && (
@@ -381,6 +435,7 @@ function OrgChartNode({ node, keyResults, users, initiativesByKR, onToggleInitia
                   users={users}
                   initiativesByKR={initiativesByKR}
                   onToggleInitiative={onToggleInitiative}
+                  currentUserId={currentUserId}
                 />
               </div>
             ))}
@@ -401,6 +456,8 @@ export function OkrHierarchyView({
   onToggleInitiative = () => {},
 }: OkrHierarchyViewProps) {
   const tree = useMemo(() => buildTree(objectives), [objectives]);
+  const { user: currentUser } = useAuth();
+  const currentUserId = currentUser?.id;
 
   if (tree.length === 0) {
     return (
@@ -429,6 +486,7 @@ export function OkrHierarchyView({
             users={users}
             initiativesByKR={initiativesByKR}
             onToggleInitiative={onToggleInitiative}
+            currentUserId={currentUserId}
           />
         ))}
       </div>
