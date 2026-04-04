@@ -106,7 +106,6 @@ const workspaceSubItems = [
 const metasSubItems = [
   { title: "Visão Geral", url: "/metas", icon: LayoutDashboard },
   { title: "Gestão de Metas", url: "/metas/gestao", icon: Target },
-  { title: "OKRs", url: "/okrs", icon: Target },
 ];
 
 // Submenu Logística (4 abas do dashboard)
@@ -182,8 +181,8 @@ export function AppSidebar() {
 
   const isWorkspaceRoute = (loc: string) =>
     loc.startsWith("/workspace") || loc.startsWith("/tarefas") || loc.startsWith("/reunioes") || loc.startsWith("/fluxogramas") || loc.startsWith("/diagramas");
-  const isMetasRoute = (loc: string) =>
-    loc.startsWith("/metas") || loc.startsWith("/okrs");
+  const isMetasRoute = (loc: string) => loc.startsWith("/metas");
+  const isOkrsRoute = (loc: string) => loc.startsWith("/okrs");
 
   const [workspaceOpen, setWorkspaceOpen] = useState(isWorkspaceRoute(location));
   const [metasOpen, setMetasOpen] = useState(isMetasRoute(location));
@@ -216,6 +215,7 @@ export function AppSidebar() {
 
   const isWorkspaceActive = isWorkspaceRoute(location);
   const isMetasActive = isMetasRoute(location);
+  const isOkrsActive = isOkrsRoute(location);
   const isLogisticaActive = location.startsWith("/logistica");
   const isTriagemActive = location.startsWith("/triagem");
   const isApisActive = location.startsWith("/apis");
@@ -561,6 +561,21 @@ export function AppSidebar() {
                     </CollapsibleContent>
                   </SidebarMenuItem>
                 </Collapsible>
+              )}
+
+              {hasMetasAccess && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isOkrsActive}
+                    className="h-9 px-3"
+                  >
+                    <Link href="/okrs" data-testid="link-okrs">
+                      <Target className="h-[20px] w-[20px]" />
+                      <span className="text-[12px]">OKRs</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               )}
 
               {hasBibliotecaAccess && (
