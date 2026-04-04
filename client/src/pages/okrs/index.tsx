@@ -53,6 +53,7 @@ import { KeyResultDialog } from "./key-result-dialog";
 import { KeyResultEditDialog } from "./key-result-edit-dialog";
 import { KeyResultUpdateDialog } from "./key-result-update-dialog";
 import { InitiativeDialog } from "./initiative-dialog";
+import { InitiativeEditDialog } from "./initiative-edit-dialog";
 import { OkrHierarchyView } from "@/components/okrs/OkrHierarchyView";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -162,6 +163,7 @@ export default function OKRsPage() {
 
   const [editingObjective, setEditingObjective] = useState<Objective | null>(null);
   const [editingKR, setEditingKR] = useState<KeyResult | null>(null);
+  const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null);
   const [deletingObjectiveId, setDeletingObjectiveId] = useState<string | null>(null);
   const [deletingKRId, setDeletingKRId] = useState<string | null>(null);
 
@@ -670,6 +672,13 @@ export default function OKRsPage() {
                                             {format(new Date(initiative.dueDate), "dd/MM/yy", { locale: ptBR })}
                                           </span>
                                         )}
+                                        <button
+                                          onClick={() => setEditingInitiative(initiative)}
+                                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                                          data-testid={`btn-edit-initiative-${initiative.id}`}
+                                        >
+                                          <Pencil className="h-3 w-3" />
+                                        </button>
                                       </div>
                                     );
                                   })}
@@ -753,6 +762,15 @@ export default function OKRsPage() {
           open={!!editingKR}
           onOpenChange={(open) => { if (!open) setEditingKR(null); }}
           keyResult={editingKR}
+          hasInitiatives={(initiativesByKR.get(editingKR.id) ?? []).length > 0}
+        />
+      )}
+      {editingInitiative && (
+        <InitiativeEditDialog
+          open={!!editingInitiative}
+          onOpenChange={(open) => { if (!open) setEditingInitiative(null); }}
+          initiative={editingInitiative}
+          defaultCycle={cycleFilter}
         />
       )}
 
