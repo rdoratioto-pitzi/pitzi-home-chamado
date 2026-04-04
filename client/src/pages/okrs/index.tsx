@@ -66,6 +66,7 @@ import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { getCurrentQuarter, getQuarterOptions } from "@/lib/quarter";
+import { formatKRRange, formatKRCurrentOverTarget } from "@/lib/kr-format";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -552,8 +553,7 @@ export default function OKRsPage() {
 
                                     {/* De X → Para Y [unit] */}
                                     <p className="text-[11px] text-muted-foreground mb-2">
-                                      De {parseFloat(kr.startValue || "0")} → Para {parseFloat(kr.targetValue || "100")}
-                                      {kr.unit ? ` ${kr.unit}` : ""}
+                                      {formatKRRange(kr.startValue, kr.targetValue, kr.measurementType, kr.unit)}
                                     </p>
 
                                     {/* KR progress bar (blue) */}
@@ -576,8 +576,7 @@ export default function OKRsPage() {
                                       </p>
                                     ) : (
                                       <p className="text-[11px] text-muted-foreground">
-                                        {parseFloat(kr.currentValue || "0")} / {parseFloat(kr.targetValue || "100")}
-                                        {kr.unit ? ` ${kr.unit}` : ""}
+                                        {formatKRCurrentOverTarget(kr.currentValue, kr.targetValue, kr.measurementType, kr.unit)}
                                       </p>
                                     )}
                                   </div>
