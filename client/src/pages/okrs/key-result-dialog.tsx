@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,35 +29,28 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import type { User } from "@shared/schema";
-import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import type { Objective, User } from "@shared/schema";
 
 const measurementTypes = [
-  { value: "percentage", label: "Percentual (%)", example: "0% → 100%" },
   { value: "absolute", label: "Absoluto (número)", example: "0 → 1000 clientes" },
+  { value: "percentage", label: "Percentual (%)", example: "0% → 100%" },
   { value: "monetary", label: "Monetário (R$)", example: "R$ 0 → R$ 50.000" },
-  { value: "temporal", label: "Temporal (dias/horas)", example: "10 dias → 5 dias" },
-  { value: "binary", label: "Binário (sim/não)", example: "Não → Sim" },
   { value: "decreasing", label: "Decrescente", example: "100 → 20 (menos é melhor)" },
+  { value: "binary", label: "Binário (sim/não)", example: "Não → Sim" },
 ];
 
 const formSchema = z.object({
+  selectedObjectiveId: z.string().min(1, "Selecione o objetivo pai"),
   title: z.string().min(3, "Título deve ter no mínimo 3 caracteres"),
-  measurementType: z.enum(["percentage", "absolute", "monetary", "temporal", "binary", "decreasing"]),
-  startValue: z.coerce.number().min(0, "Valor inicial deve ser 0 ou maior"),
-  targetValue: z.coerce.number().min(0, "Valor alvo deve ser 0 ou maior"),
-  currentValue: z.coerce.number().min(0, "Valor atual deve ser 0 ou maior"),
+  description: z.string().optional(),
+  measurementType: z.enum(["percentage", "absolute", "monetary", "binary", "decreasing"]),
+  startValue: z.coerce.number(),
+  targetValue: z.coerce.number(),
   unit: z.string().optional(),
+  ownerId: z.string().optional(),
   dueDate: z.date().optional(),
-  ownerIds: z.array(z.string()).min(1, "Selecione pelo menos um responsável"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -64,133 +58,179 @@ type FormData = z.infer<typeof formSchema>;
 interface KeyResultDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  objectiveId: string;
+  objectiveId?: string;
+  defaultCycle?: string;
 }
 
-export function KeyResultDialog({ open, onOpenChange, objectiveId }: KeyResultDialogProps) {
+export function KeyResultDialog({
+  open,
+  onOpenChange,
+  objectiveId,
+  defaultCycle,
+}: KeyResultDialogProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: users = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+  const { data: users = [] } = useQuery<User[]>({ queryKey: ["/api/users"] });
+  const { data: allObjectives = [] } = useQuery<Objective[]>({
+    queryKey: ["/api/objectives"],
   });
+
+  const activeUsers = users
+    .filter((u) => u.status === "active")
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+
+  // Objectives available for selection: company level, filtered by cycle
+  const selectableObjectives = allObjectives
+    .filter((obj) => obj.level === "company" && (!defaultCycle || obj.cycle === defaultCycle))
+    .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
+
+  const showObjectiveSelector = !objectiveId;
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      selectedObjectiveId: objectiveId ?? "",
       title: "",
-      measurementType: "percentage",
+      description: "",
+      measurementType: "absolute",
       startValue: 0,
       targetValue: 100,
-      currentValue: 0,
-      unit: "%",
-      ownerIds: [],
+      unit: "",
+      ownerId: undefined,
     },
   });
 
-  // Reset form when dialog closes
-  const handleOpenChange = (isOpen: boolean) => {
-    if (!isOpen) {
+  useEffect(() => {
+    if (open) {
       form.reset({
+        selectedObjectiveId: objectiveId ?? "",
         title: "",
-        measurementType: "percentage",
+        description: "",
+        measurementType: "absolute",
         startValue: 0,
         targetValue: 100,
-        currentValue: 0,
-        unit: "%",
-        ownerIds: [],
+        unit: "",
+        ownerId: undefined,
       });
     }
-    onOpenChange(isOpen);
-  };
+  }, [open, objectiveId, form]);
 
   const measurementType = form.watch("measurementType");
 
-  // Update unit based on measurement type
   const handleMeasurementTypeChange = (value: string) => {
-    form.setValue("measurementType", value as any);
-    switch (value) {
-      case "percentage":
-        form.setValue("unit", "%");
-        form.setValue("startValue", 0);
-        form.setValue("targetValue", 100);
-        break;
-      case "monetary":
-        form.setValue("unit", "R$");
-        break;
-      case "temporal":
-        form.setValue("unit", "dias");
-        break;
-      case "binary":
-        form.setValue("unit", "");
-        form.setValue("startValue", 0);
-        form.setValue("targetValue", 1);
-        form.setValue("currentValue", 0);
-        break;
-      case "decreasing":
-      case "absolute":
-        form.setValue("unit", "");
-        break;
+    form.setValue("measurementType", value as FormData["measurementType"]);
+    if (value === "percentage") {
+      form.setValue("unit", "%");
+      form.setValue("startValue", 0);
+      form.setValue("targetValue", 100);
+    } else if (value === "monetary") {
+      form.setValue("unit", "R$");
+    } else if (value === "binary") {
+      form.setValue("unit", "");
+      form.setValue("startValue", 0);
+      form.setValue("targetValue", 1);
+    } else {
+      form.setValue("unit", "");
     }
   };
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
+      const responsibleIds = data.ownerId && data.ownerId !== "__none__"
+        ? JSON.stringify([data.ownerId])
+        : null;
       return apiRequest("POST", "/api/key-results", {
-        ...data,
-        objectiveId,
+        objectiveId: data.selectedObjectiveId,
+        title: data.title,
+        description: data.description || null,
+        measurementType: data.measurementType,
         startValue: String(data.startValue),
         targetValue: String(data.targetValue),
-        currentValue: String(data.currentValue),
-        dueDate: data.dueDate?.toISOString(),
+        currentValue: "0",
+        unit: data.unit || null,
+        responsibleIds,
+        dueDate: data.dueDate?.toISOString() ?? null,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/key-results"] });
-      toast({
-        title: "Key Result criado",
-        description: "O resultado-chave foi adicionado ao objetivo.",
-      });
-      form.reset();
+      toast({ title: "Key Result criado", description: "O resultado-chave foi adicionado." });
       onOpenChange(false);
     },
     onError: () => {
-      toast({
-        title: "Erro",
-        description: "Não foi possível criar o resultado-chave.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "Não foi possível criar o resultado-chave.", variant: "destructive" });
     },
   });
 
-  const onSubmit = (data: FormData) => {
-    mutation.mutate(data);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Novo Resultado-Chave</DialogTitle>
+          <DialogTitle>Novo Key Result</DialogTitle>
           <DialogDescription>
-            Adicione uma métrica quantitativa para medir o progresso do objetivo.
+            Defina uma métrica quantitativa para medir o progresso do objetivo.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4">
+            {showObjectiveSelector && (
+              <FormField
+                control={form.control}
+                name="selectedObjectiveId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Objetivo pai</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-kr-objective">
+                          <SelectValue placeholder="Selecione o objetivo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {selectableObjectives.map((obj) => (
+                          <SelectItem key={obj.id} value={obj.id}>
+                            {obj.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
             <FormField
               control={form.control}
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Descrição do KR</FormLabel>
+                  <FormLabel>Título do KR</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="Ex: Atingir NPS de 80 pontos" 
+                    <Input
+                      placeholder="Ex: Atingir NPS de 80 pontos"
                       data-testid="input-kr-title"
-                      {...field} 
+                      {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Descrição{" "}
+                    <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="Contexto adicional sobre o KR" {...field} value={field.value ?? ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -203,13 +243,10 @@ export function KeyResultDialog({ open, onOpenChange, objectiveId }: KeyResultDi
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo de Medição</FormLabel>
-                  <Select 
-                    onValueChange={handleMeasurementTypeChange} 
-                    value={field.value}
-                  >
+                  <Select onValueChange={handleMeasurementTypeChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-measurement-type">
-                        <SelectValue placeholder="Selecione o tipo" />
+                        <SelectValue />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -229,16 +266,16 @@ export function KeyResultDialog({ open, onOpenChange, objectiveId }: KeyResultDi
             />
 
             {measurementType !== "binary" && (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
                   name="startValue"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Valor Inicial</FormLabel>
+                      <FormLabel>De (baseline)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           data-testid="input-kr-start"
                           value={field.value}
                           onChange={(e) => field.onChange(Number(e.target.value))}
@@ -251,38 +288,15 @@ export function KeyResultDialog({ open, onOpenChange, objectiveId }: KeyResultDi
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="currentValue"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valor Atual</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          data-testid="input-kr-current"
-                          value={field.value}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                          onBlur={field.onBlur}
-                          name={field.name}
-                          ref={field.ref}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormField
                   control={form.control}
                   name="targetValue"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Valor Alvo</FormLabel>
+                      <FormLabel>Para (meta)</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
+                        <Input
+                          type="number"
                           data-testid="input-kr-target"
                           value={field.value}
                           onChange={(e) => field.onChange(Number(e.target.value))}
@@ -306,114 +320,96 @@ export function KeyResultDialog({ open, onOpenChange, objectiveId }: KeyResultDi
               </div>
             )}
 
-            {measurementType !== "binary" && measurementType !== "percentage" && (
+            <FormField
+              control={form.control}
+              name="unit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Unidade{" "}
+                    <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder='Ex: "%", "R$", "dispositivos/mês"'
+                      data-testid="input-kr-unit"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {measurementType === "monetary" && "Ex: R$, USD, EUR"}
+                    {measurementType === "absolute" && "Ex: clientes, vendas, tickets"}
+                    {measurementType === "decreasing" && "Ex: bugs, reclamações"}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="unit"
+                name="ownerId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Unidade</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Ex: pontos, clientes, R$" 
-                        data-testid="input-kr-unit"
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {measurementType === "monetary" && "Ex: R$, USD, EUR"}
-                      {measurementType === "temporal" && "Ex: dias, horas, minutos"}
-                      {measurementType === "absolute" && "Ex: clientes, vendas, tickets"}
-                      {measurementType === "decreasing" && "Ex: bugs, reclamações, tempo de espera"}
-                    </FormDescription>
+                    <FormLabel>
+                      Responsável{" "}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value ?? "__none__"}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">— Nenhum —</SelectItem>
+                        {activeUsers.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
 
-            <FormField
-              control={form.control}
-              name="dueDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Data Estimada de Conclusão</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="date"
-                      className="date-picker-full"
-                      value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
-                      onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : undefined)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="ownerIds"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Responsáveis</FormLabel>
-                  <FormDescription>
-                    Selecione as pessoas responsáveis por este resultado-chave
-                  </FormDescription>
-                  <div className="grid grid-cols-2 gap-2 mt-2 max-h-48 overflow-y-auto border rounded-lg p-3">
-                    {users.filter(u => u.status === "active").sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((user) => (
-                      <FormField
-                        key={user.id}
-                        control={form.control}
-                        name="ownerIds"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={user.id}
-                              className="flex flex-row items-center space-x-2 space-y-0"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(user.id)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...field.value, user.id])
-                                      : field.onChange(
-                                          field.value?.filter(
-                                            (value) => value !== user.id
-                                          )
-                                        );
-                                  }}
-                                  data-testid={`checkbox-owner-${user.id}`}
-                                />
-                              </FormControl>
-                              <FormLabel className="text-sm font-normal cursor-pointer">
-                                {user.name}
-                              </FormLabel>
-                            </FormItem>
-                          );
-                        }}
+              <FormField
+                control={form.control}
+                name="dueDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Data limite{" "}
+                      <span className="text-muted-foreground font-normal">(opcional)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        className="date-picker-full"
+                        value={field.value ? new Date(field.value).toISOString().split("T")[0] : ""}
+                        onChange={(e) =>
+                          field.onChange(e.target.value ? new Date(e.target.value) : undefined)
+                        }
                       />
-                    ))}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <DialogFooter>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => handleOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button 
-                type="submit" 
-                disabled={mutation.isPending}
-                data-testid="button-submit-kr"
-              >
+              <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-kr">
                 {mutation.isPending ? "Criando..." : "Criar KR"}
               </Button>
             </DialogFooter>

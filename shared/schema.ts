@@ -378,6 +378,28 @@ export const insertKeyResultUpdateSchema = createInsertSchema(keyResultUpdates).
 export type InsertKeyResultUpdate = z.infer<typeof insertKeyResultUpdateSchema>;
 export type KeyResultUpdate = typeof keyResultUpdates.$inferSelect;
 
+// ============== INITIATIVES (Nível 3 da hierarquia OKR) ==============
+export const initiatives = pgTable("initiatives", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  keyResultId: varchar("key_result_id").notNull().references(() => keyResults.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  completed: boolean("completed").notNull().default(false),
+  ownerId: varchar("owner_id"),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+const baseInsertInitiativeSchema = createInsertSchema(initiatives).omit({ id: true, createdAt: true });
+export const insertInitiativeSchema = baseInsertInitiativeSchema.extend({
+  dueDate: z.union([z.string(), z.date(), z.null()]).optional().transform(val =>
+    val ? (typeof val === 'string' ? new Date(val) : val) : null
+  ),
+});
+export type InsertInitiative = z.infer<typeof insertInitiativeSchema>;
+export type Initiative = typeof initiatives.$inferSelect;
+
 // ============== LOGISTICS ==============
 export const shipments = pgTable("shipments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
