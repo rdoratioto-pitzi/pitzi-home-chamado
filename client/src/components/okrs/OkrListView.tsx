@@ -128,12 +128,12 @@ function OwnerDisplay({
 }
 
 // ─── Column widths ─────────────────────────────────────────────────────────────
-// Layout: [title flex-1] [level 80px] [status 110px] [progress 120px] [owner 120px] [due 80px] [actions 60px]
+// Layout: [title flex-1 min-300] [level 80px] [status 110px] [progress 120px] [owner 120px] [due 80px] [actions 60px]
 
 function TableHeader() {
   return (
     <div className="flex items-center px-3 py-1.5 border-b border-border/40 bg-muted/30">
-      <div className="flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide min-w-0">
+      <div className="flex-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide min-w-[300px]">
         Objetivo / KR / Iniciativa
       </div>
       <div className="w-[80px] text-[10px] font-semibold text-muted-foreground uppercase tracking-wide shrink-0">
@@ -177,7 +177,7 @@ function InitiativeRow({
       style={{ paddingLeft: "calc(12px + 48px)" }}
       data-testid={`list-row-initiative-${initiative.id}`}
     >
-      <div className="flex-1 flex items-center gap-2 min-w-0">
+      <div className="flex-1 flex items-center gap-2 min-w-[300px]">
         <button
           onClick={onToggle}
           className="shrink-0 text-muted-foreground hover:text-[#7F77DD] transition-colors"
@@ -188,6 +188,7 @@ function InitiativeRow({
         </button>
         <span
           className={`text-[12px] truncate ${initiative.completed ? "line-through opacity-50" : "text-foreground"}`}
+          title={initiative.title}
         >
           {initiative.title}
         </span>
@@ -260,7 +261,7 @@ function KRRow({
         style={{ paddingLeft: "calc(12px + 24px)" }}
         data-testid={`list-row-kr-${kr.id}`}
       >
-        <div className="flex-1 flex items-center gap-1.5 min-w-0">
+        <div className="flex-1 flex items-center gap-1.5 min-w-[300px]">
           {hasInitiatives && showInitiatives ? (
             <button
               onClick={onToggleExpand}
@@ -273,7 +274,7 @@ function KRRow({
           ) : (
             <div className="w-3.5 shrink-0" />
           )}
-          <span className="text-[12px] font-semibold truncate text-foreground">{kr.title}</span>
+          <span className="text-[12px] font-semibold truncate text-foreground" title={kr.title}>{kr.title}</span>
           <span className="text-[11px] text-muted-foreground shrink-0 hidden sm:inline">
             {formatKRRange(kr.startValue, kr.targetValue, kr.measurementType, kr.unit)}
           </span>
@@ -421,7 +422,7 @@ function ObjectiveRow({
         className={`flex items-center h-12 px-3 border-b border-border/40 hover:bg-muted/30 transition-colors border-l-[3px] ${borderCls} bg-background ${isClosed ? "opacity-70" : ""}`}
         data-testid={`list-row-objective-${objective.id}`}
       >
-        <div className="flex-1 flex items-center gap-1.5 min-w-0">
+        <div className="flex-1 flex items-center gap-1.5 min-w-[300px]">
           {krs.length > 0 && showKRs ? (
             <button
               onClick={() => setKrsExpanded((v) => !v)}
@@ -434,7 +435,10 @@ function ObjectiveRow({
           ) : (
             <div className="w-3.5 shrink-0" />
           )}
-          <span className={`text-[13px] font-bold truncate ${isClosed ? "text-muted-foreground" : "text-foreground"}`}>
+          <span
+            className={`text-[13px] font-bold truncate ${isClosed ? "text-muted-foreground" : "text-foreground"}`}
+            title={objective.title}
+          >
             {objective.title}
           </span>
         </div>
@@ -565,7 +569,8 @@ export function OkrListView({
   }
 
   return (
-    <div className="rounded-xl border border-border/60 overflow-hidden">
+    <div className="rounded-xl border border-border/60 overflow-x-auto">
+      <div className="min-w-[870px]">
       <TableHeader />
       {objectives.map((obj) => (
         <ObjectiveRow
@@ -586,6 +591,7 @@ export function OkrListView({
           onRetroObjective={onRetroObjective}
         />
       ))}
+      </div>
     </div>
   );
 }

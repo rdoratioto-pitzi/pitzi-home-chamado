@@ -83,6 +83,65 @@ Reviewer obrigatório: **Marcelo (CTO)** — sem aprovação dele, não fazer me
 - Before deploying, verify which environment (dev/prod) is targeted. Never deploy to production without explicit confirmation.
 - Check wrangler.toml route configuration and ensure secrets are set for the target environment before deploying.
 
+## ⚠️ Regra Crítica de Deploy — Sempre Executar Nesta Ordem
+
+NUNCA fazer apenas `git push` e considerar o deploy concluído.
+O Cloudflare Pages e o Worker NÃO fazem deploy automático a partir do git.
+O deploy SEMPRE requer execução manual dos comandos abaixo.
+
+### Script de deploy completo (salvo em `scripts/deploy.sh`):
+```bash
+#!/bin/bash
+set -e
+
+cd ~/Documentos/workspaces/renov.home.macmini/Renov.Home
+
+echo "→ Build do frontend..."
+npm run build
+
+echo "→ Forçando upload do index.html..."
+echo "<!-- deploy $(date) -->" >> dist/public/index.html
+
+echo "→ Deploy Pages (frontend)..."
+npx wrangler pages deploy dist/public --project-name renov-home --commit-dirty=true
+
+echo "→ Deploy Worker (backend)..."
+cd worker && npm install && npx wrangler deploy --env=""
+
+echo "✓ Deploy completo."
+```
+
+Executar sempre via:
+```bash
+bash scripts/deploy.sh
+```
+
+### Por que o comentário no index.html é obrigatório:
+O wrangler Pages usa cache baseado em hash de conteúdo.
+Se os arquivos JS não mudaram entre dois builds, o wrangler envia
+0 arquivos — mas o index.html antigo no edge do Cloudflare pode
+referenciar chunks de versões anteriores, causando erro de MIME type
+no browser ("Expected JavaScript but received text/html").
+O comentário com `date` garante que o index.html sempre tem hash
+diferente e é sempre enviado, mantendo consistência entre o HTML
+e os assets JS em produção.
+
+## Checklist de Deploy — Obrigatório Antes de Considerar Concluído
+
+Após qualquer merge em main:
+- [ ] `bash scripts/deploy.sh` executado com sucesso
+- [ ] Output mostra "Uploaded 1 files" (index.html) no Pages
+- [ ] Output mostra "Deployed renov-home-api" no Worker
+- [ ] Testar https://home.renovsmart.com.br em aba anônima
+- [ ] Login funciona e aplicação carrega sem tela preta
+- [ ] Abrir DevTools → Console → zero erros de MIME type ou módulo
+
+Se aparecer tela preta após login:
+1. Verificar Console do browser — erros de módulo JS indicam index.html desatualizado no Cloudflare
+2. Rodar: `echo "<!-- fix $(date) -->" >> dist/public/index.html`
+3. Rodar: `npx wrangler pages deploy dist/public --project-name renov-home --commit-dirty=true`
+4. Aguardar 30s e testar em aba anônima
+
 ## Bug Fixes
 
 - After applying any fix, verify there are no regressions by building the project and testing affected functionality.
