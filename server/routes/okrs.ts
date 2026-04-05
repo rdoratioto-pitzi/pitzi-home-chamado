@@ -192,18 +192,24 @@ export function registerOkrRoutes(router: Router) {
           healthStatus: health,
           keyResultsCount: objKrs.length,
           status: obj.status,
+          closedAt: obj.closedAt ? obj.closedAt.toISOString() : null,
+          closeStatus: obj.closeStatus ?? null,
         };
       });
 
-      // Stats gerais
-      const totalObjectives = objectiveSummaries.length;
+      // Separar encerrados dos ativos para byHealth
+      const activeObjectives = objectiveSummaries.filter((o) => !o.closedAt);
+      const closedObjectives = objectiveSummaries.filter((o) => o.closedAt);
+
+      // Stats gerais (somente objetivos ativos)
+      const totalObjectives = activeObjectives.length;
       const avgProgress = totalObjectives > 0
-        ? Math.round(objectiveSummaries.reduce((s, o) => s + o.progressPercent, 0) / totalObjectives)
+        ? Math.round(activeObjectives.reduce((s, o) => s + o.progressPercent, 0) / totalObjectives)
         : 0;
       const byHealth = {
-        on_track: objectiveSummaries.filter((o) => o.healthStatus === "on_track").length,
-        at_risk: objectiveSummaries.filter((o) => o.healthStatus === "at_risk").length,
-        off_track: objectiveSummaries.filter((o) => o.healthStatus === "off_track").length,
+        on_track: activeObjectives.filter((o) => o.healthStatus === "on_track").length,
+        at_risk: activeObjectives.filter((o) => o.healthStatus === "at_risk").length,
+        off_track: activeObjectives.filter((o) => o.healthStatus === "off_track").length,
       };
 
       // KRs fora do ritmo
@@ -259,6 +265,13 @@ export function registerOkrRoutes(router: Router) {
         totalObjectives,
         avgProgress,
         byHealth,
+        closedCount: closedObjectives.length,
+        closedObjectives: closedObjectives.map((o) => ({
+          id: o.id,
+          title: o.title,
+          closeStatus: o.closeStatus,
+          closedAt: o.closedAt,
+        })),
         objectives: objectiveSummaries.sort((a, b) => a.progressPercent - b.progressPercent),
         initiatives: {
           total: cycleInitiatives.length,
@@ -281,6 +294,14 @@ export function registerOkrRoutes(router: Router) {
     try {
       const { userId, isAdmin } = getSessionUser(req);
       const objectives = await storage.getObjectives();
+
+      // Modo arquivo: retorna apenas objetivos encerrados de todos os cycles
+      if (req.query.archived === "true") {
+        const archived = objectives
+          .filter((o) => o.closedAt != null)
+          .sort((a, b) => new Date(b.closedAt!).getTime() - new Date(a.closedAt!).getTime());
+        return res.json(archived);
+      }
 
       let list: Objective[];
       if (isAdmin) {
@@ -311,6 +332,45 @@ export function registerOkrRoutes(router: Router) {
     } catch (error) {
       console.error("Error fetching objectives:", error);
       res.status(500).json({ error: "Failed to fetch objectives" });
+    }
+  });
+
+  // POST /api/objectives/:id/close — encerrar quarter de um objetivo
+  router.post("/api/objectives/:id/close", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const id = getId(req);
+
+      const existing = await storage.getObjective(id);
+      if (!existing) return res.status(404).json({ error: "Objetivo não encontrado" });
+      if (!isAdmin && existing.ownerId !== userId) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.closedAt != null) {
+        return res.status(400).json({ error: "Este objetivo já foi encerrado." });
+      }
+
+      const closeSchema = z.object({
+        closeStatus: z.enum(["achieved", "partial", "not_achieved"]),
+        closeComment: z.string().min(20, "O comentário deve ter pelo menos 20 caracteres"),
+      });
+
+      const { closeStatus, closeComment } = closeSchema.parse(req.body);
+
+      const updated = await storage.updateObjective(id, {
+        closedAt: new Date(),
+        closeStatus,
+        closeComment,
+      } as any);
+
+      if (!updated) return res.status(404).json({ error: "Objetivo não encontrado" });
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validação falhou", details: error.errors });
+      }
+      console.error("Error closing objective:", error);
+      res.status(500).json({ error: "Falha ao encerrar objetivo" });
     }
   });
 

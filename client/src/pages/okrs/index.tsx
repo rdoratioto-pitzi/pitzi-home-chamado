@@ -44,11 +44,15 @@ import {
   ChevronUp,
   Square,
   CheckSquare,
+  Flag,
+  Archive,
+  Eye,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Objective, KeyResult, User, Initiative, KeyResultUpdate } from "@shared/schema";
 import { ObjectiveDialog } from "./objective-dialog";
 import { ObjectiveEditDialog } from "./objective-edit-dialog";
+import { ObjectiveRetrospectiveDialog } from "./objective-retrospective-dialog";
 import { KeyResultDialog } from "./key-result-dialog";
 import { KeyResultEditDialog } from "./key-result-edit-dialog";
 import { KeyResultUpdateDialog } from "./key-result-update-dialog";
@@ -293,6 +297,8 @@ export default function OKRsPage() {
   const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null);
   const [deletingObjectiveId, setDeletingObjectiveId] = useState<string | null>(null);
   const [deletingKRId, setDeletingKRId] = useState<string | null>(null);
+  const [retroObjective, setRetroObjective] = useState<Objective | null>(null);
+  const [retroReadOnly, setRetroReadOnly] = useState(false);
 
   const [selectedObjectiveId, setSelectedObjectiveId] = useState<string | null>(null);
   const [selectedKeyResult, setSelectedKeyResult] = useState<KeyResult | null>(null);
@@ -314,8 +320,12 @@ export default function OKRsPage() {
   }, [cycleFilter]);
 
   // ── Queries ─────────────────────────────────────────────────────────────────
+  const isArchiveMode = cycleFilter === "archive";
   const { data: objectives = [], isLoading: objectivesLoading } = useQuery<Objective[]>({
-    queryKey: ["/api/objectives"],
+    queryKey: isArchiveMode ? ["/api/objectives", "archived"] : ["/api/objectives"],
+    queryFn: isArchiveMode
+      ? () => fetch("/api/objectives?archived=true").then((r) => r.json())
+      : undefined,
   });
   const { data: keyResults = [] } = useQuery<KeyResult[]>({
     queryKey: ["/api/key-results"],
@@ -338,7 +348,9 @@ export default function OKRsPage() {
     return map;
   }, [allInitiatives]);
 
-  const filteredObjectives = objectives.filter((obj) => obj.cycle === cycleFilter);
+  const filteredObjectives = isArchiveMode
+    ? objectives
+    : objectives.filter((obj) => obj.cycle === cycleFilter);
 
   // ── Mutations ────────────────────────────────────────────────────────────────
   const deleteObjectiveMutation = useMutation({
@@ -417,33 +429,35 @@ export default function OKRsPage() {
         title="OKRs"
         breadcrumbs={[{ label: "OKRs" }]}
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              onClick={() => setIsInitiativeDialogOpen(true)}
-              data-testid="button-new-initiative"
-              className="text-primary hover:text-primary hover:bg-primary/10"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Nova Iniciativa
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setIsGlobalKRDialogOpen(true)}
-              data-testid="button-new-kr-global"
-              className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Novo KR
-            </Button>
-            <Button
-              onClick={() => setIsObjectiveDialogOpen(true)}
-              data-testid="button-new-objective"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Novo Objetivo
-            </Button>
-          </div>
+          !isArchiveMode ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setIsInitiativeDialogOpen(true)}
+                data-testid="button-new-initiative"
+                className="text-primary hover:text-primary hover:bg-primary/10"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Nova Iniciativa
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsGlobalKRDialogOpen(true)}
+                data-testid="button-new-kr-global"
+                className="border-primary text-primary hover:bg-primary/10 hover:text-primary"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo KR
+              </Button>
+              <Button
+                onClick={() => setIsObjectiveDialogOpen(true)}
+                data-testid="button-new-objective"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Novo Objetivo
+              </Button>
+            </div>
+          ) : undefined
         }
       />
 
@@ -466,6 +480,12 @@ export default function OKRsPage() {
                   {quarters.map((q) => (
                     <SelectItem key={q} value={q}>{q}</SelectItem>
                   ))}
+                  <SelectItem value="archive">
+                    <span className="flex items-center gap-1.5">
+                      <Archive className="h-3 w-3" />
+                      Arquivo
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
               <div className="w-px h-4 bg-border/60 self-center" />
@@ -554,6 +574,7 @@ export default function OKRsPage() {
               onDeleteKR={(id) => setDeletingKRId(id)}
               onEditInitiative={(init) => setEditingInitiative(init)}
               onCheckin={(kr) => openUpdateDialog(kr)}
+              onRetroObjective={(obj, ro) => { setRetroObjective(obj); setRetroReadOnly(ro); }}
             />
           )
 
@@ -574,6 +595,7 @@ export default function OKRsPage() {
               onToggleInitiative={(id, completed) =>
                 toggleInitiativeMutation.mutate({ id, completed })
               }
+              onRetroObjective={(obj, ro) => { setRetroObjective(obj); setRetroReadOnly(ro); }}
             />
           )
 
@@ -614,16 +636,22 @@ export default function OKRsPage() {
                 )
               );
 
+              const isClosed = objective.closedAt != null;
+
               return (
                 <div
                   key={objective.id}
-                  className="rounded-xl border border-border/60 border-l-[3px] border-l-[#00E676] bg-background shadow-sm overflow-hidden"
+                  className={`rounded-xl border border-border/60 bg-background shadow-sm overflow-hidden ${
+                    isClosed
+                      ? "border-l-[3px] border-l-border opacity-70"
+                      : "border-l-[3px] border-l-[#00E676]"
+                  }`}
                   data-testid={`card-objective-${objective.id}`}
                 >
                   {/* ── Objective header ─────────────────────────────────── */}
                   <div className="px-5 pt-4 pb-3">
                     <div className="flex items-start gap-3">
-                      <div className={`h-9 w-9 shrink-0 rounded-xl flex items-center justify-center ${statusColors[objective.status]}`}>
+                      <div className={`h-9 w-9 shrink-0 rounded-xl flex items-center justify-center ${isClosed ? "bg-muted/40" : statusColors[objective.status]}`}>
                         <StatusIcon className="h-4 w-4" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -632,14 +660,22 @@ export default function OKRsPage() {
                             <Badge variant="secondary" className="font-bold text-[10px] uppercase tracking-wider bg-[#00E676]/10 text-[#00E676] border-[#00E676]/20 border">
                               {levelLabels[objective.level]}
                             </Badge>
-                            <h3 className="text-[15px] font-bold text-foreground leading-tight">
+                            <h3 className={`text-[15px] font-bold leading-tight ${isClosed ? "text-muted-foreground" : "text-foreground"}`}>
                               {objective.title}
                             </h3>
-                            <Badge variant="outline" className={`font-bold text-[10px] uppercase tracking-wider ${statusColors[objective.status]}`}>
-                              {statusLabels[objective.status]}
-                            </Badge>
-                            {objHealth !== objective.status && (
-                              <HealthBadge status={objHealth} secondary />
+                            {isClosed ? (
+                              <Badge variant="outline" className="font-bold text-[10px] uppercase tracking-wider bg-muted/40 text-muted-foreground border-border/60">
+                                ENCERRADO
+                              </Badge>
+                            ) : (
+                              <>
+                                <Badge variant="outline" className={`font-bold text-[10px] uppercase tracking-wider ${statusColors[objective.status]}`}>
+                                  {statusLabels[objective.status]}
+                                </Badge>
+                                {objHealth !== objective.status && (
+                                  <HealthBadge status={objHealth} secondary />
+                                )}
+                              </>
                             )}
                             <Badge variant="outline" className="font-bold text-[10px] uppercase tracking-wider">
                               {objective.cycle}
@@ -666,10 +702,23 @@ export default function OKRsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => setEditingObjective(objective)}>
-                                  <Pencil className="h-3.5 w-3.5 mr-2" />
-                                  Editar
-                                </DropdownMenuItem>
+                                {isClosed ? (
+                                  <DropdownMenuItem onClick={() => { setRetroObjective(objective); setRetroReadOnly(true); }}>
+                                    <Eye className="h-3.5 w-3.5 mr-2" />
+                                    Ver retrospectiva
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <>
+                                    <DropdownMenuItem onClick={() => setEditingObjective(objective)}>
+                                      <Pencil className="h-3.5 w-3.5 mr-2" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => { setRetroObjective(objective); setRetroReadOnly(false); }}>
+                                      <Flag className="h-3.5 w-3.5 mr-2" />
+                                      Encerrar Quarter
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                                 <DropdownMenuItem
                                   className="text-destructive focus:text-destructive"
                                   onClick={() => setDeletingObjectiveId(objective.id)}
@@ -802,7 +851,7 @@ export default function OKRsPage() {
                                         {isKRCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
                                       </Button>
                                     )}
-                                    {initiatives.length === 0 && (
+                                    {!isClosed && initiatives.length === 0 && (
                                       <Button
                                         variant="ghost"
                                         size="sm"
@@ -814,24 +863,28 @@ export default function OKRsPage() {
                                         Check-in
                                       </Button>
                                     )}
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                                      onClick={() => setEditingKR(kr)}
-                                      data-testid={`btn-edit-kr-${kr.id}`}
-                                    >
-                                      <Pencil className="h-3 w-3" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                      onClick={() => setDeletingKRId(kr.id)}
-                                      data-testid={`btn-delete-kr-${kr.id}`}
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
+                                    {!isClosed && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                        onClick={() => setEditingKR(kr)}
+                                        data-testid={`btn-edit-kr-${kr.id}`}
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                    {!isClosed && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                        onClick={() => setDeletingKRId(kr.id)}
+                                        data-testid={`btn-delete-kr-${kr.id}`}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
 
@@ -856,21 +909,23 @@ export default function OKRsPage() {
                                         className="flex items-center gap-2 py-1.5 px-3 rounded-md hover:bg-muted/30 group"
                                         data-testid={`row-initiative-${initiative.id}`}
                                       >
-                                        <button
-                                          onClick={() =>
-                                            toggleInitiativeMutation.mutate({
-                                              id: initiative.id,
-                                              completed: !initiative.completed,
-                                            })
-                                          }
-                                          className="shrink-0 text-muted-foreground hover:text-[#378ADD] transition-colors"
-                                        >
-                                          {initiative.completed ? (
-                                            <CheckSquare className="h-4 w-4 text-[#378ADD]" />
-                                          ) : (
-                                            <Square className="h-4 w-4" />
-                                          )}
-                                        </button>
+                                        {!isClosed && (
+                                          <button
+                                            onClick={() =>
+                                              toggleInitiativeMutation.mutate({
+                                                id: initiative.id,
+                                                completed: !initiative.completed,
+                                              })
+                                            }
+                                            className="shrink-0 text-muted-foreground hover:text-[#378ADD] transition-colors"
+                                          >
+                                            {initiative.completed ? (
+                                              <CheckSquare className="h-4 w-4 text-[#378ADD]" />
+                                            ) : (
+                                              <Square className="h-4 w-4" />
+                                            )}
+                                          </button>
+                                        )}
                                         <p
                                           className={`flex-1 text-[13px] transition-all ${
                                             initiative.completed
@@ -903,14 +958,16 @@ export default function OKRsPage() {
                                   })}
 
                                   {/* + Adicionar iniciativa */}
-                                  <button
-                                    className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary py-1 px-3 rounded-md hover:bg-muted/20 transition-colors"
-                                    onClick={() => openInlineInitiativeDialog(kr.id)}
-                                    data-testid={`button-add-initiative-${kr.id}`}
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                    Adicionar iniciativa
-                                  </button>
+                                  {!isClosed && (
+                                    <button
+                                      className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary py-1 px-3 rounded-md hover:bg-muted/20 transition-colors"
+                                      onClick={() => openInlineInitiativeDialog(kr.id)}
+                                      data-testid={`button-add-initiative-${kr.id}`}
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                      Adicionar iniciativa
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -919,14 +976,16 @@ export default function OKRsPage() {
                       </div>
 
                       {/* + Adicionar KR */}
-                      <button
-                        className="ml-5 mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary py-1 px-2 rounded-md hover:bg-muted/20 transition-colors"
-                        onClick={() => openKRDialog(objective.id)}
-                        data-testid={`button-add-kr-${objective.id}`}
-                      >
-                        <Plus className="h-3 w-3" />
-                        Adicionar KR
-                      </button>
+                      {!isClosed && (
+                        <button
+                          className="ml-5 mt-2 flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary py-1 px-2 rounded-md hover:bg-muted/20 transition-colors"
+                          onClick={() => openKRDialog(objective.id)}
+                          data-testid={`button-add-kr-${objective.id}`}
+                        >
+                          <Plus className="h-3 w-3" />
+                          Adicionar KR
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -991,6 +1050,20 @@ export default function OKRsPage() {
           onOpenChange={(open) => { if (!open) setEditingInitiative(null); }}
           initiative={editingInitiative}
           defaultCycle={cycleFilter}
+        />
+      )}
+
+      {/* ── Retrospectiva dialog ────────────────────────────────────────────── */}
+      {retroObjective && (
+        <ObjectiveRetrospectiveDialog
+          objective={retroObjective}
+          keyResults={keyResults.filter((kr) => kr.objectiveId === retroObjective.id)}
+          open={!!retroObjective}
+          onClose={() => setRetroObjective(null)}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/objectives"] });
+          }}
+          readOnly={retroReadOnly}
         />
       )}
 
