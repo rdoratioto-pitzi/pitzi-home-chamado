@@ -60,14 +60,248 @@ async function validateParentOkr(
   return null;
 }
 
+// ─── Health helpers (replica de client/src/lib/okr-health.ts para uso no backend) ───
+type HealthStatus = "on_track" | "at_risk" | "off_track";
+
+const QUARTER_RANGES: Record<string, { start: Date; end: Date }> = {
+  "2025-Q1": { start: new Date("2025-01-01"), end: new Date("2025-03-31") },
+  "2025-Q2": { start: new Date("2025-04-01"), end: new Date("2025-06-30") },
+  "2025-Q3": { start: new Date("2025-07-01"), end: new Date("2025-09-30") },
+  "2025-Q4": { start: new Date("2025-10-01"), end: new Date("2025-12-31") },
+  "2026-Q1": { start: new Date("2026-01-01"), end: new Date("2026-03-31") },
+  "2026-Q2": { start: new Date("2026-04-01"), end: new Date("2026-06-30") },
+  "2026-Q3": { start: new Date("2026-07-01"), end: new Date("2026-09-30") },
+  "2026-Q4": { start: new Date("2026-10-01"), end: new Date("2026-12-31") },
+};
+
+function calcKrProgress(kr: { measurementType: string; startValue: string | null; targetValue: string; currentValue: string }): number {
+  const start = parseFloat(kr.startValue ?? "0");
+  const target = parseFloat(kr.targetValue);
+  const current = parseFloat(kr.currentValue);
+  let p: number;
+  if (kr.measurementType === "decreasing") {
+    p = target !== start ? ((start - current) / (start - target)) * 100 : 0;
+  } else if (kr.measurementType === "binary") {
+    p = current > 0 ? 100 : 0;
+  } else {
+    p = target !== start ? ((current - start) / (target - start)) * 100 : 0;
+  }
+  return Math.max(0, Math.min(100, p));
+}
+
+function normalizeCycle(cycle: string): string {
+  // Normaliza "2026 Q2" → "2026-Q2"
+  return cycle.replace(" ", "-");
+}
+
+function calcHealthStatus(progressPercent: number, cycle: string): HealthStatus {
+  const range = QUARTER_RANGES[normalizeCycle(cycle)];
+  if (!range) return "on_track";
+  const now = new Date();
+  if (now < range.start) return "on_track";
+  if (now > range.end) {
+    if (progressPercent >= 70) return "on_track";
+    if (progressPercent >= 40) return "at_risk";
+    return "off_track";
+  }
+  const total = range.end.getTime() - range.start.getTime();
+  const elapsed = now.getTime() - range.start.getTime();
+  const timeElapsed = Math.min((elapsed / total) * 100, 100);
+  if (progressPercent >= timeElapsed * 0.9) return "on_track";
+  if (progressPercent >= timeElapsed * 0.6) return "at_risk";
+  return "off_track";
+}
+
+function calcTimeElapsedPercent(cycle: string): number {
+  const range = QUARTER_RANGES[normalizeCycle(cycle)];
+  if (!range) return 0;
+  const now = new Date();
+  if (now <= range.start) return 0;
+  if (now >= range.end) return 100;
+  const total = range.end.getTime() - range.start.getTime();
+  const elapsed = now.getTime() - range.start.getTime();
+  return Math.min((elapsed / total) * 100, 100);
+}
+
+function calcObjectiveHealth(krStatuses: HealthStatus[]): HealthStatus {
+  if (krStatuses.length === 0) return "on_track";
+  if (krStatuses.includes("off_track")) return "off_track";
+  if (krStatuses.includes("at_risk")) return "at_risk";
+  return "on_track";
+}
+
 export function registerOkrRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
+
+  // ============== DASHBOARD ==============
+  router.get("/api/okrs/dashboard", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const cycle = (req.query.cycle as string) || "";
+
+      const allObjectives = await storage.getObjectives();
+      const allKeyResults = await storage.getKeyResults();
+      const allInitiatives = await storage.getInitiatives();
+
+      // Filtrar objectives pelo cycle
+      let cycleObjectives = allObjectives.filter((o) => o.cycle === cycle);
+
+      // Aplicar filtro de permissão igual ao GET /api/objectives
+      if (!isAdmin) {
+        cycleObjectives = cycleObjectives.filter((obj) => {
+          if (obj.ownerId === userId) return true;
+          return allKeyResults.some((kr) => {
+            if (kr.objectiveId !== obj.id) return false;
+            try {
+              const ids = typeof kr.responsibleIds === "string"
+                ? JSON.parse(kr.responsibleIds)
+                : kr.responsibleIds;
+              return Array.isArray(ids) && ids.includes(userId);
+            } catch {
+              return false;
+            }
+          });
+        });
+      }
+
+      const objectiveIds = new Set(cycleObjectives.map((o) => o.id));
+      const cycleKrs = allKeyResults.filter((kr) => objectiveIds.has(kr.objectiveId));
+      const krIds = new Set(cycleKrs.map((kr) => kr.id));
+      const cycleInitiatives = allInitiatives.filter((i) => krIds.has(i.keyResultId));
+
+      const timeElapsed = calcTimeElapsedPercent(cycle);
+
+      // KRs com progresso e health
+      const krsWithHealth = cycleKrs.map((kr) => {
+        const progress = calcKrProgress(kr);
+        const health = calcHealthStatus(progress, cycle);
+        return { kr, progress, health };
+      });
+
+      // Objectives com progresso e health
+      const objectiveSummaries = cycleObjectives.map((obj) => {
+        const objKrs = krsWithHealth.filter((k) => k.kr.objectiveId === obj.id);
+        const avgProgress = objKrs.length > 0
+          ? objKrs.reduce((sum, k) => sum + k.progress, 0) / objKrs.length
+          : 0;
+        const health = calcObjectiveHealth(objKrs.map((k) => k.health));
+        return {
+          id: obj.id,
+          title: obj.title,
+          progressPercent: Math.round(avgProgress),
+          healthStatus: health,
+          keyResultsCount: objKrs.length,
+          status: obj.status,
+          closedAt: obj.closedAt ? obj.closedAt.toISOString() : null,
+          closeStatus: obj.closeStatus ?? null,
+        };
+      });
+
+      // Separar encerrados dos ativos para byHealth
+      const activeObjectives = objectiveSummaries.filter((o) => !o.closedAt);
+      const closedObjectives = objectiveSummaries.filter((o) => o.closedAt);
+
+      // Stats gerais (somente objetivos ativos)
+      const totalObjectives = activeObjectives.length;
+      const avgProgress = totalObjectives > 0
+        ? Math.round(activeObjectives.reduce((s, o) => s + o.progressPercent, 0) / totalObjectives)
+        : 0;
+      const byHealth = {
+        on_track: activeObjectives.filter((o) => o.healthStatus === "on_track").length,
+        at_risk: activeObjectives.filter((o) => o.healthStatus === "at_risk").length,
+        off_track: activeObjectives.filter((o) => o.healthStatus === "off_track").length,
+      };
+
+      // KRs fora do ritmo
+      const atRiskKRs = krsWithHealth
+        .filter((k) => k.health === "at_risk" || k.health === "off_track")
+        .map((k) => {
+          const obj = cycleObjectives.find((o) => o.id === k.kr.objectiveId);
+          return {
+            id: k.kr.id,
+            title: k.kr.title,
+            objectiveId: k.kr.objectiveId,
+            objectiveTitle: obj?.title ?? "",
+            progressPercent: Math.round(k.progress),
+            expectedPercent: Math.round(timeElapsed),
+            healthStatus: k.health as "at_risk" | "off_track",
+            ownerId: k.kr.responsibleIds
+              ? (() => {
+                  try {
+                    const ids = typeof k.kr.responsibleIds === "string"
+                      ? JSON.parse(k.kr.responsibleIds)
+                      : k.kr.responsibleIds;
+                    return Array.isArray(ids) && ids.length > 0 ? ids[0] : null;
+                  } catch {
+                    return null;
+                  }
+                })()
+              : null,
+          };
+        })
+        .sort((a, b) => (b.expectedPercent - b.progressPercent) - (a.expectedPercent - a.progressPercent));
+
+      // Initiatives stats
+      const completedInitiatives = cycleInitiatives.filter((i) => i.completed).length;
+      const now = new Date();
+      const overdueInitiatives = cycleInitiatives
+        .filter((i) => !i.completed && i.dueDate && new Date(i.dueDate) < now)
+        .map((i) => {
+          const kr = cycleKrs.find((k) => k.id === i.keyResultId);
+          const obj = kr ? cycleObjectives.find((o) => o.id === kr.objectiveId) : undefined;
+          return {
+            id: i.id,
+            title: i.title,
+            keyResultId: i.keyResultId,
+            keyResultTitle: kr?.title ?? "",
+            objectiveTitle: obj?.title ?? "",
+            dueDate: i.dueDate ? i.dueDate.toISOString() : "",
+            ownerId: i.ownerId ?? null,
+          };
+        });
+
+      res.json({
+        cycle,
+        totalObjectives,
+        avgProgress,
+        byHealth,
+        closedCount: closedObjectives.length,
+        closedObjectives: closedObjectives.map((o) => ({
+          id: o.id,
+          title: o.title,
+          closeStatus: o.closeStatus,
+          closedAt: o.closedAt,
+        })),
+        objectives: objectiveSummaries.sort((a, b) => a.progressPercent - b.progressPercent),
+        initiatives: {
+          total: cycleInitiatives.length,
+          completed: completedInitiatives,
+          completionRate: cycleInitiatives.length > 0
+            ? Math.round((completedInitiatives / cycleInitiatives.length) * 100)
+            : 0,
+        },
+        atRiskKRs,
+        overdueInitiatives,
+      });
+    } catch (error) {
+      console.error("Error fetching OKR dashboard:", error);
+      res.status(500).json({ error: "Failed to fetch OKR dashboard" });
+    }
+  });
 
   // ============== OKRs ==============
   router.get("/api/objectives", requireAuth, async (req, res) => {
     try {
       const { userId, isAdmin } = getSessionUser(req);
       const objectives = await storage.getObjectives();
+
+      // Modo arquivo: retorna apenas objetivos encerrados de todos os cycles
+      if (req.query.archived === "true") {
+        const archived = objectives
+          .filter((o) => o.closedAt != null)
+          .sort((a, b) => new Date(b.closedAt!).getTime() - new Date(a.closedAt!).getTime());
+        return res.json(archived);
+      }
 
       let list: Objective[];
       if (isAdmin) {
@@ -98,6 +332,45 @@ export function registerOkrRoutes(router: Router) {
     } catch (error) {
       console.error("Error fetching objectives:", error);
       res.status(500).json({ error: "Failed to fetch objectives" });
+    }
+  });
+
+  // POST /api/objectives/:id/close — encerrar quarter de um objetivo
+  router.post("/api/objectives/:id/close", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const id = getId(req);
+
+      const existing = await storage.getObjective(id);
+      if (!existing) return res.status(404).json({ error: "Objetivo não encontrado" });
+      if (!isAdmin && existing.ownerId !== userId) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (existing.closedAt != null) {
+        return res.status(400).json({ error: "Este objetivo já foi encerrado." });
+      }
+
+      const closeSchema = z.object({
+        closeStatus: z.enum(["achieved", "partial", "not_achieved"]),
+        closeComment: z.string().min(20, "O comentário deve ter pelo menos 20 caracteres"),
+      });
+
+      const { closeStatus, closeComment } = closeSchema.parse(req.body);
+
+      const updated = await storage.updateObjective(id, {
+        closedAt: new Date(),
+        closeStatus,
+        closeComment,
+      } as any);
+
+      if (!updated) return res.status(404).json({ error: "Objetivo não encontrado" });
+      res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Validação falhou", details: error.errors });
+      }
+      console.error("Error closing objective:", error);
+      res.status(500).json({ error: "Falha ao encerrar objetivo" });
     }
   });
 

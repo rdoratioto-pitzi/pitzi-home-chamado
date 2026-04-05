@@ -1,12 +1,21 @@
 import { useState, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronDown, ChevronUp, ChevronRight, Target, Square, CheckSquare, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, ChevronUp, ChevronRight, Target, Square, CheckSquare, Clock, MoreHorizontal, Flag, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatKRRange } from "@/lib/kr-format";
 import { useAuth } from "@/contexts/auth-context";
 import type { Objective, KeyResult, User, Initiative } from "@shared/schema";
+import { calculateHealthStatus, calculateObjectiveHealth } from "@/lib/okr-health";
+import { HealthBadge } from "@/components/okrs/HealthBadge";
 
 // ─── OwnerChip (organogram variant) ──────────────────────────────────────────
 function OwnerChip({
@@ -48,6 +57,7 @@ export interface OkrHierarchyViewProps {
   users: User[];
   initiativesByKR?: Map<string, Initiative[]>;
   onToggleInitiative?: (id: string, completed: boolean) => void;
+  onRetroObjective?: (obj: Objective, readOnly: boolean) => void;
 }
 
 interface OrgChartNodeProps {
@@ -57,6 +67,7 @@ interface OrgChartNodeProps {
   initiativesByKR: Map<string, Initiative[]>;
   onToggleInitiative: (id: string, completed: boolean) => void;
   currentUserId: string | undefined;
+  onRetroObjective?: (obj: Objective, readOnly: boolean) => void;
 }
 
 interface OrgChartCardProps {
@@ -69,6 +80,7 @@ interface OrgChartCardProps {
   hasChildren: boolean;
   onToggle: () => void;
   currentUserId: string | undefined;
+  onRetroObjective?: (obj: Objective, readOnly: boolean) => void;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -170,16 +182,26 @@ function OrgChartCard({
   hasChildren,
   onToggle,
   currentUserId,
+  onRetroObjective,
 }: OrgChartCardProps) {
   const [krsExpanded, setKrsExpanded] = useState(true);
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
 
+  const isClosed = node.closedAt != null;
   const progress = calcObjectiveProgress(node.id, keyResults, initiativesByKR);
   const nodeKRs = keyResults.filter((kr) => kr.objectiveId === node.id);
   const levelInfo = levelBadgeStyle[node.level] ?? levelBadgeStyle.company;
   const statusInfo = statusBadgeStyle[node.status] ?? statusBadgeStyle.on_track;
-  const borderCls = levelBorderLeft[node.level] ?? "";
-  const progressColor = levelProgressColor[node.level] ?? "#00E676";
+  const borderCls = isClosed ? "border-l-[3px] border-l-border" : (levelBorderLeft[node.level] ?? "");
+  const progressColor = isClosed ? "var(--border)" : (levelProgressColor[node.level] ?? "#00E676");
+  const objHealth = calculateObjectiveHealth(
+    nodeKRs.map((kr) =>
+      calculateHealthStatus(
+        calcKRProgress(kr, initiativesByKR.get(kr.id) ?? []),
+        node.cycle,
+      )
+    )
+  );
 
   const toggleKR = (id: string) =>
     setExpandedKRs((prev) => {
@@ -190,21 +212,45 @@ function OrgChartCard({
 
   return (
     <Card
-      className={`overflow-hidden ${borderCls} border-[0.5px] border-border/40`}
+      className={`overflow-hidden ${borderCls} border-[0.5px] border-border/40 ${isClosed ? "opacity-70" : ""}`}
       style={{ width: CARD_WIDTH, minWidth: CARD_WIDTH }}
     >
       <CardContent className="p-0">
         <div className="px-4 pt-3 pb-3">
-          {/* Level badge */}
-          <Badge
-            variant="outline"
-            className={`text-[10px] px-[7px] py-[2px] font-semibold mb-2 ${levelInfo.cls}`}
-          >
-            {levelInfo.label}
-          </Badge>
+          {/* Level badge + menu ⋯ */}
+          <div className="flex items-start justify-between gap-1 mb-2">
+            <Badge
+              variant="outline"
+              className={`text-[10px] px-[7px] py-[2px] font-semibold ${levelInfo.cls}`}
+            >
+              {levelInfo.label}
+            </Badge>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 text-muted-foreground hover:text-foreground -mt-0.5 -mr-1 shrink-0"
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {isClosed ? (
+                  <DropdownMenuItem onClick={() => onRetroObjective?.(node, true)}>
+                    <Eye className="h-3.5 w-3.5 mr-2" /> Ver retrospectiva
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => onRetroObjective?.(node, false)}>
+                    <Flag className="h-3.5 w-3.5 mr-2" /> Encerrar Quarter
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
           {/* Title */}
-          <p className="text-[13px] font-medium text-foreground leading-snug line-clamp-2 mt-1 mb-2">
+          <p className={`text-[13px] font-medium leading-snug line-clamp-2 mt-1 mb-2 ${isClosed ? "text-muted-foreground" : "text-foreground"}`}>
             {node.title}
           </p>
 
@@ -215,13 +261,26 @@ function OrgChartCard({
             </div>
           )}
 
-          {/* Status badge */}
-          <Badge
-            variant="outline"
-            className={`text-[10px] px-[7px] py-[2px] font-semibold ${statusInfo.cls}`}
-          >
-            {statusInfo.label}
-          </Badge>
+          {/* Status badge (manual) + HealthBadge automático */}
+          <div className="flex items-center gap-1 flex-wrap">
+            {isClosed ? (
+              <Badge variant="outline" className="text-[10px] px-[7px] py-[2px] font-semibold bg-muted/40 text-muted-foreground border-border/60">
+                ENCERRADO
+              </Badge>
+            ) : (
+              <>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] px-[7px] py-[2px] font-semibold ${statusInfo.cls}`}
+                >
+                  {statusInfo.label}
+                </Badge>
+                {objHealth !== node.status && (
+                  <HealthBadge status={objHealth} secondary />
+                )}
+              </>
+            )}
+          </div>
 
           {/* Progress bar */}
           <div className="mt-3">
@@ -252,6 +311,7 @@ function OrgChartCard({
                     const krProgress = calcKRProgress(kr, initiatives);
                     const isKRExpanded = expandedKRs.has(kr.id);
                     const completedCount = initiatives.filter((i) => i.completed).length;
+                    const krHealth = calculateHealthStatus(krProgress, node.cycle);
                     const krOwnerId = (() => {
                       try {
                         const ids = JSON.parse(kr.responsibleIds ?? "[]");
@@ -268,9 +328,12 @@ function OrgChartCard({
                       >
                         {/* KR header */}
                         <div className="min-w-0">
-                          <p className="text-[11px] font-semibold leading-snug line-clamp-2">
-                            {kr.title}
-                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            <p className="text-[11px] font-semibold leading-snug line-clamp-2">
+                              {kr.title}
+                            </p>
+                            <HealthBadge status={krHealth} />
+                          </div>
                           <p className="text-[10px] text-muted-foreground mt-0.5">
                             {formatKRRange(kr.startValue, kr.targetValue, kr.measurementType, kr.unit)}
                           </p>
@@ -384,7 +447,7 @@ function OrgChartCard({
 
 // ─── OrgChartNode ─────────────────────────────────────────────────────────────
 
-function OrgChartNode({ node, keyResults, users, initiativesByKR, onToggleInitiative, currentUserId }: OrgChartNodeProps) {
+function OrgChartNode({ node, keyResults, users, initiativesByKR, onToggleInitiative, currentUserId, onRetroObjective }: OrgChartNodeProps) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children.length > 0;
   const subtreeWidth = calcSubtreeWidth(node);
@@ -401,6 +464,7 @@ function OrgChartNode({ node, keyResults, users, initiativesByKR, onToggleInitia
         hasChildren={hasChildren}
         onToggle={() => setExpanded((v) => !v)}
         currentUserId={currentUserId}
+        onRetroObjective={onRetroObjective}
       />
 
       {hasChildren && expanded && (
@@ -436,6 +500,7 @@ function OrgChartNode({ node, keyResults, users, initiativesByKR, onToggleInitia
                   initiativesByKR={initiativesByKR}
                   onToggleInitiative={onToggleInitiative}
                   currentUserId={currentUserId}
+                  onRetroObjective={onRetroObjective}
                 />
               </div>
             ))}
@@ -454,6 +519,7 @@ export function OkrHierarchyView({
   users,
   initiativesByKR = new Map(),
   onToggleInitiative = () => {},
+  onRetroObjective,
 }: OkrHierarchyViewProps) {
   const tree = useMemo(() => buildTree(objectives), [objectives]);
   const { user: currentUser } = useAuth();
@@ -487,6 +553,7 @@ export function OkrHierarchyView({
             initiativesByKR={initiativesByKR}
             onToggleInitiative={onToggleInitiative}
             currentUserId={currentUserId}
+            onRetroObjective={onRetroObjective}
           />
         ))}
       </div>

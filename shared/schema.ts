@@ -308,6 +308,9 @@ export const objectives = pgTable("objectives", {
   status: text("status").notNull().default("on_track"),
   parentOkrId: varchar("parent_okr_id").references((): AnyPgColumn => objectives.id),
   createdAt: timestamp("created_at").defaultNow(),
+  closedAt: timestamp("closed_at"),
+  closeComment: text("close_comment"),
+  closeStatus: varchar("close_status", { length: 20 }),
 });
 
 export const insertObjectiveSchema = createInsertSchema(objectives).omit({ id: true, createdAt: true });
