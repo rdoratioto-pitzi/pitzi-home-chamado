@@ -548,11 +548,12 @@ export function registerOkrRoutes(router: Router) {
 
   router.patch("/api/initiatives/:id", requireAuth, async (req, res) => {
     try {
-      const existing = await storage.getInitiative(req.params.id);
+      const id = req.params.id as string;
+      const existing = await storage.getInitiative(id);
       if (!existing) return res.status(404).json({ error: "Initiative not found" });
       const partialSchema = insertInitiativeSchema.partial();
       const validated = partialSchema.parse(req.body);
-      const initiative = await storage.updateInitiative(req.params.id, validated);
+      const initiative = await storage.updateInitiative(id, validated);
       if (!initiative) return res.status(404).json({ error: "Initiative not found" });
       res.json(initiative);
     } catch (error) {
@@ -564,9 +565,10 @@ export function registerOkrRoutes(router: Router) {
   });
 
   router.delete("/api/initiatives/:id", requireAuth, async (req, res) => {
-    const existing = await storage.getInitiative(req.params.id);
+    const id = req.params.id as string;
+    const existing = await storage.getInitiative(id);
     if (!existing) return res.status(404).json({ error: "Initiative not found" });
-    const deleted = await storage.deleteInitiative(req.params.id);
+    const deleted = await storage.deleteInitiative(id);
     if (!deleted) return res.status(404).json({ error: "Initiative not found" });
     res.status(204).send();
   });
