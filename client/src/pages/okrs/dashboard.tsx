@@ -226,24 +226,25 @@ export default function OKRsDashboardPage() {
   });
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-4">
-        <PageHeader
-          title="Dashboard OKRs"
-          description="Visão executiva do trimestre"
-        />
-        <Select value={cycle} onValueChange={setCycle}>
-          <SelectTrigger className="w-[140px] border h-9" data-testid="select-dashboard-cycle">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {quarters.map((q) => (
-              <SelectItem key={q} value={q}>{q}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="flex flex-col min-h-full">
+      <PageHeader
+        title="Dashboard OKRs"
+        description="Visão executiva do trimestre"
+        actions={
+          <Select value={cycle} onValueChange={setCycle}>
+            <SelectTrigger className="w-[140px] border h-9" data-testid="select-dashboard-cycle">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {quarters.map((q) => (
+                <SelectItem key={q} value={q}>{q}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
+      />
+
+      <main className="flex-1 p-6 space-y-6 max-w-6xl mx-auto w-full">
 
       {/* ── Loading ── */}
       {isLoading && <DashboardSkeleton />}
@@ -555,6 +556,8 @@ export default function OKRsDashboardPage() {
           </div>
         </>
       )}
+
+      </main>
     </div>
   );
 }
