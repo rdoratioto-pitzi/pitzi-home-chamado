@@ -21,6 +21,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { formatKRRange } from "@/lib/kr-format";
 import type { Objective, KeyResult, User, Initiative } from "@shared/schema";
+import { calculateHealthStatus, calculateObjectiveHealth } from "@/lib/okr-health";
+import { HealthBadge } from "@/components/okrs/HealthBadge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -220,6 +222,7 @@ function KRRow({
   currentUserId,
   showInitiatives,
   levelFilter,
+  objectiveCycle,
   onToggleExpand,
   onToggleInitiative,
   onEdit,
@@ -234,6 +237,7 @@ function KRRow({
   currentUserId: string | undefined;
   showInitiatives: boolean;
   levelFilter: string;
+  objectiveCycle: string;
   onToggleExpand: () => void;
   onToggleInitiative: (id: string, completed: boolean) => void;
   onEdit: () => void;
@@ -244,6 +248,7 @@ function KRRow({
   const krProgress = calcKRProgress(kr, initiatives);
   const ownerIds = parseResponsibleIds(kr.responsibleIds);
   const hasInitiatives = initiatives.length > 0;
+  const krHealth = calculateHealthStatus(krProgress, objectiveCycle);
 
   return (
     <>
@@ -275,7 +280,9 @@ function KRRow({
             KR
           </Badge>
         </div>
-        <div className="w-[110px] shrink-0" />
+        <div className="w-[110px] shrink-0">
+          <HealthBadge status={krHealth} />
+        </div>
         <div className="w-[120px] shrink-0 flex items-center gap-1.5 pr-2">
           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
@@ -382,6 +389,14 @@ function ObjectiveRow({
   const lvlInfo = levelBadge[objective.level] ?? levelBadge.company;
   const stInfo = statusBadge[objective.status] ?? statusBadge.on_track;
   const borderCls = levelBorder[objective.level] ?? "border-l-[#00E676]";
+  const objHealth = calculateObjectiveHealth(
+    krs.map((kr) =>
+      calculateHealthStatus(
+        calcKRProgress(kr, initiativesByKR.get(kr.id) ?? []),
+        objective.cycle,
+      )
+    )
+  );
 
   const showKRs = levelFilter !== "empresa";
   const showInitiatives = levelFilter === "all" || levelFilter === "iniciativa";
@@ -420,10 +435,13 @@ function ObjectiveRow({
             {lvlInfo.label}
           </Badge>
         </div>
-        <div className="w-[110px] shrink-0">
+        <div className="w-[110px] shrink-0 flex flex-col gap-0.5">
           <Badge variant="outline" className={`text-[9px] font-bold ${stInfo.cls}`}>
             {stInfo.label}
           </Badge>
+          {objHealth !== objective.status && (
+            <HealthBadge status={objHealth} secondary />
+          )}
         </div>
         <div className="w-[120px] shrink-0 flex items-center gap-1.5 pr-2">
           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
@@ -480,6 +498,7 @@ function ObjectiveRow({
           currentUserId={currentUserId}
           showInitiatives={showInitiatives}
           levelFilter={levelFilter}
+          objectiveCycle={objective.cycle}
           onToggleExpand={() => toggleKR(kr.id)}
           onToggleInitiative={onToggleInitiative}
           onEdit={() => onEditKR(kr)}

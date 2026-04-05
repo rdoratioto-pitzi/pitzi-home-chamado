@@ -69,6 +69,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { getCurrentQuarter, getQuarterOptions } from "@/lib/quarter";
 import { formatKRRange, formatKRCurrentOverTarget } from "@/lib/kr-format";
 import { useAuth } from "@/contexts/auth-context";
+import { calculateHealthStatus, calculateObjectiveHealth } from "@/lib/okr-health";
+import { HealthBadge } from "@/components/okrs/HealthBadge";
 
 // ─── OwnerChip ────────────────────────────────────────────────────────────────
 // Exibe avatar (iniciais) + nome do responsável. Mostra "Você" quando o
@@ -603,6 +605,14 @@ export default function OKRsPage() {
               const progress = calcObjectiveProgress(objective.id, keyResults, initiativesByKR);
               const StatusIcon = statusIcons[objective.status] ?? CheckCircle2;
               const isObjCollapsed = collapsedObjectives.has(objective.id);
+              const objHealth = calculateObjectiveHealth(
+                krs.map((kr) =>
+                  calculateHealthStatus(
+                    calcKRProgress(kr, initiativesByKR.get(kr.id) ?? []),
+                    objective.cycle,
+                  )
+                )
+              );
 
               return (
                 <div
@@ -628,6 +638,9 @@ export default function OKRsPage() {
                             <Badge variant="outline" className={`font-bold text-[10px] uppercase tracking-wider ${statusColors[objective.status]}`}>
                               {statusLabels[objective.status]}
                             </Badge>
+                            {objHealth !== objective.status && (
+                              <HealthBadge status={objHealth} secondary />
+                            )}
                             <Badge variant="outline" className="font-bold text-[10px] uppercase tracking-wider">
                               {objective.cycle}
                             </Badge>
@@ -707,6 +720,7 @@ export default function OKRsPage() {
                           const completedCount = initiatives.filter((i) => i.completed).length;
                           const deadlineStatus = kr.deadlineStatus || "on_track";
                           const ownerIds = parseResponsibleIds(kr.responsibleIds);
+                          const krHealth = calculateHealthStatus(krProgress, objective.cycle);
 
                           return (
                             <div key={kr.id}>
@@ -725,6 +739,7 @@ export default function OKRsPage() {
                                       <p className="text-[13px] font-semibold text-foreground leading-snug">
                                         {kr.title}
                                       </p>
+                                      <HealthBadge status={krHealth} />
                                       {kr.dueDate && (
                                         <Badge
                                           variant="outline"
