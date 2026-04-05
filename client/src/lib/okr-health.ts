@@ -21,11 +21,16 @@ export const QUARTER_RANGES: Record<string, { start: Date; end: Date }> = {
  *   ≥ 90% do tempo    → on_track
  *   ≥ 60% do tempo    → at_risk
  *   <  60% do tempo   → off_track
+ *
+ * hasKeyResults = false → on_track (sem KRs, não é possível avaliar saúde)
  */
 export function calculateHealthStatus(
   progressPercent: number,
   cycle: string,
+  hasKeyResults = true,
 ): HealthStatus {
+  if (!hasKeyResults) return 'on_track'
+
   const range = QUARTER_RANGES[cycle]
   if (!range) return 'on_track'
 
