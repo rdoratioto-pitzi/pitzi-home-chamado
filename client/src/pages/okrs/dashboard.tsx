@@ -20,6 +20,7 @@ import {
   TrendingUp,
   RefreshCw,
   AlertCircle,
+  Archive,
 } from "lucide-react";
 import { getCurrentQuarter, getQuarterOptions } from "@/lib/quarter";
 import { HealthBadge } from "@/components/okrs/HealthBadge";
@@ -36,6 +37,13 @@ interface ObjectiveSummary {
   healthStatus: HealthStatus;
   keyResultsCount: number;
   status: string;
+}
+
+interface ClosedObjectiveSummary {
+  id: string;
+  title: string;
+  closeStatus: string | null;
+  closedAt: string | null;
 }
 
 interface AtRiskKR {
@@ -64,6 +72,8 @@ interface DashboardData {
   totalObjectives: number;
   avgProgress: number;
   byHealth: { on_track: number; at_risk: number; off_track: number };
+  closedCount: number;
+  closedObjectives: ClosedObjectiveSummary[];
   objectives: ObjectiveSummary[];
   initiatives: { total: number; completed: number; completionRate: number };
   atRiskKRs: AtRiskKR[];
@@ -359,6 +369,62 @@ export default function OKRsDashboardPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* ── BLOCO 2b: Objetivos encerrados ── */}
+          {data.closedCount > 0 && (
+            <Card style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Archive className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-[14px] font-semibold" style={{ color: "var(--l1)" }}>
+                    {data.closedCount} objetivo{data.closedCount !== 1 ? "s" : ""} encerrado{data.closedCount !== 1 ? "s" : ""} este quarter
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {data.closedObjectives.map((obj) => {
+                  const statusConfig = {
+                    achieved: { label: "Atingido", className: "bg-green-500/10 text-green-600 border-green-500/30" },
+                    partial: { label: "Parcialmente Atingido", className: "bg-yellow-500/10 text-yellow-600 border-yellow-500/30" },
+                    not_achieved: { label: "Não Atingido", className: "bg-red-500/10 text-red-600 border-red-500/30" },
+                  } as const;
+                  type CloseStatus = keyof typeof statusConfig;
+                  const cfg = obj.closeStatus && obj.closeStatus in statusConfig
+                    ? statusConfig[obj.closeStatus as CloseStatus]
+                    : null;
+                  const closedDate = obj.closedAt
+                    ? format(new Date(obj.closedAt), "dd/MM/yyyy", { locale: ptBR })
+                    : null;
+                  return (
+                    <div
+                      key={obj.id}
+                      className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 opacity-75"
+                      style={{ borderBottom: "1px solid var(--sep)" }}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Archive className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
+                        <span className="text-[13px] truncate" style={{ color: "var(--l2)" }}>
+                          {obj.title}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {closedDate && (
+                          <span className="text-[11px]" style={{ color: "var(--l3)" }}>
+                            {closedDate}
+                          </span>
+                        )}
+                        {cfg && (
+                          <Badge variant="outline" className={`text-[9px] font-semibold uppercase tracking-wide ${cfg.className}`}>
+                            {cfg.label}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
 
           {/* ── BLOCOS 3+4 em grid ── */}
           <div className="grid md:grid-cols-2 gap-4 items-start">
