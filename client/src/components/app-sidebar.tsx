@@ -47,6 +47,9 @@ import {
   Route,
   LayoutGrid,
   Factory,
+  AlertTriangle,
+  ScanEye,
+  Filter,
 } from "lucide-react";
 import {
   Sidebar,
@@ -136,7 +139,18 @@ const logisticaOutrosItems = [
 const logisticaSubItems = logisticaDashboardItems;
 
 const triagemSubItems = [
+  { title: "Dashboard", url: "/triagem/dashboard", icon: LayoutDashboard },
+  { title: "Recebimentos", url: "/triagem/recebimentos", icon: Package },
+  { title: "Fila de Triagem", url: "/triagem/fila", icon: ClipboardList },
+  { title: "Desvios", url: "/triagem/desvios", icon: AlertTriangle },
   { title: "Impressão Etiquetas", url: "/triagem/impressao-etiquetas", icon: Printer },
+];
+
+const avaliacoesSubItems = [
+  { title: "Dashboard", url: "/avaliacoes/dashboard", icon: LayoutDashboard },
+  { title: "Curadoria", url: "/avaliacoes/curadoria", icon: ClipboardList },
+  { title: "Matriz de Confusão", url: "/avaliacoes/matriz", icon: FileSpreadsheet },
+  { title: "Configurações", url: "/avaliacoes/configuracoes", icon: Settings2 },
 ];
 
 const apisSubItems = [
@@ -168,14 +182,13 @@ const bibliotecaSubItems = [
 ];
 
 const estoquesSubItems = [
-  { title: "Dashboard", url: "/estoques/dashboard", icon: PieChart },
+  { title: "Dashboard", url: "/estoques/dashboard", icon: LayoutDashboard },
   { title: "Posição Estoques", url: "/estoques/posicao", icon: BarChart3 },
-  { title: "Pipeline", url: "/estoques/pipeline", icon: GitMerge },
+  { title: "Pipeline", url: "/estoques/pipeline", icon: Workflow },
   { title: "Lead Time", url: "/estoques/lead-time", icon: Clock },
   { title: "Aging Report", url: "/estoques/aging", icon: TrendingDown },
-  { title: "Rastreabilidade", url: "/estoques/rastreabilidade", icon: Route },
   { title: "Contagem Interna", url: "/estoques/contagem", icon: ClipboardList },
-  { title: "Relatório Contagens", url: "/estoques/relatorio-contagens", icon: FileSpreadsheet },
+  { title: "Rastreabilidade", url: "/estoques/rastreabilidade", icon: Search },
 ];
 
 export function AppSidebar() {
@@ -196,6 +209,7 @@ export function AppSidebar() {
   const [logisticaDashboardOpen, setLogisticaDashboardOpen] = useState(location.startsWith("/logistica/dispositivos") || location.startsWith("/logistica/coletas") || location.startsWith("/logistica/consulta") || location.startsWith("/logistica/fechamentos"));
   const [logisticaOutrosOpen, setLogisticaOutrosOpen] = useState(location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios") || location.startsWith("/logistica/avaliacoes-ia"));
   const [triagemOpen, setTriagemOpen] = useState(location.startsWith("/triagem"));
+  const [avaliacoesOpen, setAvaliacoesOpen] = useState(location.startsWith("/avaliacoes"));
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
   const [bibliotecaOpen, setBibliotecaOpen] = useState(location.startsWith("/biblioteca"));
@@ -212,7 +226,8 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (location.startsWith("/estoques")) setEstoquesOpen(true);
-    if (location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/pricing")) setOperacoesOpen(true);
+    if (location.startsWith("/avaliacoes")) setAvaliacoesOpen(true);
+    if (location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/pricing") || location.startsWith("/avaliacoes")) setOperacoesOpen(true);
     if (location.startsWith("/logistica/dispositivos") || location.startsWith("/logistica/coletas") || location.startsWith("/logistica/consulta") || location.startsWith("/logistica/fechamentos")) setLogisticaDashboardOpen(true);
     if (location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios") || location.startsWith("/logistica/avaliacoes-ia")) setLogisticaOutrosOpen(true);
     if (isWorkspaceRoute(location)) setWorkspaceOpen(true);
@@ -229,7 +244,8 @@ export function AppSidebar() {
   const isPricingActive = location.startsWith("/pricing");
   const isBibliotecaActive = location.startsWith("/biblioteca");
   const isEstoquesActive = location.startsWith("/estoques");
-  const isOperacoesActive = location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/pricing");
+  const isAvaliacoesActive = location.startsWith("/avaliacoes");
+  const isOperacoesActive = location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/avaliacoes");
 
   const permissions = useMemo(() => {
     try {
@@ -248,6 +264,7 @@ export function AppSidebar() {
           apis: true,
           configuracoes: true,
           estoques: true,
+          avaliacoes: true,
         };
       }
       if (currentUser?.modulePermissions) {
@@ -272,6 +289,7 @@ export function AppSidebar() {
       apis: false,
       configuracoes: false,
       estoques: false,
+      avaliacoes: false,
     };
   }, [currentUser]);
 
@@ -298,7 +316,8 @@ export function AppSidebar() {
   const hasEstoquesPermission = permissions.estoques === true;
   const isInEstoquesPage = location.startsWith("/estoques");
   const hasEstoquesAccess = currentUser?.isAdmin || hasEstoquesPermission || isInEstoquesPage;
-  const hasOperacoesAccess = hasEstoquesAccess || hasLogisticaAccess || hasTriagemAccess || hasPricingAccess;
+  const hasAvaliacoesAccess = permissions.avaliacoes === true;
+  const hasOperacoesAccess = hasEstoquesAccess || hasLogisticaAccess || hasTriagemAccess || hasAvaliacoesAccess;
 
   const handleLogout = async () => {
     await logout();
@@ -325,6 +344,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2 py-2">
+        {/* ── Grupo 1: Itens principais ── */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
@@ -396,141 +416,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               </Collapsible>
 
-              {hasOperacoesAccess && (
-                <Collapsible open={operacoesOpen} onOpenChange={setOperacoesOpen}>
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        className="h-9 px-3"
-                        isActive={isOperacoesActive}
-                        data-testid="link-operacoes"
-                      >
-                        <Factory className="h-[20px] w-[20px]" />
-                        <span className="text-[12px]">Operações</span>
-                        {operacoesOpen ? (
-                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
-                        ) : (
-                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
-                        )}
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
-                        {hasEstoquesAccess && estoquesSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                        {/* Submenu Logística (Dashboard) */}
-                        {hasLogisticaAccess && (
-                          <Collapsible open={logisticaDashboardOpen} onOpenChange={setLogisticaDashboardOpen} className="mt-1">
-                            <SidebarMenuSubItem>
-                              <CollapsibleTrigger asChild>
-                                <SidebarMenuSubButton className="h-8 px-2 rounded-md">
-                                  <Truck className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">Logística</span>
-                                  {logisticaDashboardOpen ? (
-                                    <ChevronDown className="ml-auto h-3 w-3 opacity-50" />
-                                  ) : (
-                                    <ChevronRight className="ml-auto h-3 w-3 opacity-50" />
-                                  )}
-                                </SidebarMenuSubButton>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <SidebarMenuSub className="ml-4 mt-1 border-l pl-1.5 gap-0.5">
-                                  {logisticaDashboardItems.map((subItem) => {
-                                    const isSubActive = location === subItem.url;
-                                    return (
-                                      <SidebarMenuSubItem key={subItem.url}>
-                                        <SidebarMenuSubButton asChild isActive={isSubActive} className="h-7 px-2 rounded-md">
-                                          <Link href={subItem.url} data-testid={`link-logistica-dashboard-${subItem.url.split("/").pop()}`}>
-                                            <subItem.icon className="h-3.5 w-3.5 mr-2" />
-                                            <span className="text-[11px]">{subItem.title}</span>
-                                          </Link>
-                                        </SidebarMenuSubButton>
-                                      </SidebarMenuSubItem>
-                                    );
-                                  })}
-                                </SidebarMenuSub>
-                              </CollapsibleContent>
-                            </SidebarMenuSubItem>
-                          </Collapsible>
-                        )}
-                        {/* Submenu Outros de Logística */}
-                        {hasLogisticaAccess && (
-                          <Collapsible open={logisticaOutrosOpen} onOpenChange={setLogisticaOutrosOpen} className="mt-1">
-                            <SidebarMenuSubItem>
-                              <CollapsibleTrigger asChild>
-                                <SidebarMenuSubButton className="h-8 px-2 rounded-md">
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">Outros</span>
-                                  {logisticaOutrosOpen ? (
-                                    <ChevronDown className="ml-auto h-3 w-3 opacity-50" />
-                                  ) : (
-                                    <ChevronRight className="ml-auto h-3 w-3 opacity-50" />
-                                  )}
-                                </SidebarMenuSubButton>
-                              </CollapsibleTrigger>
-                              <CollapsibleContent>
-                                <SidebarMenuSub className="ml-4 mt-1 border-l pl-1.5 gap-0.5">
-                                  {logisticaOutrosItems.map((subItem) => {
-                                    const isSubActive = location === subItem.url;
-                                    return (
-                                      <SidebarMenuSubItem key={subItem.url}>
-                                        <SidebarMenuSubButton asChild isActive={isSubActive} className="h-7 px-2 rounded-md">
-                                          <Link href={subItem.url} data-testid={`link-logistica-outros-${subItem.url.split("/").pop()}`}>
-                                            <subItem.icon className="h-3.5 w-3.5 mr-2" />
-                                            <span className="text-[11px]">{subItem.title}</span>
-                                          </Link>
-                                        </SidebarMenuSubButton>
-                                      </SidebarMenuSubItem>
-                                    );
-                                  })}
-                                </SidebarMenuSub>
-                              </CollapsibleContent>
-                            </SidebarMenuSubItem>
-                          </Collapsible>
-                        )}
-                        {hasTriagemAccess && triagemSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                        {hasPricingAccess && pricingSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-
               {hasMetasAccess && (
                 <Collapsible open={metasOpen} onOpenChange={setMetasOpen}>
                   <SidebarMenuItem>
@@ -596,6 +481,283 @@ export function AppSidebar() {
                             <SidebarMenuSubItem key={subItem.url}>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-okrs-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[12px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* ── Grupo 2: Operações (2 níveis) ── */}
+        {hasOperacoesAccess && (
+          <SidebarGroup>
+            <SidebarGroupLabel
+              className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-3 mt-1"
+              data-testid="label-operacoes"
+            >
+              Operações
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0.5">
+
+                {/* Logística */}
+                {hasLogisticaAccess && (
+                  <Collapsible open={logisticaOpen} onOpenChange={setLogisticaOpen}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="h-9 px-3"
+                          isActive={isLogisticaActive}
+                          data-testid="link-logistica"
+                        >
+                          <Truck className="h-[20px] w-[20px]" />
+                          <span className="text-[12px]">Logística</span>
+                          {logisticaOpen ? (
+                            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                          {/* Dashboard items sub-Collapsible */}
+                          <Collapsible open={logisticaDashboardOpen} onOpenChange={setLogisticaDashboardOpen} className="mt-0.5">
+                            <SidebarMenuSubItem>
+                              <CollapsibleTrigger asChild>
+                                <SidebarMenuSubButton className="h-8 px-2 rounded-md">
+                                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                                  <span className="text-[12px]">Dashboard</span>
+                                  {logisticaDashboardOpen ? (
+                                    <ChevronDown className="ml-auto h-3 w-3 opacity-50" />
+                                  ) : (
+                                    <ChevronRight className="ml-auto h-3 w-3 opacity-50" />
+                                  )}
+                                </SidebarMenuSubButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <SidebarMenuSub className="ml-4 mt-1 border-l pl-1.5 gap-0.5">
+                                  {logisticaDashboardItems.map((subItem) => {
+                                    const isSubActive = location === subItem.url;
+                                    return (
+                                      <SidebarMenuSubItem key={subItem.url}>
+                                        <SidebarMenuSubButton asChild isActive={isSubActive} className="h-7 px-2 rounded-md">
+                                          <Link href={subItem.url} data-testid={`link-logistica-dashboard-${subItem.url.split("/").pop()}`}>
+                                            <subItem.icon className="h-3.5 w-3.5 mr-2" />
+                                            <span className="text-[11px]">{subItem.title}</span>
+                                          </Link>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    );
+                                  })}
+                                </SidebarMenuSub>
+                              </CollapsibleContent>
+                            </SidebarMenuSubItem>
+                          </Collapsible>
+                          {/* Outros items sub-Collapsible */}
+                          <Collapsible open={logisticaOutrosOpen} onOpenChange={setLogisticaOutrosOpen} className="mt-0.5">
+                            <SidebarMenuSubItem>
+                              <CollapsibleTrigger asChild>
+                                <SidebarMenuSubButton className="h-8 px-2 rounded-md">
+                                  <Settings className="h-4 w-4 mr-2" />
+                                  <span className="text-[12px]">Operações</span>
+                                  {logisticaOutrosOpen ? (
+                                    <ChevronDown className="ml-auto h-3 w-3 opacity-50" />
+                                  ) : (
+                                    <ChevronRight className="ml-auto h-3 w-3 opacity-50" />
+                                  )}
+                                </SidebarMenuSubButton>
+                              </CollapsibleTrigger>
+                              <CollapsibleContent>
+                                <SidebarMenuSub className="ml-4 mt-1 border-l pl-1.5 gap-0.5">
+                                  {logisticaOutrosItems.map((subItem) => {
+                                    const isSubActive = location === subItem.url;
+                                    return (
+                                      <SidebarMenuSubItem key={subItem.url}>
+                                        <SidebarMenuSubButton asChild isActive={isSubActive} className="h-7 px-2 rounded-md">
+                                          <Link href={subItem.url} data-testid={`link-logistica-outros-${subItem.url.split("/").pop()}`}>
+                                            <subItem.icon className="h-3.5 w-3.5 mr-2" />
+                                            <span className="text-[11px]">{subItem.title}</span>
+                                          </Link>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    );
+                                  })}
+                                </SidebarMenuSub>
+                              </CollapsibleContent>
+                            </SidebarMenuSubItem>
+                          </Collapsible>
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+                {/* Triagem */}
+                {hasTriagemAccess && (
+                  <Collapsible open={triagemOpen} onOpenChange={setTriagemOpen}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="h-9 px-3"
+                          isActive={isTriagemActive}
+                          data-testid="link-triagem"
+                        >
+                          <Filter className="h-[20px] w-[20px]" />
+                          <span className="text-[12px]">Triagem</span>
+                          {triagemOpen ? (
+                            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                          {triagemSubItems.map((subItem) => {
+                            const isSubActive = location === subItem.url;
+                            return (
+                              <SidebarMenuSubItem key={subItem.url}>
+                                <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                  <Link href={subItem.url} data-testid={`link-triagem-${subItem.url.split("/").pop()}`}>
+                                    <subItem.icon className="h-4 w-4 mr-2" />
+                                    <span className="text-[12px]">{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+                {/* Avaliações */}
+                {hasAvaliacoesAccess && (
+                  <Collapsible open={avaliacoesOpen} onOpenChange={setAvaliacoesOpen}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="h-9 px-3"
+                          isActive={isAvaliacoesActive}
+                          data-testid="link-avaliacoes"
+                        >
+                          <ScanEye className="h-[20px] w-[20px]" />
+                          <span className="text-[12px]">Avaliações</span>
+                          {avaliacoesOpen ? (
+                            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                          {avaliacoesSubItems.map((subItem) => {
+                            const isSubActive = location === subItem.url;
+                            return (
+                              <SidebarMenuSubItem key={subItem.url}>
+                                <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                  <Link href={subItem.url} data-testid={`link-avaliacoes-${subItem.url.split("/").pop()}`}>
+                                    <subItem.icon className="h-4 w-4 mr-2" />
+                                    <span className="text-[12px]">{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+                {/* Estoque */}
+                {hasEstoquesAccess && (
+                  <Collapsible open={estoquesOpen} onOpenChange={setEstoquesOpen}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="h-9 px-3"
+                          isActive={isEstoquesActive}
+                          data-testid="link-estoques"
+                        >
+                          <Warehouse className="h-[20px] w-[20px]" />
+                          <span className="text-[12px]">Estoque</span>
+                          {estoquesOpen ? (
+                            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                          {estoquesSubItems.map((subItem) => {
+                            const isSubActive = location === subItem.url;
+                            return (
+                              <SidebarMenuSubItem key={subItem.url}>
+                                <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                  <Link href={subItem.url} data-testid={`link-estoques-${subItem.url.split("/").pop()}`}>
+                                    <subItem.icon className="h-4 w-4 mr-2" />
+                                    <span className="text-[12px]">{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* ── Grupo 3: Demais módulos ── */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu className="gap-0.5">
+
+              {hasPricingAccess && (
+                <Collapsible open={pricingOpen} onOpenChange={setPricingOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        className="h-9 px-3"
+                        isActive={isPricingActive}
+                        data-testid="link-pricing"
+                      >
+                        <DollarSign className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Pricing</span>
+                        {pricingOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                        {pricingSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
                                 </Link>
@@ -701,6 +863,7 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

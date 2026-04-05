@@ -42,6 +42,15 @@ const SolicitacoesPage                 = lazy(() => import("@/pages/logistica/so
 const LogisticaReversaPage             = lazy(() => import("@/pages/logistica/logistica-reversa"));
 const SimularFretePage                 = lazy(() => import("@/pages/logistica/simular-frete"));
 const ImpressaoEtiquetasPage           = lazy(() => import("@/pages/triagem/impressao-etiquetas"));
+const TriagemDashboardPage             = lazy(() => import("@/pages/triagem/dashboard"));
+const TriagemRecebimentosPage          = lazy(() => import("@/pages/triagem/recebimentos"));
+const TriagemFilaPage                  = lazy(() => import("@/pages/triagem/fila"));
+const TriagemDesviosPage               = lazy(() => import("@/pages/triagem/desvios"));
+const AvaliacoesPage                   = lazy(() => import("@/pages/avaliacoes/index"));
+const AvaliacoesDashboardPage          = lazy(() => import("@/pages/avaliacoes/dashboard"));
+const AvaliacoesCuradoriaPage          = lazy(() => import("@/pages/avaliacoes/curadoria"));
+const AvaliacoesMatrizPage             = lazy(() => import("@/pages/avaliacoes/matriz"));
+const AvaliacoesConfiguracoesPage      = lazy(() => import("@/pages/avaliacoes/configuracoes"));
 const RomaneiosPage                    = lazy(() => import("@/pages/logistica/romaneios"));
 const EficienciaAvaliacoesIaPage       = lazy(() => import("@/pages/logistica/avaliacoes-ia"));
 const ApisPage                         = lazy(() => import("@/pages/apis/index"));
@@ -265,6 +274,51 @@ function Router() {
       <Route path="/triagem/impressao-etiquetas">
         <ProtectedRoute requiredPermission="triagem">
           <ImpressaoEtiquetasPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/triagem/dashboard">
+        <ProtectedRoute requiredPermission="triagem">
+          <TriagemDashboardPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/triagem/recebimentos">
+        <ProtectedRoute requiredPermission="triagem">
+          <TriagemRecebimentosPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/triagem/fila">
+        <ProtectedRoute requiredPermission="triagem">
+          <TriagemFilaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/triagem/desvios">
+        <ProtectedRoute requiredPermission="triagem">
+          <TriagemDesviosPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/avaliacoes">
+        <ProtectedRoute requiredPermission="avaliacoes">
+          <AvaliacoesPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/avaliacoes/dashboard">
+        <ProtectedRoute requiredPermission="avaliacoes">
+          <AvaliacoesDashboardPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/avaliacoes/curadoria">
+        <ProtectedRoute requiredPermission="avaliacoes">
+          <AvaliacoesCuradoriaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/avaliacoes/matriz">
+        <ProtectedRoute requiredPermission="avaliacoes">
+          <AvaliacoesMatrizPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/avaliacoes/configuracoes">
+        <ProtectedRoute requiredPermission="avaliacoes">
+          <AvaliacoesConfiguracoesPage />
         </ProtectedRoute>
       </Route>
       <Route path="/apis">
