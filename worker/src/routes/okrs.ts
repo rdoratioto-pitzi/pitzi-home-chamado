@@ -82,7 +82,12 @@ function normalizeCycle(cycle: string): string {
   return cycle.replace(" ", "-");
 }
 
-function calcHealthStatus(progressPercent: number, cycle: string): HealthStatus {
+function calcHealthStatus(
+  progressPercent: number,
+  cycle: string,
+  hasCheckins = true,
+): HealthStatus {
+  if (!hasCheckins) return "on_track";
   const range = QUARTER_RANGES[normalizeCycle(cycle)];
   if (!range) return "on_track";
   const now = new Date();
@@ -157,10 +162,14 @@ okrs.get("/api/okrs/dashboard", async (c) => {
 
     const timeElapsed = calcTimeElapsedPercent(cycle);
 
+    // Batch: quais KRs já tiveram ao menos um check-in (1 query, sem N+1)
+    const krsWithCheckinsSet = await storage.getKRsWithCheckins();
+
     const krsWithHealth = cycleKrs.map((kr) => {
       const progress = calcKrProgress(kr);
-      const health = calcHealthStatus(progress, cycle);
-      return { kr, progress, health };
+      const hasCheckins = krsWithCheckinsSet.has(kr.id);
+      const health = calcHealthStatus(progress, cycle, hasCheckins);
+      return { kr, progress, health, hasCheckins };
     });
 
     const objectiveSummaries = cycleObjectives.map((obj) => {
@@ -428,8 +437,11 @@ okrs.delete("/api/objectives/:id", async (c) => {
 // GET /api/key-results
 okrs.get("/api/key-results", async (c) => {
   const storage = getStorage(c.get("db"));
-  const keyResults = await storage.getKeyResults();
-  return c.json(keyResults);
+  const [keyResults, krsWithCheckins] = await Promise.all([
+    storage.getKeyResults(),
+    storage.getKRsWithCheckins(),
+  ]);
+  return c.json(keyResults.map((kr) => ({ ...kr, hasCheckins: krsWithCheckins.has(kr.id) })));
 });
 
 // GET /api/key-results/:id
