@@ -40,6 +40,7 @@ import {
   Trash2,
   Network,
   LayoutGrid,
+  List,
   ChevronDown,
   ChevronUp,
   Square,
@@ -55,6 +56,7 @@ import { KeyResultUpdateDialog } from "./key-result-update-dialog";
 import { InitiativeDialog } from "./initiative-dialog";
 import { InitiativeEditDialog } from "./initiative-edit-dialog";
 import { OkrHierarchyView } from "@/components/okrs/OkrHierarchyView";
+import { OkrListView } from "@/components/okrs/OkrListView";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Tooltip,
@@ -211,7 +213,7 @@ export default function OKRsPage() {
   // ── Filter + view state ─────────────────────────────────────────────────────
   const [cycleFilter, setCycleFilter] = useState<string>(getInitialQuarter);
   const [levelFilter, setLevelFilter] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<"list" | "hierarchy">("list");
+  const [viewMode, setViewMode] = useState<"lista" | "bullets" | "hierarchy">("bullets");
 
   // Per-card collapse state (default: all expanded)
   const [collapsedObjectives, setCollapsedObjectives] = useState<Set<string>>(new Set());
@@ -248,11 +250,7 @@ export default function OKRsPage() {
     return map;
   }, [allInitiatives]);
 
-  const filteredObjectives = objectives.filter((obj) => {
-    const matchesCycle = obj.cycle === cycleFilter;
-    const matchesLevel = levelFilter === "all" || obj.level === levelFilter;
-    return matchesCycle && matchesLevel;
-  });
+  const filteredObjectives = objectives.filter((obj) => obj.cycle === cycleFilter);
 
   // ── Mutations ────────────────────────────────────────────────────────────────
   const deleteObjectiveMutation = useMutation({
@@ -389,36 +387,89 @@ export default function OKRsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos Níveis</SelectItem>
-                  <SelectItem value="company">Empresa</SelectItem>
-                  <SelectItem value="team">Time</SelectItem>
+                  <SelectItem value="empresa">Empresa</SelectItem>
+                  <SelectItem value="kr">KR</SelectItem>
+                  <SelectItem value="iniciativa">Iniciativa</SelectItem>
                 </SelectContent>
               </Select>
             </Card>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={viewMode === "hierarchy" ? "default" : "outline"}
-                  size="icon"
-                  className="h-10 w-10"
-                  onClick={() => setViewMode((m) => (m === "list" ? "hierarchy" : "list"))}
-                  data-testid="button-toggle-hierarchy"
-                >
-                  {viewMode === "hierarchy" ? (
+            {/* View mode toggle: Lista | Bullets | Organograma */}
+            <div className="flex rounded-lg border border-border/60 overflow-hidden">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-10 w-10 rounded-none border-r border-border/60 ${viewMode === "lista" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                    onClick={() => setViewMode("lista")}
+                    data-testid="button-view-lista"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Lista</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-10 w-10 rounded-none border-r border-border/60 ${viewMode === "bullets" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                    onClick={() => setViewMode("bullets")}
+                    data-testid="button-view-bullets"
+                  >
                     <LayoutGrid className="h-4 w-4" />
-                  ) : (
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Bullets</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-10 w-10 rounded-none ${viewMode === "hierarchy" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                    onClick={() => setViewMode("hierarchy")}
+                    data-testid="button-view-organograma"
+                  >
                     <Network className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {viewMode === "hierarchy" ? "Bullets" : "Organograma"}
-              </TooltipContent>
-            </Tooltip>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Organograma</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
 
-        {/* ── Organograma view ──────────────────────────────────────────────── */}
-        {viewMode === "hierarchy" ? (
+        {/* ── Lista view ───────────────────────────────────────────────────── */}
+        {viewMode === "lista" ? (
+          objectivesLoading ? (
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-12 rounded-xl" />
+              ))}
+            </div>
+          ) : (
+            <OkrListView
+              objectives={filteredObjectives}
+              keyResults={keyResults}
+              users={users}
+              initiativesByKR={initiativesByKR}
+              levelFilter={levelFilter}
+              currentUserId={currentUserId}
+              onToggleInitiative={(id, completed) =>
+                toggleInitiativeMutation.mutate({ id, completed })
+              }
+              onEditObjective={(obj) => setEditingObjective(obj)}
+              onDeleteObjective={(id) => setDeletingObjectiveId(id)}
+              onEditKR={(kr) => setEditingKR(kr)}
+              onDeleteKR={(id) => setDeletingKRId(id)}
+              onEditInitiative={(init) => setEditingInitiative(init)}
+            />
+          )
+
+        /* ── Organograma view ──────────────────────────────────────────────── */
+        ) : viewMode === "hierarchy" ? (
           objectivesLoading ? (
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
@@ -559,7 +610,7 @@ export default function OKRsPage() {
                   </div>
 
                   {/* ── KRs section (collapsible) ────────────────────────── */}
-                  {!isObjCollapsed && (
+                  {!isObjCollapsed && levelFilter !== "empresa" && (
                     <div className="border-t border-border/40 bg-muted/5 px-5 pb-4 pt-3">
                       <div className="space-y-2">
                         {krs.map((kr) => {
@@ -682,7 +733,7 @@ export default function OKRsPage() {
                               </div>
 
                               {/* ── Initiatives (indented 40px) ──────────── */}
-                              {!isKRCollapsed && (
+                              {!isKRCollapsed && levelFilter !== "kr" && (
                                 <div className="ml-10 mt-1 space-y-0.5">
                                   {initiatives.map((initiative) => {
                                     const owner = users.find((u) => u.id === initiative.ownerId);
