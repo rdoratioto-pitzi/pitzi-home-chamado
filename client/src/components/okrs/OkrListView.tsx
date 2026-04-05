@@ -252,7 +252,7 @@ function KRRow({
   const krProgress = calcKRProgress(kr, initiatives);
   const ownerIds = parseResponsibleIds(kr.responsibleIds);
   const hasInitiatives = initiatives.length > 0;
-  const krHealth = calculateHealthStatus(krProgress, objectiveCycle);
+  const krHealth = calculateHealthStatus(krProgress, objectiveCycle, { hasCheckins: kr.hasCheckins });
 
   return (
     <>
@@ -401,6 +401,7 @@ function ObjectiveRow({
       calculateHealthStatus(
         calcKRProgress(kr, initiativesByKR.get(kr.id) ?? []),
         objective.cycle,
+        { hasCheckins: kr.hasCheckins },
       )
     )
   );
