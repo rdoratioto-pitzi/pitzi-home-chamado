@@ -33,7 +33,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  RefreshCw,
   CalendarClock,
   MoreHorizontal,
   Pencil,
@@ -47,7 +46,7 @@ import {
   CheckSquare,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Objective, KeyResult, User, Initiative } from "@shared/schema";
+import type { Objective, KeyResult, User, Initiative, KeyResultUpdate } from "@shared/schema";
 import { ObjectiveDialog } from "./objective-dialog";
 import { ObjectiveEditDialog } from "./objective-edit-dialog";
 import { KeyResultDialog } from "./key-result-dialog";
@@ -182,6 +181,93 @@ function calcObjectiveProgress(
     0,
   );
   return Math.round(total / krs.length);
+}
+
+// ─── KRHistorySection ─────────────────────────────────────────────────────────
+// Seção colapsável inline no card do KR com histórico de check-ins.
+// Faz fetch apenas quando expandido (enabled: isOpen).
+
+function KRHistorySection({
+  krId,
+  unit,
+  onViewAll,
+}: {
+  krId: string;
+  unit: string | null | undefined;
+  onViewAll: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const { data: updates = [], isLoading } = useQuery<(KeyResultUpdate & { user?: { name: string } })[]>({
+    queryKey: ["/api/key-results", krId, "updates"],
+    enabled: isOpen,
+  });
+
+  const sorted = [...updates].sort((a, b) => {
+    const dA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const dB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return dB - dA;
+  });
+
+  return (
+    <div className="border-t border-border/30 mt-2 pt-1.5">
+      <button
+        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors py-0.5"
+        onClick={() => setIsOpen((v) => !v)}
+      >
+        {isOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        Histórico
+      </button>
+
+      {isOpen && (
+        <div className="mt-1.5 space-y-1">
+          {isLoading ? (
+            <p className="text-[11px] text-muted-foreground py-1">Carregando...</p>
+          ) : sorted.length === 0 ? (
+            <p className="text-[11px] text-muted-foreground py-1">Nenhum check-in registrado ainda.</p>
+          ) : (
+            <>
+              {sorted.slice(0, 5).map((u) => {
+                const newVal = parseFloat(u.newValue || "0");
+                const prog = u.progressPercentage
+                  ? Math.round(parseFloat(u.progressPercentage))
+                  : null;
+                return (
+                  <div key={u.id} className="flex items-center gap-2 text-[11px] py-0.5 flex-wrap">
+                    <span className="text-muted-foreground shrink-0">
+                      {u.createdAt ? format(new Date(u.createdAt), "dd/MM/yy", { locale: ptBR }) : "—"}
+                    </span>
+                    <span className="font-semibold shrink-0">
+                      {newVal}{unit ? ` ${unit}` : ""}
+                    </span>
+                    {prog !== null && (
+                      <span className="text-muted-foreground shrink-0">{prog}%</span>
+                    )}
+                    {u.user?.name && (
+                      <span className="text-muted-foreground">{u.user.name}</span>
+                    )}
+                    {u.comment && (
+                      <span className="text-muted-foreground truncate max-w-[160px]">
+                        {u.comment.length > 60 ? `${u.comment.slice(0, 60)}…` : u.comment}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+              {sorted.length > 5 && (
+                <button
+                  className="text-[11px] text-primary hover:underline py-0.5"
+                  onClick={onViewAll}
+                >
+                  Ver todos ({sorted.length})
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -465,6 +551,7 @@ export default function OKRsPage() {
               onEditKR={(kr) => setEditingKR(kr)}
               onDeleteKR={(id) => setDeletingKRId(id)}
               onEditInitiative={(init) => setEditingInitiative(init)}
+              onCheckin={(kr) => openUpdateDialog(kr)}
             />
           )
 
@@ -700,16 +787,18 @@ export default function OKRsPage() {
                                         {isKRCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
                                       </Button>
                                     )}
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
-                                      onClick={() => openUpdateDialog(kr)}
-                                      data-testid={`button-update-kr-${kr.id}`}
-                                    >
-                                      <RefreshCw className="h-3 w-3 mr-1" />
-                                      Check-in
-                                    </Button>
+                                    {initiatives.length === 0 && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+                                        onClick={() => openUpdateDialog(kr)}
+                                        data-testid={`button-update-kr-${kr.id}`}
+                                      >
+                                        <TrendingUp className="h-3 w-3 mr-1" />
+                                        Check-in
+                                      </Button>
+                                    )}
                                     <Button
                                       variant="ghost"
                                       size="icon"
@@ -730,6 +819,15 @@ export default function OKRsPage() {
                                     </Button>
                                   </div>
                                 </div>
+
+                                {/* Histórico inline colapsável */}
+                                {initiatives.length === 0 && (
+                                  <KRHistorySection
+                                    krId={kr.id}
+                                    unit={kr.unit}
+                                    onViewAll={() => openUpdateDialog(kr)}
+                                  />
+                                )}
                               </div>
 
                               {/* ── Initiatives (indented 40px) ──────────── */}
@@ -855,6 +953,7 @@ export default function OKRsPage() {
         open={isUpdateDialogOpen}
         onOpenChange={setIsUpdateDialogOpen}
         keyResult={selectedKeyResult}
+        cycle={cycleFilter}
       />
       {editingObjective && (
         <ObjectiveEditDialog
