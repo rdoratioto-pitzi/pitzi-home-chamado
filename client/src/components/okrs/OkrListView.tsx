@@ -8,6 +8,8 @@ import {
   Pencil,
   Trash2,
   TrendingUp,
+  Flag,
+  Eye,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -40,6 +42,7 @@ export interface OkrListViewProps {
   onDeleteKR: (id: string) => void;
   onEditInitiative: (init: Initiative) => void;
   onCheckin?: (kr: KeyResult) => void;
+  onRetroObjective?: (obj: Objective, readOnly: boolean) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -365,6 +368,7 @@ function ObjectiveRow({
   onDeleteKR,
   onEditInitiative,
   onCheckin,
+  onRetroObjective,
 }: {
   objective: Objective;
   keyResults: KeyResult[];
@@ -379,16 +383,18 @@ function ObjectiveRow({
   onDeleteKR: (id: string) => void;
   onEditInitiative: (init: Initiative) => void;
   onCheckin?: (kr: KeyResult) => void;
+  onRetroObjective?: (obj: Objective, readOnly: boolean) => void;
 }) {
   // Default: objectives expanded, KRs collapsed
   const [krsExpanded, setKrsExpanded] = useState(true);
   const [expandedKRs, setExpandedKRs] = useState<Set<string>>(new Set());
 
+  const isClosed = objective.closedAt != null;
   const krs = keyResults.filter((kr) => kr.objectiveId === objective.id);
   const progress = calcObjectiveProgress(objective.id, keyResults, initiativesByKR);
   const lvlInfo = levelBadge[objective.level] ?? levelBadge.company;
   const stInfo = statusBadge[objective.status] ?? statusBadge.on_track;
-  const borderCls = levelBorder[objective.level] ?? "border-l-[#00E676]";
+  const borderCls = isClosed ? "border-l-border" : (levelBorder[objective.level] ?? "border-l-[#00E676]");
   const objHealth = calculateObjectiveHealth(
     krs.map((kr) =>
       calculateHealthStatus(
@@ -412,7 +418,7 @@ function ObjectiveRow({
     <>
       {/* Objective row */}
       <div
-        className={`flex items-center h-12 px-3 border-b border-border/40 hover:bg-muted/30 transition-colors border-l-[3px] ${borderCls} bg-background`}
+        className={`flex items-center h-12 px-3 border-b border-border/40 hover:bg-muted/30 transition-colors border-l-[3px] ${borderCls} bg-background ${isClosed ? "opacity-70" : ""}`}
         data-testid={`list-row-objective-${objective.id}`}
       >
         <div className="flex-1 flex items-center gap-1.5 min-w-0">
@@ -428,7 +434,9 @@ function ObjectiveRow({
           ) : (
             <div className="w-3.5 shrink-0" />
           )}
-          <span className="text-[13px] font-bold truncate text-foreground">{objective.title}</span>
+          <span className={`text-[13px] font-bold truncate ${isClosed ? "text-muted-foreground" : "text-foreground"}`}>
+            {objective.title}
+          </span>
         </div>
         <div className="w-[80px] shrink-0">
           <Badge variant="outline" className={`text-[9px] font-bold ${lvlInfo.cls}`}>
@@ -436,21 +444,29 @@ function ObjectiveRow({
           </Badge>
         </div>
         <div className="w-[110px] shrink-0 flex flex-col gap-0.5">
-          <Badge variant="outline" className={`text-[9px] font-bold ${stInfo.cls}`}>
-            {stInfo.label}
-          </Badge>
-          {objHealth !== objective.status && (
-            <HealthBadge status={objHealth} secondary />
+          {isClosed ? (
+            <Badge variant="outline" className="text-[9px] font-bold bg-muted/40 text-muted-foreground border-border/60">
+              ENCERRADO
+            </Badge>
+          ) : (
+            <>
+              <Badge variant="outline" className={`text-[9px] font-bold ${stInfo.cls}`}>
+                {stInfo.label}
+              </Badge>
+              {objHealth !== objective.status && (
+                <HealthBadge status={objHealth} secondary />
+              )}
+            </>
           )}
         </div>
         <div className="w-[120px] shrink-0 flex items-center gap-1.5 pr-2">
           <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all"
-              style={{ width: `${progress}%`, background: "#00E676" }}
+              style={{ width: `${progress}%`, background: isClosed ? "var(--border)" : "#00E676" }}
             />
           </div>
-          <span className="text-[10px] font-bold whitespace-nowrap" style={{ color: "#00E676" }}>
+          <span className="text-[10px] font-bold whitespace-nowrap" style={{ color: isClosed ? "var(--muted-foreground)" : "#00E676" }}>
             {progress}%
           </span>
         </div>
@@ -473,9 +489,20 @@ function ObjectiveRow({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEditObjective(objective)}>
-                <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
-              </DropdownMenuItem>
+              {isClosed ? (
+                <DropdownMenuItem onClick={() => onRetroObjective?.(objective, true)}>
+                  <Eye className="h-3.5 w-3.5 mr-2" /> Ver retrospectiva
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem onClick={() => onEditObjective(objective)}>
+                    <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onRetroObjective?.(objective, false)}>
+                    <Flag className="h-3.5 w-3.5 mr-2" /> Encerrar Quarter
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => onDeleteObjective(objective.id)}
@@ -504,7 +531,7 @@ function ObjectiveRow({
           onEdit={() => onEditKR(kr)}
           onDelete={() => onDeleteKR(kr.id)}
           onEditInitiative={onEditInitiative}
-          onCheckin={onCheckin ? () => onCheckin(kr) : undefined}
+          onCheckin={!isClosed && onCheckin ? () => onCheckin(kr) : undefined}
         />
       ))}
     </>
@@ -527,6 +554,7 @@ export function OkrListView({
   onDeleteKR,
   onEditInitiative,
   onCheckin,
+  onRetroObjective,
 }: OkrListViewProps) {
   if (objectives.length === 0) {
     return (
@@ -555,6 +583,7 @@ export function OkrListView({
           onDeleteKR={onDeleteKR}
           onEditInitiative={onEditInitiative}
           onCheckin={onCheckin}
+          onRetroObjective={onRetroObjective}
         />
       ))}
     </div>
