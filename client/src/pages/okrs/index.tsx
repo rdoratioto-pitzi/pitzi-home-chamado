@@ -632,6 +632,7 @@ export default function OKRsPage() {
                   calculateHealthStatus(
                     calcKRProgress(kr, initiativesByKR.get(kr.id) ?? []),
                     objective.cycle,
+                    { hasCheckins: kr.hasCheckins },
                   )
                 )
               );
@@ -769,7 +770,7 @@ export default function OKRsPage() {
                           const completedCount = initiatives.filter((i) => i.completed).length;
                           const deadlineStatus = kr.deadlineStatus || "on_track";
                           const ownerIds = parseResponsibleIds(kr.responsibleIds);
-                          const krHealth = calculateHealthStatus(krProgress, objective.cycle);
+                          const krHealth = calculateHealthStatus(krProgress, objective.cycle, { hasCheckins: kr.hasCheckins });
 
                           return (
                             <div key={kr.id}>

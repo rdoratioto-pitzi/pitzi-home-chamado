@@ -94,7 +94,12 @@ function normalizeCycle(cycle: string): string {
   return cycle.replace(" ", "-");
 }
 
-function calcHealthStatus(progressPercent: number, cycle: string): HealthStatus {
+function calcHealthStatus(
+  progressPercent: number,
+  cycle: string,
+  hasCheckins = true,
+): HealthStatus {
+  if (!hasCheckins) return "on_track";
   const range = QUARTER_RANGES[normalizeCycle(cycle)];
   if (!range) return "on_track";
   const now = new Date();
@@ -171,11 +176,15 @@ export function registerOkrRoutes(router: Router) {
 
       const timeElapsed = calcTimeElapsedPercent(cycle);
 
+      // Batch: quais KRs já tiveram ao menos um check-in (1 query, sem N+1)
+      const krsWithCheckinsSet = await storage.getKRsWithCheckins();
+
       // KRs com progresso e health
       const krsWithHealth = cycleKrs.map((kr) => {
         const progress = calcKrProgress(kr);
-        const health = calcHealthStatus(progress, cycle);
-        return { kr, progress, health };
+        const hasCheckins = krsWithCheckinsSet.has(kr.id);
+        const health = calcHealthStatus(progress, cycle, hasCheckins);
+        return { kr, progress, health, hasCheckins };
       });
 
       // Objectives com progresso e health
@@ -462,8 +471,11 @@ export function registerOkrRoutes(router: Router) {
 
   // ============== KEY RESULTS ==============
   router.get("/api/key-results", requireAuth, async (req, res) => {
-    const keyResults = await storage.getKeyResults();
-    res.json(keyResults);
+    const [keyResults, krsWithCheckins] = await Promise.all([
+      storage.getKeyResults(),
+      storage.getKRsWithCheckins(),
+    ]);
+    res.json(keyResults.map((kr) => ({ ...kr, hasCheckins: krsWithCheckins.has(kr.id) })));
   });
 
   router.post("/api/key-results", requireAuth, async (req, res) => {

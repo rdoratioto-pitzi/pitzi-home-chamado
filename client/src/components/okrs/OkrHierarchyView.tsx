@@ -199,6 +199,7 @@ function OrgChartCard({
       calculateHealthStatus(
         calcKRProgress(kr, initiativesByKR.get(kr.id) ?? []),
         node.cycle,
+        { hasCheckins: kr.hasCheckins },
       )
     )
   );
@@ -311,7 +312,7 @@ function OrgChartCard({
                     const krProgress = calcKRProgress(kr, initiatives);
                     const isKRExpanded = expandedKRs.has(kr.id);
                     const completedCount = initiatives.filter((i) => i.completed).length;
-                    const krHealth = calculateHealthStatus(krProgress, node.cycle);
+                    const krHealth = calculateHealthStatus(krProgress, node.cycle, { hasCheckins: kr.hasCheckins });
                     const krOwnerId = (() => {
                       try {
                         const ids = JSON.parse(kr.responsibleIds ?? "[]");
