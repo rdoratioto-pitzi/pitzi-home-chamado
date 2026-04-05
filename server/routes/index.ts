@@ -23,6 +23,7 @@ import { registerOmieRoutes } from "./omie";
 import { registerEstoqueRoutes } from "./estoques";
 import { registerDevToolsRoutes } from "./dev-tools";
 import { registerWorkspaceRoutes } from "./workspace";
+import { registerTriagemRoutes } from "./triagem";
 
 export function registerModularRoutes(app: Router) {
   const router = Router();
@@ -51,6 +52,7 @@ export function registerModularRoutes(app: Router) {
   registerEstoqueRoutes(router);
   registerDevToolsRoutes(router);
   registerWorkspaceRoutes(router);
+  registerTriagemRoutes(router);
 
   app.use(router);
 }
