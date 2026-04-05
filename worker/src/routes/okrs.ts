@@ -49,7 +49,211 @@ async function validateParentOkr(
   return null;
 }
 
+// ─── Health helpers ───────────────────────────────────────────────────────────
+type HealthStatus = "on_track" | "at_risk" | "off_track";
+
+const QUARTER_RANGES: Record<string, { start: Date; end: Date }> = {
+  "2025-Q1": { start: new Date("2025-01-01"), end: new Date("2025-03-31") },
+  "2025-Q2": { start: new Date("2025-04-01"), end: new Date("2025-06-30") },
+  "2025-Q3": { start: new Date("2025-07-01"), end: new Date("2025-09-30") },
+  "2025-Q4": { start: new Date("2025-10-01"), end: new Date("2025-12-31") },
+  "2026-Q1": { start: new Date("2026-01-01"), end: new Date("2026-03-31") },
+  "2026-Q2": { start: new Date("2026-04-01"), end: new Date("2026-06-30") },
+  "2026-Q3": { start: new Date("2026-07-01"), end: new Date("2026-09-30") },
+  "2026-Q4": { start: new Date("2026-10-01"), end: new Date("2026-12-31") },
+};
+
+function calcKrProgress(kr: { measurementType: string; startValue: string | null; targetValue: string; currentValue: string }): number {
+  const start = parseFloat(kr.startValue ?? "0");
+  const target = parseFloat(kr.targetValue);
+  const current = parseFloat(kr.currentValue);
+  let p: number;
+  if (kr.measurementType === "decreasing") {
+    p = target !== start ? ((start - current) / (start - target)) * 100 : 0;
+  } else if (kr.measurementType === "binary") {
+    p = current > 0 ? 100 : 0;
+  } else {
+    p = target !== start ? ((current - start) / (target - start)) * 100 : 0;
+  }
+  return Math.max(0, Math.min(100, p));
+}
+
+function normalizeCycle(cycle: string): string {
+  return cycle.replace(" ", "-");
+}
+
+function calcHealthStatus(progressPercent: number, cycle: string): HealthStatus {
+  const range = QUARTER_RANGES[normalizeCycle(cycle)];
+  if (!range) return "on_track";
+  const now = new Date();
+  if (now < range.start) return "on_track";
+  if (now > range.end) {
+    if (progressPercent >= 70) return "on_track";
+    if (progressPercent >= 40) return "at_risk";
+    return "off_track";
+  }
+  const total = range.end.getTime() - range.start.getTime();
+  const elapsed = now.getTime() - range.start.getTime();
+  const timeElapsed = Math.min((elapsed / total) * 100, 100);
+  if (progressPercent >= timeElapsed * 0.9) return "on_track";
+  if (progressPercent >= timeElapsed * 0.6) return "at_risk";
+  return "off_track";
+}
+
+function calcTimeElapsedPercent(cycle: string): number {
+  const range = QUARTER_RANGES[normalizeCycle(cycle)];
+  if (!range) return 0;
+  const now = new Date();
+  if (now <= range.start) return 0;
+  if (now >= range.end) return 100;
+  const total = range.end.getTime() - range.start.getTime();
+  const elapsed = now.getTime() - range.start.getTime();
+  return Math.min((elapsed / total) * 100, 100);
+}
+
+function calcObjectiveHealth(krStatuses: HealthStatus[]): HealthStatus {
+  if (krStatuses.length === 0) return "on_track";
+  if (krStatuses.includes("off_track")) return "off_track";
+  if (krStatuses.includes("at_risk")) return "at_risk";
+  return "on_track";
+}
+
 const okrs = new Hono<AppEnv>();
+
+// ============== DASHBOARD ==============
+okrs.get("/api/okrs/dashboard", async (c) => {
+  try {
+    const user = c.get("user");
+    const storage = getStorage(c.get("db"));
+    const cycle = c.req.query("cycle") ?? "";
+
+    const allObjectives = await storage.getObjectives();
+    const allKeyResults = await storage.getKeyResults();
+    const allInitiatives = await storage.getInitiatives();
+
+    let cycleObjectives = allObjectives.filter((o) => o.cycle === cycle);
+
+    if (user.role !== "admin") {
+      cycleObjectives = cycleObjectives.filter((obj) => {
+        if (obj.ownerId === user.userId) return true;
+        return allKeyResults.some((kr) => {
+          if (kr.objectiveId !== obj.id) return false;
+          try {
+            const ids = typeof kr.responsibleIds === "string"
+              ? JSON.parse(kr.responsibleIds)
+              : kr.responsibleIds;
+            return Array.isArray(ids) && ids.includes(user.userId);
+          } catch {
+            return false;
+          }
+        });
+      });
+    }
+
+    const objectiveIds = new Set(cycleObjectives.map((o) => o.id));
+    const cycleKrs = allKeyResults.filter((kr) => objectiveIds.has(kr.objectiveId));
+    const krIds = new Set(cycleKrs.map((kr) => kr.id));
+    const cycleInitiatives = allInitiatives.filter((i) => krIds.has(i.keyResultId));
+
+    const timeElapsed = calcTimeElapsedPercent(cycle);
+
+    const krsWithHealth = cycleKrs.map((kr) => {
+      const progress = calcKrProgress(kr);
+      const health = calcHealthStatus(progress, cycle);
+      return { kr, progress, health };
+    });
+
+    const objectiveSummaries = cycleObjectives.map((obj) => {
+      const objKrs = krsWithHealth.filter((k) => k.kr.objectiveId === obj.id);
+      const avgProgress = objKrs.length > 0
+        ? objKrs.reduce((sum, k) => sum + k.progress, 0) / objKrs.length
+        : 0;
+      const health = calcObjectiveHealth(objKrs.map((k) => k.health));
+      return {
+        id: obj.id,
+        title: obj.title,
+        progressPercent: Math.round(avgProgress),
+        healthStatus: health,
+        keyResultsCount: objKrs.length,
+        status: obj.status,
+      };
+    });
+
+    const totalObjectives = objectiveSummaries.length;
+    const avgProgress = totalObjectives > 0
+      ? Math.round(objectiveSummaries.reduce((s, o) => s + o.progressPercent, 0) / totalObjectives)
+      : 0;
+    const byHealth = {
+      on_track: objectiveSummaries.filter((o) => o.healthStatus === "on_track").length,
+      at_risk: objectiveSummaries.filter((o) => o.healthStatus === "at_risk").length,
+      off_track: objectiveSummaries.filter((o) => o.healthStatus === "off_track").length,
+    };
+
+    const atRiskKRs = krsWithHealth
+      .filter((k) => k.health === "at_risk" || k.health === "off_track")
+      .map((k) => {
+        const obj = cycleObjectives.find((o) => o.id === k.kr.objectiveId);
+        let ownerId: string | null = null;
+        if (k.kr.responsibleIds) {
+          try {
+            const ids = typeof k.kr.responsibleIds === "string"
+              ? JSON.parse(k.kr.responsibleIds)
+              : k.kr.responsibleIds;
+            ownerId = Array.isArray(ids) && ids.length > 0 ? ids[0] : null;
+          } catch { /* ignore */ }
+        }
+        return {
+          id: k.kr.id,
+          title: k.kr.title,
+          objectiveId: k.kr.objectiveId,
+          objectiveTitle: obj?.title ?? "",
+          progressPercent: Math.round(k.progress),
+          expectedPercent: Math.round(timeElapsed),
+          healthStatus: k.health as "at_risk" | "off_track",
+          ownerId,
+        };
+      })
+      .sort((a, b) => (b.expectedPercent - b.progressPercent) - (a.expectedPercent - a.progressPercent));
+
+    const completedInitiatives = cycleInitiatives.filter((i) => i.completed).length;
+    const now = new Date();
+    const overdueInitiatives = cycleInitiatives
+      .filter((i) => !i.completed && i.dueDate && new Date(i.dueDate) < now)
+      .map((i) => {
+        const kr = cycleKrs.find((k) => k.id === i.keyResultId);
+        const obj = kr ? cycleObjectives.find((o) => o.id === kr.objectiveId) : undefined;
+        return {
+          id: i.id,
+          title: i.title,
+          keyResultId: i.keyResultId,
+          keyResultTitle: kr?.title ?? "",
+          objectiveTitle: obj?.title ?? "",
+          dueDate: i.dueDate ? new Date(i.dueDate).toISOString() : "",
+          ownerId: i.ownerId ?? null,
+        };
+      });
+
+    return c.json({
+      cycle,
+      totalObjectives,
+      avgProgress,
+      byHealth,
+      objectives: objectiveSummaries.sort((a, b) => a.progressPercent - b.progressPercent),
+      initiatives: {
+        total: cycleInitiatives.length,
+        completed: completedInitiatives,
+        completionRate: cycleInitiatives.length > 0
+          ? Math.round((completedInitiatives / cycleInitiatives.length) * 100)
+          : 0,
+      },
+      atRiskKRs,
+      overdueInitiatives,
+    });
+  } catch (error) {
+    console.error("Error fetching OKR dashboard:", error);
+    return c.json({ error: "Failed to fetch OKR dashboard" }, 500);
+  }
+});
 
 // ============== OBJECTIVES ==============
 
