@@ -176,17 +176,23 @@ okrs.get("/api/okrs/dashboard", async (c) => {
         healthStatus: health,
         keyResultsCount: objKrs.length,
         status: obj.status,
+        closedAt: obj.closedAt ?? null,
+        closeStatus: obj.closeStatus ?? null,
       };
     });
 
-    const totalObjectives = objectiveSummaries.length;
+    // Separar encerrados dos ativos para byHealth
+    const activeObjectives = objectiveSummaries.filter((o) => !o.closedAt);
+    const closedObjectives = objectiveSummaries.filter((o) => o.closedAt);
+
+    const totalObjectives = activeObjectives.length;
     const avgProgress = totalObjectives > 0
-      ? Math.round(objectiveSummaries.reduce((s, o) => s + o.progressPercent, 0) / totalObjectives)
+      ? Math.round(activeObjectives.reduce((s, o) => s + o.progressPercent, 0) / totalObjectives)
       : 0;
     const byHealth = {
-      on_track: objectiveSummaries.filter((o) => o.healthStatus === "on_track").length,
-      at_risk: objectiveSummaries.filter((o) => o.healthStatus === "at_risk").length,
-      off_track: objectiveSummaries.filter((o) => o.healthStatus === "off_track").length,
+      on_track: activeObjectives.filter((o) => o.healthStatus === "on_track").length,
+      at_risk: activeObjectives.filter((o) => o.healthStatus === "at_risk").length,
+      off_track: activeObjectives.filter((o) => o.healthStatus === "off_track").length,
     };
 
     const atRiskKRs = krsWithHealth
@@ -238,6 +244,13 @@ okrs.get("/api/okrs/dashboard", async (c) => {
       totalObjectives,
       avgProgress,
       byHealth,
+      closedCount: closedObjectives.length,
+      closedObjectives: closedObjectives.map((o) => ({
+        id: o.id,
+        title: o.title,
+        closeStatus: o.closeStatus,
+        closedAt: o.closedAt,
+      })),
       objectives: objectiveSummaries.sort((a, b) => a.progressPercent - b.progressPercent),
       initiatives: {
         total: cycleInitiatives.length,
@@ -263,6 +276,14 @@ okrs.get("/api/objectives", async (c) => {
   const storage = getStorage(c.get("db"));
   const objectives = await storage.getObjectives();
 
+  // Modo arquivo: retorna apenas objetivos encerrados de todos os cycles
+  if (c.req.query("archived") === "true") {
+    const archived = objectives
+      .filter((o) => o.closedAt != null)
+      .sort((a, b) => new Date(b.closedAt!).getTime() - new Date(a.closedAt!).getTime());
+    return c.json(archived);
+  }
+
   let list: Objective[];
   if (user.role === "admin") {
     list = objectives;
@@ -287,6 +308,42 @@ okrs.get("/api/objectives", async (c) => {
 
   if (c.req.query("tree") === "true") return c.json(buildOkrTree(list));
   return c.json(list);
+});
+
+// POST /api/objectives/:id/close — encerrar quarter de um objetivo
+okrs.post("/api/objectives/:id/close", async (c) => {
+  const user = c.get("user");
+  const storage = getStorage(c.get("db"));
+  const id = c.req.param("id");
+
+  const existing = await storage.getObjective(id);
+  if (!existing) return c.json({ error: "Objetivo não encontrado" }, 404);
+  if (user.role !== "admin" && existing.ownerId !== user.userId) {
+    return c.json({ error: "Acesso negado" }, 403);
+  }
+  if (existing.closedAt != null) {
+    return c.json({ error: "Este objetivo já foi encerrado." }, 400);
+  }
+
+  const closeSchema = z.object({
+    closeStatus: z.enum(["achieved", "partial", "not_achieved"]),
+    closeComment: z.string().min(20, "O comentário deve ter pelo menos 20 caracteres"),
+  });
+
+  const body = await c.req.json();
+  const parsed = closeSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: "Validação falhou", details: parsed.error.errors }, 400);
+  }
+
+  const updated = await storage.updateObjective(id, {
+    closedAt: new Date(),
+    closeStatus: parsed.data.closeStatus,
+    closeComment: parsed.data.closeComment,
+  } as any);
+
+  if (!updated) return c.json({ error: "Objetivo não encontrado" }, 404);
+  return c.json(updated);
 });
 
 // GET /api/objectives/:id
