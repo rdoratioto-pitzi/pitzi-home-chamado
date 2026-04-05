@@ -108,6 +108,11 @@ const metasSubItems = [
   { title: "Gestão de Metas", url: "/metas/gestao", icon: Target },
 ];
 
+const okrsSubItems = [
+  { title: "Visão Geral", url: "/okrs", icon: LayoutDashboard },
+  { title: "Dashboard", url: "/okrs/dashboard", icon: PieChart },
+];
+
 // Submenu Logística (4 abas do dashboard)
 const logisticaDashboardItems = [
   { title: "Dispositivos", url: "/logistica/dispositivos", icon: Warehouse },
@@ -186,6 +191,7 @@ export function AppSidebar() {
 
   const [workspaceOpen, setWorkspaceOpen] = useState(isWorkspaceRoute(location));
   const [metasOpen, setMetasOpen] = useState(isMetasRoute(location));
+  const [okrsOpen, setOkrsOpen] = useState(isOkrsRoute(location));
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
   const [logisticaDashboardOpen, setLogisticaDashboardOpen] = useState(location.startsWith("/logistica/dispositivos") || location.startsWith("/logistica/coletas") || location.startsWith("/logistica/consulta") || location.startsWith("/logistica/fechamentos"));
   const [logisticaOutrosOpen, setLogisticaOutrosOpen] = useState(location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios") || location.startsWith("/logistica/avaliacoes-ia"));
@@ -211,6 +217,7 @@ export function AppSidebar() {
     if (location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios") || location.startsWith("/logistica/avaliacoes-ia")) setLogisticaOutrosOpen(true);
     if (isWorkspaceRoute(location)) setWorkspaceOpen(true);
     if (isMetasRoute(location)) setMetasOpen(true);
+    if (isOkrsRoute(location)) setOkrsOpen(true);
   }, [location]);
 
   const isWorkspaceActive = isWorkspaceRoute(location);
@@ -564,18 +571,42 @@ export function AppSidebar() {
               )}
 
               {hasMetasAccess && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isOkrsActive}
-                    className="h-9 px-3"
-                  >
-                    <Link href="/okrs" data-testid="link-okrs">
-                      <Target className="h-[20px] w-[20px]" />
-                      <span className="text-[12px]">OKRs</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                <Collapsible open={okrsOpen} onOpenChange={setOkrsOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        className="h-9 px-3"
+                        isActive={isOkrsActive}
+                        data-testid="link-okrs"
+                      >
+                        <Target className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">OKRs</span>
+                        {okrsOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                        {okrsSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-okrs-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[12px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
               )}
 
               {hasBibliotecaAccess && (

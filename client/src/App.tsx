@@ -30,6 +30,7 @@ const TaskDetailPage                   = lazy(() => import("@/pages/tarefas/deta
 const ReunioesPage                     = lazy(() => import("@/pages/reunioes/index"));
 const MeetingDetailPage                = lazy(() => import("@/pages/reunioes/detail"));
 const OKRsPage                         = lazy(() => import("@/pages/okrs/index"));
+const OKRsDashboardPage                = lazy(() => import("@/pages/okrs/dashboard"));
 const LogisticaPage                    = lazy(() => import("@/pages/logistica/index"));
 const LogisticsDashboard               = lazy(() => import("@/pages/logistica/dashboard"));
 const DispositivosPage                 = lazy(() => import("@/pages/logistica/dispositivos"));
@@ -194,6 +195,11 @@ function Router() {
       <Route path="/okrs">
         <ProtectedRoute requiredPermission="okrs">
           <OKRsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/okrs/dashboard">
+        <ProtectedRoute requiredPermission="okrs">
+          <OKRsDashboardPage />
         </ProtectedRoute>
       </Route>
       <Route path="/logistica">
