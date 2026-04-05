@@ -7,6 +7,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  TrendingUp,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -36,6 +37,7 @@ export interface OkrListViewProps {
   onEditKR: (kr: KeyResult) => void;
   onDeleteKR: (id: string) => void;
   onEditInitiative: (init: Initiative) => void;
+  onCheckin?: (kr: KeyResult) => void;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -223,6 +225,7 @@ function KRRow({
   onEdit,
   onDelete,
   onEditInitiative,
+  onCheckin,
 }: {
   kr: KeyResult;
   users: User[];
@@ -236,6 +239,7 @@ function KRRow({
   onEdit: () => void;
   onDelete: () => void;
   onEditInitiative: (init: Initiative) => void;
+  onCheckin?: () => void;
 }) {
   const krProgress = calcKRProgress(kr, initiatives);
   const ownerIds = parseResponsibleIds(kr.responsibleIds);
@@ -287,7 +291,19 @@ function KRRow({
         <div className="w-[80px] shrink-0 text-[11px] text-muted-foreground">
           {kr.dueDate ? format(new Date(kr.dueDate), "dd/MM/yy", { locale: ptBR }) : null}
         </div>
-        <div className="w-[60px] shrink-0 flex justify-end">
+        <div className="w-[60px] shrink-0 flex items-center justify-end gap-0.5">
+          {!hasInitiatives && onCheckin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={onCheckin}
+              data-testid={`list-checkin-kr-${kr.id}`}
+              title="Check-in"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -341,6 +357,7 @@ function ObjectiveRow({
   onEditKR,
   onDeleteKR,
   onEditInitiative,
+  onCheckin,
 }: {
   objective: Objective;
   keyResults: KeyResult[];
@@ -354,6 +371,7 @@ function ObjectiveRow({
   onEditKR: (kr: KeyResult) => void;
   onDeleteKR: (id: string) => void;
   onEditInitiative: (init: Initiative) => void;
+  onCheckin?: (kr: KeyResult) => void;
 }) {
   // Default: objectives expanded, KRs collapsed
   const [krsExpanded, setKrsExpanded] = useState(true);
@@ -467,6 +485,7 @@ function ObjectiveRow({
           onEdit={() => onEditKR(kr)}
           onDelete={() => onDeleteKR(kr.id)}
           onEditInitiative={onEditInitiative}
+          onCheckin={onCheckin ? () => onCheckin(kr) : undefined}
         />
       ))}
     </>
@@ -488,6 +507,7 @@ export function OkrListView({
   onEditKR,
   onDeleteKR,
   onEditInitiative,
+  onCheckin,
 }: OkrListViewProps) {
   if (objectives.length === 0) {
     return (
@@ -515,6 +535,7 @@ export function OkrListView({
           onEditKR={onEditKR}
           onDeleteKR={onDeleteKR}
           onEditInitiative={onEditInitiative}
+          onCheckin={onCheckin}
         />
       ))}
     </div>
