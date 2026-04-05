@@ -94,7 +94,12 @@ function normalizeCycle(cycle: string): string {
   return cycle.replace(" ", "-");
 }
 
-function calcHealthStatus(progressPercent: number, cycle: string): HealthStatus {
+function calcHealthStatus(
+  progressPercent: number,
+  cycle: string,
+  hasCheckins = true,
+): HealthStatus {
+  if (!hasCheckins) return "on_track";
   const range = QUARTER_RANGES[normalizeCycle(cycle)];
   if (!range) return "on_track";
   const now = new Date();
@@ -171,11 +176,15 @@ export function registerOkrRoutes(router: Router) {
 
       const timeElapsed = calcTimeElapsedPercent(cycle);
 
+      // Batch: quais KRs já tiveram ao menos um check-in (1 query, sem N+1)
+      const krsWithCheckinsSet = await storage.getKRsWithCheckins();
+
       // KRs com progresso e health
       const krsWithHealth = cycleKrs.map((kr) => {
         const progress = calcKrProgress(kr);
-        const health = calcHealthStatus(progress, cycle);
-        return { kr, progress, health };
+        const hasCheckins = krsWithCheckinsSet.has(kr.id);
+        const health = calcHealthStatus(progress, cycle, hasCheckins);
+        return { kr, progress, health, hasCheckins };
       });
 
       // Objectives com progresso e health
@@ -462,8 +471,11 @@ export function registerOkrRoutes(router: Router) {
 
   // ============== KEY RESULTS ==============
   router.get("/api/key-results", requireAuth, async (req, res) => {
-    const keyResults = await storage.getKeyResults();
-    res.json(keyResults);
+    const [keyResults, krsWithCheckins] = await Promise.all([
+      storage.getKeyResults(),
+      storage.getKRsWithCheckins(),
+    ]);
+    res.json(keyResults.map((kr) => ({ ...kr, hasCheckins: krsWithCheckins.has(kr.id) })));
   });
 
   router.post("/api/key-results", requireAuth, async (req, res) => {
@@ -536,11 +548,12 @@ export function registerOkrRoutes(router: Router) {
 
   router.patch("/api/initiatives/:id", requireAuth, async (req, res) => {
     try {
-      const existing = await storage.getInitiative(req.params.id);
+      const id = req.params.id as string;
+      const existing = await storage.getInitiative(id);
       if (!existing) return res.status(404).json({ error: "Initiative not found" });
       const partialSchema = insertInitiativeSchema.partial();
       const validated = partialSchema.parse(req.body);
-      const initiative = await storage.updateInitiative(req.params.id, validated);
+      const initiative = await storage.updateInitiative(id, validated);
       if (!initiative) return res.status(404).json({ error: "Initiative not found" });
       res.json(initiative);
     } catch (error) {
@@ -552,9 +565,10 @@ export function registerOkrRoutes(router: Router) {
   });
 
   router.delete("/api/initiatives/:id", requireAuth, async (req, res) => {
-    const existing = await storage.getInitiative(req.params.id);
+    const id = req.params.id as string;
+    const existing = await storage.getInitiative(id);
     if (!existing) return res.status(404).json({ error: "Initiative not found" });
-    const deleted = await storage.deleteInitiative(req.params.id);
+    const deleted = await storage.deleteInitiative(id);
     if (!deleted) return res.status(404).json({ error: "Initiative not found" });
     res.status(204).send();
   });

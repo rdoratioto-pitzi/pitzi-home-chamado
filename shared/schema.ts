@@ -357,7 +357,8 @@ export const insertKeyResultSchema = baseInsertKeyResultSchema.extend({
   ),
 });
 export type InsertKeyResult = z.infer<typeof insertKeyResultSchema>;
-export type KeyResult = typeof keyResults.$inferSelect;
+/** hasCheckins é campo virtual injetado pelo backend (GET /api/key-results) — não persiste no banco */
+export type KeyResult = typeof keyResults.$inferSelect & { hasCheckins?: boolean };
 
 // ============== KEY RESULT UPDATES (Check-ins) ==============
 export const keyResultUpdates = pgTable("key_result_updates", {
