@@ -58,6 +58,7 @@ export type ModulePermissions = {
   configuracoes: boolean;
   updates: boolean;
   estoques: boolean;
+  avaliacoes: boolean;
 };
 
 // ============== REFRESH TOKENS (JWT Auth) ==============
@@ -1647,4 +1648,50 @@ export const workspaceComentarios = pgTable("workspace_comentarios", {
 export const insertWorkspaceComentarioSchema = createInsertSchema(workspaceComentarios).omit({ id: true, criadoEm: true });
 export type InsertWorkspaceComentario = z.infer<typeof insertWorkspaceComentarioSchema>;
 export type WorkspaceComentario = typeof workspaceComentarios.$inferSelect;
+
+// ============== CURADORIA DE AVALIAÇÕES ==============
+export const curadoriaAvaliacoes = pgTable("curadoria_avaliacoes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  tradeInId: text("trade_in_id").notNull(),
+  imei: text("imei"),
+  modelo: text("modelo"),
+  categoria: text("categoria"), // smartphone, iphone, console
+  gradeIaDisplay: text("grade_ia_display"), // A, B ou C
+  gradeIaCarcaca: text("grade_ia_carcaca"), // A, B ou C
+  gradeHumanoDisplay: text("grade_humano_display"), // A, B ou C
+  gradeHumanoCarcaca: text("grade_humano_carcaca"), // A, B ou C
+  avaliadorHumanoId: text("avaliador_humano_id"),
+  gradeCorretaDisplay: text("grade_correta_display"), // A, B ou C (curador)
+  gradeCorretaCarcaca: text("grade_correta_carcaca"), // A, B ou C (curador)
+  revisaoAvaliador: boolean("revisao_avaliador").default(false),
+  revisaoTipo: text("revisao_tipo"), // burn-in, listras, pixels, manchas
+  curadorId: varchar("curador_id"),
+  observacao: text("observacao"),
+  dataTradeIn: timestamp("data_trade_in"),
+  dataCuradoria: timestamp("data_curadoria").defaultNow(),
+  precoMaximo: decimal("preco_maximo"),
+  imagemFrontal: text("imagem_frontal"),
+  imagemTraseira: text("imagem_traseira"),
+  imagemLateral1: text("imagem_lateral_1"),
+  imagemLateral2: text("imagem_lateral_2"),
+  imagemDetalhe: text("imagem_detalhe"),
+});
+
+export const insertCuradoriaAvaliacaoSchema = createInsertSchema(curadoriaAvaliacoes).omit({ id: true, dataCuradoria: true });
+export type InsertCuradoriaAvaliacao = z.infer<typeof insertCuradoriaAvaliacaoSchema>;
+export type CuradoriaAvaliacao = typeof curadoriaAvaliacoes.$inferSelect;
+
+// ============== CURADORIA CONFIGURAÇÕES ==============
+export const curadoriaConfiguracoes = pgTable("curadoria_configuracoes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  percentualAmostragem: decimal("percentual_amostragem").default("15"),
+  modoPrioridade: text("modo_prioridade").default("aleatorio"),
+  atualizadoEm: timestamp("atualizado_em").defaultNow(),
+});
+
+export const insertCuradoriaConfiguracaoSchema = createInsertSchema(curadoriaConfiguracoes).omit({ id: true, atualizadoEm: true });
+export type InsertCuradoriaConfiguracao = z.infer<typeof insertCuradoriaConfiguracaoSchema>;
+export type CuradoriaConfiguracao = typeof curadoriaConfiguracoes.$inferSelect;
 

@@ -17,6 +17,8 @@ import {
   Sparkles,
   GitBranch,
   Printer,
+  ScanEye,
+  Warehouse,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MacGyverIcon from "@/components/Chat/MacGyverIcon";
@@ -150,6 +152,24 @@ const modules: ModuleCard[] = [
     color: "text-indigo-600 dark:text-indigo-400",
     bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
     permissionKey: "gitAnalytics"
+  },
+  {
+    title: "Avaliações",
+    description: "Curadoria de avaliações e matriz de confusão da IA",
+    icon: ScanEye,
+    href: "/avaliacoes/dashboard",
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    permissionKey: "avaliacoes",
+  },
+  {
+    title: "Estoque",
+    description: "Posição de estoques, pipeline e rastreabilidade",
+    icon: Warehouse,
+    href: "/estoques/dashboard",
+    color: "text-purple-600 dark:text-purple-400",
+    bgColor: "bg-purple-100 dark:bg-purple-900/30",
+    permissionKey: "estoques",
   },
 ];
 
