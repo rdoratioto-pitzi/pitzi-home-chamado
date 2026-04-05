@@ -7,6 +7,8 @@ import { ptBR } from "date-fns/locale";
 import { formatKRRange } from "@/lib/kr-format";
 import { useAuth } from "@/contexts/auth-context";
 import type { Objective, KeyResult, User, Initiative } from "@shared/schema";
+import { calculateHealthStatus, calculateObjectiveHealth } from "@/lib/okr-health";
+import { HealthBadge } from "@/components/okrs/HealthBadge";
 
 // ─── OwnerChip (organogram variant) ──────────────────────────────────────────
 function OwnerChip({
@@ -180,6 +182,14 @@ function OrgChartCard({
   const statusInfo = statusBadgeStyle[node.status] ?? statusBadgeStyle.on_track;
   const borderCls = levelBorderLeft[node.level] ?? "";
   const progressColor = levelProgressColor[node.level] ?? "#00E676";
+  const objHealth = calculateObjectiveHealth(
+    nodeKRs.map((kr) =>
+      calculateHealthStatus(
+        calcKRProgress(kr, initiativesByKR.get(kr.id) ?? []),
+        node.cycle,
+      )
+    )
+  );
 
   const toggleKR = (id: string) =>
     setExpandedKRs((prev) => {
@@ -215,13 +225,18 @@ function OrgChartCard({
             </div>
           )}
 
-          {/* Status badge */}
-          <Badge
-            variant="outline"
-            className={`text-[10px] px-[7px] py-[2px] font-semibold ${statusInfo.cls}`}
-          >
-            {statusInfo.label}
-          </Badge>
+          {/* Status badge (manual) + HealthBadge automático */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <Badge
+              variant="outline"
+              className={`text-[10px] px-[7px] py-[2px] font-semibold ${statusInfo.cls}`}
+            >
+              {statusInfo.label}
+            </Badge>
+            {objHealth !== node.status && (
+              <HealthBadge status={objHealth} secondary />
+            )}
+          </div>
 
           {/* Progress bar */}
           <div className="mt-3">
@@ -252,6 +267,7 @@ function OrgChartCard({
                     const krProgress = calcKRProgress(kr, initiatives);
                     const isKRExpanded = expandedKRs.has(kr.id);
                     const completedCount = initiatives.filter((i) => i.completed).length;
+                    const krHealth = calculateHealthStatus(krProgress, node.cycle);
                     const krOwnerId = (() => {
                       try {
                         const ids = JSON.parse(kr.responsibleIds ?? "[]");
@@ -268,9 +284,12 @@ function OrgChartCard({
                       >
                         {/* KR header */}
                         <div className="min-w-0">
-                          <p className="text-[11px] font-semibold leading-snug line-clamp-2">
-                            {kr.title}
-                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            <p className="text-[11px] font-semibold leading-snug line-clamp-2">
+                              {kr.title}
+                            </p>
+                            <HealthBadge status={krHealth} />
+                          </div>
                           <p className="text-[10px] text-muted-foreground mt-0.5">
                             {formatKRRange(kr.startValue, kr.targetValue, kr.measurementType, kr.unit)}
                           </p>
