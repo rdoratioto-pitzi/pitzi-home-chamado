@@ -5,13 +5,17 @@ import { Calculator, BarChart3, FileDown } from "lucide-react";
 import { SimuladorForm } from "./components/simulador-form";
 import { SimuladorResults } from "./components/simulador-results";
 import { AnatomiaNegocio } from "./components/anatomia-negocio";
+import { DashboardView } from "./components/dashboard-view";
 import {
   calcSimulacao,
   DEFAULT_INPUTS,
   type SimuladorInputs,
 } from "./lib/simulador-calc";
 
+type ViewMode = "simulator" | "dashboard";
+
 export default function ComercialSimuladorPage() {
+  const [currentView, setCurrentView] = useState<ViewMode>("simulator");
   const [inputs, setInputs] = useState<SimuladorInputs>(DEFAULT_INPUTS);
   const [selectedUf, setSelectedUf] = useState("SP");
   const [revenda, setRevenda] = useState("");
@@ -40,11 +44,21 @@ export default function ComercialSimuladorPage() {
         ]}
         actions={
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="default" className="gap-1.5 text-xs">
+            <Button
+              size="sm"
+              variant={currentView === "simulator" ? "default" : "ghost"}
+              className="gap-1.5 text-xs"
+              onClick={() => setCurrentView("simulator")}
+            >
               <Calculator className="h-3.5 w-3.5" />
               Simulador
             </Button>
-            <Button size="sm" variant="ghost" className="gap-1.5 text-xs" disabled>
+            <Button
+              size="sm"
+              variant={currentView === "dashboard" ? "default" : "ghost"}
+              className="gap-1.5 text-xs"
+              onClick={() => setCurrentView("dashboard")}
+            >
               <BarChart3 className="h-3.5 w-3.5" />
               Dashboard
             </Button>
@@ -57,31 +71,35 @@ export default function ComercialSimuladorPage() {
       />
 
       <div className="flex-1 p-6 overflow-auto">
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
-          {/* ── Coluna esquerda: Form + Results ── */}
-          <div className="xl:col-span-3 space-y-4">
-            <SimuladorForm
-              inputs={inputs}
-              selectedUf={selectedUf}
-              compraTotal={result.compraTotal}
-              vendaTotal={result.vendaTotal}
-              freteTotal={result.freteTotal}
-              comissaoVarUn={result.comissaoVarUn}
-              comissaoRepUn={result.comissaoRepUn}
-              onChange={handleChange}
-              onSelectUf={handleSelectUf}
-              revenda={revenda}
-              onRevendaChange={setRevenda}
-            />
+        {currentView === "simulator" ? (
+          <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
+            {/* ── Coluna esquerda: Form + Results ── */}
+            <div className="xl:col-span-3 space-y-4">
+              <SimuladorForm
+                inputs={inputs}
+                selectedUf={selectedUf}
+                compraTotal={result.compraTotal}
+                vendaTotal={result.vendaTotal}
+                freteTotal={result.freteTotal}
+                comissaoVarUn={result.comissaoVarUn}
+                comissaoRepUn={result.comissaoRepUn}
+                onChange={handleChange}
+                onSelectUf={handleSelectUf}
+                revenda={revenda}
+                onRevendaChange={setRevenda}
+              />
 
-            <SimuladorResults result={result} markupMeta={inputs.markupMeta} />
-          </div>
+              <SimuladorResults result={result} markupMeta={inputs.markupMeta} />
+            </div>
 
-          {/* ── Coluna direita: Anatomia do Negócio ── */}
-          <div className="xl:col-span-2">
-            <AnatomiaNegocio resultado={result} inputs={inputs} revenda={revenda} />
+            {/* ── Coluna direita: Anatomia do Negócio ── */}
+            <div className="xl:col-span-2">
+              <AnatomiaNegocio resultado={result} inputs={inputs} revenda={revenda} />
+            </div>
           </div>
-        </div>
+        ) : (
+          <DashboardView />
+        )}
       </div>
     </div>
   );
