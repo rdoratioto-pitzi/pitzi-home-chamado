@@ -1,27 +1,48 @@
-import { useState, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Pencil } from "lucide-react";
+import { Pencil, Loader2 } from "lucide-react";
 import {
   type DashboardMonth,
   type MonthKey,
   MONTH_KEYS,
   INITIAL_DASHBOARD_DATA,
+  periodoToMonthKey,
 } from "../lib/dashboard-data";
 import { DashboardHero } from "./dashboard-hero";
 import { DashboardKpiRow } from "./dashboard-kpi-row";
 import { DashboardBreakdown } from "./dashboard-breakdown";
 import { KpiEditModal } from "./kpi-edit-modal";
+import { useComercialKpis, apiRowToDashboardMonth } from "../hooks/use-comercial-kpis";
 
 export function DashboardView() {
-  const [data, setData] = useState<Record<MonthKey, DashboardMonth>>(INITIAL_DASHBOARD_DATA);
   const [activeMonth, setActiveMonth] = useState<MonthKey>("mar-2026");
   const [editOpen, setEditOpen] = useState(false);
 
-  const handleSave = useCallback((month: MonthKey, updated: DashboardMonth) => {
-    setData((prev) => ({ ...prev, [month]: updated }));
-  }, []);
+  const { data: apiRows, isLoading } = useComercialKpis();
+
+  const data = useMemo<Record<MonthKey, DashboardMonth>>(() => {
+    const base = { ...INITIAL_DASHBOARD_DATA };
+    if (apiRows) {
+      for (const row of apiRows) {
+        const key = periodoToMonthKey(row.periodo);
+        if (key) {
+          base[key] = apiRowToDashboardMonth(row);
+        }
+      }
+    }
+    return base;
+  }, [apiRows]);
 
   const current = data[activeMonth];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Carregando KPIs...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -64,7 +85,6 @@ export function DashboardView() {
         onOpenChange={setEditOpen}
         currentMonth={activeMonth}
         data={data}
-        onSave={handleSave}
       />
     </div>
   );

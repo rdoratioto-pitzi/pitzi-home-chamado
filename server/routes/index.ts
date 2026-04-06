@@ -25,6 +25,7 @@ import { registerDevToolsRoutes } from "./dev-tools";
 import { registerWorkspaceRoutes } from "./workspace";
 import { registerTriagemRoutes } from "./triagem";
 import { registerAvaliacoesRoutes } from "./avaliacoes";
+import { registerComercialKpisRoutes } from "./comercial-kpis";
 
 export function registerModularRoutes(app: Router) {
   const router = Router();
@@ -55,6 +56,7 @@ export function registerModularRoutes(app: Router) {
   registerWorkspaceRoutes(router);
   registerTriagemRoutes(router);
   registerAvaliacoesRoutes(router);
+  registerComercialKpisRoutes(router);
 
   app.use(router);
 }
