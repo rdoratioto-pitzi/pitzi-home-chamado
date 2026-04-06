@@ -52,6 +52,7 @@ interface TarefaItem {
   sprint: string | null;
   progresso: number | null;
   criadoEm: string | null;
+  anexos?: Array<{ name: string; url: string }>;
 }
 
 interface ProjetoComTarefas {
@@ -768,6 +769,7 @@ function toUnifiedItem(tarefa: TarefaItem, projetoNome: string): UnifiedItem {
     progresso: tarefa.progresso,
     sprint: tarefa.sprint,
     dataEntrega: tarefa.dataEntrega,
+    anexos: tarefa.anexos || [],
   };
 }
 

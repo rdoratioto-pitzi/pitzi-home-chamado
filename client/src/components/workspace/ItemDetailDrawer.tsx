@@ -319,14 +319,14 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
               )}
             </div>
             <div className="flex items-center gap-1">
-              {isChamado && (
+              {item && (
                 <button
-                  onClick={() => { onClose(); setLocation(`/chamados/${item!.id}`); }}
+                  onClick={() => { onClose(); setLocation(isChamado ? `/chamados/${item!.id}` : `/workspace/tarefas/${item!.id}`); }}
                   className="p-1.5 rounded transition-colors"
                   style={{ color: "rgba(255,255,255,0.4)" }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  title="Abrir detalhe"
+                  title={isChamado ? "Abrir detalhe" : "Editar atividade"}
                 >
                   <ExternalLink className="h-4 w-4" />
                 </button>
@@ -565,7 +565,12 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                 </div>
 
                 {/* ANEXOS */}
-                {isChamado && (item as ChamadoItem).anexos?.length > 0 && (
+                {(() => {
+                  const anexos = isChamado
+                    ? (item as ChamadoItem).anexos
+                    : (item as UnifiedItem).anexos || [];
+                  if (!anexos || anexos.length === 0) return null;
+                  return (
                   <div
                     style={{
                       marginBottom: 24,
@@ -575,10 +580,10 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                   >
                     <div style={SECTION_LABEL_STYLE}>
                       <Paperclip size={12} style={{ display: "inline", marginRight: 6 }} />
-                      Anexos ({(item as ChamadoItem).anexos.length})
+                      Anexos ({anexos.length})
                     </div>
                     <div className="grid grid-cols-2 gap-2 mt-2">
-                      {(item as ChamadoItem).anexos.map((anexo, idx) =>
+                      {anexos.map((anexo, idx) =>
                         isImageAnexo(anexo) ? (
                           <Dialog key={idx}>
                             <DialogTrigger asChild>
@@ -622,7 +627,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                       )}
                     </div>
                   </div>
-                )}
+                  );
+                })()}
 
                 {/* COMENTÁRIOS section — só chamados */}
                 {isChamado && (
