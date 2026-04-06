@@ -16,19 +16,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   type DashboardMonth,
   type MonthKey,
   MONTH_KEYS,
   INITIAL_DASHBOARD_DATA,
+  monthKeyToPeriodo,
 } from "../lib/dashboard-data";
+import { useUpsertComercialKpi } from "../hooks/use-comercial-kpis";
 
 interface KpiEditModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentMonth: MonthKey;
   data: Record<MonthKey, DashboardMonth>;
-  onSave: (month: MonthKey, updated: DashboardMonth) => void;
 }
 
 type NumericField = keyof Omit<DashboardMonth, "label">;
@@ -59,11 +62,13 @@ function formatForInput(value: number): string {
   return value.toFixed(2).replace(".", ",");
 }
 
-export function KpiEditModal({ open, onOpenChange, currentMonth, data, onSave }: KpiEditModalProps) {
+export function KpiEditModal({ open, onOpenChange, currentMonth, data }: KpiEditModalProps) {
   const [selectedMonth, setSelectedMonth] = useState<MonthKey>(currentMonth);
   const [values, setValues] = useState<Record<NumericField, string>>(() =>
     buildFormValues(data[currentMonth]),
   );
+  const { toast } = useToast();
+  const upsertMutation = useUpsertComercialKpi();
 
   function buildFormValues(month: DashboardMonth): Record<NumericField, string> {
     const result: Record<string, string> = {};
@@ -83,8 +88,11 @@ export function KpiEditModal({ open, onOpenChange, currentMonth, data, onSave }:
   }
 
   function handleSave() {
-    const updated: DashboardMonth = {
-      label: data[selectedMonth].label,
+    const periodo = monthKeyToPeriodo(selectedMonth);
+    const label = data[selectedMonth].label;
+
+    const payload = {
+      label,
       volume: parseNumericInput(values.volume),
       ticket: parseNumericInput(values.ticket),
       cmc: parseNumericInput(values.cmc),
@@ -99,8 +107,26 @@ export function KpiEditModal({ open, onOpenChange, currentMonth, data, onSave }:
       cofinsPct: parseNumericInput(values.cofinsPct),
       frete: parseNumericInput(values.frete),
     };
-    onSave(selectedMonth, updated);
-    onOpenChange(false);
+
+    upsertMutation.mutate(
+      { periodo, data: payload },
+      {
+        onSuccess: () => {
+          toast({
+            title: "KPIs atualizados",
+            description: `KPIs de ${label} atualizados com sucesso`,
+          });
+          onOpenChange(false);
+        },
+        onError: () => {
+          toast({
+            title: "Erro",
+            description: "Não foi possível salvar os KPIs",
+            variant: "destructive",
+          });
+        },
+      },
+    );
   }
 
   return (
@@ -155,7 +181,10 @@ export function KpiEditModal({ open, onOpenChange, currentMonth, data, onSave }:
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleSave}>Salvar</Button>
+          <Button onClick={handleSave} disabled={upsertMutation.isPending}>
+            {upsertMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

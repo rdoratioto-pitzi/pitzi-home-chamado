@@ -1696,3 +1696,29 @@ export const insertCuradoriaConfiguracaoSchema = createInsertSchema(curadoriaCon
 export type InsertCuradoriaConfiguracao = z.infer<typeof insertCuradoriaConfiguracaoSchema>;
 export type CuradoriaConfiguracao = typeof curadoriaConfiguracoes.$inferSelect;
 
+// ============== COMERCIAL KPIs (Dashboard CPD) ==============
+export const comercialKpis = pgTable("comercial_kpis", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  periodo: varchar("periodo", { length: 10 }).notNull().unique(), // "2026-03"
+  label: varchar("label", { length: 20 }).notNull(), // "Mar 2026"
+  volume: integer("volume").notNull().default(0),
+  ticket: decimal("ticket", { precision: 12, scale: 2 }).notNull().default("0"),
+  cmc: decimal("cmc", { precision: 12, scale: 2 }).notNull().default("0"),
+  margemUn: decimal("margem_un", { precision: 12, scale: 2 }).notNull().default("0"),
+  margemPct: decimal("margem_pct", { precision: 6, scale: 2 }).notNull().default("0"),
+  margemTotal: decimal("margem_total", { precision: 14, scale: 2 }).notNull().default("0"),
+  mcTotal: decimal("mc_total", { precision: 14, scale: 2 }).notNull().default("0"),
+  comissaoVarPct: decimal("comissao_var_pct", { precision: 5, scale: 2 }).notNull().default("10"),
+  comissaoRepPct: decimal("comissao_rep_pct", { precision: 5, scale: 2 }).notNull().default("0"),
+  icmsPct: decimal("icms_pct", { precision: 5, scale: 2 }).notNull().default("3.51"),
+  pisPct: decimal("pis_pct", { precision: 5, scale: 2 }).notNull().default("0.65"),
+  cofinsPct: decimal("cofins_pct", { precision: 5, scale: 2 }).notNull().default("3.00"),
+  frete: decimal("frete", { precision: 10, scale: 2 }).notNull().default("36.01"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertComercialKpiSchema = createInsertSchema(comercialKpis).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertComercialKpi = z.infer<typeof insertComercialKpiSchema>;
+export type ComercialKpi = typeof comercialKpis.$inferSelect;
+
