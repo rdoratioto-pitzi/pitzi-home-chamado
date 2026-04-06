@@ -291,6 +291,34 @@ export function useMatrizConfusao(filtros: AvaliacoesFilters = {}) {
   });
 }
 
+// ─── Assertividade por Tipo de Foto (from proxy API) ────────────────────────
+
+export interface AssertividadeFotoItem {
+  Nome_da_Tela: string;
+  Total_Fotos: number;
+  Acertos: number;
+  Percentual_Assertividade: number;
+  Mes_Avaliacao?: string;
+}
+
+export function useAssertividadeFotos(filtros: AvaliacoesFilters = {}) {
+  return useQuery<AssertividadeFotoItem[]>({
+    queryKey: ["/api/avaliacoes-ia/assertividade-fotos", filtros],
+    queryFn: async () => {
+      const p = new URLSearchParams();
+      if (filtros.dataInicio) p.set("start_date", filtros.dataInicio);
+      if (filtros.dataFim) p.set("end_date", filtros.dataFim);
+      if (filtros.categoria) p.set("categories", filtros.categoria);
+      const qs = p.toString();
+      const res = await apiRequest("GET", `/api/avaliacoes-ia/assertividade-fotos${qs ? `?${qs}` : ""}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export function useSaveCuradoria() {

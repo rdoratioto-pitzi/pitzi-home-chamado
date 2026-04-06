@@ -8,11 +8,18 @@ import { insertLogisticaReversaEventoSchema } from "../../../shared/schema";
 const integrations = new Hono<AppEnv>();
 
 const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
-const RS_API_TOKEN = "Renov123";
+
+function getApiToken(c?: any): string {
+  try {
+    return c?.env?.RENOVSMART_API_TOKEN || "Renov123";
+  } catch {
+    return "Renov123";
+  }
+}
 
 // ============== HELPERS ==============
 
-async function fetchAiEvaluation(endpoint: string, query: Record<string, string | string[] | undefined>) {
+async function fetchAiEvaluation(endpoint: string, query: Record<string, string | string[] | undefined>, apiToken?: string) {
   const params = new URLSearchParams();
   Object.keys(query).forEach((key) => {
     const value = query[key];
@@ -25,11 +32,12 @@ async function fetchAiEvaluation(endpoint: string, query: Record<string, string 
 
   const url = `${RS_API_BASE_URL}/avaliacoes-ia/${endpoint}`;
   const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
+  const token = apiToken || "Renov123";
 
   const response = await fetch(fullUrl, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${RS_API_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
   });
@@ -49,7 +57,7 @@ async function fetchAiEvaluation(endpoint: string, query: Record<string, string 
   return response.json();
 }
 
-async function fetchEstoque(query: Record<string, string | string[] | undefined>) {
+async function fetchEstoque(query: Record<string, string | string[] | undefined>, apiToken?: string) {
   const params = new URLSearchParams();
   Object.keys(query).forEach((key) => {
     const value = query[key];
@@ -62,11 +70,12 @@ async function fetchEstoque(query: Record<string, string | string[] | undefined>
 
   const url = `${RS_API_BASE_URL}/estoques`;
   const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
+  const token = apiToken || "Renov123";
 
   const response = await fetch(fullUrl, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${RS_API_TOKEN}`,
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
   });
@@ -90,12 +99,13 @@ async function fetchEstoque(query: Record<string, string | string[] | undefined>
 // POST /api/integrations/relatorio-pedidos/test-connection (public)
 integrations.post("/api/integrations/relatorio-pedidos/test-connection", async (c) => {
   try {
+    const token = getApiToken(c);
     const response = await fetch(
       `${RS_API_BASE_URL}/orders/advanced?imei=000000000000000`,
       {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${RS_API_TOKEN}`,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       }
@@ -117,6 +127,7 @@ integrations.post("/api/integrations/relatorio-pedidos/test-connection", async (
 
 // GET /api/integrations/relatorio-pedidos/orders/advanced (public)
 integrations.get("/api/integrations/relatorio-pedidos/orders/advanced", async (c) => {
+  const token = getApiToken(c);
   const params = new URLSearchParams();
   const queryParams = [
     "imei", "voucher_code", "voucher_status", "customer_cpf",
@@ -133,7 +144,7 @@ integrations.get("/api/integrations/relatorio-pedidos/orders/advanced", async (c
     {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${RS_API_TOKEN}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     }
@@ -164,12 +175,14 @@ const aiEndpoints = [
 
 for (const endpoint of aiEndpoints) {
   integrations.get(`/api/avaliacoes-ia/${endpoint}`, async (c) => {
-    const data = await fetchAiEvaluation(endpoint, c.req.query() as any);
+    const token = getApiToken(c);
+    const data = await fetchAiEvaluation(endpoint, c.req.query() as any, token);
     return c.json(data);
   });
 }
 
 integrations.get("/api/avaliacoes-ia/imei", async (c) => {
+  const token = getApiToken(c);
   const params = new URLSearchParams();
   const limitDate = c.req.query("limit_date") || new Date().toISOString().slice(0, 10);
   params.append("limit_date", limitDate);
@@ -179,7 +192,7 @@ integrations.get("/api/avaliacoes-ia/imei", async (c) => {
     params.append("imei", imei);
   }
 
-  const data = await fetchAiEvaluation("imei", Object.fromEntries(params.entries()) as any);
+  const data = await fetchAiEvaluation("imei", Object.fromEntries(params.entries()) as any, token);
   return c.json(data);
 });
 
@@ -187,7 +200,8 @@ integrations.get("/api/avaliacoes-ia/imei", async (c) => {
 
 // GET /api/estoques (public)
 integrations.get("/api/estoques", async (c) => {
-  const data = await fetchEstoque(c.req.query() as any);
+  const token = getApiToken(c);
+  const data = await fetchEstoque(c.req.query() as any, token);
   return c.json(data);
 });
 
