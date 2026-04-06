@@ -35,8 +35,7 @@ export function DashboardKpiRow({ data }: DashboardKpiRowProps) {
   const comissaoVarUn = data.ticket * (data.comissaoVarPct / 100);
   const comissaoRepUn = data.ticket * (data.comissaoRepPct / 100);
   const cpdUn = data.cmc + icmsUn + pisUn + cofinsUn + data.frete + comissaoVarUn + comissaoRepUn;
-  const cpdTotal = cpdUn * data.volume;
-  const cpdPctReceita = receitaTotal > 0 ? (cpdTotal / receitaTotal) * 100 : 0;
+  const cpdPctReceita = receitaTotal > 0 ? (cpdUn / data.ticket) * 100 : 0;
 
   const cards = [
     {
@@ -50,8 +49,8 @@ export function DashboardKpiRow({ data }: DashboardKpiRowProps) {
       color: "text-foreground",
     },
     {
-      title: "CPD Total",
-      value: formatBRL(cpdTotal),
+      title: "CPD Médio",
+      value: formatBRL(cpdUn),
       sub: `${formatPct(cpdPctReceita)} da receita`,
       color: "text-red-600",
     },
