@@ -1,0 +1,703 @@
+/**
+ * Serviço de integração RenovSmart para dados de avaliação estética
+ * Consome a API dash.renovsmart.com.br/api e agrega dados de curadoria do PostgreSQL
+ */
+
+import { db } from "../db";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
+import {
+  curadoriaAvaliacoes,
+  curadoriaConfiguracoes,
+  type InsertCuradoriaAvaliacao,
+} from "@shared/schema";
+
+const PIPELINE_RS_BASE = "https://dash.renovsmart.com.br/api";
+const PIPELINE_RS_TOKEN = "Renov123";
+
+export const DESCONTO_POR_GRADE: Record<string, number> = { A: 0, B: 0.25, C: 0.70 };
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type Grade = "A" | "B" | "C";
+
+export interface TradeInAvaliacao {
+  tradeInId: string;
+  imei: string;
+  modelo: string;
+  categoria: "smartphone" | "iphone" | "console" | string;
+  dataTradeIn: string;
+  precoMaximo: number;
+
+  gradeIaDisplay: Grade | null;
+  gradeIaCarcaca: Grade | null;
+  gradeHumanoDisplay: Grade | null;
+  gradeHumanoCarcaca: Grade | null;
+  avaliadorHumanoId: string | null;
+  avaliadorHumanoNome: string | null;
+
+  imagemFrontal: string | null;
+  imagemTraseira: string | null;
+  imagemLateral1: string | null;
+  imagemLateral2: string | null;
+  imagemDetalhe: string | null;
+
+  foiCurado: boolean;
+}
+
+export interface MetricasResumo {
+  acuraciaIa: number;
+  acuraciaHumano: number;
+  custoErroIa: number;
+  custoErroHumano: number;
+  totalCurados: number;
+  totalDisponiveis: number;
+  trendAcuraciaIa: number;
+  trendAcuraciaHumano: number;
+}
+
+export interface EvolucaoPonto {
+  data: string;
+  acuraciaIa: number;
+  acuraciaHumano: number;
+  totalCurados: number;
+}
+
+export interface RankingAvaliador {
+  avaliadorId: string;
+  avaliadorNome: string;
+  totalAvaliacoes: number;
+  acuraciaDisplay: number;
+  acuraciaCarcaca: number;
+  acuraciaGeral: number;
+  trend: number;
+}
+
+export interface CustoErroBreakdown {
+  transicao: string; // ex: "A→B"
+  quantidade: number;
+  custoTotal: number;
+}
+
+export interface CustoErroResult {
+  custoTotalIa: number;
+  custoTotalHumano: number;
+  breakdownPorTipoErro: CustoErroBreakdown[];
+  topModelosCustoErro: Array<{ modelo: string; custoTotal: number; quantidade: number }>;
+}
+
+export interface MatrizConfusaoEntry {
+  atribuido: Grade;
+  correto: Grade;
+  quantidade: number;
+  percentual: number;
+}
+
+export interface MatrizConfusaoResult {
+  matriz: MatrizConfusaoEntry[];
+  totalAvaliacoes: number;
+  acuraciaGeral: number;
+}
+
+export interface AvaliacoesFilters {
+  dataInicio?: string;
+  dataFim?: string;
+  categoria?: string;
+  area?: "display" | "carcaca" | "ambas";
+  avaliadorId?: string;
+  granularidade?: "diaria" | "semanal" | "mensal";
+  tipo?: "ia" | "humano";
+}
+
+export interface Avaliador {
+  id: string;
+  nome: string;
+}
+
+// ─── Mock data (fallback) ─────────────────────────────────────────────────────
+
+function getMockTradeIns(): TradeInAvaliacao[] {
+  const grades: Grade[] = ["A", "B", "C"];
+  const modelos = [
+    "iPhone 14 Pro", "Samsung Galaxy S23", "iPhone 13", "Xiaomi 13",
+    "Nintendo Switch", "Samsung Galaxy A54", "iPhone 12", "PlayStation 5",
+  ];
+  const categorias = ["iphone", "smartphone", "console"];
+  const avaliadores = [
+    { id: "av1", nome: "Carlos Mendes" },
+    { id: "av2", nome: "Ana Lima" },
+    { id: "av3", nome: "Pedro Santos" },
+  ];
+
+  return Array.from({ length: 40 }, (_, i) => {
+    const gradeIaD = grades[Math.floor(Math.random() * 3)];
+    const gradeIaC = grades[Math.floor(Math.random() * 3)];
+    const gradeHD = grades[Math.floor(Math.random() * 3)];
+    const gradeHC = grades[Math.floor(Math.random() * 3)];
+    const av = avaliadores[Math.floor(Math.random() * avaliadores.length)];
+    const daysAgo = Math.floor(Math.random() * 30);
+    const date = new Date();
+    date.setDate(date.getDate() - daysAgo);
+
+    return {
+      tradeInId: `TI-${String(i + 1).padStart(4, "0")}`,
+      imei: `3${String(Math.random()).slice(2, 17)}`,
+      modelo: modelos[i % modelos.length],
+      categoria: categorias[i % categorias.length],
+      dataTradeIn: date.toISOString(),
+      precoMaximo: [1500, 2000, 2500, 3000, 4000, 800][i % 6],
+      gradeIaDisplay: gradeIaD,
+      gradeIaCarcaca: gradeIaC,
+      gradeHumanoDisplay: gradeHD,
+      gradeHumanoCarcaca: gradeHC,
+      avaliadorHumanoId: av.id,
+      avaliadorHumanoNome: av.nome,
+      imagemFrontal: null,
+      imagemTraseira: null,
+      imagemLateral1: null,
+      imagemLateral2: null,
+      imagemDetalhe: null,
+      foiCurado: i % 4 === 0,
+    };
+  });
+}
+
+// ─── Fetch helper ─────────────────────────────────────────────────────────────
+
+async function fetchAvaliacoesApi(path: string, params: Record<string, string> = {}): Promise<any[]> {
+  const qs = new URLSearchParams(params).toString();
+  const url = `${PIPELINE_RS_BASE}${path}${qs ? "?" + qs : ""}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${PIPELINE_RS_TOKEN}`, "Content-Type": "application/json" },
+  });
+  if (!response.ok) throw new Error(`API ${path} error: ${response.status}`);
+  const data = await response.json() as any;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.results)) return data.results;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
+}
+
+function parseGrade(raw: unknown): Grade | null {
+  if (raw === "A" || raw === "B" || raw === "C") return raw as Grade;
+  return null;
+}
+
+function parseDate(dateStr: string | null): Date | null {
+  if (!dateStr) return null;
+  try {
+    const normalized = dateStr.includes("T")
+      ? dateStr
+      : dateStr.replace(/^(\d{2})\/(\d{2})\/(\d{4})/, "$3-$2-$1");
+    const d = new Date(normalized);
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeItem(item: any, foiCurado: boolean): TradeInAvaliacao {
+  return {
+    tradeInId: item.id || item.trade_in_id || item.tradeInId || "",
+    imei: item.imei || item.IMEI || "",
+    modelo: item.modelo || item.model || item.device_model || item.description || "",
+    categoria: item.category || item.categoria || "smartphone",
+    dataTradeIn: item.data_trade_in || item.created_at || item.data || new Date().toISOString(),
+    precoMaximo: parseFloat(item.preco_maximo || item.price || item.precoMaximo || "0") || 0,
+    gradeIaDisplay: parseGrade(item.grade_ia_display || item.gradeIaDisplay),
+    gradeIaCarcaca: parseGrade(item.grade_ia_carcaca || item.gradeIaCarcaca),
+    gradeHumanoDisplay: parseGrade(item.grade_humano_display || item.gradeHumanoDisplay),
+    gradeHumanoCarcaca: parseGrade(item.grade_humano_carcaca || item.gradeHumanoCarcaca),
+    avaliadorHumanoId: item.avaliador_humano_id || item.avaliadorHumanoId || null,
+    avaliadorHumanoNome: item.avaliador_nome || item.avaliadorHumanoNome || null,
+    imagemFrontal: item.imagem_frontal || item.imagemFrontal || null,
+    imagemTraseira: item.imagem_traseira || item.imagemTraseira || null,
+    imagemLateral1: item.imagem_lateral_1 || item.imagemLateral1 || null,
+    imagemLateral2: item.imagem_lateral_2 || item.imagemLateral2 || null,
+    imagemDetalhe: item.imagem_detalhe || item.imagemDetalhe || null,
+    foiCurado,
+  };
+}
+
+// ─── Public API functions ─────────────────────────────────────────────────────
+
+export async function getTradeInsAvaliacoes(
+  filtros: AvaliacoesFilters,
+  page = 1,
+  limit = 50
+): Promise<{ data: TradeInAvaliacao[]; total: number; page: number; totalPages: number }> {
+  let items: TradeInAvaliacao[];
+
+  try {
+    const raw = await fetchAvaliacoesApi("/adm_logistica/avaliacoes");
+    // Fetch curated IDs to mark foiCurado
+    const curados = db ? await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes) : [];
+    const curadosSet = new Set(curados.map((c) => c.tradeInId));
+    items = raw.map((item) => normalizeItem(item, curadosSet.has(item.id || item.trade_in_id)));
+  } catch (err) {
+    console.warn("⚠️ RenovSmart API não disponível para avaliações, usando dados mock");
+    const mockItems = getMockTradeIns();
+    const curados = db ? await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).catch(() => []) : [];
+    const curadosSet = new Set(curados.map((c) => c.tradeInId));
+    items = mockItems.map((m) => ({ ...m, foiCurado: curadosSet.has(m.tradeInId) || m.foiCurado }));
+  }
+
+  // Apply filters
+  if (filtros.dataInicio) {
+    const start = parseDate(filtros.dataInicio);
+    if (start) items = items.filter((i) => { const d = parseDate(i.dataTradeIn); return d && d >= start; });
+  }
+  if (filtros.dataFim) {
+    const end = parseDate(filtros.dataFim);
+    if (end) { end.setHours(23, 59, 59, 999); items = items.filter((i) => { const d = parseDate(i.dataTradeIn); return d && d <= end; }); }
+  }
+  if (filtros.categoria) {
+    items = items.filter((i) => i.categoria.toLowerCase().includes(filtros.categoria!.toLowerCase()));
+  }
+  if (filtros.avaliadorId) {
+    items = items.filter((i) => i.avaliadorHumanoId === filtros.avaliadorId);
+  }
+
+  const total = items.length;
+  const totalPages = Math.ceil(total / limit);
+  const paginated = items.slice((page - 1) * limit, page * limit);
+
+  return { data: paginated, total, page, totalPages };
+}
+
+export async function getTradeInById(tradeInId: string): Promise<TradeInAvaliacao | null> {
+  try {
+    const raw = await fetchAvaliacoesApi(`/adm_logistica/avaliacoes/${tradeInId}`);
+    const curados = db ? await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).where(eq(curadoriaAvaliacoes.tradeInId, tradeInId)) : [];
+    return raw.length > 0 ? normalizeItem(raw[0], curados.length > 0) : null;
+  } catch {
+    console.warn("⚠️ RenovSmart API não disponível para avaliações, usando dados mock");
+    const mock = getMockTradeIns().find((m) => m.tradeInId === tradeInId);
+    return mock ?? null;
+  }
+}
+
+export async function getAvaliadores(): Promise<Avaliador[]> {
+  try {
+    const raw = await fetchAvaliacoesApi("/adm_logistica/avaliacoes");
+    const map = new Map<string, string>();
+    for (const item of raw) {
+      const id = item.avaliador_humano_id || item.avaliadorHumanoId;
+      const nome = item.avaliador_nome || item.avaliadorHumanoNome;
+      if (id && nome) map.set(id, nome);
+    }
+    return Array.from(map.entries()).map(([id, nome]) => ({ id, nome }));
+  } catch {
+    return [
+      { id: "av1", nome: "Carlos Mendes" },
+      { id: "av2", nome: "Ana Lima" },
+      { id: "av3", nome: "Pedro Santos" },
+    ];
+  }
+}
+
+// ─── Metrics (computed from curadoria_avaliacoes) ────────────────────────────
+
+function buildDateFilter(filtros: AvaliacoesFilters) {
+  const conditions = [];
+  if (filtros.dataInicio) {
+    const start = parseDate(filtros.dataInicio);
+    if (start) conditions.push(gte(curadoriaAvaliacoes.dataCuradoria, start));
+  }
+  if (filtros.dataFim) {
+    const end = parseDate(filtros.dataFim);
+    if (end) {
+      end.setHours(23, 59, 59, 999);
+      conditions.push(lte(curadoriaAvaliacoes.dataCuradoria, end));
+    }
+  }
+  return conditions;
+}
+
+function calcAccuracy(records: any[], tipo: "ia" | "humano", area: "display" | "carcaca" | "ambas"): number {
+  const relevant = records.filter((r) => {
+    if (area === "display") return r.gradeCorretaDisplay !== null;
+    if (area === "carcaca") return r.gradeCorretaCarcaca !== null;
+    return r.gradeCorretaDisplay !== null || r.gradeCorretaCarcaca !== null;
+  });
+  if (relevant.length === 0) return 0;
+
+  let correct = 0;
+  let total = 0;
+
+  for (const r of relevant) {
+    if (area === "display" || area === "ambas") {
+      const atrib = tipo === "ia" ? r.gradeIaDisplay : r.gradeHumanoDisplay;
+      if (atrib && r.gradeCorretaDisplay) {
+        total++;
+        if (atrib === r.gradeCorretaDisplay) correct++;
+      }
+    }
+    if (area === "carcaca" || area === "ambas") {
+      const atrib = tipo === "ia" ? r.gradeIaCarcaca : r.gradeHumanoCarcaca;
+      if (atrib && r.gradeCorretaCarcaca) {
+        total++;
+        if (atrib === r.gradeCorretaCarcaca) correct++;
+      }
+    }
+  }
+
+  return total > 0 ? Math.round((correct / total) * 1000) / 10 : 0;
+}
+
+function calcCustoErroTipo(records: any[], tipo: "ia" | "humano"): number {
+  let total = 0;
+  for (const r of records) {
+    const precoMaximo = parseFloat(r.precoMaximo || "0") || 0;
+    const areas: Array<["Display" | "Carcaca", "gradeIaDisplay" | "gradeIaCarcaca" | "gradeHumanoDisplay" | "gradeHumanoCarcaca", "gradeCorretaDisplay" | "gradeCorretaCarcaca"]> = [
+      ["Display", tipo === "ia" ? "gradeIaDisplay" : "gradeHumanoDisplay", "gradeCorretaDisplay"],
+      ["Carcaca", tipo === "ia" ? "gradeIaCarcaca" : "gradeHumanoCarcaca", "gradeCorretaCarcaca"],
+    ];
+    for (const [, atribKey, corretaKey] of areas) {
+      const atrib = r[atribKey] as Grade | null;
+      const correta = r[corretaKey] as Grade | null;
+      if (atrib && correta && atrib !== correta) {
+        const diff = Math.abs((DESCONTO_POR_GRADE[atrib] ?? 0) - (DESCONTO_POR_GRADE[correta] ?? 0));
+        total += diff * precoMaximo;
+      }
+    }
+  }
+  return Math.round(total * 100) / 100;
+}
+
+export async function calcularMetricasResumo(filtros: AvaliacoesFilters): Promise<MetricasResumo> {
+  if (!db) {
+    return { acuraciaIa: 0, acuraciaHumano: 0, custoErroIa: 0, custoErroHumano: 0, totalCurados: 0, totalDisponiveis: 0, trendAcuraciaIa: 0, trendAcuraciaHumano: 0 };
+  }
+
+  const conditions = buildDateFilter(filtros);
+  const records = conditions.length > 0
+    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
+    : await db.select().from(curadoriaAvaliacoes);
+
+  const area = filtros.area ?? "ambas";
+  const acuraciaIa = calcAccuracy(records, "ia", area);
+  const acuraciaHumano = calcAccuracy(records, "humano", area);
+  const custoErroIa = calcCustoErroTipo(records, "ia");
+  const custoErroHumano = calcCustoErroTipo(records, "humano");
+
+  // Trend: compare last 7 days vs previous 7 days
+  const now = new Date();
+  const cutoff7 = new Date(now); cutoff7.setDate(cutoff7.getDate() - 7);
+  const cutoff14 = new Date(now); cutoff14.setDate(cutoff14.getDate() - 14);
+
+  const recent = records.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff7);
+  const previous = records.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff14 && new Date(r.dataCuradoria) < cutoff7);
+
+  const trendAcuraciaIa = calcAccuracy(recent, "ia", area) - calcAccuracy(previous, "ia", area);
+  const trendAcuraciaHumano = calcAccuracy(recent, "humano", area) - calcAccuracy(previous, "humano", area);
+
+  let totalDisponiveis = 0;
+  try {
+    const all = await getTradeInsAvaliacoes({}, 1, 9999);
+    totalDisponiveis = all.total;
+  } catch {
+    totalDisponiveis = 0;
+  }
+
+  return {
+    acuraciaIa,
+    acuraciaHumano,
+    custoErroIa,
+    custoErroHumano,
+    totalCurados: records.length,
+    totalDisponiveis,
+    trendAcuraciaIa: Math.round(trendAcuraciaIa * 10) / 10,
+    trendAcuraciaHumano: Math.round(trendAcuraciaHumano * 10) / 10,
+  };
+}
+
+export async function calcularEvolucaoTemporal(filtros: AvaliacoesFilters): Promise<EvolucaoPonto[]> {
+  if (!db) return [];
+
+  const conditions = buildDateFilter(filtros);
+  const records = conditions.length > 0
+    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
+    : await db.select().from(curadoriaAvaliacoes);
+
+  if (records.length === 0) return [];
+
+  const granularidade = filtros.granularidade ?? "diaria";
+
+  function getKey(date: Date): string {
+    if (granularidade === "mensal") return date.toISOString().slice(0, 7);
+    if (granularidade === "semanal") {
+      const d = new Date(date);
+      d.setDate(d.getDate() - d.getDay());
+      return d.toISOString().slice(0, 10);
+    }
+    return date.toISOString().slice(0, 10);
+  }
+
+  const grouped = new Map<string, any[]>();
+  for (const r of records) {
+    if (!r.dataCuradoria) continue;
+    const key = getKey(new Date(r.dataCuradoria));
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(r);
+  }
+
+  return Array.from(grouped.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([data, grupo]) => ({
+      data,
+      acuraciaIa: calcAccuracy(grupo, "ia", "ambas"),
+      acuraciaHumano: calcAccuracy(grupo, "humano", "ambas"),
+      totalCurados: grupo.length,
+    }));
+}
+
+export async function calcularRankingAvaliadores(filtros: AvaliacoesFilters): Promise<RankingAvaliador[]> {
+  if (!db) return [];
+
+  const conditions = buildDateFilter(filtros);
+  const records = conditions.length > 0
+    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
+    : await db.select().from(curadoriaAvaliacoes);
+
+  const byAvaliador = new Map<string, { nome: string; records: any[] }>();
+  for (const r of records) {
+    const id = r.avaliadorHumanoId || "desconhecido";
+    const nome = id; // nome is not stored separately; use ID as fallback
+    if (!byAvaliador.has(id)) byAvaliador.set(id, { nome, records: [] });
+    byAvaliador.get(id)!.records.push(r);
+  }
+
+  const now = new Date();
+  const cutoff7 = new Date(now); cutoff7.setDate(cutoff7.getDate() - 7);
+  const cutoff14 = new Date(now); cutoff14.setDate(cutoff14.getDate() - 14);
+
+  return Array.from(byAvaliador.entries())
+    .map(([avaliadorId, { nome, records: recs }]) => {
+      const recent = recs.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff7);
+      const previous = recs.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff14 && new Date(r.dataCuradoria) < cutoff7);
+      const acuraciaGeral = calcAccuracy(recs, "humano", "ambas");
+      const trendRecent = calcAccuracy(recent, "humano", "ambas");
+      const trendPrev = calcAccuracy(previous, "humano", "ambas");
+      return {
+        avaliadorId,
+        avaliadorNome: nome,
+        totalAvaliacoes: recs.length,
+        acuraciaDisplay: calcAccuracy(recs, "humano", "display"),
+        acuraciaCarcaca: calcAccuracy(recs, "humano", "carcaca"),
+        acuraciaGeral,
+        trend: Math.round((trendRecent - trendPrev) * 10) / 10,
+      };
+    })
+    .sort((a, b) => b.acuraciaGeral - a.acuraciaGeral);
+}
+
+export async function calcularCustoErro(filtros: AvaliacoesFilters): Promise<CustoErroResult> {
+  if (!db) {
+    return { custoTotalIa: 0, custoTotalHumano: 0, breakdownPorTipoErro: [], topModelosCustoErro: [] };
+  }
+
+  const conditions = buildDateFilter(filtros);
+  const records = conditions.length > 0
+    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
+    : await db.select().from(curadoriaAvaliacoes);
+
+  const custoTotalIa = calcCustoErroTipo(records, "ia");
+  const custoTotalHumano = calcCustoErroTipo(records, "humano");
+
+  // Breakdown por transição de grade
+  const transicaoMap = new Map<string, { quantidade: number; custoTotal: number }>();
+  for (const r of records) {
+    const precoMaximo = parseFloat(r.precoMaximo || "0") || 0;
+    const pairs: Array<[Grade | null, Grade | null]> = [
+      [r.gradeIaDisplay as Grade | null, r.gradeCorretaDisplay as Grade | null],
+      [r.gradeIaCarcaca as Grade | null, r.gradeCorretaCarcaca as Grade | null],
+    ];
+    for (const [atrib, correta] of pairs) {
+      if (atrib && correta && atrib !== correta) {
+        const key = `${atrib}→${correta}`;
+        const diff = Math.abs((DESCONTO_POR_GRADE[atrib] ?? 0) - (DESCONTO_POR_GRADE[correta] ?? 0));
+        const custo = diff * precoMaximo;
+        const current = transicaoMap.get(key) ?? { quantidade: 0, custoTotal: 0 };
+        transicaoMap.set(key, { quantidade: current.quantidade + 1, custoTotal: current.custoTotal + custo });
+      }
+    }
+  }
+
+  const breakdownPorTipoErro: CustoErroBreakdown[] = Array.from(transicaoMap.entries())
+    .map(([transicao, { quantidade, custoTotal }]) => ({ transicao, quantidade, custoTotal: Math.round(custoTotal * 100) / 100 }))
+    .sort((a, b) => b.custoTotal - a.custoTotal);
+
+  // Top modelos por custo de erro
+  const modeloMap = new Map<string, { custoTotal: number; quantidade: number }>();
+  for (const r of records) {
+    const precoMaximo = parseFloat(r.precoMaximo || "0") || 0;
+    const modelo = r.modelo || "Desconhecido";
+    const pares: Array<[Grade | null, Grade | null]> = [
+      [r.gradeIaDisplay as Grade | null, r.gradeCorretaDisplay as Grade | null],
+      [r.gradeIaCarcaca as Grade | null, r.gradeCorretaCarcaca as Grade | null],
+    ];
+    let custoItem = 0;
+    let temErro = false;
+    for (const [atrib, correta] of pares) {
+      if (atrib && correta && atrib !== correta) {
+        custoItem += Math.abs((DESCONTO_POR_GRADE[atrib] ?? 0) - (DESCONTO_POR_GRADE[correta] ?? 0)) * precoMaximo;
+        temErro = true;
+      }
+    }
+    if (temErro) {
+      const current = modeloMap.get(modelo) ?? { custoTotal: 0, quantidade: 0 };
+      modeloMap.set(modelo, { custoTotal: current.custoTotal + custoItem, quantidade: current.quantidade + 1 });
+    }
+  }
+
+  const topModelosCustoErro = Array.from(modeloMap.entries())
+    .map(([modelo, { custoTotal, quantidade }]) => ({ modelo, custoTotal: Math.round(custoTotal * 100) / 100, quantidade }))
+    .sort((a, b) => b.custoTotal - a.custoTotal)
+    .slice(0, 5);
+
+  return { custoTotalIa, custoTotalHumano, breakdownPorTipoErro, topModelosCustoErro };
+}
+
+export async function calcularMatrizConfusao(filtros: AvaliacoesFilters): Promise<MatrizConfusaoResult> {
+  if (!db) return { matriz: [], totalAvaliacoes: 0, acuraciaGeral: 0 };
+
+  const conditions = buildDateFilter(filtros);
+  const records = conditions.length > 0
+    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
+    : await db.select().from(curadoriaAvaliacoes);
+
+  const tipo = filtros.tipo ?? "ia";
+  const area = filtros.area ?? "ambas";
+
+  const counts = new Map<string, number>();
+  let total = 0;
+
+  for (const r of records) {
+    const pares: Array<[Grade | null, Grade | null]> = [];
+    if (area === "display" || area === "ambas") {
+      const atrib = (tipo === "ia" ? r.gradeIaDisplay : r.gradeHumanoDisplay) as Grade | null;
+      const correta = r.gradeCorretaDisplay as Grade | null;
+      if (atrib && correta) pares.push([atrib, correta]);
+    }
+    if (area === "carcaca" || area === "ambas") {
+      const atrib = (tipo === "ia" ? r.gradeIaCarcaca : r.gradeHumanoCarcaca) as Grade | null;
+      const correta = r.gradeCorretaCarcaca as Grade | null;
+      if (atrib && correta) pares.push([atrib, correta]);
+    }
+    for (const [atrib, correta] of pares) {
+      const key = `${atrib}|${correta}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+      total++;
+    }
+  }
+
+  const grades: Grade[] = ["A", "B", "C"];
+  const matriz: MatrizConfusaoEntry[] = [];
+  for (const atribuido of grades) {
+    for (const correto of grades) {
+      const key = `${atribuido}|${correto}`;
+      const quantidade = counts.get(key) ?? 0;
+      matriz.push({ atribuido, correto, quantidade, percentual: total > 0 ? Math.round((quantidade / total) * 1000) / 10 : 0 });
+    }
+  }
+
+  const acertos = grades.reduce((sum, g) => sum + (counts.get(`${g}|${g}`) ?? 0), 0);
+  const acuraciaGeral = total > 0 ? Math.round((acertos / total) * 1000) / 10 : 0;
+
+  return { matriz, totalAvaliacoes: total, acuraciaGeral };
+}
+
+// ─── Curadoria DB operations ──────────────────────────────────────────────────
+
+export async function saveCuradoria(data: InsertCuradoriaAvaliacao) {
+  if (!db) throw new Error("Banco de dados não disponível");
+  const [saved] = await db.insert(curadoriaAvaliacoes).values(data).returning();
+  return saved;
+}
+
+export async function getCuradorias(
+  filtros: { dataInicio?: string; dataFim?: string; curadorId?: string },
+  page = 1,
+  limit = 50
+) {
+  if (!db) return { data: [], total: 0, page, totalPages: 0 };
+
+  const conditions = [];
+  if (filtros.dataInicio) {
+    const start = parseDate(filtros.dataInicio);
+    if (start) conditions.push(gte(curadoriaAvaliacoes.dataCuradoria, start));
+  }
+  if (filtros.dataFim) {
+    const end = parseDate(filtros.dataFim);
+    if (end) { end.setHours(23, 59, 59, 999); conditions.push(lte(curadoriaAvaliacoes.dataCuradoria, end)); }
+  }
+  if (filtros.curadorId) {
+    conditions.push(eq(curadoriaAvaliacoes.curadorId, filtros.curadorId));
+  }
+
+  const all = conditions.length > 0
+    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions)).orderBy(desc(curadoriaAvaliacoes.dataCuradoria))
+    : await db.select().from(curadoriaAvaliacoes).orderBy(desc(curadoriaAvaliacoes.dataCuradoria));
+
+  const total = all.length;
+  const totalPages = Math.ceil(total / limit);
+  const data = all.slice((page - 1) * limit, page * limit);
+  return { data, total, page, totalPages };
+}
+
+export async function getCuradoriaPendentes(tenantId?: string | null): Promise<TradeInAvaliacao[]> {
+  // Get config for sampling percentage
+  const configs = db
+    ? tenantId
+      ? await db.select().from(curadoriaConfiguracoes).where(eq(curadoriaConfiguracoes.tenantId, tenantId)).catch(() => [])
+      : await db.select().from(curadoriaConfiguracoes).catch(() => [])
+    : [];
+  const percentual = parseFloat(configs[0]?.percentualAmostragem ?? "15") || 15;
+
+  // Get all trade-ins from yesterday
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  const { data: all } = await getTradeInsAvaliacoes({ dataInicio: yesterday.toISOString(), dataFim: todayMidnight.toISOString() }, 1, 9999);
+
+  // Exclude already curated
+  const notCurated = all.filter((t) => !t.foiCurado);
+
+  // Apply sampling
+  const sample = Math.ceil(notCurated.length * (percentual / 100));
+  return notCurated.slice(0, sample);
+}
+
+export async function getConfiguracoes(tenantId?: string | null) {
+  if (!db) return { percentualAmostragem: "15", modoPrioridade: "aleatorio" };
+  const configs = tenantId
+    ? await db.select().from(curadoriaConfiguracoes).where(eq(curadoriaConfiguracoes.tenantId, tenantId))
+    : await db.select().from(curadoriaConfiguracoes);
+  return configs[0] ?? { percentualAmostragem: "15", modoPrioridade: "aleatorio" };
+}
+
+export async function updateConfiguracoes(
+  data: { percentualAmostragem?: string; modoPrioridade?: string },
+  tenantId?: string | null
+) {
+  if (!db) throw new Error("Banco de dados não disponível");
+  const existing = await getConfiguracoes(tenantId);
+  if ((existing as any).id) {
+    const [updated] = await db
+      .update(curadoriaConfiguracoes)
+      .set({ ...data, atualizadoEm: new Date() })
+      .where(eq(curadoriaConfiguracoes.id, (existing as any).id))
+      .returning();
+    return updated;
+  } else {
+    const [created] = await db
+      .insert(curadoriaConfiguracoes)
+      .values({ ...data, tenantId: tenantId ?? null })
+      .returning();
+    return created;
+  }
+}

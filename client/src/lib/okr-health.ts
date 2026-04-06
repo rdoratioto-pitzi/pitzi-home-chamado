@@ -11,6 +11,13 @@ export const QUARTER_RANGES: Record<string, { start: Date; end: Date }> = {
   '2026-Q4': { start: new Date('2026-10-01'), end: new Date('2026-12-31') },
 }
 
+export interface HealthStatusOptions {
+  /** false → objetivo sem KRs; não avaliável → on_track */
+  hasKeyResults?: boolean
+  /** false → KR sem nenhum check-in registrado; não avaliável → on_track */
+  hasCheckins?: boolean
+}
+
 /**
  * Calcula saúde automática de um KR com base no progresso relativo ao tempo
  * decorrido no ciclo.
@@ -23,13 +30,15 @@ export const QUARTER_RANGES: Record<string, { start: Date; end: Date }> = {
  *   <  60% do tempo   → off_track
  *
  * hasKeyResults = false → on_track (sem KRs, não é possível avaliar saúde)
+ * hasCheckins   = false → on_track (sem check-ins, não é possível avaliar atraso)
  */
 export function calculateHealthStatus(
   progressPercent: number,
   cycle: string,
-  hasKeyResults = true,
+  options: HealthStatusOptions = {},
 ): HealthStatus {
-  if (!hasKeyResults) return 'on_track'
+  if (options.hasKeyResults === false) return 'on_track'
+  if (options.hasCheckins === false) return 'on_track'
 
   const range = QUARTER_RANGES[cycle]
   if (!range) return 'on_track'

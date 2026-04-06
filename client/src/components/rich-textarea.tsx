@@ -92,7 +92,7 @@ export function RichTextarea({
   "data-testid": dataTestId,
 }: RichTextareaProps) {
   // Support both new (attachments) and legacy (images) props
-  const attachments: { name: string; url: string }[] = attachmentsProp ?? (imagesProp || []).map((url, i) => ({ name: `Arquivo_${i + 1}`, url }));
+  const attachments: { name: string; url: string }[] = (attachmentsProp ?? (imagesProp || []).map((url, i) => ({ name: `Arquivo_${i + 1}`, url }))).filter(a => a != null && a.url);
   const handleAttachmentsChange = useCallback((newAttachments: { name: string; url: string }[]) => {
     if (onAttachmentsChange) {
       onAttachmentsChange(newAttachments);
