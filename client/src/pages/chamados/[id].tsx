@@ -307,13 +307,16 @@ export default function TicketDetailPage() {
       setEditedDescription(ticket.description || "");
       try {
         const rawAttachments = ticket.attachments ? JSON.parse(ticket.attachments) : [];
-        // Convert old format (string URLs) to new format (objects with name and url)
-        const attachments = rawAttachments.map((a: string | { name: string; url: string }, i: number) => {
-          if (typeof a === 'string') {
-            return { name: `Arquivo_${i + 1}`, url: a };
-          }
-          return a;
-        });
+        // Convert old format (string URLs) to new format, filtering out null entries
+        const attachments = rawAttachments
+          .filter((a: unknown) => a != null)
+          .map((a: string | { name: string; url: string }, i: number) => {
+            if (typeof a === 'string') {
+              return { name: `Arquivo_${i + 1}`, url: a };
+            }
+            return a;
+          })
+          .filter((a: { name: string; url: string }) => a.url);
         setEditedAttachments(attachments);
       } catch {
         setEditedAttachments([]);
