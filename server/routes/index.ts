@@ -24,6 +24,7 @@ import { registerEstoqueRoutes } from "./estoques";
 import { registerDevToolsRoutes } from "./dev-tools";
 import { registerWorkspaceRoutes } from "./workspace";
 import { registerTriagemRoutes } from "./triagem";
+import { registerAvaliacoesRoutes } from "./avaliacoes";
 
 export function registerModularRoutes(app: Router) {
   const router = Router();
@@ -53,6 +54,7 @@ export function registerModularRoutes(app: Router) {
   registerDevToolsRoutes(router);
   registerWorkspaceRoutes(router);
   registerTriagemRoutes(router);
+  registerAvaliacoesRoutes(router);
 
   app.use(router);
 }
