@@ -25,6 +25,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/page-header";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useLocation } from "wouter";
 
 // --- Interfaces based on User Request ---
 
@@ -117,6 +119,7 @@ const COLORS = {
 const API_BASE_URL = "/api/avaliacoes-ia";
 
 export default function EficienciaAvaliacoesIaPage() {
+  const [, navigate] = useLocation();
   const { toast } = useToast();
 
   // --- State ---
@@ -435,6 +438,24 @@ export default function EficienciaAvaliacoesIaPage() {
         title="Eficiência de Avaliações IA"
         description="Monitoramento detalhado da performance dos modelos de avaliação"
       />
+
+      {/* Banner de referência cruzada */}
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription className="flex items-center justify-between gap-4">
+          <span className="text-sm">
+            Esta funcionalidade foi expandida para o módulo Avaliações com curadoria, matriz de confusão e configurações.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/avaliacoes/dashboard")}
+            className="shrink-0"
+          >
+            Ir para Avaliações
+          </Button>
+        </AlertDescription>
+      </Alert>
 
       {/* Filters Section */}
       <Card>
