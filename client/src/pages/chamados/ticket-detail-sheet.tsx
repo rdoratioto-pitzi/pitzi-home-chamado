@@ -156,13 +156,16 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
       // Extrair imagens do HTML da descrição + anexos existentes
       const htmlImages = extractImagesFromHtml(ticket.description || '');
       const rawAttachments = ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : [];
-      // Convert old format (string URLs) to new format (objects with name and url)
-      const attachmentImages = rawAttachments.map((a: string | { name: string; url: string }, i: number) => {
-        if (typeof a === 'string') {
-          return { name: `Arquivo_${i + 1}`, url: a };
-        }
-        return a;
-      });
+      // Convert old format (string URLs) to new format, filtering out null entries
+      const attachmentImages = rawAttachments
+        .filter((a: unknown) => a != null)
+        .map((a: string | { name: string; url: string }, i: number) => {
+          if (typeof a === 'string') {
+            return { name: `Arquivo_${i + 1}`, url: a };
+          }
+          return a;
+        })
+        .filter((a: { name: string; url: string }) => a.url);
       setEditedAttachments([...htmlImages, ...attachmentImages]);
       setIsEditingDescription(false);
     }
@@ -445,7 +448,7 @@ export function TicketDetailSheet({ ticket, onClose }: TicketDetailSheetProps) {
                     onClick={() => {
                       setIsEditingDescription(false);
                       setEditedDescription(ticket.description);
-                      setEditedAttachments(ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : []);
+                      setEditedAttachments((ticket.attachments ? (() => { try { return JSON.parse(ticket.attachments); } catch { return []; } })() : []).filter((a: unknown) => a != null && (typeof a === 'string' || (a as any).url)));
                     }}
                   >
                     <X className="h-4 w-4 mr-1" />
