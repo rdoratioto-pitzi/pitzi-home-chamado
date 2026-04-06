@@ -16,11 +16,13 @@ export interface TriagemResumo {
 export interface RecebimentoItem {
   imei: string;
   modelo: string;
+  marca?: string;
   categoria: string;
   rede: string;
   status: string;
   dataRecebimento: string | null;
   responsavel: string;
+  diasNoStatus?: number;
 }
 
 export interface RecebimentosResult {
