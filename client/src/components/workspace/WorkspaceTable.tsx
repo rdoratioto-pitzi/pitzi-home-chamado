@@ -45,6 +45,7 @@ export interface UnifiedItem {
   progresso?: number | null;
   sprint?: string | null;
   dataEntrega?: string | null;
+  anexos?: Array<{ name: string; url: string }>;
 }
 
 type WorkspaceTableProps =
