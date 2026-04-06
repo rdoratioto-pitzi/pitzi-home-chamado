@@ -85,6 +85,17 @@ function extrairResponsavel(item: any): string {
   return item.responsavel_triagem || item.responsavel || item.responsible || "";
 }
 
+function extrairMarca(item: any): string {
+  return item.brand || item.marca || item.Marca || item.device_brand || item.manufacturer || "";
+}
+
+function calcDiasNoStatus(dateStr: string | null): number {
+  const d = parseDate(dateStr);
+  if (!d) return 0;
+  const diffMs = Date.now() - d.getTime();
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+}
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 export const triagem = new Hono<AppEnv>();
@@ -202,15 +213,20 @@ triagem.get("/api/triagem/recebimentos", async (c) => {
 triagem.get("/api/triagem/fila", async (c) => {
   try {
     const items = await fetchPipelineApi("/adm_logistica/triagem");
-    const mapped = items.map(item => ({
-      imei: extrairImei(item),
-      modelo: extrairModelo(item),
-      categoria: extrairCategoria(item),
-      rede: extrairRede(item),
-      status: extrairStatus(item),
-      dataRecebimento: extractItemDate(item),
-      responsavel: extrairResponsavel(item),
-    }));
+    const mapped = items.map(item => {
+      const dataRecebimento = extractItemDate(item);
+      return {
+        imei: extrairImei(item),
+        modelo: extrairModelo(item),
+        marca: extrairMarca(item),
+        categoria: extrairCategoria(item),
+        rede: extrairRede(item),
+        status: extrairStatus(item),
+        dataRecebimento,
+        responsavel: extrairResponsavel(item),
+        diasNoStatus: calcDiasNoStatus(dataRecebimento),
+      };
+    });
     return c.json({ success: true, data: mapped, total: mapped.length });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Erro interno";
