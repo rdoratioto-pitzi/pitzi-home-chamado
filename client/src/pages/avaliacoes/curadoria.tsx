@@ -5,6 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { useToast } from "@/hooks/use-toast";
 import {
   CheckCircle2,
@@ -183,7 +191,20 @@ export default function AvaliacoesCuradoriaPage() {
     <div className="min-h-screen bg-background">
       <PageHeader title="Avaliações — Curadoria" />
 
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
+      <div className="container mx-auto px-4 py-6 max-w-7xl space-y-5">
+        {/* Breadcrumb */}
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/avaliacoes/dashboard">Avaliações</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Curadoria</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         {isLoading ? (
           <CuradoriaLoadingSkeleton />
         ) : isError ? (
@@ -193,7 +214,7 @@ export default function AvaliacoesCuradoriaPage() {
         ) : concluido ? (
           <ConclusaoState curados={curadosCount} pulados={puladosCount} />
         ) : (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-5 mt-0">
             {/* Progresso */}
             <ProgressBar current={currentIndex} total={tradeIns.length} />
 
