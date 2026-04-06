@@ -31,6 +31,7 @@ import { uploads } from "./routes/uploads";
 import { workspace } from "./routes/workspace";
 import { triagem } from "./routes/triagem";
 import { avaliacoes } from "./routes/avaliacoes";
+import { comercialKpisRoutes } from "./routes/comercial-kpis";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -148,5 +149,6 @@ app.route("/", uploads);
 app.route("/", workspace);
 app.route("/", triagem);
 app.route("/", avaliacoes);
+app.route("/", comercialKpisRoutes);
 
 export default app;
