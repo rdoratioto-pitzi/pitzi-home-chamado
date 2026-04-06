@@ -64,6 +64,7 @@ const MODULES = [
   { key: "pricing", label: "Pricing" },
   { key: "conhecimento", label: "Biblioteca" },
   { key: "apis", label: "Integrações" },
+  { key: "comercial", label: "Comercial" },
   { key: "configuracoes", label: "Configurações" },
 ] as const;
 
@@ -94,6 +95,7 @@ const formSchema = z.object({
     pricing: z.boolean().default(true),
     conhecimento: z.boolean().default(true),
     apis: z.boolean(),
+    comercial: z.boolean().default(true),
     configuracoes: z.boolean(),
   }),
 });
@@ -199,6 +201,7 @@ export function UsersSettings() {
         pricing: true,
         conhecimento: true,
         apis: false,
+        comercial: true,
         configuracoes: false,
       },
     },
@@ -308,6 +311,7 @@ export function UsersSettings() {
         pricing: true,
         conhecimento: true,
         apis: false,
+        comercial: true,
         configuracoes: false,
       },
     });
