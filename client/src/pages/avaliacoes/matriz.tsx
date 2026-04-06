@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { ConfusionMatrix } from "@/components/avaliacoes/confusion-matrix";
 import { MatrizFilters } from "@/components/avaliacoes/matriz-filters";
 import { useMatrizConfusao } from "@/hooks/use-avaliacoes";
@@ -200,7 +208,20 @@ export default function AvaliacoesMatrizPage() {
   return (
     <div className="min-h-screen bg-background">
       <PageHeader title="Avaliações — Matriz de Confusão" />
-      <div className="container mx-auto px-4 py-8 space-y-6">
+      <div className="container mx-auto px-4 py-6 space-y-6">
+
+        {/* Breadcrumb */}
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/avaliacoes/dashboard">Avaliações</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Matriz de Confusão</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
 
         {/* Filtros */}
         <MatrizFilters
