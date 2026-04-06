@@ -1,10 +1,10 @@
 import { useMemo, useState, useCallback } from "react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Calculator, BarChart3, FileDown, FlaskConical } from "lucide-react";
+import { Calculator, BarChart3, FileDown } from "lucide-react";
 import { SimuladorForm } from "./components/simulador-form";
 import { SimuladorResults } from "./components/simulador-results";
+import { AnatomiaNegocio } from "./components/anatomia-negocio";
 import {
   calcSimulacao,
   DEFAULT_INPUTS,
@@ -77,24 +77,9 @@ export default function ComercialSimuladorPage() {
             <SimuladorResults result={result} markupMeta={inputs.markupMeta} />
           </div>
 
-          {/* ── Coluna direita: Anatomia (placeholder Fase 3) ── */}
+          {/* ── Coluna direita: Anatomia do Negócio ── */}
           <div className="xl:col-span-2">
-            <Card
-              className="border h-full"
-              style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}
-            >
-              <CardContent className="pt-6 flex flex-col items-center justify-center h-full min-h-[300px] text-center gap-3">
-                <FlaskConical className="h-8 w-8 text-muted-foreground/40" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Anatomia do Negocio
-                  </p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">
-                    Em breve — Fase 3
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            <AnatomiaNegocio resultado={result} inputs={inputs} revenda={revenda} />
           </div>
         </div>
       </div>
