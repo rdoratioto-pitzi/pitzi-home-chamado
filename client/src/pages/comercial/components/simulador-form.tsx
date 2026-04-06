@@ -60,10 +60,12 @@ function CurrencyInput({
           {prefix}
         </span>
         <Input
-          className="pl-8 text-right tabular-nums text-sm h-9"
+          className={`pl-8 text-right tabular-nums text-sm h-9 ${readOnly ? "cursor-default opacity-70" : ""}`}
           value={readOnly ? fmtNum.format(value) : undefined}
           defaultValue={readOnly ? undefined : fmtNum.format(value)}
           readOnly={readOnly}
+          tabIndex={readOnly ? -1 : undefined}
+          aria-label={label}
           onChange={
             onChange
               ? (e) => onChange(parseBRL(e.target.value))
@@ -108,6 +110,7 @@ function NumberInput({
           value={value}
           step={step}
           min={min}
+          aria-label={label}
           onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
         />
         {suffix && (

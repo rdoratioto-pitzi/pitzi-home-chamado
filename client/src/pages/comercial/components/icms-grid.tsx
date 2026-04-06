@@ -11,7 +11,7 @@ export function IcmsGrid({ selectedUf, onSelectUf }: IcmsGridProps) {
       <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         Tabela ICMS — SP → UF Destino
       </h4>
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-7 gap-1.5">
         {UF_LIST.map(({ uf, aliquota }) => {
           const isActive = uf === selectedUf;
           const hasAliquota = aliquota !== null;

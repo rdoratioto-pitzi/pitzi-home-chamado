@@ -11,6 +11,7 @@ import {
   DEFAULT_INPUTS,
   type SimuladorInputs,
 } from "./lib/simulador-calc";
+import { exportPDF } from "./lib/export-pdf";
 
 type ViewMode = "simulator" | "dashboard";
 
@@ -23,6 +24,10 @@ export default function ComercialSimuladorPage() {
   const handleChange = useCallback((patch: Partial<SimuladorInputs>) => {
     setInputs((prev) => ({ ...prev, ...patch }));
   }, []);
+
+  const handleExport = useCallback(() => {
+    exportPDF(revenda || undefined);
+  }, [revenda]);
 
   const handleSelectUf = useCallback(
     (uf: string, aliquota: number) => {
@@ -43,7 +48,7 @@ export default function ComercialSimuladorPage() {
           { label: "Simulador CPD" },
         ]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" data-print-hide>
             <Button
               size="sm"
               variant={currentView === "simulator" ? "default" : "ghost"}
@@ -62,7 +67,12 @@ export default function ComercialSimuladorPage() {
               <BarChart3 className="h-3.5 w-3.5" />
               Dashboard
             </Button>
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" disabled>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-xs"
+              onClick={handleExport}
+            >
               <FileDown className="h-3.5 w-3.5" />
               Exportar PDF
             </Button>
