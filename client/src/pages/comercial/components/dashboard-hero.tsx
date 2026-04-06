@@ -9,9 +9,9 @@ export function DashboardHero({ data }: DashboardHeroProps) {
   const markupMeta = 1.35;
   const naMeta = markup >= markupMeta;
 
-  const receitaTotal = data.volume * data.ticket;
-  const mcPctReceita = receitaTotal > 0 ? (data.mcTotal / receitaTotal) * 100 : 0;
-  const margemPctRevenda = receitaTotal > 0 ? (data.margemTotal / receitaTotal) * 100 : 0;
+  const margemPctRevenda = data.faturamentoTotal > 0
+    ? (data.margemTotal / data.faturamentoTotal) * 100
+    : 0;
 
   const items = [
     {
@@ -33,14 +33,14 @@ export function DashboardHero({ data }: DashboardHeroProps) {
       ),
     },
     {
-      title: "Margem de Contribuição",
-      value: formatBRL(data.mcTotal),
-      sub: `${formatPct(mcPctReceita)} da receita`,
+      title: "Faturamento Total",
+      value: formatBRL(data.faturamentoTotal),
+      sub: `Ticket médio ${formatBRL(data.ticket)}`,
     },
     {
       title: "Margem Líquida Total",
       value: formatBRL(data.margemTotal),
-      sub: `${formatPct(margemPctRevenda, 2)} sobre revenda`,
+      sub: `${formatPct(margemPctRevenda, 2)} sobre faturamento`,
     },
   ];
 

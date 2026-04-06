@@ -20,7 +20,7 @@ export function registerComercialKpisRoutes(router: Router) {
   router.get("/api/comercial/kpis/:periodo", requireAuth, async (req, res) => {
     try {
       if (!db) return res.status(503).json({ error: "Database not available" });
-      const periodo = req.params.periodo;
+      const periodo = String(req.params.periodo);
       const [row] = await db.select().from(comercialKpis).where(eq(comercialKpis.periodo, periodo));
       if (!row) return res.status(404).json({ error: "KPI não encontrado para este período" });
       res.json(row);
@@ -33,7 +33,7 @@ export function registerComercialKpisRoutes(router: Router) {
   router.put("/api/comercial/kpis/:periodo", requireAuth, async (req, res) => {
     try {
       if (!db) return res.status(503).json({ error: "Database not available" });
-      const periodo = req.params.periodo;
+      const periodo = String(req.params.periodo);
       const validated = insertComercialKpiSchema.parse({ ...req.body, periodo });
 
       const [existing] = await db.select().from(comercialKpis).where(eq(comercialKpis.periodo, periodo));
