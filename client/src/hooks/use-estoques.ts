@@ -285,3 +285,127 @@ export function useTendencias(periodo = "30d") {
     refetchOnWindowFocus: false,
   });
 }
+
+// ─── Pipeline ────────────────────────────────────────────────────────────────
+
+/** Dados do funil de dispositivos por etapa */
+export function usePipeline() {
+  return useQuery({
+    queryKey: ["/api/estoques/pipeline"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/estoques/pipeline");
+      return res.json();
+    },
+    staleTime: 3 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** Itens de uma etapa específica do pipeline (drill-down) */
+export function usePipelineEtapa(etapa: string | null, page = 1, limite = 50, filtroMes?: string) {
+  return useQuery({
+    queryKey: ["/api/estoques/pipeline/etapa", etapa, page, filtroMes],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: String(page), limite: String(limite) });
+      if (filtroMes) params.set("filtroMes", filtroMes);
+      const res = await apiRequest("GET", `/api/estoques/pipeline/${etapa}?${params}`);
+      return res.json();
+    },
+    enabled: !!etapa,
+    staleTime: 2 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ─── Lead Time ───────────────────────────────────────────────────────────────
+
+/** Métricas de lead time por etapa (ciclos + estatísticas) */
+export function useLeadTime(periodo = "30d") {
+  return useQuery({
+    queryKey: ["/api/estoques/lead-time", periodo],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/estoques/lead-time?periodo=${periodo}`);
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** Tendência histórica semanal de lead time */
+export function useLeadTimeTendencia() {
+  return useQuery({
+    queryKey: ["/api/estoques/lead-time/tendencia"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/estoques/lead-time/tendencia");
+      return res.json();
+    },
+    staleTime: 10 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// ─── Aging Report ────────────────────────────────────────────────────────────
+
+/** Matriz de aging pré-estoque (faixa × etapa) */
+export function useAgingMatriz() {
+  return useQuery({
+    queryKey: ["/api/estoques/aging/matriz"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/estoques/aging/matriz");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** Aging de dispositivos em estoque (dias desde triagem finalizada) */
+export function useAgingEmEstoque() {
+  return useQuery({
+    queryKey: ["/api/estoques/aging/estoque"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/estoques/aging/estoque");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** Lista FIFO de dispositivos mais antigos (paginada) */
+export function useAgingFifo(pagina = 1, etapa?: string, faixa?: string) {
+  return useQuery({
+    queryKey: ["/api/estoques/aging/fifo", pagina, etapa, faixa],
+    queryFn: async () => {
+      const params = new URLSearchParams({ pagina: String(pagina), limite: "50" });
+      if (etapa) params.set("etapa", etapa);
+      if (faixa) params.set("faixa", faixa);
+      const res = await apiRequest("GET", `/api/estoques/aging/fifo?${params}`);
+      return res.json();
+    },
+    staleTime: 3 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** Configuração de alertas de aging por etapa */
+export function useAgingAlertasConfig() {
+  return useQuery({
+    queryKey: ["/api/estoques/aging/alertas/config"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/estoques/aging/alertas/config");
+      return res.json();
+    },
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+  });
+}
