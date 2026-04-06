@@ -2745,4 +2745,167 @@ estoques.get("/api/estoques/dashboard/aging-estoque", requireAdmin, async (c) =>
   });
 });
 
+// ─── Endpoints da camada de serviço (estoque.service) ────────────────────────
+
+// GET /api/estoques/resumo — KPIs consolidados
+estoques.get("/api/estoques/resumo", requireAdmin, async (c) => {
+  try {
+    const omieService = getOmieService(c.get("db"));
+    const posEstoque = await getCachedPosEstoque(omieService);
+    const [triagemR, vouchersR] = await Promise.allSettled([
+      fetchPipelineApi("/adm_logistica/triagem"),
+      fetchPipelineApi("/orders/advanced"),
+    ]);
+    const triagem: any[] = triagemR.status === "fulfilled" ? triagemR.value : [];
+    const vouchers: any[] = vouchersR.status === "fulfilled" ? vouchersR.value : [];
+
+    let qtdeEstoque = 0;
+    let valorEstoque = 0;
+    posEstoque.forEach((locais: any[]) => {
+      const saldo = locais.reduce((s: number, l: any) => s + (l.nSaldo ?? 0), 0);
+      const cmc = locais[0]?.nCMC ?? 0;
+      qtdeEstoque += saldo;
+      valorEstoque += saldo * cmc;
+    });
+    const custoMedioUnitario = qtdeEstoque > 0 ? valorEstoque / qtdeEstoque : 0;
+    const qtdeEmTransito = Math.max(0, vouchers.length - triagem.length);
+
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+    const qtdeVendidosMes = triagem.filter((t: any) => {
+      const d = t.data_triagem || t.data_recebimento || t.created_at;
+      if (!d) return false;
+      return new Date(String(d).includes("T") ? d : String(d).replace(/^(\d{2})\/(\d{2})\/(\d{4})/, "$3-$2-$1")) >= inicioMes;
+    }).length;
+    const ticketMedio = qtdeVendidosMes > 0 ? custoMedioUnitario * 1.25 : 0;
+
+    return c.json({ success: true, data: { qtdeEstoque, valorEstoque, custoMedioUnitario, qtdeEmTransito, qtdeVendidosMes, ticketMedio } });
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+// GET /api/estoques/curva-abc — Classificação ABC
+estoques.get("/api/estoques/curva-abc", requireAdmin, async (c) => {
+  try {
+    const omieService = getOmieService(c.get("db"));
+    const posEstoque = await getCachedPosEstoque(omieService);
+    const emptyClasse = { itens: 0, percentualItens: 0, percentualValor: 0 };
+
+    if (posEstoque.size === 0) {
+      return c.json({ success: true, data: { resumo: { classeA: emptyClasse, classeB: emptyClasse, classeC: emptyClasse, valorTotal: 0, totalItens: 0 }, classes: [], grafico: [] } });
+    }
+
+    const itens: any[] = [];
+    posEstoque.forEach((locais: any[], codigo: string) => {
+      const primeiro = locais[0];
+      const descricao = primeiro?.cDescricao || "";
+      const saldo = locais.reduce((s: number, l: any) => s + (l.nSaldo ?? 0), 0);
+      const cmc = primeiro?.nCMC ?? 0;
+      itens.push({ codigoErp: codigo, descricao, estoqueDisponivel: saldo, custoUnitario: cmc, custoTotal: saldo * cmc });
+    });
+
+    itens.sort((a, b) => b.custoTotal - a.custoTotal);
+    const valorTotal = itens.reduce((s, i) => s + i.custoTotal, 0);
+    const totalItens = itens.length;
+
+    let acumulado = 0;
+    const classificados = itens.map((item) => {
+      acumulado += item.custoTotal;
+      const pct = valorTotal > 0 ? (acumulado / valorTotal) * 100 : 0;
+      return { ...item, classificacao: pct <= 80 ? "A" : pct <= 95 ? "B" : "C" };
+    });
+
+    const byClasse: Record<string, any[]> = { A: [], B: [], C: [] };
+    classificados.forEach((i) => byClasse[i.classificacao].push(i));
+    const pctItens = (n: number) => parseFloat(((n / (totalItens || 1)) * 100).toFixed(1));
+    const pctValor = (v: number) => parseFloat(((v / (valorTotal || 1)) * 100).toFixed(1));
+    const valorClasse = (cls: string) => byClasse[cls].reduce((s: number, i: any) => s + i.custoTotal, 0);
+
+    const resumo = {
+      classeA: { itens: byClasse.A.length, percentualItens: pctItens(byClasse.A.length), percentualValor: pctValor(valorClasse("A")) },
+      classeB: { itens: byClasse.B.length, percentualItens: pctItens(byClasse.B.length), percentualValor: pctValor(valorClasse("B")) },
+      classeC: { itens: byClasse.C.length, percentualItens: pctItens(byClasse.C.length), percentualValor: pctValor(valorClasse("C")) },
+      valorTotal, totalItens,
+    };
+
+    let acumGrafico = 0;
+    const grafico = classificados.slice(0, 20).map((item) => {
+      acumGrafico += item.custoTotal;
+      return { classificacao: item.classificacao, valor: parseFloat(item.custoTotal.toFixed(2)), percentual: pctValor(item.custoTotal), acumulado: pctValor(acumGrafico) };
+    });
+
+    const classes = (["A", "B", "C"] as const).map((cls) => ({ classificacao: cls, qtdeItens: byClasse[cls].length, percentualValor: pctValor(valorClasse(cls)), percentualItens: pctItens(byClasse[cls].length), itens: byClasse[cls] }));
+
+    return c.json({ success: true, data: { resumo, classes, grafico } });
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+// GET /api/estoques/giro — Métricas de giro de estoque
+estoques.get("/api/estoques/giro", requireAdmin, async (c) => {
+  try {
+    const omieService = getOmieService(c.get("db"));
+    const [posEstoqueR, triagemR] = await Promise.allSettled([
+      getCachedPosEstoque(omieService),
+      fetchPipelineApi("/adm_logistica/triagem"),
+    ]);
+    const posEstoque = posEstoqueR.status === "fulfilled" ? posEstoqueR.value : new Map();
+    const triagem: any[] = triagemR.status === "fulfilled" ? triagemR.value : [];
+
+    const estoquePorCategoria: Record<string, { quantidade: number }> = {};
+    posEstoque.forEach((locais: any[]) => {
+      const desc = locais[0]?.cDescricao || "";
+      const d = desc.toUpperCase();
+      const cat = d.includes("IPHONE") || d.includes("APPLE") ? "iPhone"
+        : d.includes("GALAXY") || d.includes("SAMSUNG") ? "Samsung"
+        : d.includes("MOTOROLA") ? "Motorola"
+        : d.includes("XIAOMI") || d.includes("REDMI") ? "Xiaomi"
+        : "Outros";
+      const saldo = locais.reduce((s: number, l: any) => s + (l.nSaldo ?? 0), 0);
+      if (!estoquePorCategoria[cat]) estoquePorCategoria[cat] = { quantidade: 0 };
+      estoquePorCategoria[cat].quantidade += saldo;
+    });
+
+    const estoqueTotal = Object.values(estoquePorCategoria).reduce((s, c) => s + c.quantidade, 0);
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+    const triagemMes = triagem.filter((t: any) => {
+      const d = t.data_triagem || t.data_recebimento || t.created_at;
+      if (!d) return false;
+      return new Date(String(d).includes("T") ? d : String(d).replace(/^(\d{2})\/(\d{2})\/(\d{4})/, "$3-$2-$1")) >= inicioMes;
+    }).length;
+
+    const giroMensal = estoqueTotal > 0 ? parseFloat((triagemMes / estoqueTotal).toFixed(2)) : 0;
+    const mediaDiaria = triagemMes / 30;
+    const cobertura = mediaDiaria > 0 ? Math.round(estoqueTotal / mediaDiaria) : 0;
+
+    const porCategoria = Object.entries(estoquePorCategoria).map(([categoria, data]) => {
+      const giroCat = data.quantidade > 0 && triagemMes > 0 ? parseFloat(((triagemMes * (data.quantidade / estoqueTotal)) / data.quantidade).toFixed(2)) : 0;
+      return { categoria, giro: giroCat, dias: giroCat > 0 ? Math.round(365 / giroCat) : 0, estoqueAtual: data.quantidade };
+    }).sort((a, b) => b.giro - a.giro);
+
+    const agora = new Date();
+    const mesesNome = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+    const tendencia = Array.from({ length: 6 }, (_, i) => {
+      const mes = new Date(agora.getFullYear(), agora.getMonth() - (5 - i), 1);
+      const mesProx = new Date(agora.getFullYear(), agora.getMonth() - (5 - i) + 1, 1);
+      const count = triagem.filter((t: any) => {
+        const d = t.data_triagem || t.data_recebimento || t.created_at;
+        if (!d) return false;
+        const dt = new Date(String(d).includes("T") ? d : String(d).replace(/^(\d{2})\/(\d{2})\/(\d{4})/, "$3-$2-$1"));
+        return dt >= mes && dt < mesProx;
+      }).length;
+      return { mes: mesesNome[mes.getMonth()], giro: estoqueTotal > 0 ? parseFloat((count / estoqueTotal).toFixed(2)) : 0 };
+    });
+
+    return c.json({ success: true, data: { giroMensal, cobertura, meta: 1.5, porCategoria, tendencia } });
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
 export { estoques };
