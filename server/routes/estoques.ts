@@ -19,6 +19,7 @@ import {
 import { eq, desc, and, sql, like } from "drizzle-orm";
 import { getCachedProdutos, invalidateEstoqueCache } from "../services/estoque-cache.service";
 import { getCachedPosEstoque, invalidatePosEstoqueCache } from "../services/estoque-pos.service";
+import { getResumoEstoque, getCurvaABC as getEstoqueCurvaABC, getGiroEstoque as getEstoqueGiro } from "../services/estoque.service";
 
 // ─── Helpers de classificação por descrição ───────────────────────────────────
 
@@ -2876,6 +2877,39 @@ export function registerEstoqueRoutes(router: Router) {
       }});
     } catch (error: any) {
       console.error('[Estoque Routes] Error aging-estoque:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/resumo — KPIs consolidados (via estoque.service)
+  router.get("/api/estoques/resumo", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const resumo = await getResumoEstoque();
+      res.json({ success: true, data: resumo });
+    } catch (error: any) {
+      console.error("[Estoque Routes] Error /resumo:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/curva-abc — Classificação ABC (via estoque.service)
+  router.get("/api/estoques/curva-abc", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const result = await getEstoqueCurvaABC();
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      console.error("[Estoque Routes] Error /curva-abc:", error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // GET /api/estoques/giro — Métricas de giro (via estoque.service)
+  router.get("/api/estoques/giro", requireAuth, requireAdmin, async (_req, res) => {
+    try {
+      const result = await getEstoqueGiro();
+      res.json({ success: true, data: result });
+    } catch (error: any) {
+      console.error("[Estoque Routes] Error /giro:", error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });
