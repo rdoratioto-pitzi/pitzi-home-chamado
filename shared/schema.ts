@@ -59,6 +59,7 @@ export type ModulePermissions = {
   updates: boolean;
   estoques: boolean;
   avaliacoes: boolean;
+  comercial: boolean;
 };
 
 // ============== REFRESH TOKENS (JWT Auth) ==============
