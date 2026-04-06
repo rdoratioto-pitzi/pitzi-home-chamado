@@ -90,6 +90,17 @@ function extrairResponsavel(item: any): string {
   return item.responsavel_triagem || item.responsavel || item.responsible || "";
 }
 
+function extrairMarca(item: any): string {
+  return item.brand || item.marca || item.Marca || item.device_brand || item.manufacturer || "";
+}
+
+function calcDiasNoStatus(dateStr: string | null): number {
+  const d = parseDate(dateStr);
+  if (!d) return 0;
+  const diffMs = Date.now() - d.getTime();
+  return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TriagemResumo {
@@ -105,11 +116,13 @@ export interface TriagemResumo {
 export interface RecebimentoItem {
   imei: string;
   modelo: string;
+  marca?: string;
   categoria: string;
   rede: string;
   status: string;
   dataRecebimento: string | null;
   responsavel: string;
+  diasNoStatus?: number;
 }
 
 export interface RecebimentosResult {
@@ -251,15 +264,20 @@ export async function getRecebimentos(
 
 export async function getFilaTriagem(): Promise<RecebimentoItem[]> {
   const items = await fetchPipelineApi("/adm_logistica/triagem");
-  return items.map(item => ({
-    imei: extrairImei(item),
-    modelo: extrairModelo(item),
-    categoria: extrairCategoria(item),
-    rede: extrairRede(item),
-    status: extrairStatus(item),
-    dataRecebimento: extractItemDate(item),
-    responsavel: extrairResponsavel(item),
-  }));
+  return items.map(item => {
+    const dataRecebimento = extractItemDate(item);
+    return {
+      imei: extrairImei(item),
+      modelo: extrairModelo(item),
+      marca: extrairMarca(item),
+      categoria: extrairCategoria(item),
+      rede: extrairRede(item),
+      status: extrairStatus(item),
+      dataRecebimento,
+      responsavel: extrairResponsavel(item),
+      diasNoStatus: calcDiasNoStatus(dataRecebimento),
+    };
+  });
 }
 
 export async function getDesvios(): Promise<DesvioItem[]> {
