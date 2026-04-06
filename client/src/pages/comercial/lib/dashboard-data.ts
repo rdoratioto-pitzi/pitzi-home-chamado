@@ -13,6 +13,11 @@ export interface DashboardMonth {
   pisPct: number;
   cofinsPct: number;
   frete: number;
+  faturamentoTotal: number;
+  cmcTotal: number;
+  freteTotal: number;
+  cpdMedio: number;
+  markup: number;
 }
 
 const EMPTY_MONTH: Omit<DashboardMonth, "label"> = {
@@ -29,55 +34,81 @@ const EMPTY_MONTH: Omit<DashboardMonth, "label"> = {
   pisPct: 0,
   cofinsPct: 0,
   frete: 0,
+  faturamentoTotal: 0,
+  cmcTotal: 0,
+  freteTotal: 0,
+  cpdMedio: 0,
+  markup: 0,
 };
 
-export const MONTH_KEYS = ["mar-2026", "abr-2026", "mai-2026", "jun-2026"] as const;
-export type MonthKey = (typeof MONTH_KEYS)[number];
+const MONTH_ABBR = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-// Mapeamento periodo API (YYYY-MM) <-> MonthKey (mmm-yyyy)
-const PERIODO_TO_KEY: Record<string, MonthKey> = {
-  "2026-03": "mar-2026",
-  "2026-04": "abr-2026",
-  "2026-05": "mai-2026",
-  "2026-06": "jun-2026",
-};
+function generateMonthKeys(): string[] {
+  const now = new Date();
+  const keys: string[] = [];
+  for (let offset = -6; offset <= 1; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    keys.push(`${MONTH_ABBR[d.getMonth()]}-${d.getFullYear()}`);
+  }
+  return keys;
+}
 
-const KEY_TO_PERIODO: Record<MonthKey, string> = {
-  "mar-2026": "2026-03",
-  "abr-2026": "2026-04",
-  "mai-2026": "2026-05",
-  "jun-2026": "2026-06",
-};
+export const MONTH_KEYS = generateMonthKeys();
+export type MonthKey = string;
 
 export function monthKeyToPeriodo(key: MonthKey): string {
-  return KEY_TO_PERIODO[key];
+  const [abbr, year] = key.split("-");
+  const monthIdx = MONTH_ABBR.indexOf(abbr);
+  return `${year}-${String(monthIdx + 1).padStart(2, "0")}`;
 }
 
 export function periodoToMonthKey(periodo: string): MonthKey | undefined {
-  return PERIODO_TO_KEY[periodo];
+  const [year, month] = periodo.split("-");
+  const idx = parseInt(month, 10) - 1;
+  if (idx < 0 || idx > 11) return undefined;
+  return `${MONTH_ABBR[idx]}-${year}`;
 }
 
-export const INITIAL_DASHBOARD_DATA: Record<MonthKey, DashboardMonth> = {
-  "mar-2026": {
-    label: "Mar 2026",
-    volume: 1643,
-    ticket: 709.28,
-    cmc: 523.68,
-    margemUn: 46.43,
-    margemPct: 8.87,
-    margemTotal: 76281,
-    mcTotal: 304938,
-    comissaoVarPct: 10,
-    comissaoRepPct: 0,
-    icmsPct: 3.51,
-    pisPct: 0.65,
-    cofinsPct: 3.00,
-    frete: 36.01,
-  },
-  "abr-2026": { label: "Abr 2026", ...EMPTY_MONTH },
-  "mai-2026": { label: "Mai 2026", ...EMPTY_MONTH },
-  "jun-2026": { label: "Jun 2026", ...EMPTY_MONTH },
-};
+export function monthKeyToLabel(key: MonthKey): string {
+  const [abbr, year] = key.split("-");
+  const idx = MONTH_ABBR.indexOf(abbr);
+  return idx >= 0 ? `${MONTH_LABELS[idx]} ${year}` : key;
+}
+
+function buildInitialData(): Record<MonthKey, DashboardMonth> {
+  const result: Record<string, DashboardMonth> = {};
+  for (const key of MONTH_KEYS) {
+    result[key] = { label: monthKeyToLabel(key), ...EMPTY_MONTH };
+  }
+  // Seed dados reais de março 2026
+  if (result["mar-2026"]) {
+    result["mar-2026"] = {
+      label: "Mar 2026",
+      volume: 1643,
+      ticket: 709.28,
+      cmc: 523.68,
+      margemUn: 46.43,
+      margemPct: 8.87,
+      margemTotal: 76281,
+      mcTotal: 304938,
+      comissaoVarPct: 10,
+      comissaoRepPct: 0,
+      icmsPct: 3.51,
+      pisPct: 0.65,
+      cofinsPct: 3.00,
+      frete: 36.01,
+      faturamentoTotal: 1165339.11,
+      cmcTotal: 860401.56,
+      freteTotal: 59148.00,
+      cpdMedio: 612.85,
+      markup: 1.35,
+    };
+  }
+  return result;
+}
+
+export const INITIAL_DASHBOARD_DATA: Record<MonthKey, DashboardMonth> = buildInitialData();
 
 export function formatBRL(value: number): string {
   return value.toLocaleString("pt-BR", {
