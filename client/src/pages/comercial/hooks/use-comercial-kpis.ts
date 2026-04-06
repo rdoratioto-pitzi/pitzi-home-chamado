@@ -18,6 +18,11 @@ interface ComercialKpiRow {
   pisPct: string;
   cofinsPct: string;
   frete: string;
+  faturamentoTotal: string;
+  cmcTotal: string;
+  freteTotal: string;
+  cpdMedio: string;
+  markup: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -38,6 +43,11 @@ export function apiRowToDashboardMonth(row: ComercialKpiRow): DashboardMonth {
     pisPct: Number(row.pisPct),
     cofinsPct: Number(row.cofinsPct),
     frete: Number(row.frete),
+    faturamentoTotal: Number(row.faturamentoTotal),
+    cmcTotal: Number(row.cmcTotal),
+    freteTotal: Number(row.freteTotal),
+    cpdMedio: Number(row.cpdMedio),
+    markup: Number(row.markup),
   };
 }
 
