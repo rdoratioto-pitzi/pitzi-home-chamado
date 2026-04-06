@@ -2,7 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import { requireAuth, getSessionUser } from "../middleware/auth";
-import { projects, kanbanCards, kanbanColumns, users, workspaceComentarios } from "@shared/schema";
+import { projects, kanbanCards, kanbanColumns, kanbanComments, users, workspaceComentarios } from "@shared/schema";
 import type { Ticket, User, SlaRule, InsertTicket } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
@@ -675,6 +675,9 @@ export function registerWorkspaceRoutes(router: Router) {
               .slice(0, 2)
               .map((w) => w[0].toUpperCase())
               .join("");
+            // Parse attachments: kanbanCards.attachments is text[] of URLs
+            const rawAtt = c.attachments || [];
+            const anexos = rawAtt.map((url, i) => ({ name: `Anexo ${i + 1}`, url }));
             return {
               id: c.id,
               codigo: c.code,
@@ -688,6 +691,7 @@ export function registerWorkspaceRoutes(router: Router) {
               criadoEm: c.createdAt ? String(c.createdAt) : null,
               responsavel: tNome,
               responsavelInitials: tInitials,
+              anexos,
             };
           }),
         };
@@ -786,17 +790,76 @@ export function registerWorkspaceRoutes(router: Router) {
     }
   });
 
+  // ─── GET tarefa individual ──────────────────────────────────────────────────
+  router.get("/api/workspace/tarefas/:id", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { id } = req.params;
+
+      const [card] = await db
+        .select()
+        .from(kanbanCards)
+        .where(eq(kanbanCards.id, String(id)))
+        .limit(1);
+
+      if (!card) return res.status(404).json({ error: "Tarefa não encontrada" });
+
+      // Fetch project info
+      const [projeto] = await db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, card.projectId))
+        .limit(1);
+
+      const allUsers = await storage.getUsers();
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const resp = card.assigneeId ? userMap.get(card.assigneeId) : null;
+      const respNome = resp?.name || "Não atribuído";
+      const respInitials = respNome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+
+      const rawAtt = card.attachments || [];
+      const anexos = rawAtt.map((url, i) => ({ name: `Anexo ${i + 1}`, url }));
+
+      return res.json({
+        id: card.id,
+        codigo: card.code,
+        titulo: card.title,
+        descricao: card.objectives || null,
+        status: kanbanStatusToPtBr[card.status] || card.status,
+        prioridade: card.priority,
+        responsavelId: card.assigneeId,
+        responsavel: respNome,
+        responsavelInitials: respInitials,
+        dataEntrega: card.dueDate ? String(card.dueDate) : null,
+        dataInicio: card.startDate ? String(card.startDate) : null,
+        progresso: card.progress ?? 0,
+        criadoEm: card.createdAt ? String(card.createdAt) : null,
+        anexos,
+        projeto: projeto ? {
+          id: projeto.id,
+          codigo: projeto.code,
+          nome: projeto.name,
+          cor: projeto.color || "#00c853",
+        } : null,
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
   // ─── PATCH tarefa ──────────────────────────────────────────────────────────────
   router.patch("/api/workspace/tarefas/:id", requireAuth, async (req, res) => {
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
       const { id } = req.params;
-      const { status, prioridade, responsavelId, dataEntrega, progresso } = req.body as {
+      const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao } = req.body as {
         status?: string;
         prioridade?: string;
         responsavelId?: string;
         dataEntrega?: string;
         progresso?: number;
+        titulo?: string;
+        descricao?: string;
       };
 
       const ptBrToKanban: Record<string, string> = {
@@ -812,6 +875,8 @@ export function registerWorkspaceRoutes(router: Router) {
       if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
       if (dataEntrega !== undefined) updateData.dueDate = dataEntrega ? new Date(dataEntrega) : null;
       if (progresso !== undefined) updateData.progress = progresso;
+      if (titulo !== undefined) updateData.title = titulo.trim();
+      if (descricao !== undefined) updateData.objectives = descricao;
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ error: "Nenhum campo para atualizar" });
@@ -864,6 +929,81 @@ export function registerWorkspaceRoutes(router: Router) {
       if (!deleted) return res.status(404).json({ error: "Tarefa não encontrada" });
 
       return res.json({ ok: true });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── GET comentarios de tarefa ────────────────────────────────────────────────
+  router.get("/api/workspace/tarefas/:id/comentarios", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { id } = req.params;
+
+      const comentarios = await db
+        .select()
+        .from(kanbanComments)
+        .where(eq(kanbanComments.cardId, String(id)))
+        .orderBy(kanbanComments.createdAt);
+
+      const allUsers = await storage.getUsers();
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+      const items = comentarios.map((c) => {
+        const autor = userMap.get(c.userId);
+        const autorNome = autor?.name || "Usuário";
+        const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+        return {
+          id: c.id,
+          texto: c.content,
+          autorId: c.userId,
+          autorNome,
+          autorInitials,
+          criadoEm: c.createdAt ? String(c.createdAt) : null,
+        };
+      });
+
+      return res.json({ comentarios: items });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── POST comentario em tarefa ──────────────────────────────────────────────
+  router.post("/api/workspace/tarefas/:id/comentarios", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { id } = req.params;
+      const { userId } = getSessionUser(req);
+      const { texto } = req.body as { texto?: string };
+
+      if (!texto?.trim()) {
+        return res.status(400).json({ error: "Texto obrigatório" });
+      }
+
+      const [comentario] = await db
+        .insert(kanbanComments)
+        .values({
+          cardId: String(id),
+          userId,
+          content: texto.trim(),
+        })
+        .returning();
+
+      const allUsers = await storage.getUsers();
+      const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const autor = userMap.get(comentario.userId);
+      const autorNome = autor?.name || "Usuário";
+      const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+
+      return res.status(201).json({
+        id: comentario.id,
+        texto: comentario.content,
+        autorId: comentario.userId,
+        autorNome,
+        autorInitials,
+        criadoEm: comentario.createdAt ? String(comentario.createdAt) : null,
+      });
     } catch (error: any) {
       return res.status(error.status || 500).json({ error: error.message });
     }
