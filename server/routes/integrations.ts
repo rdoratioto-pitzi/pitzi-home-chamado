@@ -2,11 +2,12 @@ import { Router } from "express";
 import { insertLogisticaReversaEventoSchema } from "@shared/schema";
 import { storage } from "../storage";
 import { z } from "zod";
+import { requireAuth } from "../middleware/auth";
 
 export function registerIntegrationRoutes(router: Router) {
   console.log("Registering Integration Routes...");
   const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
-  const RS_API_TOKEN = "Renov123";
+  const RS_API_TOKEN = process.env.RENOVSMART_API_TOKEN || "Renov123";
 
   // ============== RELATÓRIO PEDIDOS API INTEGRATION ==============
 
@@ -119,7 +120,7 @@ export function registerIntegrationRoutes(router: Router) {
   };
 
   // 1. Resumo de Assertividade
-  router.get("/api/avaliacoes-ia/resumo", async (req, res) => {
+  router.get("/api/avaliacoes-ia/resumo", requireAuth, async (req, res) => {
     try {
       const data = await fetchAiEvaluation("resumo", req.query);
       res.json(data);
@@ -130,7 +131,7 @@ export function registerIntegrationRoutes(router: Router) {
   });
 
   // 2. Evolução Temporal
-  router.get("/api/avaliacoes-ia/evolucao", async (req, res) => {
+  router.get("/api/avaliacoes-ia/evolucao", requireAuth, async (req, res) => {
     try {
       const data = await fetchAiEvaluation("evolucao", req.query);
       res.json(data);
@@ -141,7 +142,7 @@ export function registerIntegrationRoutes(router: Router) {
   });
 
   // 2.1. Evolução por Categoria
-  router.get("/api/avaliacoes-ia/evolucao-categoria", async (req, res) => {
+  router.get("/api/avaliacoes-ia/evolucao-categoria", requireAuth, async (req, res) => {
     try {
       const data = await fetchAiEvaluation("evolucao-categoria", req.query);
       res.json(data);
@@ -152,7 +153,7 @@ export function registerIntegrationRoutes(router: Router) {
   });
 
   // 3. Acurácia por Dispositivo
-  router.get("/api/avaliacoes-ia/dispositivos", async (req, res) => {
+  router.get("/api/avaliacoes-ia/dispositivos", requireAuth, async (req, res) => {
     try {
       const data = await fetchAiEvaluation("dispositivos", req.query);
       res.json(data);
@@ -163,7 +164,7 @@ export function registerIntegrationRoutes(router: Router) {
   });
 
   // 4. Detalhamento de Avaliações
-  router.get("/api/avaliacoes-ia/detalhes", async (req, res) => {
+  router.get("/api/avaliacoes-ia/detalhes", requireAuth, async (req, res) => {
     try {
       const data = await fetchAiEvaluation("detalhes", req.query);
       res.json(data);
@@ -174,7 +175,7 @@ export function registerIntegrationRoutes(router: Router) {
   });
 
   // 5. Acurácia por Categoria
-  router.get("/api/avaliacoes-ia/categorias", async (req, res) => {
+  router.get("/api/avaliacoes-ia/categorias", requireAuth, async (req, res) => {
     try {
       console.log("[API] Calling categorias endpoint with params:", req.query);
       const data = await fetchAiEvaluation("categorias", req.query);
@@ -191,7 +192,7 @@ export function registerIntegrationRoutes(router: Router) {
   });
 
   // 6. Assertividade por Foto
-  router.get("/api/avaliacoes-ia/assertividade-fotos", async (req, res) => {
+  router.get("/api/avaliacoes-ia/assertividade-fotos", requireAuth, async (req, res) => {
     try {
       console.log("[API] Calling assertividade-fotos endpoint with params:", req.query);
       const data = await fetchAiEvaluation("assertividade-fotos", req.query);
@@ -208,7 +209,7 @@ export function registerIntegrationRoutes(router: Router) {
   });
 
   // 7. Últimas Avaliações por IMEI
-  router.get("/api/avaliacoes-ia/imei", async (req, res) => {
+  router.get("/api/avaliacoes-ia/imei", requireAuth, async (req, res) => {
     try {
       const params = new URLSearchParams();
       const limitDate = (req.query.limit_date as string) || new Date().toISOString().slice(0, 10);
