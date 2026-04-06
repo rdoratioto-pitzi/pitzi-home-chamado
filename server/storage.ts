@@ -195,6 +195,7 @@ import {
 
   // Key Result Updates (Check-ins)
   getKeyResultUpdates(keyResultId: string): Promise<KeyResultUpdate[]>;
+  getKRsWithCheckins(): Promise<Set<string>>;
   createKeyResultUpdate(update: InsertKeyResultUpdate): Promise<KeyResultUpdate>;
 
   // Initiatives
@@ -1068,6 +1069,13 @@ export class DatabaseStorage implements IStorage {
   async getKeyResultUpdates(keyResultId: string): Promise<KeyResultUpdate[]> {
     if (!this.db) return [];
     return await this.db.select().from(keyResultUpdates).where(eq(keyResultUpdates.keyResultId, keyResultId));
+  }
+  async getKRsWithCheckins(): Promise<Set<string>> {
+    if (!this.db) return new Set();
+    const rows = await this.db
+      .selectDistinct({ keyResultId: keyResultUpdates.keyResultId })
+      .from(keyResultUpdates);
+    return new Set(rows.map((r) => r.keyResultId));
   }
   async createKeyResultUpdate(update: InsertKeyResultUpdate): Promise<KeyResultUpdate> {
     if (!this.db) throw new Error("Database not connected");
