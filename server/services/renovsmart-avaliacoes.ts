@@ -10,9 +10,16 @@ import {
   curadoriaConfiguracoes,
   type InsertCuradoriaAvaliacao,
 } from "@shared/schema";
+import {
+  normalizeGrade,
+  agregarPorDispositivo,
+  calcularAssertividadePorDispositivo,
+  buildMatrizConfusaoFromDevices,
+  type RawFotoAvaliacao,
+} from "./avaliacoes-normalizer";
 
 const PIPELINE_RS_BASE = "https://dash.renovsmart.com.br/api";
-const PIPELINE_RS_TOKEN = "Renov123";
+const PIPELINE_RS_TOKEN = process.env.RENOVSMART_API_TOKEN || "Renov123";
 
 export const DESCONTO_POR_GRADE: Record<string, number> = { A: 0, B: 0.25, C: 0.70 };
 
@@ -228,17 +235,22 @@ export async function getTradeInsAvaliacoes(
 ): Promise<{ data: TradeInAvaliacao[]; total: number; page: number; totalPages: number }> {
   let items: TradeInAvaliacao[];
 
+  // Fetch curated IDs to mark foiCurado
+  const curados = db ? await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).catch(() => []) : [];
+  const curadosSet = new Set(curados.map((c) => c.tradeInId));
+
   try {
-    const raw = await fetchAvaliacoesApi("/adm_logistica/avaliacoes");
-    // Fetch curated IDs to mark foiCurado
-    const curados = db ? await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes) : [];
-    const curadosSet = new Set(curados.map((c) => c.tradeInId));
-    items = raw.map((item) => normalizeItem(item, curadosSet.has(item.id || item.trade_in_id)));
+    // Consume real proxy endpoint /avaliacoes-ia/detalhes (returns per-photo data)
+    const params: Record<string, string> = {};
+    if (filtros.dataInicio) params.start_date = filtros.dataInicio;
+    if (filtros.dataFim) params.end_date = filtros.dataFim;
+    if (filtros.categoria) params.categories = filtros.categoria;
+
+    const rawPhotos = await fetchAvaliacoesApi("/avaliacoes-ia/detalhes", params) as RawFotoAvaliacao[];
+    items = agregarPorDispositivo(rawPhotos, curadosSet);
   } catch (err) {
     console.warn("⚠️ RenovSmart API não disponível para avaliações, usando dados mock");
     const mockItems = getMockTradeIns();
-    const curados = db ? await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).catch(() => []) : [];
-    const curadosSet = new Set(curados.map((c) => c.tradeInId));
     items = mockItems.map((m) => ({ ...m, foiCurado: curadosSet.has(m.tradeInId) || m.foiCurado }));
   }
 
@@ -366,130 +378,219 @@ function calcCustoErroTipo(records: any[], tipo: "ia" | "humano"): number {
 }
 
 export async function calcularMetricasResumo(filtros: AvaliacoesFilters): Promise<MetricasResumo> {
-  if (!db) {
+  // Try curadoria-based metrics first (gold standard when available)
+  const records = db ? await (async () => {
+    const conditions = buildDateFilter(filtros);
+    return conditions.length > 0
+      ? db.select().from(curadoriaAvaliacoes).where(and(...conditions))
+      : db.select().from(curadoriaAvaliacoes);
+  })().catch(() => []) : [];
+
+  const hasCuradoria = records.length > 0;
+
+  if (hasCuradoria) {
+    const area = filtros.area ?? "ambas";
+    const acuraciaIa = calcAccuracy(records, "ia", area);
+    const acuraciaHumano = calcAccuracy(records, "humano", area);
+    const custoErroIa = calcCustoErroTipo(records, "ia");
+    const custoErroHumano = calcCustoErroTipo(records, "humano");
+
+    const now = new Date();
+    const cutoff7 = new Date(now); cutoff7.setDate(cutoff7.getDate() - 7);
+    const cutoff14 = new Date(now); cutoff14.setDate(cutoff14.getDate() - 14);
+
+    const recent = records.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff7);
+    const previous = records.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff14 && new Date(r.dataCuradoria) < cutoff7);
+
+    const trendAcuraciaIa = calcAccuracy(recent, "ia", area) - calcAccuracy(previous, "ia", area);
+    const trendAcuraciaHumano = calcAccuracy(recent, "humano", area) - calcAccuracy(previous, "humano", area);
+
+    let totalDisponiveis = 0;
+    try { const all = await getTradeInsAvaliacoes({}, 1, 9999); totalDisponiveis = all.total; } catch { totalDisponiveis = 0; }
+
+    return {
+      acuraciaIa, acuraciaHumano, custoErroIa, custoErroHumano,
+      totalCurados: records.length, totalDisponiveis,
+      trendAcuraciaIa: Math.round(trendAcuraciaIa * 10) / 10,
+      trendAcuraciaHumano: Math.round(trendAcuraciaHumano * 10) / 10,
+    };
+  }
+
+  // Fallback: use real API proxy data (IA vs Humano as proxy for accuracy)
+  try {
+    const params: Record<string, string> = {};
+    if (filtros.dataInicio) params.start_date = filtros.dataInicio;
+    if (filtros.dataFim) params.end_date = filtros.dataFim;
+    if (filtros.categoria) params.categories = filtros.categoria;
+
+    const rawPhotos = await fetchAvaliacoesApi("/avaliacoes-ia/detalhes", params) as RawFotoAvaliacao[];
+    const dispositivos = agregarPorDispositivo(rawPhotos);
+    const assertividade = calcularAssertividadePorDispositivo(dispositivos);
+
+    // Calculate custo erro from API data using percentuais POP V3
+    let custoErroIa = 0;
+    for (const d of dispositivos) {
+      const preco = d.precoMaximo || 0;
+      if (d.gradeIaDisplay && d.gradeHumanoDisplay && d.gradeIaDisplay !== d.gradeHumanoDisplay) {
+        custoErroIa += Math.abs((DESCONTO_POR_GRADE[d.gradeIaDisplay] ?? 0) - (DESCONTO_POR_GRADE[d.gradeHumanoDisplay] ?? 0)) * preco;
+      }
+      if (d.gradeIaCarcaca && d.gradeHumanoCarcaca && d.gradeIaCarcaca !== d.gradeHumanoCarcaca) {
+        custoErroIa += Math.abs((DESCONTO_POR_GRADE[d.gradeIaCarcaca] ?? 0) - (DESCONTO_POR_GRADE[d.gradeHumanoCarcaca] ?? 0)) * preco;
+      }
+    }
+
+    return {
+      acuraciaIa: assertividade.acuraciaIa,
+      acuraciaHumano: 0,
+      custoErroIa: Math.round(custoErroIa * 100) / 100,
+      custoErroHumano: 0,
+      totalCurados: 0,
+      totalDisponiveis: dispositivos.length,
+      trendAcuraciaIa: 0,
+      trendAcuraciaHumano: 0,
+    };
+  } catch {
     return { acuraciaIa: 0, acuraciaHumano: 0, custoErroIa: 0, custoErroHumano: 0, totalCurados: 0, totalDisponiveis: 0, trendAcuraciaIa: 0, trendAcuraciaHumano: 0 };
   }
-
-  const conditions = buildDateFilter(filtros);
-  const records = conditions.length > 0
-    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
-    : await db.select().from(curadoriaAvaliacoes);
-
-  const area = filtros.area ?? "ambas";
-  const acuraciaIa = calcAccuracy(records, "ia", area);
-  const acuraciaHumano = calcAccuracy(records, "humano", area);
-  const custoErroIa = calcCustoErroTipo(records, "ia");
-  const custoErroHumano = calcCustoErroTipo(records, "humano");
-
-  // Trend: compare last 7 days vs previous 7 days
-  const now = new Date();
-  const cutoff7 = new Date(now); cutoff7.setDate(cutoff7.getDate() - 7);
-  const cutoff14 = new Date(now); cutoff14.setDate(cutoff14.getDate() - 14);
-
-  const recent = records.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff7);
-  const previous = records.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff14 && new Date(r.dataCuradoria) < cutoff7);
-
-  const trendAcuraciaIa = calcAccuracy(recent, "ia", area) - calcAccuracy(previous, "ia", area);
-  const trendAcuraciaHumano = calcAccuracy(recent, "humano", area) - calcAccuracy(previous, "humano", area);
-
-  let totalDisponiveis = 0;
-  try {
-    const all = await getTradeInsAvaliacoes({}, 1, 9999);
-    totalDisponiveis = all.total;
-  } catch {
-    totalDisponiveis = 0;
-  }
-
-  return {
-    acuraciaIa,
-    acuraciaHumano,
-    custoErroIa,
-    custoErroHumano,
-    totalCurados: records.length,
-    totalDisponiveis,
-    trendAcuraciaIa: Math.round(trendAcuraciaIa * 10) / 10,
-    trendAcuraciaHumano: Math.round(trendAcuraciaHumano * 10) / 10,
-  };
 }
 
 export async function calcularEvolucaoTemporal(filtros: AvaliacoesFilters): Promise<EvolucaoPonto[]> {
-  if (!db) return [];
+  // Try curadoria data first
+  if (db) {
+    const conditions = buildDateFilter(filtros);
+    const records = conditions.length > 0
+      ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions)).catch(() => [])
+      : await db.select().from(curadoriaAvaliacoes).catch(() => []);
 
-  const conditions = buildDateFilter(filtros);
-  const records = conditions.length > 0
-    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
-    : await db.select().from(curadoriaAvaliacoes);
+    if (records.length > 0) {
+      const granularidade = filtros.granularidade ?? "diaria";
 
-  if (records.length === 0) return [];
+      function getKey(date: Date): string {
+        if (granularidade === "mensal") return date.toISOString().slice(0, 7);
+        if (granularidade === "semanal") {
+          const d = new Date(date);
+          d.setDate(d.getDate() - d.getDay());
+          return d.toISOString().slice(0, 10);
+        }
+        return date.toISOString().slice(0, 10);
+      }
 
-  const granularidade = filtros.granularidade ?? "diaria";
+      const grouped = new Map<string, any[]>();
+      for (const r of records) {
+        if (!r.dataCuradoria) continue;
+        const key = getKey(new Date(r.dataCuradoria));
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(r);
+      }
 
-  function getKey(date: Date): string {
-    if (granularidade === "mensal") return date.toISOString().slice(0, 7);
-    if (granularidade === "semanal") {
-      const d = new Date(date);
-      d.setDate(d.getDate() - d.getDay());
-      return d.toISOString().slice(0, 10);
+      return Array.from(grouped.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([data, grupo]) => ({
+          data,
+          acuraciaIa: calcAccuracy(grupo, "ia", "ambas"),
+          acuraciaHumano: calcAccuracy(grupo, "humano", "ambas"),
+          totalCurados: grupo.length,
+        }));
     }
-    return date.toISOString().slice(0, 10);
   }
 
-  const grouped = new Map<string, any[]>();
-  for (const r of records) {
-    if (!r.dataCuradoria) continue;
-    const key = getKey(new Date(r.dataCuradoria));
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(r);
-  }
+  // Fallback: use real API /avaliacoes-ia/evolucao (normalize Grade D→C)
+  try {
+    const params: Record<string, string> = {};
+    if (filtros.dataInicio) params.start_date = filtros.dataInicio;
+    if (filtros.dataFim) params.end_date = filtros.dataFim;
 
-  return Array.from(grouped.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([data, grupo]) => ({
-      data,
-      acuraciaIa: calcAccuracy(grupo, "ia", "ambas"),
-      acuraciaHumano: calcAccuracy(grupo, "humano", "ambas"),
-      totalCurados: grupo.length,
+    const raw = await fetchAvaliacoesApi("/avaliacoes-ia/evolucao", params);
+    return raw.map((item: any) => ({
+      data: item.Mes || item.data || "",
+      acuraciaIa: item.Acuracia_Mensal ?? item.acuraciaIa ?? 0,
+      acuraciaHumano: 0,
+      totalCurados: 0,
     }));
+  } catch {
+    return [];
+  }
 }
 
 export async function calcularRankingAvaliadores(filtros: AvaliacoesFilters): Promise<RankingAvaliador[]> {
-  if (!db) return [];
+  // Try curadoria data first
+  if (db) {
+    const conditions = buildDateFilter(filtros);
+    const records = conditions.length > 0
+      ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions)).catch(() => [])
+      : await db.select().from(curadoriaAvaliacoes).catch(() => []);
 
-  const conditions = buildDateFilter(filtros);
-  const records = conditions.length > 0
-    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
-    : await db.select().from(curadoriaAvaliacoes);
+    if (records.length > 0) {
+      const byAvaliador = new Map<string, { nome: string; records: any[] }>();
+      for (const r of records) {
+        const id = r.avaliadorHumanoId || "desconhecido";
+        const nome = id;
+        if (!byAvaliador.has(id)) byAvaliador.set(id, { nome, records: [] });
+        byAvaliador.get(id)!.records.push(r);
+      }
 
-  const byAvaliador = new Map<string, { nome: string; records: any[] }>();
-  for (const r of records) {
-    const id = r.avaliadorHumanoId || "desconhecido";
-    const nome = id; // nome is not stored separately; use ID as fallback
-    if (!byAvaliador.has(id)) byAvaliador.set(id, { nome, records: [] });
-    byAvaliador.get(id)!.records.push(r);
+      const now = new Date();
+      const cutoff7 = new Date(now); cutoff7.setDate(cutoff7.getDate() - 7);
+      const cutoff14 = new Date(now); cutoff14.setDate(cutoff14.getDate() - 14);
+
+      return Array.from(byAvaliador.entries())
+        .map(([avaliadorId, { nome, records: recs }]) => {
+          const recent = recs.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff7);
+          const previous = recs.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff14 && new Date(r.dataCuradoria) < cutoff7);
+          const acuraciaGeral = calcAccuracy(recs, "humano", "ambas");
+          const trendRecent = calcAccuracy(recent, "humano", "ambas");
+          const trendPrev = calcAccuracy(previous, "humano", "ambas");
+          return {
+            avaliadorId, avaliadorNome: nome, totalAvaliacoes: recs.length,
+            acuraciaDisplay: calcAccuracy(recs, "humano", "display"),
+            acuraciaCarcaca: calcAccuracy(recs, "humano", "carcaca"),
+            acuraciaGeral, trend: Math.round((trendRecent - trendPrev) * 10) / 10,
+          };
+        })
+        .sort((a, b) => b.acuraciaGeral - a.acuraciaGeral);
+    }
   }
 
-  const now = new Date();
-  const cutoff7 = new Date(now); cutoff7.setDate(cutoff7.getDate() - 7);
-  const cutoff14 = new Date(now); cutoff14.setDate(cutoff14.getDate() - 14);
+  // Fallback: use real API /avaliacoes-ia/detalhes, aggregate by evaluator
+  try {
+    const params: Record<string, string> = {};
+    if (filtros.dataInicio) params.start_date = filtros.dataInicio;
+    if (filtros.dataFim) params.end_date = filtros.dataFim;
 
-  return Array.from(byAvaliador.entries())
-    .map(([avaliadorId, { nome, records: recs }]) => {
-      const recent = recs.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff7);
-      const previous = recs.filter((r) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff14 && new Date(r.dataCuradoria) < cutoff7);
-      const acuraciaGeral = calcAccuracy(recs, "humano", "ambas");
-      const trendRecent = calcAccuracy(recent, "humano", "ambas");
-      const trendPrev = calcAccuracy(previous, "humano", "ambas");
+    const rawPhotos = await fetchAvaliacoesApi("/avaliacoes-ia/detalhes", params) as RawFotoAvaliacao[];
+    const dispositivos = agregarPorDispositivo(rawPhotos);
+
+    // Group by evaluator from raw data (Nota_Humana field contains evaluator info)
+    const byDevice = new Map<string, { gradeIa: string | null; gradeHumano: string | null }[]>();
+    for (const d of dispositivos) {
+      // Use "Avaliador Humano" as a single group since we don't have per-evaluator data in detalhes
+      const key = d.avaliadorHumanoId || "avaliador_padrao";
+      if (!byDevice.has(key)) byDevice.set(key, []);
+      if (d.gradeIaDisplay && d.gradeHumanoDisplay) {
+        byDevice.get(key)!.push({ gradeIa: d.gradeIaDisplay, gradeHumano: d.gradeHumanoDisplay });
+      }
+      if (d.gradeIaCarcaca && d.gradeHumanoCarcaca) {
+        byDevice.get(key)!.push({ gradeIa: d.gradeIaCarcaca, gradeHumano: d.gradeHumanoCarcaca });
+      }
+    }
+
+    return Array.from(byDevice.entries()).map(([avaliadorId, evals]) => {
+      const total = evals.length;
+      const acertos = evals.filter((e) => e.gradeIa === e.gradeHumano).length;
+      const acuraciaGeral = total > 0 ? Math.round((acertos / total) * 1000) / 10 : 0;
       return {
         avaliadorId,
-        avaliadorNome: nome,
-        totalAvaliacoes: recs.length,
-        acuraciaDisplay: calcAccuracy(recs, "humano", "display"),
-        acuraciaCarcaca: calcAccuracy(recs, "humano", "carcaca"),
+        avaliadorNome: avaliadorId === "avaliador_padrao" ? "Avaliador Humano" : avaliadorId,
+        totalAvaliacoes: total,
+        acuraciaDisplay: acuraciaGeral,
+        acuraciaCarcaca: acuraciaGeral,
         acuraciaGeral,
-        trend: Math.round((trendRecent - trendPrev) * 10) / 10,
+        trend: 0,
       };
-    })
-    .sort((a, b) => b.acuraciaGeral - a.acuraciaGeral);
+    }).sort((a, b) => b.acuraciaGeral - a.acuraciaGeral);
+  } catch {
+    return [];
+  }
 }
 
 export async function calcularCustoErro(filtros: AvaliacoesFilters): Promise<CustoErroResult> {
@@ -560,52 +661,63 @@ export async function calcularCustoErro(filtros: AvaliacoesFilters): Promise<Cus
 }
 
 export async function calcularMatrizConfusao(filtros: AvaliacoesFilters): Promise<MatrizConfusaoResult> {
-  if (!db) return { matriz: [], totalAvaliacoes: 0, acuraciaGeral: 0 };
+  // Try curadoria data first
+  if (db) {
+    const conditions = buildDateFilter(filtros);
+    const records = conditions.length > 0
+      ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions)).catch(() => [])
+      : await db.select().from(curadoriaAvaliacoes).catch(() => []);
 
-  const conditions = buildDateFilter(filtros);
-  const records = conditions.length > 0
-    ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
-    : await db.select().from(curadoriaAvaliacoes);
+    if (records.length > 0) {
+      const tipo = filtros.tipo ?? "ia";
+      const area = filtros.area ?? "ambas";
+      const counts = new Map<string, number>();
+      let total = 0;
 
-  const tipo = filtros.tipo ?? "ia";
-  const area = filtros.area ?? "ambas";
+      for (const r of records) {
+        const pares: Array<[Grade | null, Grade | null]> = [];
+        if (area === "display" || area === "ambas") {
+          const atrib = (tipo === "ia" ? r.gradeIaDisplay : r.gradeHumanoDisplay) as Grade | null;
+          const correta = r.gradeCorretaDisplay as Grade | null;
+          if (atrib && correta) pares.push([atrib, correta]);
+        }
+        if (area === "carcaca" || area === "ambas") {
+          const atrib = (tipo === "ia" ? r.gradeIaCarcaca : r.gradeHumanoCarcaca) as Grade | null;
+          const correta = r.gradeCorretaCarcaca as Grade | null;
+          if (atrib && correta) pares.push([atrib, correta]);
+        }
+        for (const [atrib, correta] of pares) {
+          counts.set(`${atrib}|${correta}`, (counts.get(`${atrib}|${correta}`) ?? 0) + 1);
+          total++;
+        }
+      }
 
-  const counts = new Map<string, number>();
-  let total = 0;
-
-  for (const r of records) {
-    const pares: Array<[Grade | null, Grade | null]> = [];
-    if (area === "display" || area === "ambas") {
-      const atrib = (tipo === "ia" ? r.gradeIaDisplay : r.gradeHumanoDisplay) as Grade | null;
-      const correta = r.gradeCorretaDisplay as Grade | null;
-      if (atrib && correta) pares.push([atrib, correta]);
-    }
-    if (area === "carcaca" || area === "ambas") {
-      const atrib = (tipo === "ia" ? r.gradeIaCarcaca : r.gradeHumanoCarcaca) as Grade | null;
-      const correta = r.gradeCorretaCarcaca as Grade | null;
-      if (atrib && correta) pares.push([atrib, correta]);
-    }
-    for (const [atrib, correta] of pares) {
-      const key = `${atrib}|${correta}`;
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-      total++;
+      const grades: Grade[] = ["A", "B", "C"];
+      const matriz: MatrizConfusaoEntry[] = [];
+      for (const atribuido of grades) {
+        for (const correto of grades) {
+          const quantidade = counts.get(`${atribuido}|${correto}`) ?? 0;
+          matriz.push({ atribuido, correto, quantidade, percentual: total > 0 ? Math.round((quantidade / total) * 1000) / 10 : 0 });
+        }
+      }
+      const acertos = grades.reduce((sum, g) => sum + (counts.get(`${g}|${g}`) ?? 0), 0);
+      return { matriz, totalAvaliacoes: total, acuraciaGeral: total > 0 ? Math.round((acertos / total) * 1000) / 10 : 0 };
     }
   }
 
-  const grades: Grade[] = ["A", "B", "C"];
-  const matriz: MatrizConfusaoEntry[] = [];
-  for (const atribuido of grades) {
-    for (const correto of grades) {
-      const key = `${atribuido}|${correto}`;
-      const quantidade = counts.get(key) ?? 0;
-      matriz.push({ atribuido, correto, quantidade, percentual: total > 0 ? Math.round((quantidade / total) * 1000) / 10 : 0 });
-    }
+  // Fallback: build from real API data (IA vs Humano, 3×3 without Grade D)
+  try {
+    const params: Record<string, string> = {};
+    if (filtros.dataInicio) params.start_date = filtros.dataInicio;
+    if (filtros.dataFim) params.end_date = filtros.dataFim;
+    if (filtros.categoria) params.categories = filtros.categoria;
+
+    const rawPhotos = await fetchAvaliacoesApi("/avaliacoes-ia/detalhes", params) as RawFotoAvaliacao[];
+    const dispositivos = agregarPorDispositivo(rawPhotos);
+    return buildMatrizConfusaoFromDevices(dispositivos, filtros.tipo ?? "ia");
+  } catch {
+    return { matriz: [], totalAvaliacoes: 0, acuraciaGeral: 0 };
   }
-
-  const acertos = grades.reduce((sum, g) => sum + (counts.get(`${g}|${g}`) ?? 0), 0);
-  const acuraciaGeral = total > 0 ? Math.round((acertos / total) * 1000) / 10 : 0;
-
-  return { matriz, totalAvaliacoes: total, acuraciaGeral };
 }
 
 // ─── Curadoria DB operations ──────────────────────────────────────────────────
@@ -655,14 +767,28 @@ export async function getCuradoriaPendentes(tenantId?: string | null): Promise<T
     : [];
   const percentual = parseFloat(configs[0]?.percentualAmostragem ?? "15") || 15;
 
-  // Get all trade-ins from yesterday
+  // Get all trade-ins from yesterday via real API proxy
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  yesterday.setHours(0, 0, 0, 0);
-  const todayMidnight = new Date();
-  todayMidnight.setHours(0, 0, 0, 0);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  const { data: all } = await getTradeInsAvaliacoes({ dataInicio: yesterday.toISOString(), dataFim: todayMidnight.toISOString() }, 1, 9999);
+  // Get curated IDs
+  const curados = db ? await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).catch(() => []) : [];
+  const curadosSet = new Set(curados.map((c) => c.tradeInId));
+
+  let all: TradeInAvaliacao[];
+  try {
+    const rawPhotos = await fetchAvaliacoesApi("/avaliacoes-ia/detalhes", {
+      start_date: yesterdayStr,
+      end_date: todayStr,
+    }) as RawFotoAvaliacao[];
+    all = agregarPorDispositivo(rawPhotos, curadosSet);
+  } catch {
+    // Fallback to existing method
+    const result = await getTradeInsAvaliacoes({ dataInicio: yesterdayStr, dataFim: todayStr }, 1, 9999);
+    all = result.data;
+  }
 
   // Exclude already curated
   const notCurated = all.filter((t) => !t.foiCurado);
