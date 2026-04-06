@@ -94,6 +94,7 @@ const EstoquesRastreabilidadePage      = lazy(() => import("@/pages/estoques/ras
 const SQLRunnerPage                    = lazy(() => import("@/pages/dev/sql-runner"));
 const OmieIntegration                  = lazy(() => import("@/pages/integrations/omie/OmieIntegration"));
 const WorkspacePage                    = lazy(() => import("@/pages/workspace/WorkspacePage"));
+const TarefaDetailPage                 = lazy(() => import("@/pages/workspace/TarefaDetailPage"));
 const NovoChamadoPage                  = lazy(() => import("@/pages/chamados/novo"));
 const TicketDetailPage                 = lazy(() => import("@/pages/chamados/[id]"));
 const EstoquesPage                     = lazy(() => import("@/pages/estoques/index"));
@@ -116,6 +117,11 @@ function Router() {
           <WorkspaceErrorBoundary>
             <WorkspacePage />
           </WorkspaceErrorBoundary>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/workspace/tarefas/:id">
+        <ProtectedRoute>
+          <TarefaDetailPage />
         </ProtectedRoute>
       </Route>
       <Route path="/workspace/:tab">
