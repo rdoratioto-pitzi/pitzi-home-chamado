@@ -34,6 +34,29 @@ const EMPTY_MONTH: Omit<DashboardMonth, "label"> = {
 export const MONTH_KEYS = ["mar-2026", "abr-2026", "mai-2026", "jun-2026"] as const;
 export type MonthKey = (typeof MONTH_KEYS)[number];
 
+// Mapeamento periodo API (YYYY-MM) <-> MonthKey (mmm-yyyy)
+const PERIODO_TO_KEY: Record<string, MonthKey> = {
+  "2026-03": "mar-2026",
+  "2026-04": "abr-2026",
+  "2026-05": "mai-2026",
+  "2026-06": "jun-2026",
+};
+
+const KEY_TO_PERIODO: Record<MonthKey, string> = {
+  "mar-2026": "2026-03",
+  "abr-2026": "2026-04",
+  "mai-2026": "2026-05",
+  "jun-2026": "2026-06",
+};
+
+export function monthKeyToPeriodo(key: MonthKey): string {
+  return KEY_TO_PERIODO[key];
+}
+
+export function periodoToMonthKey(periodo: string): MonthKey | undefined {
+  return PERIODO_TO_KEY[periodo];
+}
+
 export const INITIAL_DASHBOARD_DATA: Record<MonthKey, DashboardMonth> = {
   "mar-2026": {
     label: "Mar 2026",
