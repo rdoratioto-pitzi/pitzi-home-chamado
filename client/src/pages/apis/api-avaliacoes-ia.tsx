@@ -28,11 +28,14 @@ import {
   Calendar,
   Smartphone,
   Camera,
+  Hash,
+  ArrowRight,
 } from "lucide-react";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE_URL = "/api"; // Use relative path like other API pages
-const POSTMAN_DOC_URL = "https://documenter.getpostman.com/view/49982216/2sBXcHgy9E";
+const POSTMAN_DOC_URL = "https://documenter.getpostman.com/view/49982216/2sBXiqG9or";
 
 interface ApiResponse {
   data?: any;
@@ -203,13 +206,20 @@ export default function ApiAvaliacoesIaPage() {
       path: "/avaliacoes-ia/assertividade-fotos",
       icon: Camera,
     },
+    {
+      id: "imei",
+      name: "Busca por IMEI",
+      description: "Busca avaliações por IMEI específico, retornando todas as avaliações associadas ao dispositivo.",
+      path: "/avaliacoes-ia/imei",
+      icon: Hash,
+    },
   ];
 
   return (
     <div className="flex flex-col min-h-full">
-      <PageHeader 
-        title="API - Avaliações IA" 
-        description="API para consulta de dados de eficiência e assertividade da Inteligência Artificial nas avaliações estéticas de dispositivos."
+      <PageHeader
+        title="API - Avaliações IA"
+        description="Integração com a API de Avaliações de IA (Lapisco) do Dashboard Renov"
         breadcrumbs={[
           { label: "Integrações", href: "/apis" },
           { label: "Avaliações IA" }
@@ -217,16 +227,25 @@ export default function ApiAvaliacoesIaPage() {
       />
 
       <main className="flex-1 p-6 space-y-6">
-        {/* Documentação Postman */}
-        <div className="flex justify-end">
-          <a 
-            href={POSTMAN_DOC_URL} 
-            target="_blank" 
+        {/* Header com Status + Postman + URL Base */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
+              Ativo
+            </Badge>
+            <span className="text-xs text-muted-foreground font-mono">
+              URL Base: https://dash.renovsmart.com.br/api/avaliacoes-ia/
+            </span>
+          </div>
+          <a
+            href={POSTMAN_DOC_URL}
+            target="_blank"
             rel="noopener noreferrer"
           >
             <Button variant="outline" size="sm">
               <SiPostman className="w-4 h-4 mr-2" />
               Documentação Postman
+              <ExternalLink className="w-3 h-3 ml-2" />
             </Button>
           </a>
         </div>
@@ -413,6 +432,20 @@ export default function ApiAvaliacoesIaPage() {
           </Card>
         )}
 
+        {/* Card Informativo */}
+        <Alert className="border-blue-500/30 bg-blue-500/5">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertTitle className="text-sm font-medium">Informações sobre esta API</AlertTitle>
+          <AlertDescription className="text-sm text-muted-foreground space-y-1 mt-1">
+            <p>Esta API é consumida pelo módulo <strong>Operações &gt; Avaliações</strong>.</p>
+            <p>Dados são normalizados automaticamente: <strong>Grade D &rarr; Grade C</strong> (POP 101 V3).</p>
+            <p>Granularidade da API: por foto. O módulo Avaliações agrega por dispositivo.</p>
+            <Link href="/avaliacoes/dashboard" className="inline-flex items-center gap-1 text-primary hover:underline mt-1">
+              Ver Dashboard de Avaliações <ArrowRight className="w-3 h-3" />
+            </Link>
+          </AlertDescription>
+        </Alert>
+
         {/* Documentação dos Endpoints */}
         <Card className="shadow-sm border-border/60">
           <CardHeader>
@@ -423,12 +456,15 @@ export default function ApiAvaliacoesIaPage() {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8">
                 <TabsTrigger value="resumo">Resumo</TabsTrigger>
                 <TabsTrigger value="evolucao">Evolução</TabsTrigger>
-                <TabsTrigger value="evolucao-categoria">Evol. Categoria</TabsTrigger>
+                <TabsTrigger value="evolucao-categoria">Evol. Categ.</TabsTrigger>
                 <TabsTrigger value="dispositivos">Dispositivos</TabsTrigger>
                 <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
+                <TabsTrigger value="categorias">Categorias</TabsTrigger>
+                <TabsTrigger value="assertividade-fotos">Fotos</TabsTrigger>
+                <TabsTrigger value="imei">IMEI</TabsTrigger>
               </TabsList>
 
               <TabsContent value="resumo" className="mt-4">
@@ -832,6 +868,62 @@ export default function ApiAvaliacoesIaPage() {
     "Acertos_Ambos_Sem_Dano": 340,
     "Total_Acertos": 430,
     "Percentual_Assertividade": 89.6
+  }
+]`}
+                    </pre>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="imei" className="mt-4">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold mb-2">GET /api/avaliacoes-ia/imei</h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Busca avaliações por IMEI específico, retornando todas as avaliações associadas ao dispositivo.
+                    </p>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h4 className="font-semibold mb-2">Parâmetros de Query</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="grid grid-cols-3 gap-2 font-mono text-xs bg-muted p-2 rounded">
+                        <span className="font-bold">Parâmetro</span>
+                        <span className="font-bold">Tipo</span>
+                        <span className="font-bold">Descrição</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>imei</span>
+                        <span>string</span>
+                        <span>IMEI do dispositivo (obrigatório)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>start_date</span>
+                        <span>string</span>
+                        <span>Data inicial (YYYY-MM-DD)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <span>end_date</span>
+                        <span>string</span>
+                        <span>Data final (YYYY-MM-DD)</span>
+                      </div>
+                    </div>
+                  </div>
+                  <Separator />
+                  <div>
+                    <h4 className="font-semibold mb-2">Exemplo de Resposta</h4>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">
+{`[
+  {
+    "Imei": "123456789012345",
+    "DeviceDescription": "iPhone 13",
+    "Grade_Humano": "B",
+    "Grade_IA": "B",
+    "Status_Assertividade": "ACERTOU",
+    "Is_Match": 1,
+    "Data_Avaliacao": "2024-03-10T14:22:00Z",
+    "Categoria": "Smartphone",
+    "Link_Fotos": "https://app.renovsmart.com.br/..."
   }
 ]`}
                     </pre>
