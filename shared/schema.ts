@@ -1714,6 +1714,11 @@ export const comercialKpis = pgTable("comercial_kpis", {
   pisPct: decimal("pis_pct", { precision: 5, scale: 2 }).notNull().default("0.65"),
   cofinsPct: decimal("cofins_pct", { precision: 5, scale: 2 }).notNull().default("3.00"),
   frete: decimal("frete", { precision: 10, scale: 2 }).notNull().default("36.01"),
+  faturamentoTotal: decimal("faturamento_total", { precision: 14, scale: 2 }).notNull().default("0"),
+  cmcTotal: decimal("cmc_total", { precision: 14, scale: 2 }).notNull().default("0"),
+  freteTotal: decimal("frete_total", { precision: 14, scale: 2 }).notNull().default("0"),
+  cpdMedio: decimal("cpd_medio", { precision: 12, scale: 2 }).notNull().default("0"),
+  markup: decimal("markup", { precision: 8, scale: 4 }).notNull().default("0"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
