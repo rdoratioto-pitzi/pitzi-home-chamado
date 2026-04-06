@@ -50,6 +50,7 @@ import {
   AlertTriangle,
   ScanEye,
   Filter,
+  TrendingUp,
 } from "lucide-react";
 import {
   Sidebar,
@@ -191,6 +192,10 @@ const estoquesSubItems = [
   { title: "Rastreabilidade", url: "/estoques/rastreabilidade", icon: Search },
 ];
 
+const comercialSubItems = [
+  { title: "Simulador CPD", url: "/comercial/simulador", icon: Calculator },
+];
+
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { theme } = useTheme();
@@ -214,6 +219,7 @@ export function AppSidebar() {
   const [pricingOpen, setPricingOpen] = useState(location.startsWith("/pricing"));
   const [bibliotecaOpen, setBibliotecaOpen] = useState(location.startsWith("/biblioteca"));
   const [estoquesOpen, setEstoquesOpen] = useState(location.startsWith("/estoques"));
+  const [comercialOpen, setComercialOpen] = useState(location.startsWith("/comercial"));
   const [operacoesOpen, setOperacoesOpen] = useState(
     location.startsWith("/estoques") ||
     location.startsWith("/logistica") ||
@@ -226,6 +232,7 @@ export function AppSidebar() {
 
   useEffect(() => {
     if (location.startsWith("/estoques")) setEstoquesOpen(true);
+    if (location.startsWith("/comercial")) setComercialOpen(true);
     if (location.startsWith("/avaliacoes")) setAvaliacoesOpen(true);
     if (location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/pricing") || location.startsWith("/avaliacoes")) setOperacoesOpen(true);
     if (location.startsWith("/logistica/dispositivos") || location.startsWith("/logistica/coletas") || location.startsWith("/logistica/consulta") || location.startsWith("/logistica/fechamentos")) setLogisticaDashboardOpen(true);
@@ -244,6 +251,7 @@ export function AppSidebar() {
   const isPricingActive = location.startsWith("/pricing");
   const isBibliotecaActive = location.startsWith("/biblioteca");
   const isEstoquesActive = location.startsWith("/estoques");
+  const isComercialActive = location.startsWith("/comercial");
   const isAvaliacoesActive = location.startsWith("/avaliacoes");
   const isOperacoesActive = location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/avaliacoes");
 
@@ -265,6 +273,7 @@ export function AppSidebar() {
           configuracoes: true,
           estoques: true,
           avaliacoes: true,
+          comercial: true,
         };
       }
       if (currentUser?.modulePermissions) {
@@ -290,6 +299,7 @@ export function AppSidebar() {
       configuracoes: false,
       estoques: false,
       avaliacoes: false,
+      comercial: false,
     };
   }, [currentUser]);
 
@@ -316,6 +326,7 @@ export function AppSidebar() {
   const hasEstoquesPermission = permissions.estoques === true;
   const isInEstoquesPage = location.startsWith("/estoques");
   const hasEstoquesAccess = currentUser?.isAdmin || hasEstoquesPermission || isInEstoquesPage;
+  const hasComercialAccess = permissions.comercial === true;
   const hasAvaliacoesAccess = permissions.avaliacoes === true;
   const hasOperacoesAccess = hasEstoquesAccess || hasLogisticaAccess || hasTriagemAccess || hasAvaliacoesAccess;
 
@@ -758,6 +769,45 @@ export function AppSidebar() {
                             <SidebarMenuSubItem key={subItem.url}>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[12px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {hasComercialAccess && (
+                <Collapsible open={comercialOpen} onOpenChange={setComercialOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        className="h-9 px-3"
+                        isActive={isComercialActive}
+                        data-testid="link-comercial"
+                      >
+                        <TrendingUp className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Comercial</span>
+                        {comercialOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                        {comercialSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-comercial-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
                                 </Link>

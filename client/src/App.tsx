@@ -98,6 +98,7 @@ const TarefaDetailPage                 = lazy(() => import("@/pages/workspace/Ta
 const NovoChamadoPage                  = lazy(() => import("@/pages/chamados/novo"));
 const TicketDetailPage                 = lazy(() => import("@/pages/chamados/[id]"));
 const EstoquesPage                     = lazy(() => import("@/pages/estoques/index"));
+const ComercialSimuladorPage           = lazy(() => import("@/pages/comercial/simulador"));
 
 function Router() {
   return (
@@ -400,6 +401,11 @@ function Router() {
       <Route path="/pricing/dashboard">
         <ProtectedRoute requiredPermission="pricing">
           <PricingDashboardPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/comercial/simulador">
+        <ProtectedRoute requiredPermission="comercial">
+          <ComercialSimuladorPage />
         </ProtectedRoute>
       </Route>
       <Route path="/biblioteca">
