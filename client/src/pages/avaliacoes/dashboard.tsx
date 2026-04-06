@@ -11,13 +11,16 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
 import { AccuracyKpiStrip } from "@/components/avaliacoes/accuracy-kpi-strip";
 import { AccuracyTrendChart } from "@/components/avaliacoes/accuracy-trend-chart";
 import { EvaluatorRanking } from "@/components/avaliacoes/evaluator-ranking";
 import { CostImpactCard } from "@/components/avaliacoes/cost-impact-card";
 import { DashboardFilters } from "@/components/avaliacoes/dashboard-filters";
-import { useAvaliacoesResumo } from "@/hooks/use-avaliacoes";
-import { ArrowUpRight, ArrowDownRight, GitCompare } from "lucide-react";
+import { useAvaliacoesResumo, useAssertividadeFotos } from "@/hooks/use-avaliacoes";
+import { ArrowUpRight, ArrowDownRight, GitCompare, Camera } from "lucide-react";
 import type { AvaliacoesFilters } from "@/hooks/use-avaliacoes";
 
 // ─── Card de Divergências ─────────────────────────────────────────────────────
@@ -92,6 +95,87 @@ function DivergenciasCard({ percentualDivergencias, trend, isLoading }: Divergen
   );
 }
 
+// ─── Assertividade por Tipo de Foto ──────────────────────────────────────────
+
+function AssertividadeFotosSection({ filtros }: { filtros: AvaliacoesFilters }) {
+  const { data: fotosData, isLoading } = useAssertividadeFotos(filtros);
+
+  // Aggregate by photo type (sum across months)
+  const aggregated = (fotosData ?? []).reduce<Record<string, { total: number; acertos: number }>>((acc, item) => {
+    const nome = item.Nome_da_Tela || "Desconhecido";
+    if (!acc[nome]) acc[nome] = { total: 0, acertos: 0 };
+    acc[nome].total += item.Total_Fotos;
+    acc[nome].acertos += item.Acertos;
+    return acc;
+  }, {});
+
+  const rows = Object.entries(aggregated)
+    .map(([nome, { total, acertos }]) => ({
+      nome,
+      total,
+      acertos,
+      assertividade: total > 0 ? Math.round((acertos / total) * 1000) / 10 : 0,
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  if (isLoading) {
+    return (
+      <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
+        <CardHeader>
+          <Skeleton className="h-5 w-48" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-32 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (rows.length === 0) return null;
+
+  return (
+    <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 gap-2">
+        <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
+          Assertividade por Tipo de Foto
+        </CardTitle>
+        <Camera className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs text-muted-foreground mb-3">
+          Em qual ângulo/tipo de foto a IA tem mais dificuldade (dados por foto, não por dispositivo)
+        </p>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Tipo de Foto</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Acertos</TableHead>
+                <TableHead className="text-right">Assertividade</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.nome}>
+                  <TableCell className="font-medium">{row.nome}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.total.toLocaleString("pt-BR")}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.acertos.toLocaleString("pt-BR")}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    <span className={row.assertividade >= 80 ? "text-emerald-500" : row.assertividade >= 60 ? "text-yellow-500" : "text-red-500"}>
+                      {row.assertividade.toFixed(1)}%
+                    </span>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AvaliacoesDashboardPage() {
@@ -145,6 +229,9 @@ export default function AvaliacoesDashboardPage() {
           <EvaluatorRanking filtros={filters} />
           <CostImpactCard filtros={filters} />
         </div>
+
+        {/* Assertividade por Tipo de Foto (dados da API proxy) */}
+        <AssertividadeFotosSection filtros={filters} />
 
       </div>
     </div>
