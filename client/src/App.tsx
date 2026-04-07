@@ -274,9 +274,7 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/logistica/avaliacoes-ia">
-        <ProtectedRoute requiredPermission="logistica">
-          <EficienciaAvaliacoesIaPage />
-        </ProtectedRoute>
+        <Redirect to="/avaliacoes/dashboard" />
       </Route>
       <Route path="/triagem/impressao-etiquetas">
         <ProtectedRoute requiredPermission="triagem">
