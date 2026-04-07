@@ -1,9 +1,13 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbList,
   BreadcrumbPage, BreadcrumbSeparator,
@@ -16,16 +20,21 @@ import { EvaluatorRanking } from "@/components/avaliacoes/evaluator-ranking";
 import { CostImpactCard } from "@/components/avaliacoes/cost-impact-card";
 import { DashboardFilters } from "@/components/avaliacoes/dashboard-filters";
 import {
-  useAvaliacoesResumo, useResumoIA, useEvolucaoIA, useDispositivosIA,
-  useCategoriasIA, useAssertividadeFotos,
+  useAvaliacoesResumo,
+  useResumoIA,
+  useEvolucaoIA,
+  useDispositivosIA,
+  useCategoriasIA,
+  useAssertividadeFotos,
+  useEvolucaoCategoriaIA,
+  useImeiIA,
 } from "@/hooks/use-avaliacoes";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { format, parseISO } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import {
   BarChart2, CheckCircle2, XCircle, Camera, TrendingUp, Bot,
+  Search, TrendingDown, Loader2,
 } from "lucide-react";
 import type { AvaliacoesFilters } from "@/hooks/use-avaliacoes";
 
@@ -179,7 +188,7 @@ function AssertividadePorGradeCard({ resumoIA, isLoading }: { resumoIA: Array<{ 
         <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
           Assertividade por Grade
         </CardTitle>
-        <CardDescription className="text-xs">Precisão da IA em cada faixa de qualidade</CardDescription>
+        <CardDescription className="text-xs">Precisão da IA em cada faixa de qualidade (Grade D consolidada em C)</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -212,19 +221,27 @@ function AssertividadePorGradeCard({ resumoIA, isLoading }: { resumoIA: Array<{ 
   );
 }
 
-// ─── Top Dispositivos (proxy) ─────────────────────────────────────────────────
+// ─── Top 10 Melhor Assertividade ─────────────────────────────────────────────
 
-function TopDispositivosCard({ filtros }: { filtros: AvaliacoesFilters }) {
+function Top10MelhorCard({ filtros }: { filtros: AvaliacoesFilters }) {
   const { data, isLoading } = useDispositivosIA(filtros);
-  const top10 = useMemo(() => (data ?? []).slice(0, 10), [data]);
+
+  const top10 = useMemo(() =>
+    [...(data ?? [])]
+      .filter((d) => d.Total_Avaliados >= 5)
+      .sort((a, b) => b.Acuracia - a.Acuracia)
+      .slice(0, 10),
+    [data]
+  );
 
   return (
     <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
-      <CardHeader>
-        <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
-          Top Dispositivos
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--l1)" }}>
+          <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+          Top 10 — Melhor Assertividade
         </CardTitle>
-        <CardDescription className="text-xs">Modelos com maior volume de avaliações</CardDescription>
+        <CardDescription className="text-xs">Modelos com maior precisão da IA (mín. 5 avaliações)</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -234,17 +251,77 @@ function TopDispositivosCard({ filtros }: { filtros: AvaliacoesFilters }) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="text-xs">#</TableHead>
                   <TableHead className="text-xs">Dispositivo</TableHead>
                   <TableHead className="text-right text-xs">Total</TableHead>
                   <TableHead className="text-right text-xs">Assert.</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {top10.map((d) => (
+                {top10.map((d, idx) => (
                   <TableRow key={d.Dispositivo}>
-                    <TableCell className="text-xs font-medium truncate max-w-[180px]">{d.Dispositivo}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="text-xs font-medium truncate max-w-[160px]">{d.Dispositivo}</TableCell>
                     <TableCell className="text-right text-xs tabular-nums">{d.Total_Avaliados.toLocaleString("pt-BR")}</TableCell>
-                    <TableCell className={`text-right text-xs tabular-nums font-semibold ${d.Acuracia >= 60 ? "text-emerald-400" : d.Acuracia >= 30 ? "text-yellow-400" : "text-red-400"}`}>
+                    <TableCell className="text-right text-xs tabular-nums font-semibold text-emerald-400">
+                      {d.Acuracia.toFixed(1)}%
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">Nenhum dado para o período.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Top 10 Maior Taxa de Erro ────────────────────────────────────────────────
+
+function Top10PiorCard({ filtros }: { filtros: AvaliacoesFilters }) {
+  const { data, isLoading } = useDispositivosIA(filtros);
+
+  const top10 = useMemo(() =>
+    [...(data ?? [])]
+      .filter((d) => d.Total_Avaliados >= 5)
+      .sort((a, b) => a.Acuracia - b.Acuracia)
+      .slice(0, 10),
+    [data]
+  );
+
+  return (
+    <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2" style={{ color: "var(--l1)" }}>
+          <TrendingDown className="h-4 w-4 text-red-400" />
+          Top 10 — Maior Taxa de Erro
+        </CardTitle>
+        <CardDescription className="text-xs">Modelos onde a IA mais erra (mín. 5 avaliações)</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-6 w-full" />)}</div>
+        ) : top10.length > 0 ? (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">#</TableHead>
+                  <TableHead className="text-xs">Dispositivo</TableHead>
+                  <TableHead className="text-right text-xs">Total</TableHead>
+                  <TableHead className="text-right text-xs">Assert.</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {top10.map((d, idx) => (
+                  <TableRow key={d.Dispositivo}>
+                    <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="text-xs font-medium truncate max-w-[160px]">{d.Dispositivo}</TableCell>
+                    <TableCell className="text-right text-xs tabular-nums">{d.Total_Avaliados.toLocaleString("pt-BR")}</TableCell>
+                    <TableCell className="text-right text-xs tabular-nums font-semibold text-red-400">
                       {d.Acuracia.toFixed(1)}%
                     </TableCell>
                   </TableRow>
@@ -269,7 +346,7 @@ function CategoriaCard({ filtros }: { filtros: AvaliacoesFilters }) {
     <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
       <CardHeader>
         <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
-          Taxa por Categoria
+          Taxa de Acerto por Categoria
         </CardTitle>
         <CardDescription className="text-xs">Assertividade da IA por tipo de dispositivo</CardDescription>
       </CardHeader>
@@ -300,6 +377,83 @@ function CategoriaCard({ filtros }: { filtros: AvaliacoesFilters }) {
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">Nenhum dado para o período.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Evolução por Categoria (últimos 3 meses) ─────────────────────────────────
+
+function EvolucaoCategoriaCard({ filtros }: { filtros: AvaliacoesFilters }) {
+  const { data, isLoading } = useEvolucaoCategoriaIA(filtros);
+
+  const { pivot, sortedMonths, sortedCategories } = useMemo(() => {
+    const p: Record<string, Record<string, number>> = {};
+    const months = new Set<string>();
+    const categories = new Set<string>();
+
+    (data ?? []).forEach((item) => {
+      if (!p[item.Categoria]) p[item.Categoria] = {};
+      p[item.Categoria][item.Mes] = item.Acuracia_Mensal;
+      months.add(item.Mes);
+      categories.add(item.Categoria);
+    });
+
+    const sm = Array.from(months).sort().reverse().slice(0, 3).reverse();
+    const sc = Array.from(categories).sort();
+    return { pivot: p, sortedMonths: sm, sortedCategories: sc };
+  }, [data]);
+
+  if (!isLoading && sortedCategories.length === 0) return null;
+
+  return (
+    <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
+      <CardHeader>
+        <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
+          Evolução por Categoria (últimos 3 meses)
+        </CardTitle>
+        <CardDescription className="text-xs">Tendência de assertividade por tipo de dispositivo</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-32 w-full" />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">Categoria</TableHead>
+                  {sortedMonths.map((m) => (
+                    <TableHead key={m} className="text-right text-xs">
+                      {(() => { try { return format(parseISO(`${m.slice(0, 7)}-01`), "MMM/yy", { locale: ptBR }); } catch { return m; } })()}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedCategories.map((cat) => (
+                  <TableRow key={cat}>
+                    <TableCell className="text-xs font-medium">{cat}</TableCell>
+                    {sortedMonths.map((m) => {
+                      const val = pivot[cat]?.[m];
+                      return (
+                        <TableCell key={m} className="text-right text-xs tabular-nums">
+                          {val != null ? (
+                            <span className={val >= 60 ? "text-emerald-400" : val >= 30 ? "text-yellow-400" : "text-red-400"}>
+                              {val.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -375,6 +529,101 @@ function AssertividadeFotosSection({ filtros }: { filtros: AvaliacoesFilters }) 
   );
 }
 
+// ─── Busca por IMEI ───────────────────────────────────────────────────────────
+
+function ImeiSearchSection({ filtros }: { filtros: AvaliacoesFilters }) {
+  const [imeiInput, setImeiInput] = useState("");
+  const [imeiFilter, setImeiFilter] = useState("");
+  const [imeiEnabled, setImeiEnabled] = useState(false);
+
+  const limitDate = filtros.dataFim ?? new Date().toISOString().slice(0, 10);
+  const { data: imeiData, isLoading: imeiLoading } = useImeiIA(limitDate, imeiEnabled);
+
+  const filteredImei = useMemo(() => {
+    if (!imeiFilter || !imeiData) return [];
+    const q = imeiFilter.toLowerCase();
+    return imeiData.filter((item) => item.Imei.toLowerCase().includes(q));
+  }, [imeiData, imeiFilter]);
+
+  function handleSearch() {
+    if (!imeiInput.trim()) return;
+    setImeiEnabled(true);
+    setImeiFilter(imeiInput.trim());
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") handleSearch();
+  }
+
+  return (
+    <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 gap-2">
+        <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
+          Busca por IMEI
+        </CardTitle>
+        <Search className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex gap-2">
+          <Input
+            placeholder="Digite o IMEI..."
+            value={imeiInput}
+            onChange={(e) => setImeiInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="max-w-xs"
+            style={{ background: "var(--bg3)", borderColor: "var(--sep)", color: "var(--l1)" }}
+          />
+          <Button variant="default" size="sm" onClick={handleSearch} disabled={imeiLoading}>
+            {imeiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            <span className="ml-1">Buscar</span>
+          </Button>
+        </div>
+
+        {imeiEnabled && !imeiLoading && imeiFilter && filteredImei.length === 0 && (
+          <p className="text-xs text-muted-foreground">Nenhum resultado para "{imeiFilter}".</p>
+        )}
+
+        {filteredImei.length > 0 && (
+          <div className="overflow-x-auto">
+            <p className="text-xs text-muted-foreground mb-2">{filteredImei.length} registro(s) encontrado(s)</p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="text-xs">IMEI</TableHead>
+                  <TableHead className="text-xs">Voucher</TableHead>
+                  <TableHead className="text-xs">Data Pedido</TableHead>
+                  <TableHead className="text-xs">Captura</TableHead>
+                  <TableHead className="text-xs">Nota IA</TableHead>
+                  <TableHead className="text-xs">Nota Humana</TableHead>
+                  <TableHead className="text-xs">Tags IA</TableHead>
+                  <TableHead className="text-xs">Tags Humana</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredImei.slice(0, 50).map((item, idx) => (
+                  <TableRow key={`${item.Imei}-${idx}`}>
+                    <TableCell className="text-xs font-mono">{item.Imei}</TableCell>
+                    <TableCell className="text-xs">{item.Codigo_Voucher || "—"}</TableCell>
+                    <TableCell className="text-xs">{item.Criacao_Pedido ? item.Criacao_Pedido.slice(0, 10) : "—"}</TableCell>
+                    <TableCell className="text-xs max-w-[120px] truncate">{item.Descricao_Captura || "—"}</TableCell>
+                    <TableCell className="text-xs">{item.Nota_IA || "—"}</TableCell>
+                    <TableCell className="text-xs">{item.Nota_Humana || "—"}</TableCell>
+                    <TableCell className="text-xs max-w-[120px] truncate">{item.Tags_IA || "—"}</TableCell>
+                    <TableCell className="text-xs max-w-[120px] truncate">{item.Tags_Humana || "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {filteredImei.length > 50 && (
+              <p className="text-xs text-muted-foreground mt-2">Mostrando 50 de {filteredImei.length} resultados.</p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AvaliacoesDashboardPage() {
@@ -386,7 +635,10 @@ export default function AvaliacoesDashboardPage() {
 
   // Processar resumo: mesclar Grade D→C, calcular totais
   const resumoProcessado = useMemo(() => {
-    if (!resumoIAData) return { total: 0, acertos: 0, erros: 0, assertividade: 0, porGrade: [] as Array<{ grade: string; acertos: number; total: number; assertividade: number }> };
+    if (!resumoIAData) return {
+      total: 0, acertos: 0, erros: 0, assertividade: 0,
+      porGrade: [] as Array<{ grade: string; acertos: number; total: number; assertividade: number }>,
+    };
 
     const gradeMap = new Map<string, { acertos: number; total: number }>();
     let totalGeral = 0, acertosGeral = 0;
@@ -435,68 +687,110 @@ export default function AvaliacoesDashboardPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* Filtros */}
-        <DashboardFilters filters={filters} onChange={setFilters} />
-
-        {/* ── KPIs da API RenovSmart (dados reais) ── */}
-        <ProxyKpiStrip
-          total={resumoProcessado.total}
-          acertos={resumoProcessado.acertos}
-          erros={resumoProcessado.erros}
-          assertividade={resumoProcessado.assertividade}
-          isLoading={resumoIALoading}
-        />
-
-        {/* ── Evolução da Assertividade (dados reais) ── */}
-        <ProxyEvolutionChart filtros={filters} />
-
-        {/* ── Breakdown: Grade + Dispositivos + Categorias ── */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <AssertividadePorGradeCard resumoIA={resumoProcessado.porGrade} isLoading={resumoIALoading} />
-          <TopDispositivosCard filtros={filters} />
-          <CategoriaCard filtros={filters} />
-        </div>
-
-        {/* ── Assertividade por tipo de foto (proxy) ── */}
-        <AssertividadeFotosSection filtros={filters} />
-
-        {/* ── Métricas de Curadoria (DB local) ── */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold" style={{ color: "var(--l1)" }}>
+        {/* Tabs principais */}
+        <Tabs defaultValue="visao-geral" className="space-y-6">
+          <TabsList className="h-9">
+            <TabsTrigger value="visao-geral" className="text-xs sm:text-sm">
+              Visão Geral
+            </TabsTrigger>
+            <TabsTrigger value="curadoria" className="text-xs sm:text-sm">
               Métricas de Curadoria
-            </h2>
-            <Button variant="outline" size="sm" onClick={() => navigate("/avaliacoes/curadoria")}>
-              Acessar Curadoria
-            </Button>
-          </div>
+            </TabsTrigger>
+          </TabsList>
 
-          {!temCuradoria && !curadoriaLoading ? (
-            <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
-              <CardContent className="py-10 text-center">
-                <p className="text-muted-foreground text-sm">
-                  Inicie a curadoria para ver métricas de acurácia IA vs avaliador humano, custo do erro e evolução histórica.
-                </p>
-                <Button
-                  variant="default"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => navigate("/avaliacoes/curadoria")}
-                >
-                  Iniciar Curadoria
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              <AccuracyTrendChart filtros={filters} />
-              <div className="grid gap-4 md:grid-cols-2">
-                <EvaluatorRanking filtros={filters} />
-                <CostImpactCard filtros={filters} />
+          {/* ── Aba 1: Visão Geral ────────────────────────────────────────── */}
+          <TabsContent value="visao-geral" className="space-y-6 mt-0">
+
+            {/* Filtros */}
+            <DashboardFilters filters={filters} onChange={setFilters} />
+
+            {/* KPIs da API RenovSmart */}
+            <ProxyKpiStrip
+              total={resumoProcessado.total}
+              acertos={resumoProcessado.acertos}
+              erros={resumoProcessado.erros}
+              assertividade={resumoProcessado.assertividade}
+              isLoading={resumoIALoading}
+            />
+
+            {/* Gráfico evolução + Grade breakdown */}
+            <div className="grid gap-4 lg:grid-cols-5">
+              <div className="lg:col-span-3">
+                <ProxyEvolutionChart filtros={filters} />
               </div>
-            </>
-          )}
-        </div>
+              <div className="lg:col-span-2">
+                <AssertividadePorGradeCard resumoIA={resumoProcessado.porGrade} isLoading={resumoIALoading} />
+              </div>
+            </div>
+
+            {/* Top 10 Melhor + Top 10 Pior */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <Top10MelhorCard filtros={filters} />
+              <Top10PiorCard filtros={filters} />
+            </div>
+
+            {/* Taxa por Categoria + Evolução por Categoria */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <CategoriaCard filtros={filters} />
+              <EvolucaoCategoriaCard filtros={filters} />
+            </div>
+
+            {/* Assertividade por tipo de foto */}
+            <AssertividadeFotosSection filtros={filters} />
+
+            {/* Busca por IMEI */}
+            <ImeiSearchSection filtros={filters} />
+
+          </TabsContent>
+
+          {/* ── Aba 2: Métricas de Curadoria ─────────────────────────────── */}
+          <TabsContent value="curadoria" className="space-y-6 mt-0">
+
+            {/* Filtros compartilhados */}
+            <DashboardFilters filters={filters} onChange={setFilters} />
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold" style={{ color: "var(--l1)" }}>
+                  Métricas de Curadoria
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Acurácia IA vs avaliador humano, ranking e impacto financeiro
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate("/avaliacoes/curadoria")}>
+                Acessar Curadoria
+              </Button>
+            </div>
+
+            {!temCuradoria && !curadoriaLoading ? (
+              <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
+                <CardContent className="py-10 text-center">
+                  <p className="text-muted-foreground text-sm">
+                    Inicie a curadoria para ver métricas de acurácia IA vs avaliador humano, custo do erro e evolução histórica.
+                  </p>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => navigate("/avaliacoes/curadoria")}
+                  >
+                    Iniciar Curadoria
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <AccuracyTrendChart filtros={filters} />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <EvaluatorRanking filtros={filters} />
+                  <CostImpactCard filtros={filters} />
+                </div>
+              </>
+            )}
+
+          </TabsContent>
+        </Tabs>
 
       </div>
     </div>
