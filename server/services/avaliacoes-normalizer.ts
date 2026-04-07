@@ -75,7 +75,7 @@ export interface RawFotoAvaliacao {
   Nota_Humana?: string;
   Descricao_Captura?: string;
   Nome_da_Tela?: string;
-  Link_Fotos?: string;
+  Link_Fotos?: string | boolean;
   Codigo_Voucher?: string;
   Criacao_Pedido?: string;
   Tags_IA?: string | null;
@@ -115,7 +115,7 @@ export function agregarPorDispositivo(
         modelo: foto.Modelo || foto.Categoria || "",
         categoria: foto.Categoria || "smartphone",
         dataTradeIn: foto.Data_Avaliacao || foto.Criacao_Pedido || new Date().toISOString(),
-        linkFotos: foto.Link_Fotos || null,
+        linkFotos: typeof foto.Link_Fotos === 'string' && foto.Link_Fotos ? foto.Link_Fotos : null,
         gradesIa: [],
         gradesHumano: [],
       });
@@ -125,8 +125,9 @@ export function agregarPorDispositivo(
     device.gradesIa.push(gradeIa);
     device.gradesHumano.push(gradeHumano);
     // Preserve the most recent link if multiple records exist for same IMEI
-    if (foto.Link_Fotos && !device.linkFotos) {
-      device.linkFotos = foto.Link_Fotos;
+    const linkFotosValido = typeof foto.Link_Fotos === 'string' && foto.Link_Fotos ? foto.Link_Fotos : null;
+    if (linkFotosValido && !device.linkFotos) {
+      device.linkFotos = linkFotosValido;
     }
   }
 
