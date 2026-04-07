@@ -25,7 +25,7 @@ const DISPLAY_PATTERNS = [
 ];
 
 const CARCACA_PATTERNS = [
-  "traseira", "lateral", "superior", "inferior",
+  "traseira", "lateral", "superior", "inferior", "parte",
   "back", "rear", "side", "top", "bottom",
 ];
 
@@ -65,9 +65,11 @@ function worstGrade(grades: (Grade | null)[]): Grade | null {
 // ─── Interfaces for raw API data ─────────────────────────────────────────────
 
 export interface RawFotoAvaliacao {
+  // Common fields
   Imei: string;
   Categoria?: string;
   Modelo?: string;
+  // Old field names (from /detalhes endpoint)
   Data_Avaliacao?: string;
   Grade_IA?: string;
   Grade_Humano?: string;
@@ -82,6 +84,15 @@ export interface RawFotoAvaliacao {
   Tags_Humana?: string | null;
   Is_Match?: number;
   Status_Assertividade?: string;
+  // New field names (from /imei endpoint, with accents/spaces)
+  "Nota IA"?: string;
+  "Nota Humana"?: string;
+  "Descrição Captura"?: string;
+  "Url Captura"?: string;
+  "Código Voucher"?: string;
+  "Criação Pedido"?: string;
+  "Tags IA"?: string | null;
+  "Tags Humana"?: string | null;
 }
 
 interface DispositivoAgrupado {
@@ -90,8 +101,30 @@ interface DispositivoAgrupado {
   categoria: string;
   dataTradeIn: string;
   linkFotos: string | null;
-  gradesIa: (Grade | null)[];
-  gradesHumano: (Grade | null)[];
+  displayGradesIa: (Grade | null)[];
+  displayGradesHumano: (Grade | null)[];
+  carcacaGradesIa: (Grade | null)[];
+  carcacaGradesHumano: (Grade | null)[];
+  imagemFrontal: string | null;
+  imagemTraseira: string | null;
+  imagemLateral1: string | null;
+  imagemLateral2: string | null;
+  imagemDetalhe: string | null;
+}
+
+function assignImageSlot(device: DispositivoAgrupado, desc: string, url: string): void {
+  const lower = desc.toLowerCase();
+  if (lower.includes("traseira") || lower.includes("back") || lower.includes("rear")) {
+    if (!device.imagemTraseira) device.imagemTraseira = url;
+  } else if ((lower.includes("lateral direita") || lower.includes("lateral d")) && !device.imagemLateral1) {
+    device.imagemLateral1 = url;
+  } else if ((lower.includes("lateral esquerda") || lower.includes("lateral e")) && !device.imagemLateral2) {
+    device.imagemLateral2 = url;
+  } else if (lower.includes("lateral") && !device.imagemLateral1) {
+    device.imagemLateral1 = url;
+  } else if (!device.imagemDetalhe) {
+    device.imagemDetalhe = url;
+  }
 }
 
 // ─── Aggregate photos → devices ──────────────────────────────────────────────
@@ -106,38 +139,74 @@ export function agregarPorDispositivo(
     const imei = foto.Imei;
     if (!imei) continue;
 
-    const gradeIa = normalizeGrade(foto.Grade_IA || foto.Nota_IA);
-    const gradeHumano = normalizeGrade(foto.Grade_Humano || foto.Nota_Humana);
+    // Support both old field names (/detalhes) and new ones (/imei, with accents/spaces)
+    const gradeIaRaw = foto["Nota IA"] || foto.Grade_IA || foto.Nota_IA;
+    const gradeHumanoRaw = foto["Nota Humana"] || foto.Grade_Humano || foto.Nota_Humana;
+    const gradeIa = normalizeGrade(gradeIaRaw);
+    const gradeHumano = normalizeGrade(gradeHumanoRaw);
+
+    const descCaptura = foto["Descrição Captura"] || foto.Descricao_Captura || foto.Nome_da_Tela || "";
+    const urlCaptura = foto["Url Captura"] || null;
+    const area = mapFotoToArea(descCaptura);
+
+    const dataTradeIn =
+      foto.Data_Avaliacao ||
+      foto["Criação Pedido"] ||
+      foto.Criacao_Pedido ||
+      new Date().toISOString();
 
     if (!grouped.has(imei)) {
+      const linkFotos = typeof foto.Link_Fotos === "string" && foto.Link_Fotos ? foto.Link_Fotos : null;
       grouped.set(imei, {
         imei,
         modelo: foto.Modelo || foto.Categoria || "",
         categoria: foto.Categoria || "smartphone",
-        dataTradeIn: foto.Data_Avaliacao || foto.Criacao_Pedido || new Date().toISOString(),
-        linkFotos: typeof foto.Link_Fotos === 'string' && foto.Link_Fotos ? foto.Link_Fotos : null,
-        gradesIa: [],
-        gradesHumano: [],
+        dataTradeIn,
+        linkFotos,
+        displayGradesIa: [],
+        displayGradesHumano: [],
+        carcacaGradesIa: [],
+        carcacaGradesHumano: [],
+        imagemFrontal: null,
+        imagemTraseira: null,
+        imagemLateral1: null,
+        imagemLateral2: null,
+        imagemDetalhe: null,
       });
     }
 
     const device = grouped.get(imei)!;
-    device.gradesIa.push(gradeIa);
-    device.gradesHumano.push(gradeHumano);
-    // Preserve the most recent link if multiple records exist for same IMEI
-    const linkFotosValido = typeof foto.Link_Fotos === 'string' && foto.Link_Fotos ? foto.Link_Fotos : null;
-    if (linkFotosValido && !device.linkFotos) {
-      device.linkFotos = linkFotosValido;
+
+    if (area === "display") {
+      device.displayGradesIa.push(gradeIa);
+      device.displayGradesHumano.push(gradeHumano);
+      if (urlCaptura && !device.imagemFrontal) device.imagemFrontal = urlCaptura;
+    } else if (area === "carcaca") {
+      device.carcacaGradesIa.push(gradeIa);
+      device.carcacaGradesHumano.push(gradeHumano);
+      if (urlCaptura) assignImageSlot(device, descCaptura, urlCaptura);
+    } else {
+      // Unknown area — still accumulate grades
+      device.displayGradesIa.push(gradeIa);
+      device.carcacaGradesIa.push(gradeIa);
+      device.displayGradesHumano.push(gradeHumano);
+      device.carcacaGradesHumano.push(gradeHumano);
     }
+
+    const linkFotosValido = typeof foto.Link_Fotos === "string" && foto.Link_Fotos ? foto.Link_Fotos : null;
+    if (linkFotosValido && !device.linkFotos) device.linkFotos = linkFotosValido;
   }
 
   const result: TradeInAvaliacao[] = [];
 
   for (const [imei, device] of grouped) {
-    // API returns one grade per device evaluation (not per photo area).
-    // Use the same aggregated grade for both display and carcaça.
-    const gradeIa = worstGrade(device.gradesIa);
-    const gradeHumano = worstGrade(device.gradesHumano);
+    const allIaGrades = [...device.displayGradesIa, ...device.carcacaGradesIa];
+    const allHumanoGrades = [...device.displayGradesHumano, ...device.carcacaGradesHumano];
+
+    const gradeIaDisplay = worstGrade(device.displayGradesIa) ?? worstGrade(allIaGrades);
+    const gradeIaCarcaca = worstGrade(device.carcacaGradesIa) ?? worstGrade(allIaGrades);
+    const gradeHumanoDisplay = worstGrade(device.displayGradesHumano) ?? worstGrade(allHumanoGrades);
+    const gradeHumanoCarcaca = worstGrade(device.carcacaGradesHumano) ?? worstGrade(allHumanoGrades);
 
     result.push({
       tradeInId: imei,
@@ -146,17 +215,17 @@ export function agregarPorDispositivo(
       categoria: device.categoria,
       dataTradeIn: device.dataTradeIn,
       precoMaximo: 0,
-      gradeIaDisplay: gradeIa,
-      gradeIaCarcaca: gradeIa,
-      gradeHumanoDisplay: gradeHumano,
-      gradeHumanoCarcaca: gradeHumano,
+      gradeIaDisplay,
+      gradeIaCarcaca,
+      gradeHumanoDisplay,
+      gradeHumanoCarcaca,
       avaliadorHumanoId: null,
       avaliadorHumanoNome: null,
-      imagemFrontal: null,
-      imagemTraseira: null,
-      imagemLateral1: null,
-      imagemLateral2: null,
-      imagemDetalhe: null,
+      imagemFrontal: device.imagemFrontal,
+      imagemTraseira: device.imagemTraseira,
+      imagemLateral1: device.imagemLateral1,
+      imagemLateral2: device.imagemLateral2,
+      imagemDetalhe: device.imagemDetalhe,
       linkFotos: device.linkFotos,
       foiCurado: curadosSet.has(imei),
     });
