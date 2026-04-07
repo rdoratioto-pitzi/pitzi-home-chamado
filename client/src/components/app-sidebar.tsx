@@ -133,7 +133,6 @@ const logisticaOutrosItems = [
   { title: "Solicitações", url: "/logistica/solicitacoes", icon: Package },
   { title: "Logística Reversa", url: "/logistica/reversa", icon: RotateCcw },
   { title: "Romaneios", url: "/logistica/romaneios", icon: ClipboardList },
-  { title: "Eficiência Avaliações IA", url: "/logistica/avaliacoes-ia", icon: Bot },
 ];
 
 // Mantido para compatibilidade temporária
@@ -212,7 +211,7 @@ export function AppSidebar() {
   const [okrsOpen, setOkrsOpen] = useState(isOkrsRoute(location));
   const [logisticaOpen, setLogisticaOpen] = useState(location.startsWith("/logistica"));
   const [logisticaDashboardOpen, setLogisticaDashboardOpen] = useState(location.startsWith("/logistica/dispositivos") || location.startsWith("/logistica/coletas") || location.startsWith("/logistica/consulta") || location.startsWith("/logistica/fechamentos"));
-  const [logisticaOutrosOpen, setLogisticaOutrosOpen] = useState(location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios") || location.startsWith("/logistica/avaliacoes-ia"));
+  const [logisticaOutrosOpen, setLogisticaOutrosOpen] = useState(location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios"));
   const [triagemOpen, setTriagemOpen] = useState(location.startsWith("/triagem"));
   const [avaliacoesOpen, setAvaliacoesOpen] = useState(location.startsWith("/avaliacoes"));
   const [apisOpen, setApisOpen] = useState(location.startsWith("/apis"));
@@ -236,7 +235,7 @@ export function AppSidebar() {
     if (location.startsWith("/avaliacoes")) setAvaliacoesOpen(true);
     if (location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/pricing") || location.startsWith("/avaliacoes")) setOperacoesOpen(true);
     if (location.startsWith("/logistica/dispositivos") || location.startsWith("/logistica/coletas") || location.startsWith("/logistica/consulta") || location.startsWith("/logistica/fechamentos")) setLogisticaDashboardOpen(true);
-    if (location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios") || location.startsWith("/logistica/avaliacoes-ia")) setLogisticaOutrosOpen(true);
+    if (location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios")) setLogisticaOutrosOpen(true);
     if (isWorkspaceRoute(location)) setWorkspaceOpen(true);
     if (isMetasRoute(location)) setMetasOpen(true);
     if (isOkrsRoute(location)) setOkrsOpen(true);
