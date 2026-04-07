@@ -121,55 +121,6 @@ export interface Avaliador {
   nome: string;
 }
 
-// ─── Mock data (fallback) ─────────────────────────────────────────────────────
-
-function getMockTradeIns(): TradeInAvaliacao[] {
-  const grades: Grade[] = ["A", "B", "C"];
-  const modelos = [
-    "iPhone 14 Pro", "Samsung Galaxy S23", "iPhone 13", "Xiaomi 13",
-    "Nintendo Switch", "Samsung Galaxy A54", "iPhone 12", "PlayStation 5",
-  ];
-  const categorias = ["iphone", "smartphone", "console"];
-  const avaliadores = [
-    { id: "av1", nome: "Carlos Mendes" },
-    { id: "av2", nome: "Ana Lima" },
-    { id: "av3", nome: "Pedro Santos" },
-  ];
-
-  return Array.from({ length: 40 }, (_, i) => {
-    const gradeIaD = grades[Math.floor(Math.random() * 3)];
-    const gradeIaC = grades[Math.floor(Math.random() * 3)];
-    const gradeHD = grades[Math.floor(Math.random() * 3)];
-    const gradeHC = grades[Math.floor(Math.random() * 3)];
-    const av = avaliadores[Math.floor(Math.random() * avaliadores.length)];
-    const daysAgo = Math.floor(Math.random() * 30);
-    const date = new Date();
-    date.setDate(date.getDate() - daysAgo);
-
-    return {
-      tradeInId: `TI-${String(i + 1).padStart(4, "0")}`,
-      imei: `3${String(Math.random()).slice(2, 17)}`,
-      modelo: modelos[i % modelos.length],
-      categoria: categorias[i % categorias.length],
-      dataTradeIn: date.toISOString(),
-      precoMaximo: [1500, 2000, 2500, 3000, 4000, 800][i % 6],
-      gradeIaDisplay: gradeIaD,
-      gradeIaCarcaca: gradeIaC,
-      gradeHumanoDisplay: gradeHD,
-      gradeHumanoCarcaca: gradeHC,
-      avaliadorHumanoId: av.id,
-      avaliadorHumanoNome: av.nome,
-      imagemFrontal: null,
-      imagemTraseira: null,
-      imagemLateral1: null,
-      imagemLateral2: null,
-      imagemDetalhe: null,
-      linkFotos: null,
-      foiCurado: i % 4 === 0,
-    };
-  });
-}
-
 // ─── Fetch helper ─────────────────────────────────────────────────────────────
 
 async function fetchAvaliacoesApi(path: string, params: Record<string, string> = {}): Promise<any[]> {
@@ -252,9 +203,8 @@ export async function getTradeInsAvaliacoes(
     const rawPhotos = await fetchAvaliacoesApi("/avaliacoes-ia/detalhes", params) as RawFotoAvaliacao[];
     items = agregarPorDispositivo(rawPhotos, curadosSet);
   } catch (err) {
-    console.warn("⚠️ RenovSmart API não disponível para avaliações, usando dados mock");
-    const mockItems = getMockTradeIns();
-    items = mockItems.map((m) => ({ ...m, foiCurado: curadosSet.has(m.tradeInId) || m.foiCurado }));
+    console.error("⚠️ RenovSmart API indisponível para avaliações:", err);
+    return { data: [], total: 0, page, totalPages: 0 };
   }
 
   // Apply filters
@@ -285,10 +235,9 @@ export async function getTradeInById(tradeInId: string): Promise<TradeInAvaliaca
     const raw = await fetchAvaliacoesApi(`/adm_logistica/avaliacoes/${tradeInId}`);
     const curados = db ? await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).where(eq(curadoriaAvaliacoes.tradeInId, tradeInId)) : [];
     return raw.length > 0 ? normalizeItem(raw[0], curados.length > 0) : null;
-  } catch {
-    console.warn("⚠️ RenovSmart API não disponível para avaliações, usando dados mock");
-    const mock = getMockTradeIns().find((m) => m.tradeInId === tradeInId);
-    return mock ?? null;
+  } catch (err) {
+    console.error("⚠️ RenovSmart API indisponível para trade-in", tradeInId, ":", err);
+    return null;
   }
 }
 
@@ -302,12 +251,9 @@ export async function getAvaliadores(): Promise<Avaliador[]> {
       if (id && nome) map.set(id, nome);
     }
     return Array.from(map.entries()).map(([id, nome]) => ({ id, nome }));
-  } catch {
-    return [
-      { id: "av1", nome: "Carlos Mendes" },
-      { id: "av2", nome: "Ana Lima" },
-      { id: "av3", nome: "Pedro Santos" },
-    ];
+  } catch (err) {
+    console.error("⚠️ RenovSmart API indisponível para avaliadores:", err);
+    return [];
   }
 }
 
@@ -787,10 +733,9 @@ export async function getCuradoriaPendentes(tenantId?: string | null): Promise<T
       end_date: todayStr,
     }) as RawFotoAvaliacao[];
     all = agregarPorDispositivo(rawPhotos, curadosSet);
-  } catch {
-    // Fallback to existing method
-    const result = await getTradeInsAvaliacoes({ dataInicio: yesterdayStr, dataFim: todayStr }, 1, 9999);
-    all = result.data;
+  } catch (err) {
+    console.error("⚠️ RenovSmart API indisponível para curadoria pendentes:", err);
+    all = [];
   }
 
   // Exclude already curated
