@@ -47,6 +47,7 @@ export interface TradeInAvaliacao {
   imagemLateral1: string | null;
   imagemLateral2: string | null;
   imagemDetalhe: string | null;
+  linkFotos: string | null;
 
   foiCurado: boolean;
 }
@@ -163,6 +164,7 @@ function getMockTradeIns(): TradeInAvaliacao[] {
       imagemLateral1: null,
       imagemLateral2: null,
       imagemDetalhe: null,
+      linkFotos: null,
       foiCurado: i % 4 === 0,
     };
   });
@@ -222,6 +224,7 @@ function normalizeItem(item: any, foiCurado: boolean): TradeInAvaliacao {
     imagemLateral1: item.imagem_lateral_1 || item.imagemLateral1 || null,
     imagemLateral2: item.imagem_lateral_2 || item.imagemLateral2 || null,
     imagemDetalhe: item.imagem_detalhe || item.imagemDetalhe || null,
+    linkFotos: item.link_fotos || item.linkFotos || null,
     foiCurado,
   };
 }

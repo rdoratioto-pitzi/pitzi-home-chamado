@@ -24,24 +24,29 @@ comercialKpisRoutes.get("/api/comercial/kpis/:periodo", async (c) => {
 
 // PUT /api/comercial/kpis/:periodo — upsert KPI mensal
 comercialKpisRoutes.put("/api/comercial/kpis/:periodo", async (c) => {
-  const db = c.get("db");
-  const periodo = c.req.param("periodo");
-  const body = await c.req.json();
-  const validated = insertComercialKpiSchema.parse({ ...body, periodo });
+  try {
+    const db = c.get("db");
+    const periodo = c.req.param("periodo");
+    const body = await c.req.json();
+    const validated = insertComercialKpiSchema.parse({ ...body, periodo });
 
-  const [existing] = await db.select().from(comercialKpis).where(eq(comercialKpis.periodo, periodo));
+    const [existing] = await db.select().from(comercialKpis).where(eq(comercialKpis.periodo, periodo));
 
-  if (existing) {
-    const [updated] = await db
-      .update(comercialKpis)
-      .set({ ...validated, updatedAt: new Date() })
-      .where(eq(comercialKpis.periodo, periodo))
-      .returning();
-    return c.json(updated);
+    if (existing) {
+      const [updated] = await db
+        .update(comercialKpis)
+        .set({ ...validated, updatedAt: new Date() })
+        .where(eq(comercialKpis.periodo, periodo))
+        .returning();
+      return c.json(updated);
+    }
+
+    const [created] = await db.insert(comercialKpis).values(validated).returning();
+    return c.json(created, 201);
+  } catch (error) {
+    console.error("[comercial-kpis] PUT error:", error);
+    return c.json({ error: "Erro ao salvar KPI" }, 500);
   }
-
-  const [created] = await db.insert(comercialKpis).values(validated).returning();
-  return c.json(created, 201);
 });
 
 export { comercialKpisRoutes };

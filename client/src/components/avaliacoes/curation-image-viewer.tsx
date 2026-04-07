@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ImageOff, ZoomIn } from "lucide-react";
+import { ImageOff, ZoomIn, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ interface ImagemAngulos {
 
 interface CurationImageViewerProps {
   imagens: ImagemAngulos;
+  linkFotos?: string | null;
 }
 
 type AnguloKey = keyof ImagemAngulos;
@@ -32,7 +33,7 @@ const ANGULO_KEYS: AnguloKey[] = ["frontal", "traseira", "lateral1", "lateral2",
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function CurationImageViewer({ imagens }: CurationImageViewerProps) {
+export function CurationImageViewer({ imagens, linkFotos }: CurationImageViewerProps) {
   const disponíveis = ANGULO_KEYS.filter((k) => imagens[k] !== null);
   const [ativo, setAtivo] = useState<AnguloKey>(disponíveis[0] ?? "frontal");
   const [modalAberto, setModalAberto] = useState(false);
@@ -41,6 +42,23 @@ export function CurationImageViewer({ imagens }: CurationImageViewerProps) {
   const nenhuma = disponíveis.length === 0;
 
   if (nenhuma) {
+    if (linkFotos) {
+      return (
+        <div className="flex flex-col items-center justify-center h-64 rounded-xl border border-dashed border-border bg-muted/30 gap-4 text-muted-foreground px-6">
+          <ExternalLink className="h-12 w-12 opacity-40" />
+          <div className="flex flex-col items-center gap-2 text-center">
+            <span className="text-sm font-medium">Fotos disponíveis no sistema RenovSmart</span>
+            <span className="text-xs opacity-70">As fotos estão hospedadas no portal de avaliações</span>
+          </div>
+          <a href={linkFotos} target="_blank" rel="noopener noreferrer">
+            <Button className="gap-2 bg-[#00A137] hover:bg-[#048E33] text-white">
+              <ExternalLink className="h-4 w-4" />
+              Abrir Fotos
+            </Button>
+          </a>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center h-64 rounded-xl border border-dashed border-border bg-muted/30 gap-3 text-muted-foreground">
         <ImageOff className="h-12 w-12 opacity-40" />

@@ -1723,7 +1723,28 @@ export const comercialKpis = pgTable("comercial_kpis", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertComercialKpiSchema = createInsertSchema(comercialKpis).omit({ id: true, createdAt: true, updatedAt: true });
+// Campos decimal do Drizzle geram z.string() no schema, mas o frontend envia number.
+// z.coerce.string() aceita ambos (number → string), evitando ZodError no upsert.
+const coerceDecimal = z.coerce.string();
+export const insertComercialKpiSchema = createInsertSchema(comercialKpis, {
+  ticket: coerceDecimal,
+  cmc: coerceDecimal,
+  margemUn: coerceDecimal,
+  margemPct: coerceDecimal,
+  margemTotal: coerceDecimal,
+  mcTotal: coerceDecimal,
+  comissaoVarPct: coerceDecimal,
+  comissaoRepPct: coerceDecimal,
+  icmsPct: coerceDecimal,
+  pisPct: coerceDecimal,
+  cofinsPct: coerceDecimal,
+  frete: coerceDecimal,
+  faturamentoTotal: coerceDecimal,
+  cmcTotal: coerceDecimal,
+  freteTotal: coerceDecimal,
+  cpdMedio: coerceDecimal,
+  markup: coerceDecimal,
+}).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertComercialKpi = z.infer<typeof insertComercialKpiSchema>;
 export type ComercialKpi = typeof comercialKpis.$inferSelect;
 
