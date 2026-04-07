@@ -13,29 +13,125 @@ import {
 // ─── Constants & helpers (duplicados do service para isolamento do worker) ────
 
 const PIPELINE_RS_BASE = "https://dash.renovsmart.com.br/api";
-const PIPELINE_RS_TOKEN = "Renov123";
 const DESCONTO_POR_GRADE: Record<string, number> = { A: 0, B: 0.25, C: 0.70 };
 
 type Grade = "A" | "B" | "C";
 
-async function fetchAvaliacoesApi(path: string): Promise<any[]> {
-  const url = `${PIPELINE_RS_BASE}${path}`;
+async function fetchAvaliacoesDetalhes(
+  token: string,
+  startDate: string,
+  endDate: string
+): Promise<any[]> {
+  const url = `${PIPELINE_RS_BASE}/avaliacoes-ia/detalhes?start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${PIPELINE_RS_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
-  if (!response.ok) throw new Error(`API ${path} error: ${response.status}`);
+  if (!response.ok) throw new Error(`API detalhes error: ${response.status}`);
   const data = await response.json() as any;
   if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.results)) return data.results;
   if (Array.isArray(data?.data)) return data.data;
-  if (Array.isArray(data?.items)) return data.items;
   return [];
 }
 
-function parseGrade(raw: unknown): Grade | null {
-  if (raw === "A" || raw === "B" || raw === "C") return raw as Grade;
+// Grade normalizer: D → C (POP 101 V3)
+function normalizeGradeInline(raw: unknown): Grade | null {
+  if (!raw) return null;
+  const upper = String(raw).trim().toUpperCase();
+  if (upper === "D") return "C";
+  if (upper === "A" || upper === "B" || upper === "C") return upper as Grade;
   return null;
 }
+
+const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 };
+
+function worstGradeInline(grades: (Grade | null)[]): Grade | null {
+  const valid = grades.filter((g): g is Grade => g !== null);
+  if (valid.length === 0) return null;
+  return valid.reduce((worst, g) =>
+    (GRADE_ORDER[g] ?? 0) > (GRADE_ORDER[worst] ?? 0) ? g : worst
+  );
+}
+
+interface TradeInItem {
+  tradeInId: string;
+  imei: string;
+  modelo: string;
+  categoria: string;
+  dataTradeIn: string;
+  precoMaximo: number;
+  gradeIaDisplay: Grade | null;
+  gradeIaCarcaca: Grade | null;
+  gradeHumanoDisplay: Grade | null;
+  gradeHumanoCarcaca: Grade | null;
+  avaliadorHumanoId: null;
+  avaliadorHumanoNome: null;
+  imagemFrontal: null;
+  imagemTraseira: null;
+  imagemLateral1: null;
+  imagemLateral2: null;
+  imagemDetalhe: null;
+  linkFotos: string | null;
+  foiCurado: boolean;
+}
+
+// Agrupa registros da API (um por avaliação) em um por dispositivo (IMEI)
+function agregarPorDispositivoInline(raw: any[], curadosSet: Set<string>): TradeInItem[] {
+  const grouped = new Map<string, {
+    imei: string; modelo: string; categoria: string; dataTradeIn: string;
+    linkFotos: string | null; gradesIa: (Grade | null)[]; gradesHumano: (Grade | null)[];
+  }>();
+
+  for (const item of raw) {
+    const imei: string = item.Imei || "";
+    if (!imei) continue;
+    const gradeIa = normalizeGradeInline(item.Grade_IA);
+    const gradeHumano = normalizeGradeInline(item.Grade_Humano);
+    const link = typeof item.Link_Fotos === "string" && item.Link_Fotos ? item.Link_Fotos : null;
+
+    if (!grouped.has(imei)) {
+      grouped.set(imei, {
+        imei,
+        modelo: item.Modelo || item.Categoria || "",
+        categoria: item.Categoria || "smartphone",
+        dataTradeIn: item.Data_Avaliacao || new Date().toISOString(),
+        linkFotos: link,
+        gradesIa: [],
+        gradesHumano: [],
+      });
+    }
+    const d = grouped.get(imei)!;
+    d.gradesIa.push(gradeIa);
+    d.gradesHumano.push(gradeHumano);
+    if (link && !d.linkFotos) d.linkFotos = link;
+  }
+
+  return Array.from(grouped.values()).map((d): TradeInItem => {
+    const gradeIa = worstGradeInline(d.gradesIa);
+    const gradeHumano = worstGradeInline(d.gradesHumano);
+    return {
+      tradeInId: d.imei,
+      imei: d.imei,
+      modelo: d.modelo,
+      categoria: d.categoria,
+      dataTradeIn: d.dataTradeIn,
+      precoMaximo: 0,
+      gradeIaDisplay: gradeIa,
+      gradeIaCarcaca: gradeIa,
+      gradeHumanoDisplay: gradeHumano,
+      gradeHumanoCarcaca: gradeHumano,
+      avaliadorHumanoId: null,
+      avaliadorHumanoNome: null,
+      imagemFrontal: null,
+      imagemTraseira: null,
+      imagemLateral1: null,
+      imagemLateral2: null,
+      imagemDetalhe: null,
+      linkFotos: d.linkFotos,
+      foiCurado: curadosSet.has(d.imei),
+    };
+  });
+}
+
 
 function parseDate(dateStr: string | null): Date | null {
   if (!dateStr) return null;
@@ -50,51 +146,6 @@ function parseDate(dateStr: string | null): Date | null {
   }
 }
 
-function normalizeItem(item: any, foiCurado: boolean) {
-  return {
-    tradeInId: item.id || item.trade_in_id || item.tradeInId || "",
-    imei: item.imei || item.IMEI || "",
-    modelo: item.modelo || item.model || item.device_model || item.description || "",
-    categoria: item.category || item.categoria || "smartphone",
-    dataTradeIn: item.data_trade_in || item.created_at || item.data || new Date().toISOString(),
-    precoMaximo: parseFloat(item.preco_maximo || item.price || item.precoMaximo || "0") || 0,
-    gradeIaDisplay: parseGrade(item.grade_ia_display || item.gradeIaDisplay),
-    gradeIaCarcaca: parseGrade(item.grade_ia_carcaca || item.gradeIaCarcaca),
-    gradeHumanoDisplay: parseGrade(item.grade_humano_display || item.gradeHumanoDisplay),
-    gradeHumanoCarcaca: parseGrade(item.grade_humano_carcaca || item.gradeHumanoCarcaca),
-    avaliadorHumanoId: item.avaliador_humano_id || item.avaliadorHumanoId || null,
-    avaliadorHumanoNome: item.avaliador_nome || item.avaliadorHumanoNome || null,
-    imagemFrontal: item.imagem_frontal || null,
-    imagemTraseira: item.imagem_traseira || null,
-    imagemLateral1: item.imagem_lateral_1 || null,
-    imagemLateral2: item.imagem_lateral_2 || null,
-    imagemDetalhe: item.imagem_detalhe || null,
-    linkFotos: item.link_fotos || item.linkFotos || item.Link_Fotos || null,
-    foiCurado,
-  };
-}
-
-function getMockTradeIns() {
-  const grades: Grade[] = ["A", "B", "C"];
-  const modelos = ["iPhone 14 Pro", "Samsung Galaxy S23", "iPhone 13", "Xiaomi 13", "Nintendo Switch"];
-  return Array.from({ length: 20 }, (_, i) => ({
-    tradeInId: `TI-${String(i + 1).padStart(4, "0")}`,
-    imei: `3${String(Math.random()).slice(2, 17)}`,
-    modelo: modelos[i % modelos.length],
-    categoria: ["iphone", "smartphone", "console"][i % 3],
-    dataTradeIn: new Date(Date.now() - i * 86400000).toISOString(),
-    precoMaximo: [1500, 2000, 2500, 3000][i % 4],
-    gradeIaDisplay: grades[i % 3],
-    gradeIaCarcaca: grades[(i + 1) % 3],
-    gradeHumanoDisplay: grades[(i + 2) % 3],
-    gradeHumanoCarcaca: grades[i % 3],
-    avaliadorHumanoId: `av${(i % 3) + 1}`,
-    avaliadorHumanoNome: ["Carlos Mendes", "Ana Lima", "Pedro Santos"][i % 3],
-    imagemFrontal: null, imagemTraseira: null, imagemLateral1: null, imagemLateral2: null, imagemDetalhe: null,
-    linkFotos: null,
-    foiCurado: i % 4 === 0,
-  }));
-}
 
 function calcAccuracy(records: any[], tipo: "ia" | "humano", area: "display" | "carcaca" | "ambas"): number {
   let correct = 0, total = 0;
@@ -134,25 +185,28 @@ export const avaliacoes = new Hono<AppEnv>();
 
 avaliacoes.get("/api/avaliacoes/trade-ins", async (c) => {
   try {
-    const { data_inicio, data_fim, categoria, avaliador_id, page = "1", limit = "50" } = c.req.query();
+    const { data_inicio, data_fim, categoria, page = "1", limit = "50" } = c.req.query();
     const db = c.get("db");
+    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
 
-    let items: ReturnType<typeof normalizeItem>[];
+    // Default date range: last 30 days if not provided
+    const today = new Date();
+    const endDate = data_fim || today.toISOString().slice(0, 10);
+    const startDefault = new Date(today); startDefault.setDate(startDefault.getDate() - 30);
+    const startDate = data_inicio || startDefault.toISOString().slice(0, 10);
+
+    let items: TradeInItem[] = [];
     try {
-      const raw = await fetchAvaliacoesApi("/adm_logistica/avaliacoes");
-      const curados = await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes);
-      const curadosSet = new Set(curados.map((c) => c.tradeInId));
-      items = raw.map((item) => normalizeItem(item, curadosSet.has(item.id || item.trade_in_id)));
-    } catch {
+      const raw = await fetchAvaliacoesDetalhes(token, startDate, endDate);
       const curados = await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).catch(() => []);
       const curadosSet = new Set(curados.map((c) => c.tradeInId));
-      items = getMockTradeIns().map((m) => ({ ...m, foiCurado: curadosSet.has(m.tradeInId) || m.foiCurado }));
+      items = agregarPorDispositivoInline(raw, curadosSet);
+    } catch {
+      console.error("[avaliacoes] fetchAvaliacoesDetalhes falhou em /trade-ins — retornando lista vazia");
+      items = [];
     }
 
-    if (data_inicio) { const s = parseDate(data_inicio); if (s) items = items.filter((i) => { const d = parseDate(i.dataTradeIn); return d && d >= s; }); }
-    if (data_fim) { const e = parseDate(data_fim); if (e) { e.setHours(23,59,59,999); items = items.filter((i) => { const d = parseDate(i.dataTradeIn); return d && d <= e; }); } }
     if (categoria) items = items.filter((i) => i.categoria.toLowerCase().includes(categoria.toLowerCase()));
-    if (avaliador_id) items = items.filter((i) => i.avaliadorHumanoId === avaliador_id);
 
     const total = items.length;
     const pageNum = parseInt(page), limitNum = parseInt(limit);
@@ -167,14 +221,24 @@ avaliacoes.get("/api/avaliacoes/trade-ins", async (c) => {
 avaliacoes.get("/api/avaliacoes/trade-ins/:tradeInId", async (c) => {
   try {
     const tradeInId = c.req.param("tradeInId");
-    let item = null;
+    const db = c.get("db");
+    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+
+    let item: TradeInItem | null = null;
     try {
-      const raw = await fetchAvaliacoesApi(`/adm_logistica/avaliacoes/${tradeInId}`);
-      const db = c.get("db");
-      const curados = await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).where(eq(curadoriaAvaliacoes.tradeInId, tradeInId));
-      item = raw.length > 0 ? normalizeItem(raw[0], curados.length > 0) : null;
+      const today = new Date();
+      const endDate = today.toISOString().slice(0, 10);
+      const startDefault = new Date(today); startDefault.setDate(startDefault.getDate() - 30);
+      const startDate = startDefault.toISOString().slice(0, 10);
+
+      const raw = await fetchAvaliacoesDetalhes(token, startDate, endDate);
+      const curados = await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).where(eq(curadoriaAvaliacoes.tradeInId, tradeInId)).catch(() => []);
+      const curadosSet = new Set(curados.map((c) => c.tradeInId));
+      const aggregated = agregarPorDispositivoInline(raw, curadosSet);
+      item = aggregated.find((i) => i.imei === tradeInId) ?? null;
     } catch {
-      item = getMockTradeIns().find((m) => m.tradeInId === tradeInId) ?? null;
+      console.error(`[avaliacoes] fetchAvaliacoesDetalhes falhou para tradeInId=${tradeInId} — retornando null`);
+      item = null;
     }
     if (!item) return c.json({ success: false, error: "Trade-in não encontrado" }, 404);
     return c.json({ success: true, data: item });
@@ -185,20 +249,8 @@ avaliacoes.get("/api/avaliacoes/trade-ins/:tradeInId", async (c) => {
 
 avaliacoes.get("/api/avaliacoes/avaliadores", async (c) => {
   try {
-    let avaliadores: { id: string; nome: string }[];
-    try {
-      const raw = await fetchAvaliacoesApi("/adm_logistica/avaliacoes");
-      const map = new Map<string, string>();
-      for (const item of raw) {
-        const id = item.avaliador_humano_id || item.avaliadorHumanoId;
-        const nome = item.avaliador_nome || item.avaliadorHumanoNome;
-        if (id && nome) map.set(id, nome);
-      }
-      avaliadores = Array.from(map.entries()).map(([id, nome]) => ({ id, nome }));
-    } catch {
-      avaliadores = [{ id: "av1", nome: "Carlos Mendes" }, { id: "av2", nome: "Ana Lima" }, { id: "av3", nome: "Pedro Santos" }];
-    }
-    return c.json({ success: true, data: avaliadores });
+    // A API RenovSmart não expõe lista de avaliadores — retornar lista vazia
+    return c.json({ success: true, data: [] });
   } catch (error: unknown) {
     return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
   }
@@ -247,22 +299,23 @@ avaliacoes.post("/api/avaliacoes/curadoria", async (c) => {
 avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
   try {
     const db = c.get("db");
+    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
     const configs = await db.select().from(curadoriaConfiguracoes).catch(() => []);
     const percentual = parseFloat((configs[0] as any)?.percentualAmostragem ?? "15") || 15;
 
-    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1); yesterday.setHours(0,0,0,0);
-    const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+    // Buscar avaliações de ontem na API real
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-    let allItems: ReturnType<typeof normalizeItem>[] = [];
+    let allItems: TradeInItem[] = [];
     try {
-      const raw = await fetchAvaliacoesApi("/adm_logistica/avaliacoes");
-      const curados = await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes);
+      const raw = await fetchAvaliacoesDetalhes(token, yesterdayStr, yesterdayStr);
+      const curados = await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).catch(() => []);
       const curadosSet = new Set(curados.map((c) => c.tradeInId));
-      allItems = raw
-        .map((item) => normalizeItem(item, curadosSet.has(item.id || item.trade_in_id)))
-        .filter((i) => { const d = parseDate(i.dataTradeIn); return d && d >= yesterday && d < todayMidnight; });
+      allItems = agregarPorDispositivoInline(raw, curadosSet);
     } catch {
-      allItems = getMockTradeIns().slice(0, 5);
+      console.error("[avaliacoes] fetchAvaliacoesDetalhes falhou em /pendentes — retornando lista vazia");
+      allItems = [];
     }
 
     const notCurated = allItems.filter((t) => !t.foiCurado);
