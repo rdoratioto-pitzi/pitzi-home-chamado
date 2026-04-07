@@ -11,4 +11,7 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
+  // Tabelas gerenciadas via raw SQL (server/index.ts) — excluídas do controle do Drizzle
+  // para evitar que db:push sugira deletá-las acidentalmente.
+  tablesFilter: ["!omie_config", "!omie_sync_log"],
 });
