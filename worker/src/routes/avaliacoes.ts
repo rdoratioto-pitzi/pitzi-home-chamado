@@ -33,6 +33,51 @@ async function fetchAvaliacoesDetalhes(
   return [];
 }
 
+async function fetchAvaliacoesImei(token: string, limitDate: string): Promise<any[]> {
+  const url = `${PIPELINE_RS_BASE}/avaliacoes-ia/imei?limit_date=${encodeURIComponent(limitDate)}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  if (!response.ok) throw new Error(`API imei error: ${response.status}`);
+  const data = await response.json() as any;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+}
+
+function isDisplayFoto(desc: string): boolean {
+  const lower = desc.toLowerCase();
+  return ["tela", "frente", "front", "display", "screen"].some((p) => lower.includes(p));
+}
+
+function isCarcacaFoto(desc: string): boolean {
+  const lower = desc.toLowerCase();
+  return ["traseira", "lateral", "superior", "inferior", "parte", "back", "rear", "side", "top", "bottom"].some((p) => lower.includes(p));
+}
+
+function assignImeiImageSlot(slots: ImeiImageSlots, desc: string, url: string): void {
+  const lower = desc.toLowerCase();
+  if (lower.includes("traseira") || lower.includes("back") || lower.includes("rear")) {
+    if (!slots.imagemTraseira) slots.imagemTraseira = url;
+  } else if ((lower.includes("lateral direita") || lower.includes("lateral d")) && !slots.imagemLateral1) {
+    slots.imagemLateral1 = url;
+  } else if ((lower.includes("lateral esquerda") || lower.includes("lateral e")) && !slots.imagemLateral2) {
+    slots.imagemLateral2 = url;
+  } else if (lower.includes("lateral") && !slots.imagemLateral1) {
+    slots.imagemLateral1 = url;
+  } else if (!slots.imagemDetalhe) {
+    slots.imagemDetalhe = url;
+  }
+}
+
+interface ImeiImageSlots {
+  imagemFrontal: string | null;
+  imagemTraseira: string | null;
+  imagemLateral1: string | null;
+  imagemLateral2: string | null;
+  imagemDetalhe: string | null;
+}
+
 // Grade normalizer: D → C (POP 101 V3)
 function normalizeGradeInline(raw: unknown): Grade | null {
   if (!raw) return null;
@@ -65,16 +110,16 @@ interface TradeInItem {
   gradeHumanoCarcaca: Grade | null;
   avaliadorHumanoId: null;
   avaliadorHumanoNome: null;
-  imagemFrontal: null;
-  imagemTraseira: null;
-  imagemLateral1: null;
-  imagemLateral2: null;
-  imagemDetalhe: null;
+  imagemFrontal: string | null;
+  imagemTraseira: string | null;
+  imagemLateral1: string | null;
+  imagemLateral2: string | null;
+  imagemDetalhe: string | null;
   linkFotos: string | null;
   foiCurado: boolean;
 }
 
-// Agrupa registros da API (um por avaliação) em um por dispositivo (IMEI)
+// Agrupa registros /detalhes (campos antigos, sem URL de imagem)
 function agregarPorDispositivoInline(raw: any[], curadosSet: Set<string>): TradeInItem[] {
   const grouped = new Map<string, {
     imei: string; modelo: string; categoria: string; dataTradeIn: string;
@@ -126,6 +171,84 @@ function agregarPorDispositivoInline(raw: any[], curadosSet: Set<string>): Trade
       imagemLateral1: null,
       imagemLateral2: null,
       imagemDetalhe: null,
+      linkFotos: d.linkFotos,
+      foiCurado: curadosSet.has(d.imei),
+    };
+  });
+}
+
+// Agrupa registros /imei (campos novos com acentos/espaços, inclui Url Captura)
+function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeInItem[] {
+  const grouped = new Map<string, {
+    imei: string; dataTradeIn: string; linkFotos: string | null;
+    displayGradesIa: (Grade | null)[]; displayGradesHumano: (Grade | null)[];
+    carcacaGradesIa: (Grade | null)[]; carcacaGradesHumano: (Grade | null)[];
+    slots: ImeiImageSlots;
+  }>();
+
+  for (const item of raw) {
+    const imei: string = item["Imei"] || "";
+    if (!imei) continue;
+
+    const desc: string = item["Descrição Captura"] || "";
+    if (desc.toLowerCase().includes("video") || desc.toLowerCase().includes("360")) continue;
+
+    const gradeIa = normalizeGradeInline(item["Nota IA"]);
+    const gradeHumano = normalizeGradeInline(item["Nota Humana"]);
+    const urlCaptura: string | null = item["Url Captura"] || null;
+
+    if (!grouped.has(imei)) {
+      grouped.set(imei, {
+        imei,
+        dataTradeIn: item["Criação Pedido"] || new Date().toISOString(),
+        linkFotos: null,
+        displayGradesIa: [],
+        displayGradesHumano: [],
+        carcacaGradesIa: [],
+        carcacaGradesHumano: [],
+        slots: { imagemFrontal: null, imagemTraseira: null, imagemLateral1: null, imagemLateral2: null, imagemDetalhe: null },
+      });
+    }
+
+    const d = grouped.get(imei)!;
+
+    if (isDisplayFoto(desc)) {
+      d.displayGradesIa.push(gradeIa);
+      d.displayGradesHumano.push(gradeHumano);
+      if (urlCaptura && !d.slots.imagemFrontal) d.slots.imagemFrontal = urlCaptura;
+    } else if (isCarcacaFoto(desc)) {
+      d.carcacaGradesIa.push(gradeIa);
+      d.carcacaGradesHumano.push(gradeHumano);
+      if (urlCaptura) assignImeiImageSlot(d.slots, desc, urlCaptura);
+    } else {
+      d.displayGradesIa.push(gradeIa);
+      d.carcacaGradesIa.push(gradeIa);
+      d.displayGradesHumano.push(gradeHumano);
+      d.carcacaGradesHumano.push(gradeHumano);
+    }
+  }
+
+  return Array.from(grouped.values()).map((d): TradeInItem => {
+    const allIaGrades = [...d.displayGradesIa, ...d.carcacaGradesIa];
+    const allHumanoGrades = [...d.displayGradesHumano, ...d.carcacaGradesHumano];
+    return {
+      tradeInId: d.imei,
+      imei: d.imei,
+      modelo: "",
+      categoria: "smartphone",
+      dataTradeIn: d.dataTradeIn,
+      precoMaximo: 0,
+      gradeIaDisplay: worstGradeInline(d.displayGradesIa) ?? worstGradeInline(allIaGrades),
+      gradeIaCarcaca: worstGradeInline(d.carcacaGradesIa) ?? worstGradeInline(allIaGrades),
+      gradeHumanoDisplay: worstGradeInline(d.displayGradesHumano) ?? worstGradeInline(allHumanoGrades),
+      gradeHumanoCarcaca: worstGradeInline(d.carcacaGradesHumano) ?? worstGradeInline(allHumanoGrades),
+      avaliadorHumanoId: null,
+      avaliadorHumanoNome: null,
+      imagemFrontal: d.slots.imagemFrontal,
+      imagemTraseira: d.slots.imagemTraseira,
+      imagemLateral1: d.slots.imagemLateral1,
+      imagemLateral2: d.slots.imagemLateral2,
+      imagemDetalhe: d.slots.imagemDetalhe,
       linkFotos: d.linkFotos,
       foiCurado: curadosSet.has(d.imei),
     };
@@ -309,12 +432,12 @@ avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
 
     let allItems: TradeInItem[] = [];
     try {
-      const raw = await fetchAvaliacoesDetalhes(token, yesterdayStr, yesterdayStr);
+      const raw = await fetchAvaliacoesImei(token, yesterdayStr);
       const curados = await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).catch(() => []);
       const curadosSet = new Set(curados.map((c) => c.tradeInId));
-      allItems = agregarPorDispositivoInline(raw, curadosSet);
+      allItems = agregarPorDispositivoImei(raw, curadosSet);
     } catch {
-      console.error("[avaliacoes] fetchAvaliacoesDetalhes falhou em /pendentes — retornando lista vazia");
+      console.error("[avaliacoes] fetchAvaliacoesImei falhou em /pendentes — retornando lista vazia");
       allItems = [];
     }
 
