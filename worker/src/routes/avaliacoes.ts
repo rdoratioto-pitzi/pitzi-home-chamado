@@ -69,6 +69,7 @@ function normalizeItem(item: any, foiCurado: boolean) {
     imagemLateral1: item.imagem_lateral_1 || null,
     imagemLateral2: item.imagem_lateral_2 || null,
     imagemDetalhe: item.imagem_detalhe || null,
+    linkFotos: item.link_fotos || item.linkFotos || item.Link_Fotos || null,
     foiCurado,
   };
 }
@@ -90,6 +91,7 @@ function getMockTradeIns() {
     avaliadorHumanoId: `av${(i % 3) + 1}`,
     avaliadorHumanoNome: ["Carlos Mendes", "Ana Lima", "Pedro Santos"][i % 3],
     imagemFrontal: null, imagemTraseira: null, imagemLateral1: null, imagemLateral2: null, imagemDetalhe: null,
+    linkFotos: null,
     foiCurado: i % 4 === 0,
   }));
 }

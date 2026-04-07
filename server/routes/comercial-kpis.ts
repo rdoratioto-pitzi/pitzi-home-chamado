@@ -50,6 +50,7 @@ export function registerComercialKpisRoutes(router: Router) {
       const [created] = await db.insert(comercialKpis).values(validated).returning();
       res.status(201).json(created);
     } catch (error) {
+      console.error("[comercial-kpis] PUT error:", error);
       res.status(500).json({ error: "Erro ao salvar KPI" });
     }
   });
