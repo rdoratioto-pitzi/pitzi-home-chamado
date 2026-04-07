@@ -23,6 +23,7 @@ export interface TradeInAvaliacao {
   imagemLateral1: string | null;
   imagemLateral2: string | null;
   imagemDetalhe: string | null;
+  linkFotos: string | null;
   foiCurado: boolean;
 }
 

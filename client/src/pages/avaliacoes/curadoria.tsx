@@ -230,6 +230,7 @@ export default function AvaliacoesCuradoriaPage() {
                     lateral2: tradeInAtual.imagemLateral2,
                     detalhe: tradeInAtual.imagemDetalhe,
                   }}
+                  linkFotos={tradeInAtual.linkFotos}
                 />
               </div>
 
