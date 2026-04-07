@@ -415,6 +415,57 @@ export function useAssertividadeFotos(filtros: AvaliacoesFilters = {}) {
   });
 }
 
+// ─── Evolução por Categoria (proxy API) ──────────────────────────────────────
+
+export interface EvolucaoCategoriaIAItem {
+  Categoria: string;
+  Mes: string;
+  Acuracia_Mensal: number;
+  Qtd_Acertos: number;
+  Total_Avaliados: number;
+}
+
+export function useEvolucaoCategoriaIA(filtros: AvaliacoesFilters = {}) {
+  return useQuery<EvolucaoCategoriaIAItem[]>({
+    queryKey: ["/api/avaliacoes-ia/evolucao-categoria", filtros],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/avaliacoes-ia/evolucao-categoria${buildProxyParams(filtros)}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+// ─── IMEI lookup (proxy API, lazy — habilitar sob demanda) ───────────────────
+
+export interface AvaliacaoImeiItem {
+  Imei: string;
+  Codigo_Voucher: string;
+  Criacao_Pedido: string;
+  Descricao_Captura: string;
+  Nota_IA: string;
+  Nota_Humana: string;
+  Tags_IA: string | null;
+  Tags_Humana: string | null;
+}
+
+export function useImeiIA(limitDate: string, enabled = false) {
+  return useQuery<AvaliacaoImeiItem[]>({
+    queryKey: ["/api/avaliacoes-ia/imei", limitDate],
+    queryFn: async () => {
+      const qs = limitDate ? `?limit_date=${limitDate}` : "";
+      const res = await apiRequest("GET", `/api/avaliacoes-ia/imei${qs}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    enabled,
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+  });
+}
+
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export function useSaveCuradoria() {
