@@ -292,6 +292,101 @@ export function useMatrizConfusao(filtros: AvaliacoesFilters = {}) {
   });
 }
 
+// ─── Proxy API Types (RenovSmart) ─────────────────────────────────────────────
+
+export interface ResumoIAItem {
+  Grade_Humano_Real: string;
+  Percentual_Assertividade: number;
+  Qtd_Acertos_IA: number;
+  Total_Avaliados: number;
+  Erros_Comuns_IA: string | null;
+}
+
+export interface EvolucaoIAItem {
+  Mes: string;
+  Acuracia_Mensal: number;
+  Qtd_Acertos: number;
+  Total_Avaliados: number;
+}
+
+export interface DispositivoIAItem {
+  Dispositivo: string;
+  Acuracia: number;
+  Qtd_Acertos: number;
+  Qtd_Erros: number;
+  Total_Avaliados: number;
+}
+
+export interface CategoriaIAItem {
+  Categoria: string;
+  Acuracia: number;
+  Qtd_Acertos: number;
+  Total_Avaliados: number;
+}
+
+// ─── Proxy API Hooks ─────────────────────────────────────────────────────────
+
+function buildProxyParams(filtros: AvaliacoesFilters): string {
+  const p = new URLSearchParams();
+  if (filtros.dataInicio) p.set("start_date", filtros.dataInicio);
+  if (filtros.dataFim) p.set("end_date", filtros.dataFim);
+  if (filtros.categoria) p.set("categories", filtros.categoria);
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
+export function useResumoIA(filtros: AvaliacoesFilters = {}) {
+  return useQuery<ResumoIAItem[]>({
+    queryKey: ["/api/avaliacoes-ia/resumo", filtros],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/avaliacoes-ia/resumo${buildProxyParams(filtros)}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+export function useEvolucaoIA(filtros: AvaliacoesFilters = {}) {
+  return useQuery<EvolucaoIAItem[]>({
+    queryKey: ["/api/avaliacoes-ia/evolucao", filtros],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/avaliacoes-ia/evolucao${buildProxyParams(filtros)}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+export function useDispositivosIA(filtros: AvaliacoesFilters = {}) {
+  return useQuery<DispositivoIAItem[]>({
+    queryKey: ["/api/avaliacoes-ia/dispositivos", filtros],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/avaliacoes-ia/dispositivos${buildProxyParams(filtros)}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+export function useCategoriasIA(filtros: AvaliacoesFilters = {}) {
+  return useQuery<CategoriaIAItem[]>({
+    queryKey: ["/api/avaliacoes-ia/categorias", filtros],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/avaliacoes-ia/categorias${buildProxyParams(filtros)}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
 // ─── Assertividade por Tipo de Foto (from proxy API) ────────────────────────
 
 export interface AssertividadeFotoItem {
