@@ -1,20 +1,17 @@
+# --- Security + Cache defaults (all paths) ---
 /*
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   X-XSS-Protection: 1; mode=block
-
-/index.html
   Cache-Control: no-cache, no-store, must-revalidate
 
+# --- Hashed assets: immutable cache, NO Content-Type override ---
+# CF Pages auto-detects MIME from file extension (.css -> text/css, .js -> application/javascript).
+# Overriding Content-Type here would MASK errors when the SPA fallback serves
+# index.html (text/html) for missing asset hashes — the browser would silently
+# accept HTML as CSS/JS instead of showing a clear MIME mismatch error.
 /assets/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/assets/*.css
-  Content-Type: text/css; charset=utf-8
-  Cache-Control: public, max-age=31536000, immutable
-
-/assets/*.js
-  Content-Type: application/javascript; charset=utf-8
+  ! Cache-Control
   Cache-Control: public, max-age=31536000, immutable
