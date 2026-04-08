@@ -99,6 +99,7 @@ const NovoChamadoPage                  = lazy(() => import("@/pages/chamados/nov
 const TicketDetailPage                 = lazy(() => import("@/pages/chamados/[id]"));
 const EstoquesPage                     = lazy(() => import("@/pages/estoques/index"));
 const ComercialSimuladorPage           = lazy(() => import("@/pages/comercial/simulador"));
+const ApoioVendasPage                  = lazy(() => import("@/pages/apoio-vendas/index"));
 
 function Router() {
   return (
@@ -406,6 +407,16 @@ function Router() {
       <Route path="/comercial/simulador">
         <ProtectedRoute requiredPermission="comercial">
           <ComercialSimuladorPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/apoio-vendas">
+        <ProtectedRoute requiredPermission="apoio_vendas">
+          <ApoioVendasPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/apoio-vendas/gestao">
+        <ProtectedRoute requiredPermission="apoio_vendas">
+          <ApoioVendasPage />
         </ProtectedRoute>
       </Route>
       <Route path="/biblioteca">
