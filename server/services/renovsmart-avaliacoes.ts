@@ -9,6 +9,7 @@ import {
   curadoriaAvaliacoes,
   curadoriaConfiguracoes,
   type InsertCuradoriaAvaliacao,
+  type VersaoIA,
 } from "@shared/schema";
 import {
   normalizeGrade,
@@ -798,7 +799,7 @@ export async function getConfiguracoes(tenantId?: string | null) {
 }
 
 export async function updateConfiguracoes(
-  data: { percentualAmostragem?: string; modoPrioridade?: string; versoesIa?: unknown[] },
+  data: { percentualAmostragem?: string; modoPrioridade?: string; versoesIa?: VersaoIA[] },
   tenantId?: string | null
 ) {
   if (!db) throw new Error("Banco de dados não disponível");
