@@ -5,7 +5,6 @@ import { ptBR } from "date-fns/locale";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -34,15 +33,133 @@ import {
 } from "recharts";
 import {
   BarChart2, CheckCircle2, XCircle, Camera, TrendingUp, Bot,
-  Search, TrendingDown, Loader2,
+  TrendingDown, Smartphone, ArrowUpRight, ArrowDownRight,
 } from "lucide-react";
-import type { AvaliacoesFilters } from "@/hooks/use-avaliacoes";
+import type { AvaliacoesFilters, AvaliacaoImeiItem } from "@/hooks/use-avaliacoes";
 
-// ─── KPI Strip — dados reais da API proxy ─────────────────────────────────────
+// ─── Grade helpers ───────────────────────────────────────────────────────────
 
-function ProxyKpiStrip({
-  total, acertos, erros, assertividade, isLoading,
-}: { total: number; acertos: number; erros: number; assertividade: number; isLoading: boolean }) {
+type Grade = "A" | "B" | "C";
+
+const GRADE_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 };
+
+function normalizeGrade(raw: string | null | undefined): Grade | null {
+  if (!raw) return null;
+  const upper = raw.trim().toUpperCase();
+  if (upper === "D") return "C";
+  if (upper === "A" || upper === "B" || upper === "C") return upper as Grade;
+  return null;
+}
+
+function worstGrade(grades: (Grade | null)[]): Grade | null {
+  const valid = grades.filter((g): g is Grade => g !== null);
+  if (valid.length === 0) return null;
+  return valid.reduce((worst, g) =>
+    (GRADE_ORDER[g] ?? 0) > (GRADE_ORDER[worst] ?? 0) ? g : worst
+  );
+}
+
+// Map foto description to area
+function isDisplayFoto(desc: string): boolean {
+  const lower = desc.toLowerCase();
+  return ["tela", "frente", "front", "display", "screen"].some((p) => lower.includes(p));
+}
+
+// ─── Aggregate IMEI data into per-device metrics ────────────────────────────
+
+interface DeviceMetrics {
+  imei: string;
+  gradeIaDisplay: Grade | null;
+  gradeIaCarcaca: Grade | null;
+  gradeHumanoDisplay: Grade | null;
+  gradeHumanoCarcaca: Grade | null;
+}
+
+function aggregateDeviceMetrics(items: AvaliacaoImeiItem[], imeiFilter?: string): DeviceMetrics[] {
+  const filtered = imeiFilter
+    ? items.filter((i) => i.Imei.includes(imeiFilter))
+    : items;
+
+  const grouped = new Map<string, {
+    displayIa: (Grade | null)[]; displayHumano: (Grade | null)[];
+    carcacaIa: (Grade | null)[]; carcacaHumano: (Grade | null)[];
+  }>();
+
+  for (const item of filtered) {
+    const desc = item.Descricao_Captura || "";
+    if (desc.toLowerCase().includes("video") || desc.toLowerCase().includes("360")) continue;
+
+    const gradeIa = normalizeGrade(item.Nota_IA);
+    const gradeHumano = normalizeGrade(item.Nota_Humana);
+
+    if (!grouped.has(item.Imei)) {
+      grouped.set(item.Imei, {
+        displayIa: [], displayHumano: [],
+        carcacaIa: [], carcacaHumano: [],
+      });
+    }
+    const d = grouped.get(item.Imei)!;
+
+    if (isDisplayFoto(desc)) {
+      d.displayIa.push(gradeIa);
+      d.displayHumano.push(gradeHumano);
+    } else {
+      d.carcacaIa.push(gradeIa);
+      d.carcacaHumano.push(gradeHumano);
+    }
+  }
+
+  return Array.from(grouped.entries()).map(([imei, d]) => ({
+    imei,
+    gradeIaDisplay: worstGrade(d.displayIa),
+    gradeIaCarcaca: worstGrade(d.carcacaIa),
+    gradeHumanoDisplay: worstGrade(d.displayHumano),
+    gradeHumanoCarcaca: worstGrade(d.carcacaHumano),
+  }));
+}
+
+// ─── KPI Strip — device-level metrics ────────────────────────────────────────
+
+interface DeviceKpis {
+  totalDispositivos: number;
+  assertividadeGeral: number;
+  concordantes: number;
+  divergentes: number;
+}
+
+function computeDeviceKpis(devices: DeviceMetrics[]): DeviceKpis {
+  let concordantes = 0;
+  let divergentes = 0;
+  let comparaveis = 0;
+
+  for (const d of devices) {
+    // Check display area
+    const displayMatch = d.gradeIaDisplay && d.gradeHumanoDisplay
+      ? d.gradeIaDisplay === d.gradeHumanoDisplay : null;
+    // Check carcaca area
+    const carcacaMatch = d.gradeIaCarcaca && d.gradeHumanoCarcaca
+      ? d.gradeIaCarcaca === d.gradeHumanoCarcaca : null;
+
+    // Device is concordant if ALL comparable areas match
+    if (displayMatch !== null || carcacaMatch !== null) {
+      comparaveis++;
+      const allMatch =
+        (displayMatch === null || displayMatch) &&
+        (carcacaMatch === null || carcacaMatch);
+      if (allMatch) concordantes++;
+      else divergentes++;
+    }
+  }
+
+  return {
+    totalDispositivos: devices.length,
+    assertividadeGeral: comparaveis > 0 ? Math.round((concordantes / comparaveis) * 1000) / 10 : 0,
+    concordantes,
+    divergentes,
+  };
+}
+
+function DeviceKpiStrip({ kpis, isLoading }: { kpis: DeviceKpis; isLoading: boolean }) {
   if (isLoading) {
     return (
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
@@ -61,67 +178,156 @@ function ProxyKpiStrip({
       <Card style={{ background: "var(--vf)", border: "none" }}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
           <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#FFF" }}>
-            Total Avaliações
+            Total Dispositivos
           </CardTitle>
-          <BarChart2 className="h-4 w-4" style={{ color: "#FFF" }} />
+          <Smartphone className="h-4 w-4" style={{ color: "#FFF" }} />
         </CardHeader>
         <CardContent>
           <div className="text-[28px] font-bold" style={{ color: "#FFF" }}>
-            {total.toLocaleString("pt-BR")}
+            {kpis.totalDispositivos.toLocaleString("pt-BR")}
           </div>
-          <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.8)" }}>registros no período</p>
+          <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.8)" }}>IMEIs unicos no periodo</p>
         </CardContent>
       </Card>
 
       <Card style={{ background: "var(--vf)", border: "none" }}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
           <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#FFF" }}>
-            Assertividade Geral IA
+            Assertividade Geral
           </CardTitle>
           <Bot className="h-4 w-4" style={{ color: "#FFF" }} />
         </CardHeader>
         <CardContent>
           <div className="text-[28px] font-bold" style={{ color: "#FFF" }}>
-            {assertividade.toFixed(1)}%
+            {kpis.assertividadeGeral.toFixed(1)}%
           </div>
-          <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.8)" }}>grade IA vs grade humano</p>
+          <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.8)" }}>grade IA = grade humano por dispositivo</p>
         </CardContent>
       </Card>
 
       <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
           <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--l3)" }}>
-            Total Acertos
+            Concordantes
           </CardTitle>
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
         </CardHeader>
         <CardContent>
           <div className="text-[28px] font-bold text-emerald-400">
-            {acertos.toLocaleString("pt-BR")}
+            {kpis.concordantes.toLocaleString("pt-BR")}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">IA acertou a grade</p>
+          <p className="text-xs text-muted-foreground mt-1">IA = humano (ambas areas)</p>
         </CardContent>
       </Card>
 
       <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 gap-2">
           <CardTitle className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--l3)" }}>
-            Total Erros
+            Divergentes
           </CardTitle>
           <XCircle className="h-4 w-4 text-red-400" />
         </CardHeader>
         <CardContent>
           <div className="text-[28px] font-bold text-red-400">
-            {erros.toLocaleString("pt-BR")}
+            {kpis.divergentes.toLocaleString("pt-BR")}
           </div>
-          <p className="text-xs text-muted-foreground mt-1">IA errou a grade</p>
+          <p className="text-xs text-muted-foreground mt-1">IA != humano em alguma area</p>
         </CardContent>
       </Card>
     </div>
   );
 }
 
-// ─── Gráfico de evolução (proxy) ──────────────────────────────────────────────
+// ─── Bidirectional error card ────────────────────────────────────────────────
+
+interface ErrorBreakdown {
+  overGrading: number;
+  underGrading: number;
+  total: number;
+}
+
+function computeErrorBreakdown(devices: DeviceMetrics[]): ErrorBreakdown {
+  let overGrading = 0;
+  let underGrading = 0;
+
+  for (const d of devices) {
+    // Check display
+    if (d.gradeIaDisplay && d.gradeHumanoDisplay && d.gradeIaDisplay !== d.gradeHumanoDisplay) {
+      const iaOrder = GRADE_ORDER[d.gradeIaDisplay] ?? 0;
+      const humOrder = GRADE_ORDER[d.gradeHumanoDisplay] ?? 0;
+      if (iaOrder < humOrder) overGrading++; // IA gave better grade (A < C in order)
+      else underGrading++; // IA gave worse grade
+    }
+    // Check carcaca
+    if (d.gradeIaCarcaca && d.gradeHumanoCarcaca && d.gradeIaCarcaca !== d.gradeHumanoCarcaca) {
+      const iaOrder = GRADE_ORDER[d.gradeIaCarcaca] ?? 0;
+      const humOrder = GRADE_ORDER[d.gradeHumanoCarcaca] ?? 0;
+      if (iaOrder < humOrder) overGrading++;
+      else underGrading++;
+    }
+  }
+
+  return { overGrading, underGrading, total: overGrading + underGrading };
+}
+
+function BidirectionalErrorCard({ errors, isLoading }: { errors: ErrorBreakdown; isLoading: boolean }) {
+  const overPct = errors.total > 0 ? Math.round((errors.overGrading / errors.total) * 100) : 0;
+  const underPct = errors.total > 0 ? Math.round((errors.underGrading / errors.total) * 100) : 0;
+
+  return (
+    <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
+      <CardHeader>
+        <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
+          Direcao das Divergencias
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Quando a IA erra, ela superestima ou subestima a qualidade?
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        ) : errors.total > 0 ? (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+              <ArrowUpRight className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">Over-grading</span>
+                  <span className="text-sm font-bold tabular-nums text-amber-700 dark:text-amber-400">
+                    {errors.overGrading} ({overPct}%)
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  IA deu grade melhor que a correta (ex: IA=A, correto=C) — Renov paga mais
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+              <ArrowDownRight className="h-5 w-5 text-blue-500 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-blue-700 dark:text-blue-400">Under-grading</span>
+                  <span className="text-sm font-bold tabular-nums text-blue-700 dark:text-blue-400">
+                    {errors.underGrading} ({underPct}%)
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  IA deu grade pior que a correta (ex: IA=C, correto=A) — cliente recebe menos
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground text-center py-4">Nenhuma divergencia no periodo.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Grafico de evolucao (proxy) ──────────────────────────────────────────────
 
 function ProxyEvolutionChart({ filtros }: { filtros: AvaliacoesFilters }) {
   const { data, isLoading } = useEvolucaoIA(filtros);
@@ -140,9 +346,9 @@ function ProxyEvolutionChart({ filtros }: { filtros: AvaliacoesFilters }) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
-          Evolução da Assertividade IA
+          Evolucao da Assertividade IA
         </CardTitle>
-        <CardDescription>Precisão da IA ao longo do tempo (dados por foto)</CardDescription>
+        <CardDescription>Precisao da IA ao longo do tempo (dados por foto)</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -171,7 +377,7 @@ function ProxyEvolutionChart({ filtros }: { filtros: AvaliacoesFilters }) {
           </ResponsiveContainer>
         ) : (
           <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-            Nenhum dado disponível para o período selecionado.
+            Nenhum dado disponivel para o periodo selecionado.
           </div>
         )}
       </CardContent>
@@ -179,7 +385,7 @@ function ProxyEvolutionChart({ filtros }: { filtros: AvaliacoesFilters }) {
   );
 }
 
-// ─── Assertividade por Grade (proxy, D→C) ────────────────────────────────────
+// ─── Assertividade por Grade (proxy, D->C) ────────────────────────────────────
 
 function AssertividadePorGradeCard({ resumoIA, isLoading }: { resumoIA: Array<{ grade: string; acertos: number; total: number; assertividade: number }>; isLoading: boolean }) {
   return (
@@ -188,7 +394,7 @@ function AssertividadePorGradeCard({ resumoIA, isLoading }: { resumoIA: Array<{ 
         <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
           Assertividade por Grade
         </CardTitle>
-        <CardDescription className="text-xs">Precisão da IA em cada faixa de qualidade (Grade D consolidada em C)</CardDescription>
+        <CardDescription className="text-xs">Precisao da IA em cada faixa de qualidade (Grade D consolidada em C)</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -241,7 +447,7 @@ function Top10MelhorCard({ filtros }: { filtros: AvaliacoesFilters }) {
           <CheckCircle2 className="h-4 w-4 text-emerald-400" />
           Top 10 — Melhor Assertividade
         </CardTitle>
-        <CardDescription className="text-xs">Modelos com maior precisão da IA (mín. 5 avaliações)</CardDescription>
+        <CardDescription className="text-xs">Modelos com maior precisao da IA (min. 5 avaliacoes)</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -272,7 +478,7 @@ function Top10MelhorCard({ filtros }: { filtros: AvaliacoesFilters }) {
             </Table>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Nenhum dado para o período.</p>
+          <p className="text-xs text-muted-foreground">Nenhum dado para o periodo.</p>
         )}
       </CardContent>
     </Card>
@@ -299,7 +505,7 @@ function Top10PiorCard({ filtros }: { filtros: AvaliacoesFilters }) {
           <TrendingDown className="h-4 w-4 text-red-400" />
           Top 10 — Maior Taxa de Erro
         </CardTitle>
-        <CardDescription className="text-xs">Modelos onde a IA mais erra (mín. 5 avaliações)</CardDescription>
+        <CardDescription className="text-xs">Modelos onde a IA mais erra (min. 5 avaliacoes)</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -330,7 +536,7 @@ function Top10PiorCard({ filtros }: { filtros: AvaliacoesFilters }) {
             </Table>
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Nenhum dado para o período.</p>
+          <p className="text-xs text-muted-foreground">Nenhum dado para o periodo.</p>
         )}
       </CardContent>
     </Card>
@@ -370,20 +576,20 @@ function CategoriaCard({ filtros }: { filtros: AvaliacoesFilters }) {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {cat.Total_Avaliados.toLocaleString("pt-BR")} avaliações
+                  {cat.Total_Avaliados.toLocaleString("pt-BR")} avaliacoes
                 </p>
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-xs text-muted-foreground">Nenhum dado para o período.</p>
+          <p className="text-xs text-muted-foreground">Nenhum dado para o periodo.</p>
         )}
       </CardContent>
     </Card>
   );
 }
 
-// ─── Evolução por Categoria (últimos 3 meses) ─────────────────────────────────
+// ─── Evolucao por Categoria (ultimos 3 meses) ─────────────────────────────────
 
 function EvolucaoCategoriaCard({ filtros }: { filtros: AvaliacoesFilters }) {
   const { data, isLoading } = useEvolucaoCategoriaIA(filtros);
@@ -411,9 +617,9 @@ function EvolucaoCategoriaCard({ filtros }: { filtros: AvaliacoesFilters }) {
     <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
       <CardHeader>
         <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
-          Evolução por Categoria (últimos 3 meses)
+          Evolucao por Categoria (ultimos 3 meses)
         </CardTitle>
-        <CardDescription className="text-xs">Tendência de assertividade por tipo de dispositivo</CardDescription>
+        <CardDescription className="text-xs">Tendencia de assertividade por tipo de dispositivo</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -492,7 +698,7 @@ function AssertividadeFotosSection({ filtros }: { filtros: AvaliacoesFilters }) 
       </CardHeader>
       <CardContent>
         <p className="text-xs text-muted-foreground mb-3">
-          Em qual ângulo/tipo de foto a IA tem mais dificuldade (dados por foto, não por dispositivo)
+          Em qual angulo/tipo de foto a IA tem mais dificuldade (dados por foto, nao por dispositivo)
         </p>
         {isLoading ? (
           <Skeleton className="h-32 w-full" />
@@ -501,122 +707,27 @@ function AssertividadeFotosSection({ filtros }: { filtros: AvaliacoesFilters }) 
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tipo de Foto</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Acertos</TableHead>
-                  <TableHead className="text-right">Assertividade</TableHead>
+                  <TableHead className="text-xs">Tipo de Foto</TableHead>
+                  <TableHead className="text-right text-xs">Total</TableHead>
+                  <TableHead className="text-right text-xs">Acertos</TableHead>
+                  <TableHead className="text-right text-xs">Assert.</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.nome}>
-                    <TableCell className="font-medium">{row.nome}</TableCell>
-                    <TableCell className="text-right tabular-nums">{row.total.toLocaleString("pt-BR")}</TableCell>
-                    <TableCell className="text-right tabular-nums">{row.acertos.toLocaleString("pt-BR")}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      <span className={row.assertividade >= 80 ? "text-emerald-500" : row.assertividade >= 60 ? "text-yellow-500" : "text-red-500"}>
-                        {row.assertividade.toFixed(1)}%
+                {rows.map((r) => (
+                  <TableRow key={r.nome}>
+                    <TableCell className="text-xs font-medium max-w-[200px] truncate">{r.nome}</TableCell>
+                    <TableCell className="text-right text-xs tabular-nums">{r.total.toLocaleString("pt-BR")}</TableCell>
+                    <TableCell className="text-right text-xs tabular-nums">{r.acertos.toLocaleString("pt-BR")}</TableCell>
+                    <TableCell className="text-right text-xs tabular-nums font-semibold">
+                      <span className={r.assertividade >= 60 ? "text-emerald-400" : r.assertividade >= 30 ? "text-yellow-400" : "text-red-400"}>
+                        {r.assertividade.toFixed(1)}%
                       </span>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── Busca por IMEI ───────────────────────────────────────────────────────────
-
-function ImeiSearchSection({ filtros }: { filtros: AvaliacoesFilters }) {
-  const [imeiInput, setImeiInput] = useState("");
-  const [imeiFilter, setImeiFilter] = useState("");
-  const [imeiEnabled, setImeiEnabled] = useState(false);
-
-  const limitDate = filtros.dataFim ?? new Date().toISOString().slice(0, 10);
-  const { data: imeiData, isLoading: imeiLoading } = useImeiIA(limitDate, imeiEnabled);
-
-  const filteredImei = useMemo(() => {
-    if (!imeiFilter || !imeiData) return [];
-    const q = imeiFilter.toLowerCase();
-    return imeiData.filter((item) => item.Imei.toLowerCase().includes(q));
-  }, [imeiData, imeiFilter]);
-
-  function handleSearch() {
-    if (!imeiInput.trim()) return;
-    setImeiEnabled(true);
-    setImeiFilter(imeiInput.trim());
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") handleSearch();
-  }
-
-  return (
-    <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 gap-2">
-        <CardTitle className="text-sm font-semibold" style={{ color: "var(--l1)" }}>
-          Busca por IMEI
-        </CardTitle>
-        <Search className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex gap-2">
-          <Input
-            placeholder="Digite o IMEI..."
-            value={imeiInput}
-            onChange={(e) => setImeiInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="max-w-xs"
-            style={{ background: "var(--bg3)", borderColor: "var(--sep)", color: "var(--l1)" }}
-          />
-          <Button variant="default" size="sm" onClick={handleSearch} disabled={imeiLoading}>
-            {imeiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            <span className="ml-1">Buscar</span>
-          </Button>
-        </div>
-
-        {imeiEnabled && !imeiLoading && imeiFilter && filteredImei.length === 0 && (
-          <p className="text-xs text-muted-foreground">Nenhum resultado para "{imeiFilter}".</p>
-        )}
-
-        {filteredImei.length > 0 && (
-          <div className="overflow-x-auto">
-            <p className="text-xs text-muted-foreground mb-2">{filteredImei.length} registro(s) encontrado(s)</p>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">IMEI</TableHead>
-                  <TableHead className="text-xs">Voucher</TableHead>
-                  <TableHead className="text-xs">Data Pedido</TableHead>
-                  <TableHead className="text-xs">Captura</TableHead>
-                  <TableHead className="text-xs">Nota IA</TableHead>
-                  <TableHead className="text-xs">Nota Humana</TableHead>
-                  <TableHead className="text-xs">Tags IA</TableHead>
-                  <TableHead className="text-xs">Tags Humana</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredImei.slice(0, 50).map((item, idx) => (
-                  <TableRow key={`${item.Imei}-${idx}`}>
-                    <TableCell className="text-xs font-mono">{item.Imei}</TableCell>
-                    <TableCell className="text-xs">{item.Codigo_Voucher || "—"}</TableCell>
-                    <TableCell className="text-xs">{item.Criacao_Pedido ? item.Criacao_Pedido.slice(0, 10) : "—"}</TableCell>
-                    <TableCell className="text-xs max-w-[120px] truncate">{item.Descricao_Captura || "—"}</TableCell>
-                    <TableCell className="text-xs">{item.Nota_IA || "—"}</TableCell>
-                    <TableCell className="text-xs">{item.Nota_Humana || "—"}</TableCell>
-                    <TableCell className="text-xs max-w-[120px] truncate">{item.Tags_IA || "—"}</TableCell>
-                    <TableCell className="text-xs max-w-[120px] truncate">{item.Tags_Humana || "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {filteredImei.length > 50 && (
-              <p className="text-xs text-muted-foreground mt-2">Mostrando 50 de {filteredImei.length} resultados.</p>
-            )}
           </div>
         )}
       </CardContent>
@@ -633,7 +744,20 @@ export default function AvaliacoesDashboardPage() {
   // Dados da API proxy (reais)
   const { data: resumoIAData, isLoading: resumoIALoading } = useResumoIA(filters);
 
-  // Processar resumo: mesclar Grade D→C, calcular totais
+  // IMEI data for device-level KPIs (always enabled)
+  const limitDate = filters.dataFim ?? new Date().toISOString().slice(0, 10);
+  const { data: imeiData, isLoading: imeiLoading } = useImeiIA(limitDate, true);
+
+  // Process device-level metrics from IMEI data
+  const deviceMetrics = useMemo(() => {
+    if (!imeiData) return [];
+    return aggregateDeviceMetrics(imeiData, filters.imei);
+  }, [imeiData, filters.imei]);
+
+  const deviceKpis = useMemo(() => computeDeviceKpis(deviceMetrics), [deviceMetrics]);
+  const errorBreakdown = useMemo(() => computeErrorBreakdown(deviceMetrics), [deviceMetrics]);
+
+  // Processar resumo: mesclar Grade D->C, calcular totais
   const resumoProcessado = useMemo(() => {
     if (!resumoIAData) return {
       total: 0, acertos: 0, erros: 0, assertividade: 0,
@@ -644,7 +768,6 @@ export default function AvaliacoesDashboardPage() {
     let totalGeral = 0, acertosGeral = 0;
 
     for (const item of resumoIAData) {
-      // Grade D → C (POP 101 V3)
       const grade = item.Grade_Humano_Real === "D" ? "C" : item.Grade_Humano_Real;
       const existing = gradeMap.get(grade) ?? { acertos: 0, total: 0 };
       gradeMap.set(grade, {
@@ -669,19 +792,19 @@ export default function AvaliacoesDashboardPage() {
     };
   }, [resumoIAData]);
 
-  // Dados de curadoria (DB local — ficam zerados até curadoria ser iniciada)
+  // Dados de curadoria (DB local)
   const { data: resumoCuradoriaData, isLoading: curadoriaLoading } = useAvaliacoesResumo(filters);
   const temCuradoria = (resumoCuradoriaData?.data?.totalCurados ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader title="Avaliações — Dashboard" />
+      <PageHeader title="Avaliacoes — Dashboard" />
       <div className="container mx-auto px-4 py-6 space-y-6">
 
         {/* Breadcrumb */}
         <Breadcrumb>
           <BreadcrumbList>
-            <BreadcrumbItem><BreadcrumbPage>Avaliações</BreadcrumbPage></BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbPage>Avaliacoes</BreadcrumbPage></BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem><BreadcrumbPage>Dashboard</BreadcrumbPage></BreadcrumbItem>
           </BreadcrumbList>
@@ -691,29 +814,23 @@ export default function AvaliacoesDashboardPage() {
         <Tabs defaultValue="visao-geral" className="space-y-6">
           <TabsList className="h-9">
             <TabsTrigger value="visao-geral" className="text-xs sm:text-sm">
-              Visão Geral
+              Visao Geral
             </TabsTrigger>
             <TabsTrigger value="curadoria" className="text-xs sm:text-sm">
-              Métricas de Curadoria
+              Metricas de Curadoria
             </TabsTrigger>
           </TabsList>
 
-          {/* ── Aba 1: Visão Geral ────────────────────────────────────────── */}
+          {/* ── Aba 1: Visao Geral ────────────────────────────────────────── */}
           <TabsContent value="visao-geral" className="space-y-6 mt-0">
 
-            {/* Filtros */}
+            {/* Filtros (includes IMEI filter) */}
             <DashboardFilters filters={filters} onChange={setFilters} />
 
-            {/* KPIs da API RenovSmart */}
-            <ProxyKpiStrip
-              total={resumoProcessado.total}
-              acertos={resumoProcessado.acertos}
-              erros={resumoProcessado.erros}
-              assertividade={resumoProcessado.assertividade}
-              isLoading={resumoIALoading}
-            />
+            {/* KPIs por dispositivo (IMEIs unicos) */}
+            <DeviceKpiStrip kpis={deviceKpis} isLoading={imeiLoading} />
 
-            {/* Gráfico evolução + Grade breakdown */}
+            {/* Grafico evolucao + Grade breakdown */}
             <div className="grid gap-4 lg:grid-cols-5">
               <div className="lg:col-span-3">
                 <ProxyEvolutionChart filtros={filters} />
@@ -729,21 +846,21 @@ export default function AvaliacoesDashboardPage() {
               <Top10PiorCard filtros={filters} />
             </div>
 
-            {/* Taxa por Categoria + Evolução por Categoria */}
+            {/* Taxa por Categoria + Evolucao por Categoria */}
             <div className="grid gap-4 md:grid-cols-2">
               <CategoriaCard filtros={filters} />
               <EvolucaoCategoriaCard filtros={filters} />
             </div>
 
-            {/* Assertividade por tipo de foto */}
-            <AssertividadeFotosSection filtros={filters} />
-
-            {/* Busca por IMEI */}
-            <ImeiSearchSection filtros={filters} />
+            {/* Assertividade por tipo de foto + Direcao das divergencias */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <AssertividadeFotosSection filtros={filters} />
+              <BidirectionalErrorCard errors={errorBreakdown} isLoading={imeiLoading} />
+            </div>
 
           </TabsContent>
 
-          {/* ── Aba 2: Métricas de Curadoria ─────────────────────────────── */}
+          {/* ── Aba 2: Metricas de Curadoria ─────────────────────────────── */}
           <TabsContent value="curadoria" className="space-y-6 mt-0">
 
             {/* Filtros compartilhados */}
@@ -752,10 +869,10 @@ export default function AvaliacoesDashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-semibold" style={{ color: "var(--l1)" }}>
-                  Métricas de Curadoria
+                  Metricas de Curadoria
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Acurácia IA vs avaliador humano, ranking e impacto financeiro
+                  Acuracia IA vs avaliador humano, ranking e impacto financeiro
                 </p>
               </div>
               <Button variant="outline" size="sm" onClick={() => navigate("/avaliacoes/curadoria")}>
@@ -767,7 +884,7 @@ export default function AvaliacoesDashboardPage() {
               <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
                 <CardContent className="py-10 text-center">
                   <p className="text-muted-foreground text-sm">
-                    Inicie a curadoria para ver métricas de acurácia IA vs avaliador humano, custo do erro e evolução histórica.
+                    Inicie a curadoria para ver metricas de acuracia IA vs avaliador humano, custo do erro e evolucao historica.
                   </p>
                   <Button
                     variant="default"
