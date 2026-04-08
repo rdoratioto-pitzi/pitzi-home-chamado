@@ -18,6 +18,7 @@ export interface UserPermissions {
   diagramas: boolean;
   avaliacoes: boolean;
   comercial: boolean;
+  apoio_vendas: boolean;
 }
 
 export interface CurrentUser {
@@ -61,6 +62,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     diagramas: false,
     avaliacoes: false,
     comercial: false,
+    apoio_vendas: false,
   };
 
   if (!user) return defaultPerms;
@@ -86,6 +88,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       diagramas: true,
       avaliacoes: true,
       comercial: true,
+      apoio_vendas: true,
     };
   }
 
