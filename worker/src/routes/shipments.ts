@@ -672,6 +672,80 @@ shipments.get("/api/integrations/adm-logistica/divergentes", async (c) => {
   return c.json(data);
 });
 
+// GET /api/integrations/adm-logistica/dispositivos/aggregates
+shipments.get("/api/integrations/adm-logistica/dispositivos/aggregates", async (c) => {
+  const params = new URLSearchParams();
+  const queryParams = [
+    "start_date",
+    "end_date",
+    "rede",
+    "filial",
+    "status_coleta",
+    "transportadora",
+    "responsavel",
+    "imei",
+    "voucher",
+  ];
+
+  queryParams.forEach((param) => {
+    const value = c.req.query(param);
+    if (value) params.append(param, value);
+  });
+
+  const quinzena = c.req.query("quinzena") || c.req.query("quincena");
+  if (quinzena) {
+    params.append("quinzena", quinzena);
+  }
+
+  const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/dispositivos/aggregates?${params.toString()}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+  const data = await response.json();
+  return c.json(data);
+});
+
+// GET /api/integrations/adm-logistica/coletas/aggregates
+shipments.get("/api/integrations/adm-logistica/coletas/aggregates", async (c) => {
+  const params = new URLSearchParams();
+  const queryParams = ["start_date", "end_date", "tsp", "status_controle", "responsavel"];
+
+  queryParams.forEach((param) => {
+    const value = c.req.query(param);
+    if (value) params.append(param, value);
+  });
+
+  const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas/aggregates?${params.toString()}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+  const data = await response.json();
+  return c.json(data);
+});
+
+// GET /api/integrations/adm-logistica/consulta/aggregates
+shipments.get("/api/integrations/adm-logistica/consulta/aggregates", async (c) => {
+  const params = new URLSearchParams();
+  const codigos = c.req.query("codigos");
+  const rede = c.req.query("rede");
+
+  if (codigos) params.append("codigos", codigos);
+  if (rede) params.append("rede", rede);
+
+  const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/consulta/aggregates?${params.toString()}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+  });
+
+  if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+  const data = await response.json();
+  return c.json(data);
+});
+
 // GET /api/integrations/adm-logistica/fechamentos/aggregates
 shipments.get("/api/integrations/adm-logistica/fechamentos/aggregates", async (c) => {
   const params = new URLSearchParams();
