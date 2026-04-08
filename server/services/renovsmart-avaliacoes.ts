@@ -38,6 +38,7 @@ export interface FotoAvaliacao {
   notaHumana: Grade | null;
   tagsIa: string | null;
   tagsHumana: string | null;
+  idCaptura: string | null;
 }
 
 export interface TradeInAvaliacao {
@@ -66,6 +67,9 @@ export interface TradeInAvaliacao {
   // New: 7 named photo slots for per-photo grading
   fotos: FotoAvaliacao[];
 
+  codigoVoucher: string | null;
+  autoAvaliada: boolean;
+  idAvaliacao: string | null;
   foiCurado: boolean;
 }
 
@@ -194,6 +198,9 @@ function normalizeItem(item: any, foiCurado: boolean): TradeInAvaliacao {
     imagemDetalhe: item.imagem_detalhe || item.imagemDetalhe || null,
     linkFotos: item.link_fotos || item.linkFotos || null,
     fotos: [],
+    codigoVoucher: item.codigo_voucher || item.codigoVoucher || item["Código Voucher"] || null,
+    autoAvaliada: item.auto_avaliada ?? item.autoAvaliada ?? item["Auto Avaliada"] ?? false,
+    idAvaliacao: item.id_avaliacao || item.idAvaliacao || item["Id da Avaliação"] || null,
     foiCurado,
   };
 }
@@ -725,7 +732,15 @@ export async function getCuradorias(
   return { data, total, page, totalPages };
 }
 
-export async function getCuradoriaPendentes(tenantId?: string | null): Promise<TradeInAvaliacao[]> {
+interface CuradoriaFiltrosBackend {
+  startDate?: string;
+  endDate?: string;
+  categoria?: string;
+  imei?: string;
+  voucher?: string;
+}
+
+export async function getCuradoriaPendentes(tenantId?: string | null, filtros: CuradoriaFiltrosBackend = {}): Promise<TradeInAvaliacao[]> {
   // Get config for sampling percentage
   const configs = db
     ? tenantId
@@ -734,11 +749,10 @@ export async function getCuradoriaPendentes(tenantId?: string | null): Promise<T
     : [];
   const percentual = parseFloat(configs[0]?.percentualAmostragem ?? "15") || 15;
 
-  // Get all trade-ins from yesterday via real API proxy
+  // Resolve date range — default to yesterday
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().slice(0, 10);
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const limitDate = filtros.startDate || yesterday.toISOString().slice(0, 10);
 
   // Get curated IDs
   const curados = db ? await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).catch(() => []) : [];
@@ -747,7 +761,7 @@ export async function getCuradoriaPendentes(tenantId?: string | null): Promise<T
   let all: TradeInAvaliacao[];
   try {
     const rawPhotos = await fetchAvaliacoesApi("/avaliacoes-ia/imei", {
-      limit_date: yesterdayStr,
+      limit_date: limitDate,
     }) as RawFotoAvaliacao[];
     all = agregarPorDispositivo(rawPhotos, curadosSet);
   } catch (err) {
@@ -755,8 +769,20 @@ export async function getCuradoriaPendentes(tenantId?: string | null): Promise<T
     all = [];
   }
 
-  // Exclude already curated
-  const notCurated = all.filter((t) => !t.foiCurado);
+  // Apply filters
+  let filtered = all.filter((t) => !t.foiCurado);
+  if (filtros.endDate) {
+    filtered = filtered.filter((t) => t.dataTradeIn.slice(0, 10) <= filtros.endDate!);
+  }
+  if (filtros.imei) {
+    const imeiSearch = filtros.imei.toLowerCase();
+    filtered = filtered.filter((t) => t.imei?.toLowerCase().includes(imeiSearch));
+  }
+  if (filtros.voucher) {
+    const voucherSearch = filtros.voucher.toLowerCase();
+    filtered = filtered.filter((t) => t.codigoVoucher?.toLowerCase().includes(voucherSearch));
+  }
+  const notCurated = filtered;
 
   // Apply sampling
   const sample = Math.ceil(notCurated.length * (percentual / 100));

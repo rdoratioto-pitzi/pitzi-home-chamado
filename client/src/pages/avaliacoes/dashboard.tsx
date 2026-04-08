@@ -78,7 +78,7 @@ interface DeviceMetrics {
 
 function aggregateDeviceMetrics(items: AvaliacaoImeiItem[], imeiFilter?: string): DeviceMetrics[] {
   const filtered = imeiFilter
-    ? items.filter((i) => i.Imei.includes(imeiFilter))
+    ? items.filter((i) => i.Imei?.includes(imeiFilter))
     : items;
 
   const grouped = new Map<string, {

@@ -505,9 +505,9 @@ avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
     const percentual = parseFloat((configs[0] as any)?.percentualAmostragem ?? "15") || 15;
 
     // Date filters (default: yesterday)
-    const { start_date, end_date, categoria } = c.req.query();
+    const { start_date, end_date, categoria, imei, voucher } = c.req.query();
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    const limitDate = end_date || yesterday.toISOString().slice(0, 10);
+    const limitDate = start_date || yesterday.toISOString().slice(0, 10);
 
     let allItems: TradeInItem[] = [];
     try {
@@ -532,6 +532,18 @@ avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
     // Filter by categoria
     if (categoria) {
       allItems = allItems.filter((t) => t.categoria.toLowerCase().includes(categoria.toLowerCase()));
+    }
+
+    // Filter by IMEI
+    if (imei) {
+      const imeiSearch = imei.toLowerCase();
+      allItems = allItems.filter((t) => t.imei?.toLowerCase().includes(imeiSearch));
+    }
+
+    // Filter by voucher
+    if (voucher) {
+      const voucherSearch = voucher.toLowerCase();
+      allItems = allItems.filter((t) => (t as any).codigoVoucher?.toLowerCase().includes(voucherSearch));
     }
 
     const notCurated = allItems.filter((t) => !t.foiCurado);
