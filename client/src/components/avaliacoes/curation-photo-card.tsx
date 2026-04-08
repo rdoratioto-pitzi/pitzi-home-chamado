@@ -16,36 +16,35 @@ interface CurationPhotoCardProps {
 
 // ─── Grade styling ───────────────────────────────────────────────────────────
 
-const GRADE_COLORS: Record<Grade, { bg: string; text: string; outline: string }> = {
-  A: {
-    bg: "bg-green-500 text-white border-green-500",
-    text: "text-green-600 border-green-500",
-    outline: "hover:bg-green-50 dark:hover:bg-green-950/30",
-  },
-  B: {
-    bg: "bg-amber-500 text-white border-amber-500",
-    text: "text-amber-600 border-amber-500",
-    outline: "hover:bg-amber-50 dark:hover:bg-amber-950/30",
-  },
-  C: {
-    bg: "bg-red-500 text-white border-red-500",
-    text: "text-red-600 border-red-500",
-    outline: "hover:bg-red-50 dark:hover:bg-red-950/30",
-  },
-};
-
 const GRADE_BADGE: Record<Grade, string> = {
   A: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
   B: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
   C: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400",
 };
 
+const CURATOR_BTN_SELECTED: Record<Grade, string> = {
+  A: "bg-[#0F6E56] text-white border-[#0F6E56]",
+  B: "bg-[#BA7517] text-white border-[#BA7517]",
+  C: "bg-[#A32D2D] text-white border-[#A32D2D]",
+};
+
+const CURATOR_BTN_UNSELECTED: Record<Grade, string> = {
+  A: "text-green-600 dark:text-green-400 border-green-400 dark:border-green-600 hover:bg-green-50 dark:hover:bg-green-950/30",
+  B: "text-amber-600 dark:text-amber-400 border-amber-400 dark:border-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30",
+  C: "text-red-600 dark:text-red-400 border-red-400 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-950/30",
+};
+
+// Short label from full photo type (e.g. "Foto da Tela com IMEI" → "Tela com IMEI")
+function shortLabel(tipo: string): string {
+  return tipo.replace(/^Foto\s+(da\s+|de\s+)?/i, "");
+}
+
 function GradeBadge({ grade, label }: { grade: Grade | null; label: string }) {
-  if (!grade) return <span className="text-muted-foreground text-xs">{label}: —</span>;
+  if (!grade) return <span className="text-muted-foreground text-[10px]">{label}: —</span>;
   return (
-    <span className="text-xs flex items-center gap-1">
+    <span className="text-[10px] flex items-center gap-0.5">
       <span className="text-muted-foreground">{label}:</span>
-      <span className={cn("inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-semibold", GRADE_BADGE[grade])}>
+      <span className={cn("inline-flex items-center rounded px-1 py-0.5 font-bold", GRADE_BADGE[grade])}>
         {grade}
       </span>
     </span>
@@ -60,82 +59,76 @@ export function CurationPhotoCard({ foto, gradeCurador, onGradeChange, highlight
   const divergencia = foto.notaIa !== null && foto.notaHumana !== null && foto.notaIa !== foto.notaHumana;
   const concordam = foto.notaIa !== null && foto.notaHumana !== null && foto.notaIa === foto.notaHumana;
 
-  return (
-    <div
-      className={cn(
-        "rounded-xl border transition-all",
-        highlight && !gradeCurador
-          ? "border-red-400 dark:border-red-600 ring-2 ring-red-200 dark:ring-red-800"
-          : "border-border",
-      )}
-    >
-      {/* Header: photo type label */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/30 rounded-t-xl">
-        <span className="text-sm font-semibold">
-          Foto {foto.slot}: {foto.tipo.replace("Foto da ", "").replace("Foto ", "")}
-        </span>
-        <span className="text-xs text-muted-foreground capitalize">{foto.area === "display" ? "Display" : "Carcaça"}</span>
-      </div>
+  const needsHighlight = highlight && foto.url !== null && !gradeCurador;
 
-      {/* Content */}
-      <div className="p-4 flex flex-col gap-3">
-        {/* Image */}
+  return (
+    <>
+      <div
+        className={cn(
+          "rounded-lg border transition-all flex flex-col",
+          needsHighlight
+            ? "border-red-400 dark:border-red-600 ring-2 ring-red-200 dark:ring-red-800"
+            : "border-border",
+        )}
+      >
+        {/* Thumbnail */}
         {foto.url ? (
           <div
-            className="relative group cursor-zoom-in rounded-lg overflow-hidden border border-border bg-muted/20"
+            className="relative group cursor-zoom-in overflow-hidden rounded-t-lg bg-muted/20"
+            style={{ aspectRatio: "4/3" }}
             onClick={() => setModalAberto(true)}
           >
             <img
               src={foto.url}
               alt={foto.tipo}
-              className="w-full object-contain max-h-[400px]"
+              className="w-full h-full object-cover"
               loading="lazy"
             />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
-              <ZoomIn className="h-8 w-8 text-white drop-shadow" />
+              <ZoomIn className="h-5 w-5 text-white drop-shadow" />
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-40 rounded-lg border border-dashed border-border bg-muted/20 gap-2 text-muted-foreground">
-            <ImageOff className="h-10 w-10 opacity-40" />
-            <span className="text-sm font-medium">Foto não disponível</span>
-            <span className="text-xs opacity-70">{foto.tipo}</span>
+          <div
+            className="flex flex-col items-center justify-center rounded-t-lg bg-zinc-900 dark:bg-zinc-800 gap-1 text-muted-foreground"
+            style={{ aspectRatio: "4/3" }}
+          >
+            <ImageOff className="h-6 w-6 opacity-40" />
+            <span className="text-[10px] font-medium opacity-70 text-center px-1">{shortLabel(foto.tipo)}</span>
           </div>
         )}
 
-        {/* Grades row: IA + Humano + divergencia */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <GradeBadge grade={foto.notaIa} label="IA" />
-          <GradeBadge grade={foto.notaHumana} label="Humano" />
-          {divergencia && (
-            <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 text-xs">
-              <AlertTriangle className="h-3.5 w-3.5" />
-              <span>Divergência</span>
-            </div>
-          )}
-          {concordam && (
-            <div className="flex items-center gap-1 text-green-600 dark:text-green-400 text-xs">
-              <Check className="h-3.5 w-3.5" />
-              <span>Concordam</span>
-            </div>
-          )}
-        </div>
+        {/* Info area below thumbnail */}
+        <div className="p-2 flex flex-col gap-1.5">
+          {/* Label */}
+          <span className="text-xs font-semibold truncate">
+            {foto.slot}. {shortLabel(foto.tipo)}
+          </span>
 
-        {/* Curator grade buttons */}
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Nota do Curador:</span>
-          <div className="flex gap-2">
+          {/* IA + Humano badges + divergence indicator */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <GradeBadge grade={foto.notaIa} label="IA" />
+            <GradeBadge grade={foto.notaHumana} label="Hum" />
+            {divergencia && (
+              <AlertTriangle className="h-3 w-3 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+            )}
+            {concordam && (
+              <Check className="h-3 w-3 text-green-500 dark:text-green-400 flex-shrink-0" />
+            )}
+          </div>
+
+          {/* Curator A/B/C buttons */}
+          <div className="flex gap-1">
             {(["A", "B", "C"] as Grade[]).map((grade) => {
               const isSelected = gradeCurador === grade;
-              const colors = GRADE_COLORS[grade];
               return (
                 <button
                   key={grade}
                   type="button"
                   onClick={() => onGradeChange(grade)}
                   className={cn(
-                    "min-h-10 min-w-14 rounded-lg border-2 font-bold text-base transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary",
-                    isSelected ? colors.bg : cn("bg-transparent", colors.text, colors.outline)
+                    "flex-1 h-7 rounded border-2 font-bold text-xs transition-all focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary",
+                    isSelected ? CURATOR_BTN_SELECTED[grade] : cn("bg-transparent", CURATOR_BTN_UNSELECTED[grade])
                   )}
                 >
                   {grade}
@@ -156,13 +149,18 @@ export function CurationPhotoCard({ foto, gradeCurador, onGradeChange, highlight
               className="w-full rounded-lg object-contain max-h-[85vh]"
             />
           )}
-          <DialogClose asChild>
-            <Button variant="outline" size="sm" className="mt-2 w-full">
-              Fechar
-            </Button>
-          </DialogClose>
+          <div className="flex items-center justify-between gap-3 px-2 pt-2">
+            <div className="flex items-center gap-3">
+              <GradeBadge grade={foto.notaIa} label="IA" />
+              <GradeBadge grade={foto.notaHumana} label="Humano" />
+              {gradeCurador && <GradeBadge grade={gradeCurador} label="Curador" />}
+            </div>
+            <DialogClose asChild>
+              <Button variant="outline" size="sm">Fechar</Button>
+            </DialogClose>
+          </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
