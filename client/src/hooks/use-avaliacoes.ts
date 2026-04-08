@@ -5,6 +5,19 @@ import { apiRequest } from "@/lib/queryClient";
 
 export type Grade = "A" | "B" | "C";
 
+export type FotoArea = "display" | "carcaca";
+
+export interface FotoAvaliacao {
+  slot: number;              // 1-7
+  tipo: string;              // "Foto da Tela com IMEI", etc.
+  area: FotoArea;
+  url: string | null;
+  notaIa: Grade | null;
+  notaHumana: Grade | null;
+  tagsIa: string | null;
+  tagsHumana: string | null;
+}
+
 export interface TradeInAvaliacao {
   tradeInId: string;
   imei: string;
@@ -24,6 +37,7 @@ export interface TradeInAvaliacao {
   imagemLateral2: string | null;
   imagemDetalhe: string | null;
   linkFotos: string | null;
+  fotos: FotoAvaliacao[];
   foiCurado: boolean;
 }
 
@@ -87,6 +101,7 @@ export interface CuradoriaPayload {
   tradeInId: string;
   gradeCorretaDisplay?: Grade | null;
   gradeCorretaCarcaca?: Grade | null;
+  gradesPorFoto?: Record<string, Grade> | null;
   revisaoAvaliador?: boolean;
   revisaoTipo?: string | null;
   observacao?: string | null;
@@ -203,11 +218,22 @@ export function useCuradorias(
   });
 }
 
-export function useCuradoriaPendentes() {
+export interface CuradoriaFiltros {
+  startDate?: string;
+  endDate?: string;
+  categoria?: string;
+}
+
+export function useCuradoriaPendentes(filtros: CuradoriaFiltros = {}) {
   return useQuery<{ success: boolean; data: TradeInAvaliacao[]; total: number }>({
-    queryKey: KEYS.curadoriaPendentes(),
+    queryKey: ["/api/avaliacoes/curadoria/pendentes", filtros],
     queryFn: async () => {
-      const res = await apiRequest("GET", "/api/avaliacoes/curadoria/pendentes");
+      const qs = buildParams({
+        start_date: filtros.startDate,
+        end_date: filtros.endDate,
+        categoria: filtros.categoria,
+      });
+      const res = await apiRequest("GET", `/api/avaliacoes/curadoria/pendentes${qs}`);
       return res.json();
     },
     staleTime: 5 * 60 * 1000,
