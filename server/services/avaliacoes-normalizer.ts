@@ -4,7 +4,40 @@
  * Aplica regras POP 101 V3: Grade D → C, granularidade por dispositivo
  */
 
-import type { Grade, TradeInAvaliacao } from "./renovsmart-avaliacoes";
+import type { Grade, FotoArea as FotoAreaType, FotoAvaliacao, TradeInAvaliacao } from "./renovsmart-avaliacoes";
+
+// ─── 7-slot photo definitions (ordered) ─────────────────────────────────────
+
+export const FOTO_SLOTS: ReadonlyArray<{ slot: number; tipo: string; area: FotoAreaType; patterns: string[] }> = [
+  { slot: 1, tipo: "Foto da Tela com IMEI",  area: "display",  patterns: ["tela", "imei"] },
+  { slot: 2, tipo: "Foto da Tela Desligada",  area: "display",  patterns: ["tela", "desligada"] },
+  { slot: 3, tipo: "Foto da Parte Traseira",   area: "carcaca",  patterns: ["traseira"] },
+  { slot: 4, tipo: "Foto Lateral Esquerda",    area: "carcaca",  patterns: ["lateral", "esquerda"] },
+  { slot: 5, tipo: "Foto Lateral Direita",     area: "carcaca",  patterns: ["lateral", "direita"] },
+  { slot: 6, tipo: "Foto Parte Inferior",      area: "carcaca",  patterns: ["inferior"] },
+  { slot: 7, tipo: "Foto Parte Superior",      area: "carcaca",  patterns: ["superior"] },
+] as const;
+
+function matchFotoSlot(descricao: string): (typeof FOTO_SLOTS)[number] | null {
+  if (!descricao) return null;
+  const lower = descricao.toLowerCase();
+
+  // Skip video/360
+  if (lower.includes("video") || lower.includes("360")) return null;
+
+  // Try to match each slot by ALL its patterns present in the description
+  for (const slotDef of FOTO_SLOTS) {
+    const allMatch = slotDef.patterns.every((p) => lower.includes(p));
+    if (allMatch) return slotDef;
+  }
+
+  // Fallback: single-keyword matches for less specific descriptions
+  if (lower.includes("traseira") || lower.includes("back") || lower.includes("rear")) return FOTO_SLOTS[2]; // slot 3
+  if (lower.includes("lateral")) return FOTO_SLOTS[3]; // default to slot 4
+  if (lower.includes("tela") || lower.includes("frente") || lower.includes("front") || lower.includes("display") || lower.includes("screen")) return FOTO_SLOTS[0]; // slot 1
+
+  return null;
+}
 
 // ─── Grade Normalization (POP 101 V3) ────────────────────────────────────────
 
@@ -18,7 +51,7 @@ export function normalizeGrade(grade: string | null | undefined): Grade | null {
 
 // ─── Photo-to-Area Mapping ───────────────────────────────────────────────────
 
-export type FotoArea = "display" | "carcaca" | "ignorar";
+export type FotoArea = FotoAreaType | "ignorar";
 
 const DISPLAY_PATTERNS = [
   "frente", "tela", "front", "display", "screen",
@@ -110,6 +143,8 @@ interface DispositivoAgrupado {
   imagemLateral1: string | null;
   imagemLateral2: string | null;
   imagemDetalhe: string | null;
+  // New: per-photo data keyed by slot number
+  fotosMap: Map<number, FotoAvaliacao>;
 }
 
 function assignImageSlot(device: DispositivoAgrupado, desc: string, url: string): void {
@@ -172,10 +207,28 @@ export function agregarPorDispositivo(
         imagemLateral1: null,
         imagemLateral2: null,
         imagemDetalhe: null,
+        fotosMap: new Map(),
       });
     }
 
     const device = grouped.get(imei)!;
+
+    // Map photo to named slot (1-7)
+    const tagsIa = foto["Tags IA"] ?? foto.Tags_IA ?? null;
+    const tagsHumana = foto["Tags Humana"] ?? foto.Tags_Humana ?? null;
+    const slotDef = matchFotoSlot(descCaptura);
+    if (slotDef && !device.fotosMap.has(slotDef.slot)) {
+      device.fotosMap.set(slotDef.slot, {
+        slot: slotDef.slot,
+        tipo: slotDef.tipo,
+        area: slotDef.area,
+        url: urlCaptura,
+        notaIa: gradeIa,
+        notaHumana: gradeHumano,
+        tagsIa,
+        tagsHumana,
+      });
+    }
 
     if (area === "display") {
       device.displayGradesIa.push(gradeIa);
@@ -208,6 +261,22 @@ export function agregarPorDispositivo(
     const gradeHumanoDisplay = worstGrade(device.displayGradesHumano) ?? worstGrade(allHumanoGrades);
     const gradeHumanoCarcaca = worstGrade(device.carcacaGradesHumano) ?? worstGrade(allHumanoGrades);
 
+    // Build 7-slot fotos array (fill missing slots with null url)
+    const fotos: FotoAvaliacao[] = FOTO_SLOTS.map((slotDef) => {
+      const existing = device.fotosMap.get(slotDef.slot);
+      if (existing) return existing;
+      return {
+        slot: slotDef.slot,
+        tipo: slotDef.tipo,
+        area: slotDef.area,
+        url: null,
+        notaIa: null,
+        notaHumana: null,
+        tagsIa: null,
+        tagsHumana: null,
+      };
+    });
+
     result.push({
       tradeInId: imei,
       imei,
@@ -227,6 +296,7 @@ export function agregarPorDispositivo(
       imagemLateral2: device.imagemLateral2,
       imagemDetalhe: device.imagemDetalhe,
       linkFotos: device.linkFotos,
+      fotos,
       foiCurado: curadosSet.has(imei),
     });
   }
