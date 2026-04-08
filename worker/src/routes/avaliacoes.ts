@@ -825,3 +825,290 @@ avaliacoes.get("/api/avaliacoes/metricas/matriz-confusao", async (c) => {
     return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
   }
 });
+
+// ─── Triagem helper — busca valor voucher e avaliador por IMEI ───────────────
+
+interface TriagemInfo {
+  valorVoucher: number;
+  avaliador: string;
+}
+
+async function fetchTriagemByImeis(
+  token: string,
+  imeis: string[]
+): Promise<Map<string, TriagemInfo>> {
+  const map = new Map<string, TriagemInfo>();
+  if (imeis.length === 0) return map;
+
+  try {
+    const url = `${PIPELINE_RS_BASE}/adm_logistica/triagem`;
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    });
+    if (!response.ok) return map;
+    const raw = (await response.json()) as any;
+    const items: any[] = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : Array.isArray(raw?.results) ? raw.results : [];
+
+    const imeiSet = new Set(imeis);
+    for (const item of items) {
+      const imei = item.imei || item.IMEI || item.imei_number || "";
+      if (!imei || !imeiSet.has(imei)) continue;
+
+      const valor = parseFloat(
+        item["Valor do voucher"] ?? item["Valor do Voucher"] ?? item["valor_voucher"] ??
+        item.voucher_value ?? item.valor ?? "0"
+      ) || 0;
+      const avaliador = (
+        item["Avaliador"] ?? item.avaliador ?? item.responsavel_triagem ??
+        item.responsavel ?? item.responsible ?? ""
+      ).toString().trim();
+
+      if (!map.has(imei)) {
+        map.set(imei, { valorVoucher: valor, avaliador });
+      }
+    }
+  } catch {
+    // Silently fail — callers handle missing data
+  }
+  return map;
+}
+
+function isAvaliacaoAutomatica(nome: string): boolean {
+  return /autom[aá]tica/i.test(nome);
+}
+
+// ─── Impacto Financeiro dos Erros (com valor real do voucher) ────────────────
+
+avaliacoes.get("/api/avaliacoes/metricas/impacto-financeiro", async (c) => {
+  try {
+    const { data_inicio, data_fim } = c.req.query();
+    const db = c.get("db");
+    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+
+    const conditions = [];
+    if (data_inicio) { const s = parseDate(data_inicio); if (s) conditions.push(gte(curadoriaAvaliacoes.dataCuradoria, s)); }
+    if (data_fim) { const e = parseDate(data_fim); if (e) { e.setHours(23, 59, 59, 999); conditions.push(lte(curadoriaAvaliacoes.dataCuradoria, e)); } }
+
+    const records = conditions.length > 0
+      ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
+      : await db.select().from(curadoriaAvaliacoes);
+
+    // Collect IMEIs to lookup voucher values
+    const imeis = records.map((r) => r.imei).filter((i): i is string => Boolean(i));
+    const triagemMap = await fetchTriagemByImeis(token, [...new Set(imeis)]);
+
+    let erroIaOver = 0, erroIaUnder = 0;
+    let erroHumOver = 0, erroHumUnder = 0;
+    let usouEstimativa = false;
+
+    for (const r of records) {
+      const triagem = r.imei ? triagemMap.get(r.imei) : undefined;
+      const preco = triagem?.valorVoucher ?? (parseFloat(r.precoMaximo || "0") || 0);
+      if (!triagem?.valorVoucher && preco > 0) usouEstimativa = true;
+      if (preco <= 0) continue;
+
+      // Erro IA: comparar grade IA vs grade correta (curador)
+      const paresIa: Array<[string | null, string | null]> = [
+        [r.gradeIaDisplay, r.gradeCorretaDisplay],
+        [r.gradeIaCarcaca, r.gradeCorretaCarcaca],
+      ];
+      for (const [atrib, correta] of paresIa) {
+        if (atrib && correta && atrib !== correta) {
+          const diff = ((DESCONTO_POR_GRADE[atrib] ?? 0) - (DESCONTO_POR_GRADE[correta] ?? 0)) * preco;
+          if (diff < 0) erroIaOver += Math.abs(diff); // IA gave better grade → Renov pays more
+          else erroIaUnder += diff; // IA gave worse grade → client gets less
+        }
+      }
+
+      // Erro Humano: comparar grade humano vs grade correta (curador)
+      const paresHum: Array<[string | null, string | null]> = [
+        [r.gradeHumanoDisplay, r.gradeCorretaDisplay],
+        [r.gradeHumanoCarcaca, r.gradeCorretaCarcaca],
+      ];
+      for (const [atrib, correta] of paresHum) {
+        if (atrib && correta && atrib !== correta) {
+          const diff = ((DESCONTO_POR_GRADE[atrib] ?? 0) - (DESCONTO_POR_GRADE[correta] ?? 0)) * preco;
+          if (diff < 0) erroHumOver += Math.abs(diff);
+          else erroHumUnder += diff;
+        }
+      }
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        erroIa: {
+          overGrading: Math.round(erroIaOver * 100) / 100,
+          underGrading: Math.round(erroIaUnder * 100) / 100,
+          liquidoImpacto: Math.round((erroIaUnder - erroIaOver) * 100) / 100,
+        },
+        erroHumano: {
+          overGrading: Math.round(erroHumOver * 100) / 100,
+          underGrading: Math.round(erroHumUnder * 100) / 100,
+          liquidoImpacto: Math.round((erroHumUnder - erroHumOver) * 100) / 100,
+        },
+        totalCuradorias: records.length,
+        usouEstimativa,
+      },
+    });
+  } catch (error: unknown) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
+  }
+});
+
+// ─── Ranking de Avaliadores (enhanced: nomes reais + flag automática) ────────
+
+avaliacoes.get("/api/avaliacoes/metricas/ranking-avaliadores-completo", async (c) => {
+  try {
+    const { data_inicio, data_fim } = c.req.query();
+    const db = c.get("db");
+    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+
+    const conditions = [];
+    if (data_inicio) { const s = parseDate(data_inicio); if (s) conditions.push(gte(curadoriaAvaliacoes.dataCuradoria, s)); }
+    if (data_fim) { const e = parseDate(data_fim); if (e) { e.setHours(23, 59, 59, 999); conditions.push(lte(curadoriaAvaliacoes.dataCuradoria, e)); } }
+
+    const records = conditions.length > 0
+      ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
+      : await db.select().from(curadoriaAvaliacoes);
+
+    // Fetch real evaluator names from triagem API
+    const imeis = records.map((r) => r.imei).filter((i): i is string => Boolean(i));
+    const triagemMap = await fetchTriagemByImeis(token, [...new Set(imeis)]);
+
+    // Build evaluator map: resolve avaliadorHumanoId to real name via triagem
+    const byAvaliador = new Map<string, any[]>();
+    for (const r of records) {
+      const triagem = r.imei ? triagemMap.get(r.imei) : undefined;
+      const nome = triagem?.avaliador || r.avaliadorHumanoId || "desconhecido";
+      if (!byAvaliador.has(nome)) byAvaliador.set(nome, []);
+      byAvaliador.get(nome)!.push(r);
+    }
+
+    const now = new Date();
+    const cutoff7 = new Date(now); cutoff7.setDate(cutoff7.getDate() - 7);
+    const cutoff14 = new Date(now); cutoff14.setDate(cutoff14.getDate() - 14);
+
+    const data = Array.from(byAvaliador.entries())
+      .map(([nome, recs]) => {
+        const recent = recs.filter((r: any) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff7);
+        const previous = recs.filter((r: any) => r.dataCuradoria && new Date(r.dataCuradoria) >= cutoff14 && new Date(r.dataCuradoria) < cutoff7);
+
+        // Acurácia: grade humano = grade curador em AMBAS áreas
+        let acertos = 0, total = 0;
+        for (const r of recs) {
+          const displayOk = r.gradeHumanoDisplay && r.gradeCorretaDisplay
+            ? r.gradeHumanoDisplay === r.gradeCorretaDisplay : null;
+          const carcacaOk = r.gradeHumanoCarcaca && r.gradeCorretaCarcaca
+            ? r.gradeHumanoCarcaca === r.gradeCorretaCarcaca : null;
+          if (displayOk !== null || carcacaOk !== null) {
+            total++;
+            if ((displayOk === null || displayOk) && (carcacaOk === null || carcacaOk)) acertos++;
+          }
+        }
+
+        const recentAcc = (() => {
+          let a = 0, t = 0;
+          for (const r of recent) {
+            const dOk = r.gradeHumanoDisplay && r.gradeCorretaDisplay ? r.gradeHumanoDisplay === r.gradeCorretaDisplay : null;
+            const cOk = r.gradeHumanoCarcaca && r.gradeCorretaCarcaca ? r.gradeHumanoCarcaca === r.gradeCorretaCarcaca : null;
+            if (dOk !== null || cOk !== null) { t++; if ((dOk === null || dOk) && (cOk === null || cOk)) a++; }
+          }
+          return t > 0 ? (a / t) * 100 : 0;
+        })();
+
+        const prevAcc = (() => {
+          let a = 0, t = 0;
+          for (const r of previous) {
+            const dOk = r.gradeHumanoDisplay && r.gradeCorretaDisplay ? r.gradeHumanoDisplay === r.gradeCorretaDisplay : null;
+            const cOk = r.gradeHumanoCarcaca && r.gradeCorretaCarcaca ? r.gradeHumanoCarcaca === r.gradeCorretaCarcaca : null;
+            if (dOk !== null || cOk !== null) { t++; if ((dOk === null || dOk) && (cOk === null || cOk)) a++; }
+          }
+          return t > 0 ? (a / t) * 100 : 0;
+        })();
+
+        return {
+          avaliadorNome: nome,
+          totalDispositivos: recs.length,
+          acertos,
+          erros: total - acertos,
+          assertividade: total > 0 ? Math.round((acertos / total) * 1000) / 10 : 0,
+          isAutomatica: isAvaliacaoAutomatica(nome),
+          trend: Math.round((recentAcc - prevAcc) * 10) / 10,
+        };
+      })
+      .sort((a, b) => b.assertividade - a.assertividade);
+
+    return c.json({ success: true, data });
+  } catch (error: unknown) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
+  }
+});
+
+// ─── Evolução de Avaliadores (assertividade por período) ─────────────────────
+
+avaliacoes.get("/api/avaliacoes/metricas/avaliadores-evolucao", async (c) => {
+  try {
+    const { data_inicio, data_fim, granularidade = "dia" } = c.req.query();
+    const db = c.get("db");
+    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+
+    const conditions = [];
+    if (data_inicio) { const s = parseDate(data_inicio); if (s) conditions.push(gte(curadoriaAvaliacoes.dataCuradoria, s)); }
+    if (data_fim) { const e = parseDate(data_fim); if (e) { e.setHours(23, 59, 59, 999); conditions.push(lte(curadoriaAvaliacoes.dataCuradoria, e)); } }
+
+    const records = conditions.length > 0
+      ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions))
+      : await db.select().from(curadoriaAvaliacoes);
+
+    const imeis = records.map((r) => r.imei).filter((i): i is string => Boolean(i));
+    const triagemMap = await fetchTriagemByImeis(token, [...new Set(imeis)]);
+
+    function getPeriodoKey(date: Date): string {
+      if (granularidade === "mes") return date.toISOString().slice(0, 7);
+      return date.toISOString().slice(0, 10);
+    }
+
+    // Group by avaliador + period
+    const grouped = new Map<string, Map<string, { acertos: number; total: number }>>();
+
+    for (const r of records) {
+      if (!r.dataCuradoria) continue;
+      const triagem = r.imei ? triagemMap.get(r.imei) : undefined;
+      const nome = triagem?.avaliador || r.avaliadorHumanoId || "desconhecido";
+      const periodo = getPeriodoKey(new Date(r.dataCuradoria));
+
+      if (!grouped.has(nome)) grouped.set(nome, new Map());
+      const avMap = grouped.get(nome)!;
+      if (!avMap.has(periodo)) avMap.set(periodo, { acertos: 0, total: 0 });
+      const bucket = avMap.get(periodo)!;
+
+      const displayOk = r.gradeHumanoDisplay && r.gradeCorretaDisplay
+        ? r.gradeHumanoDisplay === r.gradeCorretaDisplay : null;
+      const carcacaOk = r.gradeHumanoCarcaca && r.gradeCorretaCarcaca
+        ? r.gradeHumanoCarcaca === r.gradeCorretaCarcaca : null;
+
+      if (displayOk !== null || carcacaOk !== null) {
+        bucket.total++;
+        if ((displayOk === null || displayOk) && (carcacaOk === null || carcacaOk)) bucket.acertos++;
+      }
+    }
+
+    const avaliadores = Array.from(grouped.entries()).map(([nome, periodos]) => ({
+      nome,
+      isAutomatica: isAvaliacaoAutomatica(nome),
+      dados: Array.from(periodos.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([periodo, { acertos, total }]) => ({
+          periodo,
+          total,
+          acertos,
+          assertividade: total > 0 ? Math.round((acertos / total) * 1000) / 10 : 0,
+        })),
+    }));
+
+    return c.json({ success: true, data: { avaliadores } });
+  } catch (error: unknown) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
+  }
+});

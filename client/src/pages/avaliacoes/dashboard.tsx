@@ -17,6 +17,7 @@ import {
 import { AccuracyTrendChart } from "@/components/avaliacoes/accuracy-trend-chart";
 import { EvaluatorRanking } from "@/components/avaliacoes/evaluator-ranking";
 import { CostImpactCard } from "@/components/avaliacoes/cost-impact-card";
+import { EvaluatorEvolutionChart } from "@/components/avaliacoes/evaluator-evolution-chart";
 import { DashboardFilters } from "@/components/avaliacoes/dashboard-filters";
 import {
   useAvaliacoesResumo,
@@ -903,6 +904,7 @@ export default function AvaliacoesDashboardPage() {
                   <EvaluatorRanking filtros={filters} />
                   <CostImpactCard filtros={filters} />
                 </div>
+                <EvaluatorEvolutionChart filtros={filters} />
               </>
             )}
 
