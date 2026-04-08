@@ -7,19 +7,13 @@
   X-XSS-Protection: 1; mode=block
   Cache-Control: no-cache, no-store, must-revalidate
 
-# --- Hashed assets: immutable cache, NO Content-Type override ---
-# CF Pages auto-detects MIME from file extension (.css -> text/css, .js -> application/javascript).
-# Overriding Content-Type here would MASK errors when the SPA fallback serves
-# index.html (text/html) for missing asset hashes — the browser would silently
-# accept HTML as CSS/JS instead of showing a clear MIME mismatch error.
+# --- Hashed assets: cache 1 dia, sem immutable ---
+# NÃO usar immutable aqui! Durante transições de deploy do CF Pages,
+# o SPA fallback pode servir index.html (text/html) para hashes de assets
+# que ainda não existem. Com immutable, o browser cacheia essa resposta
+# errada POR 1 ANO sem nunca revalidar — quebrando o CSS permanentemente.
+# Com max-age=86400 o dano máximo de cache poisoning é 1 dia.
+# CF Pages auto-detecta MIME type correto para arquivos reais.
 /assets/*
   ! Cache-Control
-  Cache-Control: public, max-age=31536000, immutable
-
-/assets/*.css
-  Content-Type: text/css; charset=utf-8
-  Cache-Control: public, max-age=31536000, immutable
-
-/assets/*.js
-  Content-Type: application/javascript; charset=utf-8
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=86400, must-revalidate
