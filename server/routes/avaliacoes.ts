@@ -150,11 +150,18 @@ export function registerAvaliacoesRoutes(router: Router) {
     }
   });
 
-  // GET /api/avaliacoes/curadoria/pendentes — trade-ins do dia anterior não curados
+  // GET /api/avaliacoes/curadoria/pendentes — trade-ins pendentes de curadoria
   router.get("/api/avaliacoes/curadoria/pendentes", requireAuth, async (req, res) => {
     try {
       const { tenantId } = (req as any).session ?? {};
-      const pendentes = await getCuradoriaPendentes(tenantId ?? null);
+      const { start_date, end_date, categoria, imei, voucher } = req.query;
+      const pendentes = await getCuradoriaPendentes(tenantId ?? null, {
+        startDate: start_date ? String(start_date) : undefined,
+        endDate: end_date ? String(end_date) : undefined,
+        categoria: categoria ? String(categoria) : undefined,
+        imei: imei ? String(imei) : undefined,
+        voucher: voucher ? String(voucher) : undefined,
+      });
       res.json({ success: true, data: pendentes, total: pendentes.length });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro interno";
