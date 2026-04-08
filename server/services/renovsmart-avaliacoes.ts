@@ -27,6 +27,19 @@ export const DESCONTO_POR_GRADE: Record<string, number> = { A: 0, B: 0.25, C: 0.
 
 export type Grade = "A" | "B" | "C";
 
+export type FotoArea = "display" | "carcaca";
+
+export interface FotoAvaliacao {
+  slot: number;              // 1-7
+  tipo: string;              // "Foto da Tela com IMEI", etc.
+  area: FotoArea;
+  url: string | null;
+  notaIa: Grade | null;
+  notaHumana: Grade | null;
+  tagsIa: string | null;
+  tagsHumana: string | null;
+}
+
 export interface TradeInAvaliacao {
   tradeInId: string;
   imei: string;
@@ -42,12 +55,16 @@ export interface TradeInAvaliacao {
   avaliadorHumanoId: string | null;
   avaliadorHumanoNome: string | null;
 
+  // Legacy image slots (backward compat)
   imagemFrontal: string | null;
   imagemTraseira: string | null;
   imagemLateral1: string | null;
   imagemLateral2: string | null;
   imagemDetalhe: string | null;
   linkFotos: string | null;
+
+  // New: 7 named photo slots for per-photo grading
+  fotos: FotoAvaliacao[];
 
   foiCurado: boolean;
 }
@@ -176,6 +193,7 @@ function normalizeItem(item: any, foiCurado: boolean): TradeInAvaliacao {
     imagemLateral2: item.imagem_lateral_2 || item.imagemLateral2 || null,
     imagemDetalhe: item.imagem_detalhe || item.imagemDetalhe || null,
     linkFotos: item.link_fotos || item.linkFotos || null,
+    fotos: [],
     foiCurado,
   };
 }
