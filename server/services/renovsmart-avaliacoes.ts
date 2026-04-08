@@ -798,7 +798,7 @@ export async function getConfiguracoes(tenantId?: string | null) {
 }
 
 export async function updateConfiguracoes(
-  data: { percentualAmostragem?: string; modoPrioridade?: string },
+  data: { percentualAmostragem?: string; modoPrioridade?: string; versoesIa?: unknown[] },
   tenantId?: string | null
 ) {
   if (!db) throw new Error("Banco de dados não disponível");
