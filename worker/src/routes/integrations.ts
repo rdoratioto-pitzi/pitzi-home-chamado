@@ -94,6 +94,51 @@ async function fetchEstoque(query: Record<string, string | string[] | undefined>
   return response.json();
 }
 
+async function fetchApoioVendas(
+  endpoint: string,
+  query: Record<string, string | string[] | undefined>,
+  apiToken?: string,
+) {
+  const params = new URLSearchParams();
+
+  Object.keys(query).forEach((key) => {
+    const value = query[key];
+    if (Array.isArray(value)) {
+      value.forEach((v) => {
+        if (v !== undefined && v !== null && v !== "") {
+          params.append(key, v);
+        }
+      });
+    } else if (value !== undefined && value !== null && value !== "") {
+      params.append(key, value);
+    }
+  });
+
+  const url = `${RS_API_BASE_URL}/${endpoint}`;
+  const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
+  const token = apiToken || "Renov123";
+
+  const response = await fetch(fullUrl, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const json = JSON.parse(text);
+      throw new Error(json.message || json.error || `API error: ${response.status}`);
+    } catch {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+  }
+
+  return response.json();
+}
+
 // ============== RELATÓRIO PEDIDOS ==============
 
 // POST /api/integrations/relatorio-pedidos/test-connection (public)
@@ -193,6 +238,26 @@ integrations.get("/api/avaliacoes-ia/imei", async (c) => {
   }
 
   const data = await fetchAiEvaluation("imei", Object.fromEntries(params.entries()) as any, token);
+  return c.json(data);
+});
+
+// ============== APOIO A VENDAS ==============
+
+integrations.get("/api/apoio-vendas/inicial/opcoes-filtros", async (c) => {
+  const token = getApiToken(c);
+  const data = await fetchApoioVendas("apoio-vendas/inicial/opcoes-filtros", c.req.query() as any, token);
+  return c.json(data);
+});
+
+integrations.get("/api/apoio-vendas/inicial/dados", async (c) => {
+  const token = getApiToken(c);
+  const data = await fetchApoioVendas("apoio-vendas/inicial/dados", c.req.query() as any, token);
+  return c.json(data);
+});
+
+integrations.get("/api/apoio-gestao/insumos-desempenho-avaliadores", async (c) => {
+  const token = getApiToken(c);
+  const data = await fetchApoioVendas("apoio-gestao/insumos-desempenho-avaliadores", c.req.query() as any, token);
   return c.json(data);
 });
 

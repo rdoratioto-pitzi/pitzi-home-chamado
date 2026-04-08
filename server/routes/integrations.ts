@@ -9,6 +9,46 @@ export function registerIntegrationRoutes(router: Router) {
   const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
   const RS_API_TOKEN = process.env.RENOVSMART_API_TOKEN || "Renov123";
 
+  const fetchApoioVendas = async (endpoint: string, query: any) => {
+    const params = new URLSearchParams();
+
+    Object.keys(query).forEach((key) => {
+      const value = query[key];
+      if (Array.isArray(value)) {
+        value.forEach((v: any) => {
+          if (v !== undefined && v !== null && v !== "") {
+            params.append(key, String(v));
+          }
+        });
+      } else if (value !== undefined && value !== null && value !== "") {
+        params.append(key, String(value));
+      }
+    });
+
+    const url = `${RS_API_BASE_URL}/${endpoint}`;
+    const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
+
+    const response = await fetch(fullUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${RS_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      try {
+        const json = JSON.parse(text);
+        throw new Error(json.message || json.error || `API error: ${response.status}`);
+      } catch {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+    }
+
+    return response.json();
+  };
+
   // ============== RELATÓRIO PEDIDOS API INTEGRATION ==============
 
   // Test connection to Relatório Pedidos API
@@ -224,6 +264,38 @@ export function registerIntegrationRoutes(router: Router) {
     } catch (error: any) {
       console.error("AI Evaluation imei error:", error);
       res.status(500).json({ error: error.message || "Falha ao buscar avaliações por IMEI" });
+    }
+  });
+
+  // ============== APOIO A VENDAS INTEGRATION ==============
+
+  router.get("/api/apoio-vendas/inicial/opcoes-filtros", requireAuth, async (req, res) => {
+    try {
+      const data = await fetchApoioVendas("apoio-vendas/inicial/opcoes-filtros", req.query);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Apoio a Vendas opcoes-filtros error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar opções de filtros" });
+    }
+  });
+
+  router.get("/api/apoio-vendas/inicial/dados", requireAuth, async (req, res) => {
+    try {
+      const data = await fetchApoioVendas("apoio-vendas/inicial/dados", req.query);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Apoio a Vendas inicial/dados error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar dados da aba Início" });
+    }
+  });
+
+  router.get("/api/apoio-gestao/insumos-desempenho-avaliadores", requireAuth, async (req, res) => {
+    try {
+      const data = await fetchApoioVendas("apoio-gestao/insumos-desempenho-avaliadores", req.query);
+      res.json(data);
+    } catch (error: any) {
+      console.error("Apoio a Vendas gestao error:", error);
+      res.status(500).json({ error: error.message || "Falha ao buscar dados da aba Gestão" });
     }
   });
 
