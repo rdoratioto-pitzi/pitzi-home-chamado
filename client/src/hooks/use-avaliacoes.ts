@@ -95,6 +95,7 @@ export interface AvaliacoesFilters {
   avaliadorId?: string;
   granularidade?: "diaria" | "semanal" | "mensal";
   tipo?: "ia" | "humano";
+  imei?: string;
 }
 
 export interface CuradoriaPayload {
