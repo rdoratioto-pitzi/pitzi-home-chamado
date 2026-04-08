@@ -187,12 +187,16 @@ function CuradoriaFilters({
   const [startDate, setStartDate] = useState(filtros.startDate || yesterdayStr);
   const [endDate, setEndDate] = useState(filtros.endDate || todayStr);
   const [categoria, setCategoria] = useState(filtros.categoria || "todas");
+  const [imei, setImei] = useState(filtros.imei || "");
+  const [voucher, setVoucher] = useState(filtros.voucher || "");
 
   function handleApply() {
     onApply({
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       categoria: categoria === "todas" ? undefined : categoria,
+      imei: imei.trim() || undefined,
+      voucher: voucher.trim() || undefined,
     });
   }
 
@@ -205,6 +209,7 @@ function CuradoriaFilters({
             <Input
               type="date"
               value={startDate}
+              min="2026-03-27"
               onChange={(e) => setStartDate(e.target.value)}
               className="w-[150px] h-9 text-sm"
             />
@@ -214,8 +219,29 @@ function CuradoriaFilters({
             <Input
               type="date"
               value={endDate}
+              min="2026-03-27"
               onChange={(e) => setEndDate(e.target.value)}
               className="w-[150px] h-9 text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">IMEI</Label>
+            <Input
+              type="text"
+              value={imei}
+              onChange={(e) => setImei(e.target.value)}
+              placeholder="Buscar IMEI..."
+              className="w-[160px] h-9 text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Voucher</Label>
+            <Input
+              type="text"
+              value={voucher}
+              onChange={(e) => setVoucher(e.target.value)}
+              placeholder="Buscar voucher..."
+              className="w-[160px] h-9 text-sm"
             />
           </div>
           <div className="flex flex-col gap-1.5">

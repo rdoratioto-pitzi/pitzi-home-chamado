@@ -266,6 +266,8 @@ export interface CuradoriaFiltros {
   startDate?: string;
   endDate?: string;
   categoria?: string;
+  imei?: string;
+  voucher?: string;
 }
 
 export function useCuradoriaPendentes(filtros: CuradoriaFiltros = {}) {
@@ -276,6 +278,8 @@ export function useCuradoriaPendentes(filtros: CuradoriaFiltros = {}) {
         start_date: filtros.startDate,
         end_date: filtros.endDate,
         categoria: filtros.categoria,
+        imei: filtros.imei,
+        voucher: filtros.voucher,
       });
       const res = await apiRequest("GET", `/api/avaliacoes/curadoria/pendentes${qs}`);
       return res.json();
