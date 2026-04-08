@@ -67,6 +67,7 @@ const MODULES = [
   { key: "conhecimento", label: "Biblioteca" },
   { key: "apis", label: "Integrações" },
   { key: "comercial", label: "Comercial" },
+  { key: "apoio_vendas", label: "Apoio a Vendas" },
   { key: "configuracoes", label: "Configurações" },
 ] as const;
 
@@ -100,6 +101,7 @@ const formSchema = z.object({
     conhecimento: z.boolean().default(true),
     apis: z.boolean(),
     comercial: z.boolean().default(true),
+    apoio_vendas: z.boolean().default(false),
     configuracoes: z.boolean(),
   }),
 });
