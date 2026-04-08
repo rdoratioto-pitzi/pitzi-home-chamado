@@ -82,6 +82,46 @@ export interface MatrizConfusaoResult {
   acuraciaGeral: number;
 }
 
+export interface ImpactoFinanceiroErro {
+  overGrading: number;
+  underGrading: number;
+  liquidoImpacto: number;
+}
+
+export interface ImpactoFinanceiroResult {
+  erroIa: ImpactoFinanceiroErro;
+  erroHumano: ImpactoFinanceiroErro;
+  totalCuradorias: number;
+  usouEstimativa: boolean;
+}
+
+export interface RankingAvaliadorCompleto {
+  avaliadorNome: string;
+  totalDispositivos: number;
+  acertos: number;
+  erros: number;
+  assertividade: number;
+  isAutomatica: boolean;
+  trend: number;
+}
+
+export interface AvaliadorEvolucaoPonto {
+  periodo: string;
+  total: number;
+  acertos: number;
+  assertividade: number;
+}
+
+export interface AvaliadorEvolucaoItem {
+  nome: string;
+  isAutomatica: boolean;
+  dados: AvaliadorEvolucaoPonto[];
+}
+
+export interface AvaliadorEvolucaoResult {
+  avaliadores: AvaliadorEvolucaoItem[];
+}
+
 export interface Avaliador {
   id: string;
   nome: string;
@@ -142,6 +182,9 @@ const KEYS = {
   ranking: (f: AvaliacoesFilters) => ["/api/avaliacoes/metricas/ranking-avaliadores", f],
   custoErro: (f: AvaliacoesFilters) => ["/api/avaliacoes/metricas/custo-erro", f],
   matrizConfusao: (f: AvaliacoesFilters) => ["/api/avaliacoes/metricas/matriz-confusao", f],
+  impactoFinanceiro: (f: AvaliacoesFilters) => ["/api/avaliacoes/metricas/impacto-financeiro", f],
+  rankingCompleto: (f: AvaliacoesFilters) => ["/api/avaliacoes/metricas/ranking-avaliadores-completo", f],
+  avaliadoresEvolucao: (f: AvaliacoesFilters & { granularidade?: string }) => ["/api/avaliacoes/metricas/avaliadores-evolucao", f],
 } as const;
 
 // ─── Helper: build query string ───────────────────────────────────────────────
@@ -489,6 +532,51 @@ export function useImeiIA(limitDate: string, enabled = false) {
     },
     enabled,
     staleTime: 10 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+// ─── Impacto Financeiro (valor real do voucher) ─────────────────────────────
+
+export function useImpactoFinanceiro(filtros: AvaliacoesFilters = {}) {
+  return useQuery<{ success: boolean; data: ImpactoFinanceiroResult }>({
+    queryKey: KEYS.impactoFinanceiro(filtros),
+    queryFn: async () => {
+      const qs = buildParams({ data_inicio: filtros.dataInicio, data_fim: filtros.dataFim });
+      const res = await apiRequest("GET", `/api/avaliacoes/metricas/impacto-financeiro${qs}`);
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+// ─── Ranking Completo (nomes reais + flag automática) ───────────────────────
+
+export function useRankingAvaliadorCompleto(filtros: AvaliacoesFilters = {}) {
+  return useQuery<{ success: boolean; data: RankingAvaliadorCompleto[] }>({
+    queryKey: KEYS.rankingCompleto(filtros),
+    queryFn: async () => {
+      const qs = buildParams({ data_inicio: filtros.dataInicio, data_fim: filtros.dataFim });
+      const res = await apiRequest("GET", `/api/avaliacoes/metricas/ranking-avaliadores-completo${qs}`);
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+// ─── Evolução Avaliadores (gráfico de linhas) ──────────────────────────────
+
+export function useAvaliadorEvolucao(filtros: AvaliacoesFilters = {}, granularidade: "dia" | "mes" = "dia") {
+  return useQuery<{ success: boolean; data: AvaliadorEvolucaoResult }>({
+    queryKey: KEYS.avaliadoresEvolucao({ ...filtros, granularidade }),
+    queryFn: async () => {
+      const qs = buildParams({ data_inicio: filtros.dataInicio, data_fim: filtros.dataFim, granularidade });
+      const res = await apiRequest("GET", `/api/avaliacoes/metricas/avaliadores-evolucao${qs}`);
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
     retry: 1,
   });
 }

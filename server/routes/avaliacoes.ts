@@ -13,6 +13,9 @@ import {
   calcularRankingAvaliadores,
   calcularCustoErro,
   calcularMatrizConfusao,
+  calcularImpactoFinanceiro,
+  calcularRankingAvaliadorCompleto,
+  calcularAvaliadorEvolucao,
   saveCuradoria,
   getCuradorias,
   getCuradoriaPendentes,
@@ -277,6 +280,57 @@ export function registerAvaliacoesRoutes(router: Router) {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro interno";
       console.error("[Avaliacoes] matriz confusao error:", message);
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  // GET /api/avaliacoes/metricas/impacto-financeiro — impacto bidirecional com voucher real
+  router.get("/api/avaliacoes/metricas/impacto-financeiro", requireAuth, async (req, res) => {
+    try {
+      const { data_inicio, data_fim } = req.query;
+      const filtros: AvaliacoesFilters = {};
+      if (data_inicio) filtros.dataInicio = String(data_inicio);
+      if (data_fim) filtros.dataFim = String(data_fim);
+
+      const impacto = await calcularImpactoFinanceiro(filtros);
+      res.json({ success: true, data: impacto });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro interno";
+      console.error("[Avaliacoes] impacto financeiro error:", message);
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  // GET /api/avaliacoes/metricas/ranking-avaliadores-completo — ranking com nomes reais + flag automática
+  router.get("/api/avaliacoes/metricas/ranking-avaliadores-completo", requireAuth, async (req, res) => {
+    try {
+      const { data_inicio, data_fim } = req.query;
+      const filtros: AvaliacoesFilters = {};
+      if (data_inicio) filtros.dataInicio = String(data_inicio);
+      if (data_fim) filtros.dataFim = String(data_fim);
+
+      const ranking = await calcularRankingAvaliadorCompleto(filtros);
+      res.json({ success: true, data: ranking });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro interno";
+      console.error("[Avaliacoes] ranking completo error:", message);
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  // GET /api/avaliacoes/metricas/avaliadores-evolucao — evolução temporal por avaliador
+  router.get("/api/avaliacoes/metricas/avaliadores-evolucao", requireAuth, async (req, res) => {
+    try {
+      const { data_inicio, data_fim, granularidade = "dia" } = req.query;
+      const filtros: AvaliacoesFilters = {};
+      if (data_inicio) filtros.dataInicio = String(data_inicio);
+      if (data_fim) filtros.dataFim = String(data_fim);
+
+      const evolucao = await calcularAvaliadorEvolucao(filtros, String(granularidade) as "dia" | "mes");
+      res.json({ success: true, data: evolucao });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro interno";
+      console.error("[Avaliacoes] avaliadores evolucao error:", message);
       res.status(500).json({ success: false, error: message });
     }
   });
