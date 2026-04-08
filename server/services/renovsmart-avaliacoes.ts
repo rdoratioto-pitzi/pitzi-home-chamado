@@ -38,6 +38,7 @@ export interface FotoAvaliacao {
   notaHumana: Grade | null;
   tagsIa: string | null;
   tagsHumana: string | null;
+  idCaptura: string | null;
 }
 
 export interface TradeInAvaliacao {
@@ -67,6 +68,8 @@ export interface TradeInAvaliacao {
   fotos: FotoAvaliacao[];
 
   codigoVoucher: string | null;
+  autoAvaliada: boolean;
+  idAvaliacao: string | null;
   foiCurado: boolean;
 }
 
@@ -196,6 +199,8 @@ function normalizeItem(item: any, foiCurado: boolean): TradeInAvaliacao {
     linkFotos: item.link_fotos || item.linkFotos || null,
     fotos: [],
     codigoVoucher: item.codigo_voucher || item.codigoVoucher || item["Código Voucher"] || null,
+    autoAvaliada: item.auto_avaliada ?? item.autoAvaliada ?? item["Auto Avaliada"] ?? false,
+    idAvaliacao: item.id_avaliacao || item.idAvaliacao || item["Id da Avaliação"] || null,
     foiCurado,
   };
 }

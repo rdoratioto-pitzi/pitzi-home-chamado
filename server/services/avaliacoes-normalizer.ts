@@ -126,6 +126,9 @@ export interface RawFotoAvaliacao {
   "Criação Pedido"?: string;
   "Tags IA"?: string | null;
   "Tags Humana"?: string | null;
+  "Auto Avaliada"?: boolean;
+  "Id da Avaliação"?: string;
+  "Id da Captura"?: string;
 }
 
 interface DispositivoAgrupado {
@@ -144,6 +147,8 @@ interface DispositivoAgrupado {
   imagemLateral2: string | null;
   imagemDetalhe: string | null;
   codigoVoucher: string | null;
+  autoAvaliada: boolean;
+  idAvaliacao: string | null;
   // New: per-photo data keyed by slot number
   fotosMap: Map<number, FotoAvaliacao>;
 }
@@ -200,6 +205,8 @@ export function agregarPorDispositivo(
         dataTradeIn,
         linkFotos,
         codigoVoucher: foto["Código Voucher"] ?? null,
+        autoAvaliada: foto["Auto Avaliada"] ?? false,
+        idAvaliacao: foto["Id da Avaliação"] ?? null,
         displayGradesIa: [],
         displayGradesHumano: [],
         carcacaGradesIa: [],
@@ -229,6 +236,7 @@ export function agregarPorDispositivo(
         notaHumana: gradeHumano,
         tagsIa,
         tagsHumana,
+        idCaptura: foto["Id da Captura"] ?? null,
       });
     }
 
@@ -276,6 +284,7 @@ export function agregarPorDispositivo(
         notaHumana: null,
         tagsIa: null,
         tagsHumana: null,
+        idCaptura: null,
       };
     });
 
@@ -300,6 +309,8 @@ export function agregarPorDispositivo(
       linkFotos: device.linkFotos,
       fotos,
       codigoVoucher: device.codigoVoucher,
+      autoAvaliada: device.autoAvaliada,
+      idAvaliacao: device.idAvaliacao,
       foiCurado: curadosSet.has(imei),
     });
   }
