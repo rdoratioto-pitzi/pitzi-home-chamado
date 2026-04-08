@@ -185,13 +185,13 @@ function CuradoriaFilters({
 
   const [startDate, setStartDate] = useState(filtros.startDate || yesterdayStr);
   const [endDate, setEndDate] = useState(filtros.endDate || todayStr);
-  const [categoria, setCategoria] = useState(filtros.categoria || "");
+  const [categoria, setCategoria] = useState(filtros.categoria || "todas");
 
   function handleApply() {
     onApply({
       startDate: startDate || undefined,
       endDate: endDate || undefined,
-      categoria: categoria || undefined,
+      categoria: categoria === "todas" ? undefined : categoria,
     });
   }
 
@@ -224,7 +224,7 @@ function CuradoriaFilters({
                 <SelectValue placeholder="Todas" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value="todas">Todas</SelectItem>
                 <SelectItem value="SmartphoneV2">Smartphone</SelectItem>
                 <SelectItem value="iPhoneV2">iPhone</SelectItem>
                 <SelectItem value="Console">Console</SelectItem>
