@@ -84,6 +84,7 @@ export function registerAvaliacoesRoutes(router: Router) {
         gradeIaDisplay, gradeIaCarcaca, gradeHumanoDisplay, gradeHumanoCarcaca,
         avaliadorHumanoId, precoMaximo, dataTradeIn,
         imagemFrontal, imagemTraseira, imagemLateral1, imagemLateral2, imagemDetalhe,
+        gradesPorFoto,
       } = req.body;
 
       if (!tradeInId) {
@@ -113,6 +114,7 @@ export function registerAvaliacoesRoutes(router: Router) {
         imagemLateral1: imagemLateral1 ?? null,
         imagemLateral2: imagemLateral2 ?? null,
         imagemDetalhe: imagemDetalhe ?? null,
+        gradesPorFoto: gradesPorFoto ?? null,
         tenantId: null,
       });
 

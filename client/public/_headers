@@ -1,12 +1,19 @@
+# --- Security + Cache defaults (all paths) ---
 /*
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   X-XSS-Protection: 1; mode=block
-
-/index.html
   Cache-Control: no-cache, no-store, must-revalidate
 
+# --- Hashed assets: cache 1 dia, sem immutable ---
+# NÃO usar immutable aqui! Durante transições de deploy do CF Pages,
+# o SPA fallback pode servir index.html (text/html) para hashes de assets
+# que ainda não existem. Com immutable, o browser cacheia essa resposta
+# errada POR 1 ANO sem nunca revalidar — quebrando o CSS permanentemente.
+# Com max-age=86400 o dano máximo de cache poisoning é 1 dia.
+# CF Pages auto-detecta MIME type correto para arquivos reais.
 /assets/*
-  Cache-Control: public, max-age=31536000, immutable
+  ! Cache-Control
+  Cache-Control: public, max-age=86400, must-revalidate

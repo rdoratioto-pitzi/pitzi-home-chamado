@@ -4,7 +4,40 @@
  * Aplica regras POP 101 V3: Grade D → C, granularidade por dispositivo
  */
 
-import type { Grade, TradeInAvaliacao } from "./renovsmart-avaliacoes";
+import type { Grade, FotoArea as FotoAreaType, FotoAvaliacao, TradeInAvaliacao } from "./renovsmart-avaliacoes";
+
+// ─── 7-slot photo definitions (ordered) ─────────────────────────────────────
+
+export const FOTO_SLOTS: ReadonlyArray<{ slot: number; tipo: string; area: FotoAreaType; patterns: string[] }> = [
+  { slot: 1, tipo: "Foto da Tela com IMEI",  area: "display",  patterns: ["tela", "imei"] },
+  { slot: 2, tipo: "Foto da Tela Desligada",  area: "display",  patterns: ["tela", "desligada"] },
+  { slot: 3, tipo: "Foto da Parte Traseira",   area: "carcaca",  patterns: ["traseira"] },
+  { slot: 4, tipo: "Foto Lateral Esquerda",    area: "carcaca",  patterns: ["lateral", "esquerda"] },
+  { slot: 5, tipo: "Foto Lateral Direita",     area: "carcaca",  patterns: ["lateral", "direita"] },
+  { slot: 6, tipo: "Foto Parte Inferior",      area: "carcaca",  patterns: ["inferior"] },
+  { slot: 7, tipo: "Foto Parte Superior",      area: "carcaca",  patterns: ["superior"] },
+] as const;
+
+function matchFotoSlot(descricao: string): (typeof FOTO_SLOTS)[number] | null {
+  if (!descricao) return null;
+  const lower = descricao.toLowerCase();
+
+  // Skip video/360
+  if (lower.includes("video") || lower.includes("360")) return null;
+
+  // Try to match each slot by ALL its patterns present in the description
+  for (const slotDef of FOTO_SLOTS) {
+    const allMatch = slotDef.patterns.every((p) => lower.includes(p));
+    if (allMatch) return slotDef;
+  }
+
+  // Fallback: single-keyword matches for less specific descriptions
+  if (lower.includes("traseira") || lower.includes("back") || lower.includes("rear")) return FOTO_SLOTS[2]; // slot 3
+  if (lower.includes("lateral")) return FOTO_SLOTS[3]; // default to slot 4
+  if (lower.includes("tela") || lower.includes("frente") || lower.includes("front") || lower.includes("display") || lower.includes("screen")) return FOTO_SLOTS[0]; // slot 1
+
+  return null;
+}
 
 // ─── Grade Normalization (POP 101 V3) ────────────────────────────────────────
 
@@ -18,14 +51,14 @@ export function normalizeGrade(grade: string | null | undefined): Grade | null {
 
 // ─── Photo-to-Area Mapping ───────────────────────────────────────────────────
 
-export type FotoArea = "display" | "carcaca" | "ignorar";
+export type FotoArea = FotoAreaType | "ignorar";
 
 const DISPLAY_PATTERNS = [
   "frente", "tela", "front", "display", "screen",
 ];
 
 const CARCACA_PATTERNS = [
-  "traseira", "lateral", "superior", "inferior",
+  "traseira", "lateral", "superior", "inferior", "parte",
   "back", "rear", "side", "top", "bottom",
 ];
 
@@ -65,9 +98,11 @@ function worstGrade(grades: (Grade | null)[]): Grade | null {
 // ─── Interfaces for raw API data ─────────────────────────────────────────────
 
 export interface RawFotoAvaliacao {
+  // Common fields
   Imei: string;
   Categoria?: string;
   Modelo?: string;
+  // Old field names (from /detalhes endpoint)
   Data_Avaliacao?: string;
   Grade_IA?: string;
   Grade_Humano?: string;
@@ -82,6 +117,15 @@ export interface RawFotoAvaliacao {
   Tags_Humana?: string | null;
   Is_Match?: number;
   Status_Assertividade?: string;
+  // New field names (from /imei endpoint, with accents/spaces)
+  "Nota IA"?: string;
+  "Nota Humana"?: string;
+  "Descrição Captura"?: string;
+  "Url Captura"?: string;
+  "Código Voucher"?: string;
+  "Criação Pedido"?: string;
+  "Tags IA"?: string | null;
+  "Tags Humana"?: string | null;
 }
 
 interface DispositivoAgrupado {
@@ -90,8 +134,32 @@ interface DispositivoAgrupado {
   categoria: string;
   dataTradeIn: string;
   linkFotos: string | null;
-  gradesIa: (Grade | null)[];
-  gradesHumano: (Grade | null)[];
+  displayGradesIa: (Grade | null)[];
+  displayGradesHumano: (Grade | null)[];
+  carcacaGradesIa: (Grade | null)[];
+  carcacaGradesHumano: (Grade | null)[];
+  imagemFrontal: string | null;
+  imagemTraseira: string | null;
+  imagemLateral1: string | null;
+  imagemLateral2: string | null;
+  imagemDetalhe: string | null;
+  // New: per-photo data keyed by slot number
+  fotosMap: Map<number, FotoAvaliacao>;
+}
+
+function assignImageSlot(device: DispositivoAgrupado, desc: string, url: string): void {
+  const lower = desc.toLowerCase();
+  if (lower.includes("traseira") || lower.includes("back") || lower.includes("rear")) {
+    if (!device.imagemTraseira) device.imagemTraseira = url;
+  } else if ((lower.includes("lateral direita") || lower.includes("lateral d")) && !device.imagemLateral1) {
+    device.imagemLateral1 = url;
+  } else if ((lower.includes("lateral esquerda") || lower.includes("lateral e")) && !device.imagemLateral2) {
+    device.imagemLateral2 = url;
+  } else if (lower.includes("lateral") && !device.imagemLateral1) {
+    device.imagemLateral1 = url;
+  } else if (!device.imagemDetalhe) {
+    device.imagemDetalhe = url;
+  }
 }
 
 // ─── Aggregate photos → devices ──────────────────────────────────────────────
@@ -106,38 +174,108 @@ export function agregarPorDispositivo(
     const imei = foto.Imei;
     if (!imei) continue;
 
-    const gradeIa = normalizeGrade(foto.Grade_IA || foto.Nota_IA);
-    const gradeHumano = normalizeGrade(foto.Grade_Humano || foto.Nota_Humana);
+    // Support both old field names (/detalhes) and new ones (/imei, with accents/spaces)
+    const gradeIaRaw = foto["Nota IA"] || foto.Grade_IA || foto.Nota_IA;
+    const gradeHumanoRaw = foto["Nota Humana"] || foto.Grade_Humano || foto.Nota_Humana;
+    const gradeIa = normalizeGrade(gradeIaRaw);
+    const gradeHumano = normalizeGrade(gradeHumanoRaw);
+
+    const descCaptura = foto["Descrição Captura"] || foto.Descricao_Captura || foto.Nome_da_Tela || "";
+    const urlCaptura = foto["Url Captura"] || null;
+    const area = mapFotoToArea(descCaptura);
+
+    const dataTradeIn =
+      foto.Data_Avaliacao ||
+      foto["Criação Pedido"] ||
+      foto.Criacao_Pedido ||
+      new Date().toISOString();
 
     if (!grouped.has(imei)) {
+      const linkFotos = typeof foto.Link_Fotos === "string" && foto.Link_Fotos ? foto.Link_Fotos : null;
       grouped.set(imei, {
         imei,
         modelo: foto.Modelo || foto.Categoria || "",
         categoria: foto.Categoria || "smartphone",
-        dataTradeIn: foto.Data_Avaliacao || foto.Criacao_Pedido || new Date().toISOString(),
-        linkFotos: typeof foto.Link_Fotos === 'string' && foto.Link_Fotos ? foto.Link_Fotos : null,
-        gradesIa: [],
-        gradesHumano: [],
+        dataTradeIn,
+        linkFotos,
+        displayGradesIa: [],
+        displayGradesHumano: [],
+        carcacaGradesIa: [],
+        carcacaGradesHumano: [],
+        imagemFrontal: null,
+        imagemTraseira: null,
+        imagemLateral1: null,
+        imagemLateral2: null,
+        imagemDetalhe: null,
+        fotosMap: new Map(),
       });
     }
 
     const device = grouped.get(imei)!;
-    device.gradesIa.push(gradeIa);
-    device.gradesHumano.push(gradeHumano);
-    // Preserve the most recent link if multiple records exist for same IMEI
-    const linkFotosValido = typeof foto.Link_Fotos === 'string' && foto.Link_Fotos ? foto.Link_Fotos : null;
-    if (linkFotosValido && !device.linkFotos) {
-      device.linkFotos = linkFotosValido;
+
+    // Map photo to named slot (1-7)
+    const tagsIa = foto["Tags IA"] ?? foto.Tags_IA ?? null;
+    const tagsHumana = foto["Tags Humana"] ?? foto.Tags_Humana ?? null;
+    const slotDef = matchFotoSlot(descCaptura);
+    if (slotDef && !device.fotosMap.has(slotDef.slot)) {
+      device.fotosMap.set(slotDef.slot, {
+        slot: slotDef.slot,
+        tipo: slotDef.tipo,
+        area: slotDef.area,
+        url: urlCaptura,
+        notaIa: gradeIa,
+        notaHumana: gradeHumano,
+        tagsIa,
+        tagsHumana,
+      });
     }
+
+    if (area === "display") {
+      device.displayGradesIa.push(gradeIa);
+      device.displayGradesHumano.push(gradeHumano);
+      if (urlCaptura && !device.imagemFrontal) device.imagemFrontal = urlCaptura;
+    } else if (area === "carcaca") {
+      device.carcacaGradesIa.push(gradeIa);
+      device.carcacaGradesHumano.push(gradeHumano);
+      if (urlCaptura) assignImageSlot(device, descCaptura, urlCaptura);
+    } else {
+      // Unknown area — still accumulate grades
+      device.displayGradesIa.push(gradeIa);
+      device.carcacaGradesIa.push(gradeIa);
+      device.displayGradesHumano.push(gradeHumano);
+      device.carcacaGradesHumano.push(gradeHumano);
+    }
+
+    const linkFotosValido = typeof foto.Link_Fotos === "string" && foto.Link_Fotos ? foto.Link_Fotos : null;
+    if (linkFotosValido && !device.linkFotos) device.linkFotos = linkFotosValido;
   }
 
   const result: TradeInAvaliacao[] = [];
 
   for (const [imei, device] of grouped) {
-    // API returns one grade per device evaluation (not per photo area).
-    // Use the same aggregated grade for both display and carcaça.
-    const gradeIa = worstGrade(device.gradesIa);
-    const gradeHumano = worstGrade(device.gradesHumano);
+    const allIaGrades = [...device.displayGradesIa, ...device.carcacaGradesIa];
+    const allHumanoGrades = [...device.displayGradesHumano, ...device.carcacaGradesHumano];
+
+    const gradeIaDisplay = worstGrade(device.displayGradesIa) ?? worstGrade(allIaGrades);
+    const gradeIaCarcaca = worstGrade(device.carcacaGradesIa) ?? worstGrade(allIaGrades);
+    const gradeHumanoDisplay = worstGrade(device.displayGradesHumano) ?? worstGrade(allHumanoGrades);
+    const gradeHumanoCarcaca = worstGrade(device.carcacaGradesHumano) ?? worstGrade(allHumanoGrades);
+
+    // Build 7-slot fotos array (fill missing slots with null url)
+    const fotos: FotoAvaliacao[] = FOTO_SLOTS.map((slotDef) => {
+      const existing = device.fotosMap.get(slotDef.slot);
+      if (existing) return existing;
+      return {
+        slot: slotDef.slot,
+        tipo: slotDef.tipo,
+        area: slotDef.area,
+        url: null,
+        notaIa: null,
+        notaHumana: null,
+        tagsIa: null,
+        tagsHumana: null,
+      };
+    });
 
     result.push({
       tradeInId: imei,
@@ -146,18 +284,19 @@ export function agregarPorDispositivo(
       categoria: device.categoria,
       dataTradeIn: device.dataTradeIn,
       precoMaximo: 0,
-      gradeIaDisplay: gradeIa,
-      gradeIaCarcaca: gradeIa,
-      gradeHumanoDisplay: gradeHumano,
-      gradeHumanoCarcaca: gradeHumano,
+      gradeIaDisplay,
+      gradeIaCarcaca,
+      gradeHumanoDisplay,
+      gradeHumanoCarcaca,
       avaliadorHumanoId: null,
       avaliadorHumanoNome: null,
-      imagemFrontal: null,
-      imagemTraseira: null,
-      imagemLateral1: null,
-      imagemLateral2: null,
-      imagemDetalhe: null,
+      imagemFrontal: device.imagemFrontal,
+      imagemTraseira: device.imagemTraseira,
+      imagemLateral1: device.imagemLateral1,
+      imagemLateral2: device.imagemLateral2,
+      imagemDetalhe: device.imagemDetalhe,
       linkFotos: device.linkFotos,
+      fotos,
       foiCurado: curadosSet.has(imei),
     });
   }

@@ -1677,6 +1677,7 @@ export const curadoriaAvaliacoes = pgTable("curadoria_avaliacoes", {
   imagemLateral1: text("imagem_lateral_1"),
   imagemLateral2: text("imagem_lateral_2"),
   imagemDetalhe: text("imagem_detalhe"),
+  gradesPorFoto: jsonb("grades_por_foto"), // { "1": "A", "2": "B", ... } — per-photo curator grades
 });
 
 export const insertCuradoriaAvaliacaoSchema = createInsertSchema(curadoriaAvaliacoes).omit({ id: true, dataCuradoria: true });

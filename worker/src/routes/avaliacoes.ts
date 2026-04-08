@@ -33,6 +33,92 @@ async function fetchAvaliacoesDetalhes(
   return [];
 }
 
+async function fetchAvaliacoesImei(token: string, limitDate: string): Promise<any[]> {
+  const url = `${PIPELINE_RS_BASE}/avaliacoes-ia/imei?limit_date=${encodeURIComponent(limitDate)}`;
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  if (!response.ok) throw new Error(`API imei error: ${response.status}`);
+  const data = await response.json() as any;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  return [];
+}
+
+function isDisplayFoto(desc: string): boolean {
+  const lower = desc.toLowerCase();
+  return ["tela", "frente", "front", "display", "screen"].some((p) => lower.includes(p));
+}
+
+function isCarcacaFoto(desc: string): boolean {
+  const lower = desc.toLowerCase();
+  return ["traseira", "lateral", "superior", "inferior", "parte", "back", "rear", "side", "top", "bottom"].some((p) => lower.includes(p));
+}
+
+function assignImeiImageSlot(slots: ImeiImageSlots, desc: string, url: string): void {
+  const lower = desc.toLowerCase();
+  if (lower.includes("traseira") || lower.includes("back") || lower.includes("rear")) {
+    if (!slots.imagemTraseira) slots.imagemTraseira = url;
+  } else if ((lower.includes("lateral direita") || lower.includes("lateral d")) && !slots.imagemLateral1) {
+    slots.imagemLateral1 = url;
+  } else if ((lower.includes("lateral esquerda") || lower.includes("lateral e")) && !slots.imagemLateral2) {
+    slots.imagemLateral2 = url;
+  } else if (lower.includes("lateral") && !slots.imagemLateral1) {
+    slots.imagemLateral1 = url;
+  } else if (!slots.imagemDetalhe) {
+    slots.imagemDetalhe = url;
+  }
+}
+
+interface ImeiImageSlots {
+  imagemFrontal: string | null;
+  imagemTraseira: string | null;
+  imagemLateral1: string | null;
+  imagemLateral2: string | null;
+  imagemDetalhe: string | null;
+}
+
+// ─── 7-slot photo definitions ────────────────────────────────────────────────
+
+type FotoAreaType = "display" | "carcaca";
+
+interface FotoAvaliacao {
+  slot: number;
+  tipo: string;
+  area: FotoAreaType;
+  url: string | null;
+  notaIa: Grade | null;
+  notaHumana: Grade | null;
+  tagsIa: string | null;
+  tagsHumana: string | null;
+}
+
+const FOTO_SLOTS: ReadonlyArray<{ slot: number; tipo: string; area: FotoAreaType; patterns: string[] }> = [
+  { slot: 1, tipo: "Foto da Tela com IMEI",  area: "display",  patterns: ["tela", "imei"] },
+  { slot: 2, tipo: "Foto da Tela Desligada",  area: "display",  patterns: ["tela", "desligada"] },
+  { slot: 3, tipo: "Foto da Parte Traseira",   area: "carcaca",  patterns: ["traseira"] },
+  { slot: 4, tipo: "Foto Lateral Esquerda",    area: "carcaca",  patterns: ["lateral", "esquerda"] },
+  { slot: 5, tipo: "Foto Lateral Direita",     area: "carcaca",  patterns: ["lateral", "direita"] },
+  { slot: 6, tipo: "Foto Parte Inferior",      area: "carcaca",  patterns: ["inferior"] },
+  { slot: 7, tipo: "Foto Parte Superior",      area: "carcaca",  patterns: ["superior"] },
+];
+
+function matchFotoSlotInline(descricao: string): (typeof FOTO_SLOTS)[number] | null {
+  if (!descricao) return null;
+  const lower = descricao.toLowerCase();
+  if (lower.includes("video") || lower.includes("360")) return null;
+
+  for (const slotDef of FOTO_SLOTS) {
+    if (slotDef.patterns.every((p) => lower.includes(p))) return slotDef;
+  }
+
+  if (lower.includes("traseira") || lower.includes("back") || lower.includes("rear")) return FOTO_SLOTS[2];
+  if (lower.includes("lateral")) return FOTO_SLOTS[3];
+  if (lower.includes("tela") || lower.includes("frente") || lower.includes("front") || lower.includes("display") || lower.includes("screen")) return FOTO_SLOTS[0];
+
+  return null;
+}
+
 // Grade normalizer: D → C (POP 101 V3)
 function normalizeGradeInline(raw: unknown): Grade | null {
   if (!raw) return null;
@@ -65,16 +151,17 @@ interface TradeInItem {
   gradeHumanoCarcaca: Grade | null;
   avaliadorHumanoId: null;
   avaliadorHumanoNome: null;
-  imagemFrontal: null;
-  imagemTraseira: null;
-  imagemLateral1: null;
-  imagemLateral2: null;
-  imagemDetalhe: null;
+  imagemFrontal: string | null;
+  imagemTraseira: string | null;
+  imagemLateral1: string | null;
+  imagemLateral2: string | null;
+  imagemDetalhe: string | null;
   linkFotos: string | null;
+  fotos: FotoAvaliacao[];
   foiCurado: boolean;
 }
 
-// Agrupa registros da API (um por avaliação) em um por dispositivo (IMEI)
+// Agrupa registros /detalhes (campos antigos, sem URL de imagem)
 function agregarPorDispositivoInline(raw: any[], curadosSet: Set<string>): TradeInItem[] {
   const grouped = new Map<string, {
     imei: string; modelo: string; categoria: string; dataTradeIn: string;
@@ -108,6 +195,11 @@ function agregarPorDispositivoInline(raw: any[], curadosSet: Set<string>): Trade
   return Array.from(grouped.values()).map((d): TradeInItem => {
     const gradeIa = worstGradeInline(d.gradesIa);
     const gradeHumano = worstGradeInline(d.gradesHumano);
+    // /detalhes endpoint has no per-photo URLs — return empty fotos
+    const fotos: FotoAvaliacao[] = FOTO_SLOTS.map((s) => ({
+      slot: s.slot, tipo: s.tipo, area: s.area, url: null,
+      notaIa: null, notaHumana: null, tagsIa: null, tagsHumana: null,
+    }));
     return {
       tradeInId: d.imei,
       imei: d.imei,
@@ -127,6 +219,114 @@ function agregarPorDispositivoInline(raw: any[], curadosSet: Set<string>): Trade
       imagemLateral2: null,
       imagemDetalhe: null,
       linkFotos: d.linkFotos,
+      fotos,
+      foiCurado: curadosSet.has(d.imei),
+    };
+  });
+}
+
+// Agrupa registros /imei (campos novos com acentos/espaços, inclui Url Captura)
+function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeInItem[] {
+  const grouped = new Map<string, {
+    imei: string; dataTradeIn: string; linkFotos: string | null;
+    displayGradesIa: (Grade | null)[]; displayGradesHumano: (Grade | null)[];
+    carcacaGradesIa: (Grade | null)[]; carcacaGradesHumano: (Grade | null)[];
+    slots: ImeiImageSlots;
+    fotosMap: Map<number, FotoAvaliacao>;
+  }>();
+
+  for (const item of raw) {
+    const imei: string = item["Imei"] || "";
+    if (!imei) continue;
+
+    const desc: string = item["Descrição Captura"] || "";
+    if (desc.toLowerCase().includes("video") || desc.toLowerCase().includes("360")) continue;
+
+    const gradeIa = normalizeGradeInline(item["Nota IA"]);
+    const gradeHumano = normalizeGradeInline(item["Nota Humana"]);
+    const urlCaptura: string | null = item["Url Captura"] || null;
+    const tagsIa: string | null = item["Tags IA"] || null;
+    const tagsHumana: string | null = item["Tags Humana"] || null;
+
+    if (!grouped.has(imei)) {
+      grouped.set(imei, {
+        imei,
+        dataTradeIn: item["Criação Pedido"] || new Date().toISOString(),
+        linkFotos: null,
+        displayGradesIa: [],
+        displayGradesHumano: [],
+        carcacaGradesIa: [],
+        carcacaGradesHumano: [],
+        slots: { imagemFrontal: null, imagemTraseira: null, imagemLateral1: null, imagemLateral2: null, imagemDetalhe: null },
+        fotosMap: new Map(),
+      });
+    }
+
+    const d = grouped.get(imei)!;
+
+    // Map to named slot (1-7)
+    const slotDef = matchFotoSlotInline(desc);
+    if (slotDef && !d.fotosMap.has(slotDef.slot)) {
+      d.fotosMap.set(slotDef.slot, {
+        slot: slotDef.slot,
+        tipo: slotDef.tipo,
+        area: slotDef.area,
+        url: urlCaptura,
+        notaIa: gradeIa,
+        notaHumana: gradeHumano,
+        tagsIa,
+        tagsHumana,
+      });
+    }
+
+    if (isDisplayFoto(desc)) {
+      d.displayGradesIa.push(gradeIa);
+      d.displayGradesHumano.push(gradeHumano);
+      if (urlCaptura && !d.slots.imagemFrontal) d.slots.imagemFrontal = urlCaptura;
+    } else if (isCarcacaFoto(desc)) {
+      d.carcacaGradesIa.push(gradeIa);
+      d.carcacaGradesHumano.push(gradeHumano);
+      if (urlCaptura) assignImeiImageSlot(d.slots, desc, urlCaptura);
+    } else {
+      d.displayGradesIa.push(gradeIa);
+      d.carcacaGradesIa.push(gradeIa);
+      d.displayGradesHumano.push(gradeHumano);
+      d.carcacaGradesHumano.push(gradeHumano);
+    }
+  }
+
+  return Array.from(grouped.values()).map((d): TradeInItem => {
+    const allIaGrades = [...d.displayGradesIa, ...d.carcacaGradesIa];
+    const allHumanoGrades = [...d.displayGradesHumano, ...d.carcacaGradesHumano];
+    // Build 7-slot fotos array
+    const fotos: FotoAvaliacao[] = FOTO_SLOTS.map((s) => {
+      const existing = d.fotosMap.get(s.slot);
+      if (existing) return existing;
+      return {
+        slot: s.slot, tipo: s.tipo, area: s.area, url: null,
+        notaIa: null, notaHumana: null, tagsIa: null, tagsHumana: null,
+      };
+    });
+    return {
+      tradeInId: d.imei,
+      imei: d.imei,
+      modelo: "",
+      categoria: "smartphone",
+      dataTradeIn: d.dataTradeIn,
+      precoMaximo: 0,
+      gradeIaDisplay: worstGradeInline(d.displayGradesIa) ?? worstGradeInline(allIaGrades),
+      gradeIaCarcaca: worstGradeInline(d.carcacaGradesIa) ?? worstGradeInline(allIaGrades),
+      gradeHumanoDisplay: worstGradeInline(d.displayGradesHumano) ?? worstGradeInline(allHumanoGrades),
+      gradeHumanoCarcaca: worstGradeInline(d.carcacaGradesHumano) ?? worstGradeInline(allHumanoGrades),
+      avaliadorHumanoId: null,
+      avaliadorHumanoNome: null,
+      imagemFrontal: d.slots.imagemFrontal,
+      imagemTraseira: d.slots.imagemTraseira,
+      imagemLateral1: d.slots.imagemLateral1,
+      imagemLateral2: d.slots.imagemLateral2,
+      imagemDetalhe: d.slots.imagemDetalhe,
+      linkFotos: d.linkFotos,
+      fotos,
       foiCurado: curadosSet.has(d.imei),
     };
   });
@@ -287,6 +487,7 @@ avaliacoes.post("/api/avaliacoes/curadoria", async (c) => {
       imagemLateral1: body.imagemLateral1 ?? null,
       imagemLateral2: body.imagemLateral2 ?? null,
       imagemDetalhe: body.imagemDetalhe ?? null,
+      gradesPorFoto: body.gradesPorFoto ?? null,
       tenantId: null,
     }).returning();
 
@@ -303,24 +504,39 @@ avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
     const configs = await db.select().from(curadoriaConfiguracoes).catch(() => []);
     const percentual = parseFloat((configs[0] as any)?.percentualAmostragem ?? "15") || 15;
 
-    // Buscar avaliações de ontem na API real
+    // Date filters (default: yesterday)
+    const { start_date, end_date, categoria } = c.req.query();
     const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
+    const limitDate = end_date || yesterday.toISOString().slice(0, 10);
 
     let allItems: TradeInItem[] = [];
     try {
-      const raw = await fetchAvaliacoesDetalhes(token, yesterdayStr, yesterdayStr);
+      const raw = await fetchAvaliacoesImei(token, limitDate);
       const curados = await db.select({ tradeInId: curadoriaAvaliacoes.tradeInId }).from(curadoriaAvaliacoes).catch(() => []);
       const curadosSet = new Set(curados.map((c) => c.tradeInId));
-      allItems = agregarPorDispositivoInline(raw, curadosSet);
+      allItems = agregarPorDispositivoImei(raw, curadosSet);
     } catch {
-      console.error("[avaliacoes] fetchAvaliacoesDetalhes falhou em /pendentes — retornando lista vazia");
+      console.error("[avaliacoes] fetchAvaliacoesImei falhou em /pendentes — retornando lista vazia");
       allItems = [];
+    }
+
+    // Filter by start_date if provided (API only supports limit_date, so filter client-side)
+    if (start_date) {
+      const startMs = new Date(start_date).getTime();
+      allItems = allItems.filter((t) => {
+        const d = new Date(t.dataTradeIn).getTime();
+        return !isNaN(d) && d >= startMs;
+      });
+    }
+
+    // Filter by categoria
+    if (categoria) {
+      allItems = allItems.filter((t) => t.categoria.toLowerCase().includes(categoria.toLowerCase()));
     }
 
     const notCurated = allItems.filter((t) => !t.foiCurado);
     const sample = Math.ceil(notCurated.length * (percentual / 100));
-    return c.json({ success: true, data: notCurated.slice(0, sample), total: sample });
+    return c.json({ success: true, data: notCurated.slice(0, sample), total: notCurated.length });
   } catch (error: unknown) {
     return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
   }
