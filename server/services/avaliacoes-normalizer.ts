@@ -143,6 +143,7 @@ interface DispositivoAgrupado {
   imagemLateral1: string | null;
   imagemLateral2: string | null;
   imagemDetalhe: string | null;
+  codigoVoucher: string | null;
   // New: per-photo data keyed by slot number
   fotosMap: Map<number, FotoAvaliacao>;
 }
@@ -198,6 +199,7 @@ export function agregarPorDispositivo(
         categoria: foto.Categoria || "smartphone",
         dataTradeIn,
         linkFotos,
+        codigoVoucher: foto["Código Voucher"] ?? null,
         displayGradesIa: [],
         displayGradesHumano: [],
         carcacaGradesIa: [],
@@ -297,6 +299,7 @@ export function agregarPorDispositivo(
       imagemDetalhe: device.imagemDetalhe,
       linkFotos: device.linkFotos,
       fotos,
+      codigoVoucher: device.codigoVoucher,
       foiCurado: curadosSet.has(imei),
     });
   }
