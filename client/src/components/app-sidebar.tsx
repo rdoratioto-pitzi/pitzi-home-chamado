@@ -196,6 +196,11 @@ const comercialSubItems = [
   { title: "Simulador CPD", url: "/comercial/simulador", icon: Calculator },
 ];
 
+const apoioVendasSubItems = [
+  { title: "Início", url: "/apoio-vendas", icon: LayoutDashboard },
+  { title: "Gestão", url: "/apoio-vendas/gestao", icon: TrendingUp },
+];
+
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { theme } = useTheme();
@@ -220,6 +225,7 @@ export function AppSidebar() {
   const [bibliotecaOpen, setBibliotecaOpen] = useState(location.startsWith("/biblioteca"));
   const [estoquesOpen, setEstoquesOpen] = useState(location.startsWith("/estoques"));
   const [comercialOpen, setComercialOpen] = useState(location.startsWith("/comercial"));
+  const [apoioVendasOpen, setApoioVendasOpen] = useState(location.startsWith("/apoio-vendas"));
   const [operacoesOpen, setOperacoesOpen] = useState(
     location.startsWith("/estoques") ||
     location.startsWith("/logistica") ||
@@ -234,6 +240,7 @@ export function AppSidebar() {
     if (location.startsWith("/estoques")) setEstoquesOpen(true);
     if (location.startsWith("/comercial")) setComercialOpen(true);
     if (location.startsWith("/avaliacoes")) setAvaliacoesOpen(true);
+    if (location.startsWith("/apoio-vendas")) setApoioVendasOpen(true);
     if (location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/pricing") || location.startsWith("/avaliacoes")) setOperacoesOpen(true);
     if (location.startsWith("/logistica/dispositivos") || location.startsWith("/logistica/coletas") || location.startsWith("/logistica/consulta") || location.startsWith("/logistica/fechamentos")) setLogisticaDashboardOpen(true);
     if (location.startsWith("/logistica/dashboard") || location.startsWith("/logistica/simular-frete") || location.startsWith("/logistica/operadores") || location.startsWith("/logistica/solicitacoes") || location.startsWith("/logistica/reversa") || location.startsWith("/logistica/romaneios") || location.startsWith("/logistica/avaliacoes-ia")) setLogisticaOutrosOpen(true);
@@ -252,6 +259,7 @@ export function AppSidebar() {
   const isBibliotecaActive = location.startsWith("/biblioteca");
   const isEstoquesActive = location.startsWith("/estoques");
   const isComercialActive = location.startsWith("/comercial");
+  const isApoioVendasActive = location.startsWith("/apoio-vendas");
   const isAvaliacoesActive = location.startsWith("/avaliacoes");
   const isOperacoesActive = location.startsWith("/estoques") || location.startsWith("/logistica") || location.startsWith("/triagem") || location.startsWith("/avaliacoes");
 
@@ -274,6 +282,7 @@ export function AppSidebar() {
           estoques: true,
           avaliacoes: true,
           comercial: true,
+          apoio_vendas: true,
         };
       }
       if (currentUser?.modulePermissions) {
@@ -300,6 +309,7 @@ export function AppSidebar() {
       estoques: false,
       avaliacoes: false,
       comercial: false,
+      apoio_vendas: false,
     };
   }, [currentUser]);
 
@@ -328,6 +338,7 @@ export function AppSidebar() {
   const hasEstoquesAccess = currentUser?.isAdmin || hasEstoquesPermission || isInEstoquesPage;
   const hasComercialAccess = permissions.comercial === true;
   const hasAvaliacoesAccess = permissions.avaliacoes === true;
+  const hasApoioVendasAccess = permissions.apoio_vendas === true;
   const hasOperacoesAccess = hasEstoquesAccess || hasLogisticaAccess || hasTriagemAccess || hasAvaliacoesAccess;
 
   const handleLogout = async () => {
@@ -808,6 +819,45 @@ export function AppSidebar() {
                             <SidebarMenuSubItem key={subItem.url}>
                               <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
                                 <Link href={subItem.url} data-testid={`link-comercial-${subItem.url.split("/").pop()}`}>
+                                  <subItem.icon className="h-4 w-4 mr-2" />
+                                  <span className="text-[12px]">{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          );
+                        })}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {hasApoioVendasAccess && (
+                <Collapsible open={apoioVendasOpen} onOpenChange={setApoioVendasOpen}>
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton
+                        className="h-9 px-3"
+                        isActive={isApoioVendasActive}
+                        data-testid="link-apoio-vendas"
+                      >
+                        <TrendingUp className="h-[20px] w-[20px]" />
+                        <span className="text-[12px]">Apoio a Vendas</span>
+                        {apoioVendasOpen ? (
+                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                        ) : (
+                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                        )}
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                        {apoioVendasSubItems.map((subItem) => {
+                          const isSubActive = location === subItem.url;
+                          return (
+                            <SidebarMenuSubItem key={subItem.url}>
+                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                <Link href={subItem.url} data-testid={`link-apoio-vendas-${subItem.url.split("/").pop()}`}>
                                   <subItem.icon className="h-4 w-4 mr-2" />
                                   <span className="text-[12px]">{subItem.title}</span>
                                 </Link>
