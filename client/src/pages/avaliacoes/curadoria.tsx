@@ -7,8 +7,8 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -60,10 +60,10 @@ function worstGrade(grades: (Grade | null)[]): Grade | null {
   );
 }
 
-const GRADE_BADGE: Record<Grade, string> = {
-  A: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 border-green-300 dark:border-green-700",
-  B: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 border-amber-300 dark:border-amber-700",
-  C: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 border-red-300 dark:border-red-700",
+const GRADE_BADGE_COLORS: Record<Grade, string> = {
+  A: "bg-[#0F6E56] text-white",
+  B: "bg-[#BA7517] text-white",
+  C: "bg-[#A32D2D] text-white",
 };
 
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
@@ -72,9 +72,10 @@ function CuradoriaLoadingSkeleton() {
   return (
     <div className="flex flex-col gap-4">
       <Skeleton className="h-4 w-full rounded-full" />
-      <Skeleton className="h-[200px] rounded-xl" />
-      <Skeleton className="h-[200px] rounded-xl" />
-      <Skeleton className="h-[200px] rounded-xl" />
+      <div className="flex gap-4">
+        <Skeleton className="h-[300px] flex-[35%] rounded-xl" />
+        <Skeleton className="h-[300px] flex-[65%] rounded-xl" />
+      </div>
     </div>
   );
 }
@@ -89,7 +90,7 @@ function EmptyState({ percentual }: { percentual: string }) {
       <div>
         <h3 className="text-lg font-semibold">Nenhum trade-in pendente para curadoria</h3>
         <p className="text-sm text-muted-foreground mt-1 max-w-md">
-          Os trade-ins serão disponibilizados com base na amostragem configurada ({percentual}%).
+          Os trade-ins serao disponibilizados com base na amostragem configurada ({percentual}%).
           Tente ajustar o filtro de datas.
         </p>
       </div>
@@ -101,7 +102,7 @@ function EmptyState({ percentual }: { percentual: string }) {
   );
 }
 
-// ─── Conclusão ────────────────────────────────────────────────────────────────
+// ─── Conclusao ────────────────────────────────────────────────────────────────
 
 function ConclusaoState({ curados, pulados }: { curados: number; pulados: number }) {
   const [, navigate] = useLocation();
@@ -111,7 +112,7 @@ function ConclusaoState({ curados, pulados }: { curados: number; pulados: number
       <div>
         <h3 className="text-2xl font-bold">Curadoria completa!</h3>
         <p className="text-sm text-muted-foreground mt-2">
-          Você curou <strong>{curados}</strong> trade-in{curados !== 1 ? "s" : ""}
+          Voce curou <strong>{curados}</strong> trade-in{curados !== 1 ? "s" : ""}
           {pulados > 0 && (
             <>
               {" · "}
@@ -139,7 +140,7 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
       <AlertCircle className="h-16 w-16 text-red-500/60" />
       <div>
         <h3 className="text-lg font-semibold">Erro ao carregar trade-ins</h3>
-        <p className="text-sm text-muted-foreground mt-1">Não foi possível conectar ao servidor.</p>
+        <p className="text-sm text-muted-foreground mt-1">Nao foi possivel conectar ao servidor.</p>
       </div>
       <Button onClick={onRetry} variant="outline" className="gap-2">
         <RefreshCw className="h-4 w-4" />
@@ -200,7 +201,7 @@ function CuradoriaFilters({
       <CardContent className="pt-4 pb-3">
         <div className="flex items-end gap-3 flex-wrap">
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Data Início</Label>
+            <Label className="text-xs">Data Inicio</Label>
             <Input
               type="date"
               value={startDate}
@@ -241,43 +242,93 @@ function CuradoriaFilters({
   );
 }
 
-// ─── Device header ────────────────────────────────────────────────────────────
+// ─── Device header (compact) ─────────────────────────────────────────────────
+
+const CATEGORIA_LABEL: Record<string, string> = {
+  iphone: "iPhone",
+  iphonev2: "iPhone",
+  smartphone: "Smartphone",
+  smartphonev2: "Smartphone",
+  console: "Console",
+};
 
 function DeviceHeader({ tradeIn }: { tradeIn: TradeInAvaliacao }) {
-  const CATEGORIA_LABEL: Record<string, string> = {
-    iphone: "iPhone",
-    smartphone: "Smartphone",
-    console: "Console",
-  };
+  const catLabel = CATEGORIA_LABEL[tradeIn.categoria.toLowerCase()] ?? tradeIn.categoria;
+  const dateStr = tradeIn.dataTradeIn
+    ? new Date(tradeIn.dataTradeIn).toLocaleDateString("pt-BR")
+    : "—";
 
   return (
-    <div className="flex items-start justify-between gap-2 flex-wrap">
-      <div>
-        <h2 className="text-xl font-bold leading-tight">{tradeIn.modelo || "Dispositivo"}</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          IMEI: {tradeIn.imei || "—"} · {CATEGORIA_LABEL[tradeIn.categoria] ?? tradeIn.categoria}
-        </p>
-      </div>
-      <span className="text-xs text-muted-foreground">
-        {tradeIn.dataTradeIn ? new Date(tradeIn.dataTradeIn).toLocaleString("pt-BR") : "—"}
-      </span>
+    <div className="flex items-center gap-2 flex-wrap text-sm">
+      <span className="font-bold text-base">{tradeIn.modelo || "Dispositivo"}</span>
+      <span className="text-muted-foreground">|</span>
+      <span className="text-muted-foreground font-mono text-xs">IMEI: {tradeIn.imei || "—"}</span>
+      <span className="text-muted-foreground">|</span>
+      <span className="text-muted-foreground">{catLabel}</span>
+      <span className="text-muted-foreground">|</span>
+      <span className="text-muted-foreground">{dateStr}</span>
     </div>
   );
 }
 
-// ─── Area summary badge ──────────────────────────────────────────────────────
+// ─── Area grade bar ──────────────────────────────────────────────────────────
 
-function AreaGradeBadge({ label, grade }: { label: string; grade: Grade | null }) {
+function AreaGradeBar({ label, grade }: { label: string; grade: Grade | null }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-sm font-medium">{label}:</span>
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/40 border border-border">
+      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}:</span>
       {grade ? (
-        <span className={`inline-flex items-center rounded-md border px-2.5 py-1 text-sm font-bold ${GRADE_BADGE[grade]}`}>
+        <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-bold ${GRADE_BADGE_COLORS[grade]}`}>
           {grade}
         </span>
       ) : (
-        <span className="text-muted-foreground text-sm">—</span>
+        <span className="text-muted-foreground text-xs">—</span>
       )}
+    </div>
+  );
+}
+
+// ─── Photo grid section ──────────────────────────────────────────────────────
+
+function PhotoGridSection({
+  label,
+  fotos,
+  gradesPorFoto,
+  onGradeChange,
+  showValidation,
+  gridClass,
+}: {
+  label: string;
+  fotos: FotoAvaliacao[];
+  gradesPorFoto: Record<number, Grade>;
+  onGradeChange: (slot: number, grade: Grade) => void;
+  showValidation: boolean;
+  gridClass: string;
+}) {
+  const areaGrade = worstGrade(
+    fotos.map((f) => gradesPorFoto[f.slot] ?? null)
+  );
+
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </h3>
+      <div className={gridClass}>
+        {fotos.map((foto) => (
+          <CurationPhotoCard
+            key={foto.slot}
+            foto={foto}
+            gradeCurador={gradesPorFoto[foto.slot] ?? null}
+            onGradeChange={(g) => onGradeChange(foto.slot, g)}
+            highlight={showValidation}
+          />
+        ))}
+      </div>
+      <AreaGradeBar
+        label={`Grade ${label.toLowerCase().includes("display") ? "display" : "carcaca"}`}
+        grade={areaGrade}
+      />
     </div>
   );
 }
@@ -355,6 +406,11 @@ export default function AvaliacoesCuradoriaPage() {
   const handleConfirm = useCallback(async () => {
     if (!canConfirm || !tradeInAtual) {
       setShowValidation(true);
+      toast({
+        title: "Avalie todas as fotos antes de confirmar",
+        description: "Fotos com imagem disponivel precisam de nota do curador.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -398,7 +454,7 @@ export default function AvaliacoesCuradoriaPage() {
     } catch {
       toast({
         title: "Erro ao salvar",
-        description: "Não foi possível salvar a curadoria. Tente novamente.",
+        description: "Nao foi possivel salvar a curadoria. Tente novamente.",
         variant: "destructive",
       });
     }
@@ -429,14 +485,14 @@ export default function AvaliacoesCuradoriaPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <PageHeader title="Avaliações — Curadoria" />
+      <PageHeader title="Avaliacoes — Curadoria" />
 
-      <div className="container mx-auto px-4 py-6 max-w-4xl space-y-5">
+      <div className="container mx-auto px-4 py-4 max-w-7xl space-y-4">
         {/* Breadcrumb */}
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/avaliacoes/dashboard">Avaliações</BreadcrumbLink>
+              <BreadcrumbLink href="/avaliacoes/dashboard">Avaliacoes</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -457,7 +513,7 @@ export default function AvaliacoesCuradoriaPage() {
         ) : concluido ? (
           <ConclusaoState curados={curadosCount} pulados={puladosCount} />
         ) : (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-4">
             {/* Sticky progress bar */}
             <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm pb-2 pt-1 -mx-1 px-1">
               <ProgressBar current={currentIndex} total={tradeIns.length} />
@@ -470,142 +526,119 @@ export default function AvaliacoesCuradoriaPage() {
 
             {/* Device header */}
             <Card>
-              <CardContent className="pt-4 pb-4">
+              <CardContent className="pt-3 pb-3">
                 <DeviceHeader tradeIn={tradeInAtual} />
               </CardContent>
             </Card>
 
-            {/* ═══ DISPLAY & TELA ═══ */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <Separator className="flex-1" />
-                <span className="text-sm font-bold text-muted-foreground whitespace-nowrap">
-                  DISPLAY & TELA (fotos 1-2)
-                </span>
-                <Separator className="flex-1" />
+            {/* ═══ GRID LAYOUT: Display (35%) + Carcaca (65%) ═══ */}
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* Left: DISPLAY & TELA — 2-col grid */}
+              <div className="lg:w-[35%] flex-shrink-0">
+                <PhotoGridSection
+                  label="Display & Tela"
+                  fotos={displayFotos}
+                  gradesPorFoto={gradesPorFoto}
+                  onGradeChange={handleFotoGradeChange}
+                  showValidation={showValidation}
+                  gridClass="grid grid-cols-2 gap-2"
+                />
               </div>
 
-              {displayFotos.map((foto) => (
-                <CurationPhotoCard
-                  key={foto.slot}
-                  foto={foto}
-                  gradeCurador={gradesPorFoto[foto.slot] ?? null}
-                  onGradeChange={(g) => handleFotoGradeChange(foto.slot, g)}
-                  highlight={showValidation}
+              {/* Right: CARCACA — 3-col grid (fotos 3-5) + 2-col grid (fotos 6-7) */}
+              <div className="lg:w-[65%] flex-1">
+                <PhotoGridSection
+                  label="Carcaca"
+                  fotos={carcacaFotos}
+                  gradesPorFoto={gradesPorFoto}
+                  onGradeChange={handleFotoGradeChange}
+                  showValidation={showValidation}
+                  gridClass="grid grid-cols-2 sm:grid-cols-3 gap-2"
                 />
-              ))}
-
-              {/* Display area grade */}
-              <div className="flex justify-center py-2">
-                <AreaGradeBadge label="Grade Display" grade={gradeDisplay} />
               </div>
             </div>
 
-            {/* ═══ CARCAÇA ═══ */}
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <Separator className="flex-1" />
-                <span className="text-sm font-bold text-muted-foreground whitespace-nowrap">
-                  CARCAÇA (fotos 3-7)
-                </span>
-                <Separator className="flex-1" />
-              </div>
-
-              {carcacaFotos.map((foto) => (
-                <CurationPhotoCard
-                  key={foto.slot}
-                  foto={foto}
-                  gradeCurador={gradesPorFoto[foto.slot] ?? null}
-                  onGradeChange={(g) => handleFotoGradeChange(foto.slot, g)}
-                  highlight={showValidation}
-                />
-              ))}
-
-              {/* Carcaça area grade */}
-              <div className="flex justify-center py-2">
-                <AreaGradeBadge label="Grade Carcaça" grade={gradeCarcaca} />
-              </div>
+            {/* ═══ RESUMO GRADES ═══ */}
+            <div className="flex items-center justify-center gap-6 py-2 rounded-lg bg-muted/30 border border-border">
+              <AreaGradeBar label="Display" grade={gradeDisplay} />
+              <div className="h-6 w-px bg-border" />
+              <AreaGradeBar label="Carcaca" grade={gradeCarcaca} />
             </div>
-
-            {/* ═══ RESUMO ═══ */}
-            <Card>
-              <CardContent className="pt-4 pb-4">
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center justify-center gap-8 py-3 rounded-lg bg-muted/30 border border-border">
-                    <AreaGradeBadge label="Display & Tela" grade={gradeDisplay} />
-                    <div className="h-8 w-px bg-border" />
-                    <AreaGradeBadge label="Carcaça" grade={gradeCarcaca} />
-                  </div>
-                  <p className="text-xs text-center text-muted-foreground">
-                    Calculado automaticamente da pior nota por área
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* ═══ REVISÃO + OBSERVAÇÃO ═══ */}
-            <Card>
-              <CardContent className="pt-4 pb-4 flex flex-col gap-4">
-                <ReviewerFlag
-                  enabled={revisaoAtiva}
-                  tipo={revisaoTipo}
-                  onToggle={(enabled) => {
-                    setRevisaoAtiva(enabled);
-                    if (!enabled) setRevisaoTipo(null);
-                  }}
-                  onTipoChange={setRevisaoTipo}
-                />
-
-                <Separator />
-
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Observação</label>
-                    <span className="text-xs text-muted-foreground">{observacao.length}/500</span>
-                  </div>
-                  <Textarea
-                    placeholder="Observação opcional..."
-                    maxLength={500}
-                    value={observacao}
-                    onChange={(e) => setObservacao(e.target.value)}
-                    rows={3}
-                    className="resize-none text-sm"
-                  />
-                </div>
-              </CardContent>
-            </Card>
 
             {/* Validation message */}
             {showValidation && !canConfirm && (
               <p className="text-sm text-red-500 font-medium text-center">
-                Avalie todas as fotos disponíveis antes de confirmar.
+                Avalie todas as fotos disponiveis antes de confirmar.
               </p>
             )}
 
             {/* ═══ STICKY ACTION BAR ═══ */}
             <div className="sticky bottom-0 z-10 bg-background/95 backdrop-blur-sm py-3 -mx-1 px-1 border-t border-border">
-              <div className="flex gap-2">
-                <Button
-                  className="flex-1 bg-[#00A137] hover:bg-[#048E33] text-white"
-                  onClick={handleConfirm}
-                  disabled={saveMutation.isPending}
-                >
-                  {saveMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Salvando...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Confirmar Curadoria
-                    </>
-                  )}
-                </Button>
-                <Button variant="outline" onClick={handleSkip} disabled={saveMutation.isPending} className="gap-2">
-                  <SkipForward className="h-4 w-4" />
-                  Pular
-                </Button>
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Revisao Avaliador toggle */}
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="revisao-inline"
+                    checked={revisaoAtiva}
+                    onCheckedChange={(checked) => {
+                      setRevisaoAtiva(checked);
+                      if (!checked) setRevisaoTipo(null);
+                    }}
+                  />
+                  <Label htmlFor="revisao-inline" className="text-xs cursor-pointer whitespace-nowrap">
+                    Revisao Avaliador
+                  </Label>
+                </div>
+
+                {/* Revisao tipo selector (compact) */}
+                {revisaoAtiva && (
+                  <Select value={revisaoTipo ?? ""} onValueChange={setRevisaoTipo}>
+                    <SelectTrigger className="h-8 w-[160px] text-xs">
+                      <SelectValue placeholder="Tipo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="listras">Listras na tela</SelectItem>
+                      <SelectItem value="burn-in">Burn-in</SelectItem>
+                      <SelectItem value="pixels">Pixels queimados</SelectItem>
+                      <SelectItem value="manchas">Manchas/sombras</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+
+                <Separator orientation="vertical" className="h-6 hidden sm:block" />
+
+                {/* Observacao inline */}
+                <Input
+                  placeholder="Observacao (opcional)..."
+                  maxLength={500}
+                  value={observacao}
+                  onChange={(e) => setObservacao(e.target.value)}
+                  className="h-8 text-xs flex-1 min-w-[140px] max-w-xs"
+                />
+
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    className="bg-[#00A137] hover:bg-[#048E33] text-white h-9"
+                    onClick={handleConfirm}
+                    disabled={saveMutation.isPending}
+                  >
+                    {saveMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Confirmar Curadoria
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="ghost" onClick={handleSkip} disabled={saveMutation.isPending} size="sm" className="gap-1 h-9">
+                    <SkipForward className="h-4 w-4" />
+                    Pular
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
