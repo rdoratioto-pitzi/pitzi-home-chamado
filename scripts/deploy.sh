@@ -23,9 +23,6 @@ if [ "$MISSING" -eq 1 ]; then
 fi
 echo "  Todos os assets referenciados existem no build."
 
-echo "→ Forçando upload do index.html..."
-echo "<!-- deploy $(date) -->" >> dist/public/index.html
-
 echo "→ Deploy Pages (frontend)..."
 npx wrangler pages deploy dist/public --project-name renov-home --commit-dirty=true
 
