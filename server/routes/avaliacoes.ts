@@ -23,6 +23,7 @@ import {
   updateConfiguracoes,
   type AvaliacoesFilters,
 } from "../services/renovsmart-avaliacoes";
+import type { VersaoIA } from "@shared/schema";
 
 export function registerAvaliacoesRoutes(router: Router) {
   // GET /api/avaliacoes/trade-ins — lista paginada com filtros
@@ -218,7 +219,7 @@ export function registerAvaliacoesRoutes(router: Router) {
     try {
       const { tenantId } = (req as any).session ?? {};
       const config = await getConfiguracoes(tenantId ?? null);
-      const versoes: any[] = (config as any).versoesIa ?? [];
+      const versoes: VersaoIA[] = (config as any).versoesIa ?? [];
       res.json({ success: true, data: versoes[0] ?? null });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro interno";
@@ -235,9 +236,9 @@ export function registerAvaliacoesRoutes(router: Router) {
         return res.status(400).json({ success: false, error: "data, versao e descricao são obrigatórios" });
       }
       const config = await getConfiguracoes(tenantId ?? null);
-      const versoesAtuais: any[] = (config as any).versoesIa ?? [];
-      const novasVersoes = [{ data, versao, descricao }, ...versoesAtuais];
-      await updateConfiguracoes({ versoesIa: novasVersoes } as any, tenantId ?? null);
+      const versoesAtuais: VersaoIA[] = (config as any).versoesIa ?? [];
+      const novasVersoes: VersaoIA[] = [{ data, versao, descricao }, ...versoesAtuais];
+      await updateConfiguracoes({ versoesIa: novasVersoes }, tenantId ?? null);
       res.json({ success: true, data: novasVersoes });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro interno";
@@ -251,12 +252,12 @@ export function registerAvaliacoesRoutes(router: Router) {
       const { tenantId } = (req as any).session ?? {};
       const idx = parseInt(String(req.params.index), 10);
       const config = await getConfiguracoes(tenantId ?? null);
-      const versoesAtuais: any[] = (config as any).versoesIa ?? [];
+      const versoesAtuais: VersaoIA[] = (config as any).versoesIa ?? [];
       if (isNaN(idx) || idx < 0 || idx >= versoesAtuais.length) {
         return res.status(400).json({ success: false, error: "Índice inválido" });
       }
-      const novasVersoes = versoesAtuais.filter((_, i) => i !== idx);
-      await updateConfiguracoes({ versoesIa: novasVersoes } as any, tenantId ?? null);
+      const novasVersoes: VersaoIA[] = versoesAtuais.filter((_, i) => i !== idx);
+      await updateConfiguracoes({ versoesIa: novasVersoes }, tenantId ?? null);
       res.json({ success: true, data: novasVersoes });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro interno";
