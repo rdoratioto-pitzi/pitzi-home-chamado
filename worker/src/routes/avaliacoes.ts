@@ -611,6 +611,73 @@ avaliacoes.put("/api/avaliacoes/configuracoes", async (c) => {
   }
 });
 
+avaliacoes.get("/api/avaliacoes/configuracoes/versoes-ia", async (c) => {
+  try {
+    const db = c.get("db");
+    const configs = await db.select().from(curadoriaConfiguracoes);
+    const versoes = (configs[0] as any)?.versoesIa ?? [];
+    return c.json({ success: true, data: versoes });
+  } catch (error: unknown) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
+  }
+});
+
+avaliacoes.get("/api/avaliacoes/configuracoes/versao-ia", async (c) => {
+  try {
+    const db = c.get("db");
+    const configs = await db.select().from(curadoriaConfiguracoes);
+    const versoes: any[] = (configs[0] as any)?.versoesIa ?? [];
+    return c.json({ success: true, data: versoes[0] ?? null });
+  } catch (error: unknown) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
+  }
+});
+
+avaliacoes.put("/api/avaliacoes/configuracoes/versao-ia", async (c) => {
+  try {
+    const db = c.get("db");
+    const body = await c.req.json() as any;
+    const { data, versao, descricao } = body;
+    if (!data || !versao || !descricao) {
+      return c.json({ success: false, error: "data, versao e descricao são obrigatórios" }, 400);
+    }
+    const configs = await db.select().from(curadoriaConfiguracoes);
+    const versoesAtuais: any[] = (configs[0] as any)?.versoesIa ?? [];
+    const novasVersoes = [{ data, versao, descricao }, ...versoesAtuais];
+    if (configs[0]) {
+      await db.update(curadoriaConfiguracoes)
+        .set({ versoesIa: novasVersoes as any, atualizadoEm: new Date() })
+        .where(eq(curadoriaConfiguracoes.id, configs[0].id));
+    } else {
+      await db.insert(curadoriaConfiguracoes).values({ versoesIa: novasVersoes as any });
+    }
+    return c.json({ success: true, data: novasVersoes });
+  } catch (error: unknown) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
+  }
+});
+
+avaliacoes.delete("/api/avaliacoes/configuracoes/versoes-ia/:index", async (c) => {
+  try {
+    const db = c.get("db");
+    const idx = parseInt(c.req.param("index"), 10);
+    const configs = await db.select().from(curadoriaConfiguracoes);
+    const versoesAtuais: any[] = (configs[0] as any)?.versoesIa ?? [];
+    if (isNaN(idx) || idx < 0 || idx >= versoesAtuais.length) {
+      return c.json({ success: false, error: "Índice inválido" }, 400);
+    }
+    const novasVersoes = versoesAtuais.filter((_: any, i: number) => i !== idx);
+    if (configs[0]) {
+      await db.update(curadoriaConfiguracoes)
+        .set({ versoesIa: novasVersoes as any, atualizadoEm: new Date() })
+        .where(eq(curadoriaConfiguracoes.id, configs[0].id));
+    }
+    return c.json({ success: true, data: novasVersoes });
+  } catch (error: unknown) {
+    return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
+  }
+});
+
 avaliacoes.get("/api/avaliacoes/metricas/resumo", async (c) => {
   try {
     const { data_inicio, data_fim, area = "ambas" } = c.req.query();
