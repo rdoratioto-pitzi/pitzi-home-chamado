@@ -33,12 +33,12 @@ async function fetchAvaliacoesDetalhes(
   return [];
 }
 
-async function fetchAvaliacoesImei(token: string, limitDate: string): Promise<any[]> {
-  const url = `${PIPELINE_RS_BASE}/avaliacoes-ia/imei?limit_date=${encodeURIComponent(limitDate)}`;
+async function fetchAvaliacoesImei(token: string, startDate: string): Promise<any[]> {
+  const url = `${PIPELINE_RS_BASE}/avaliacoes-ia/detalhes?start_date=${encodeURIComponent(startDate)}`;
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
-  if (!response.ok) throw new Error(`API imei error: ${response.status}`);
+  if (!response.ok) throw new Error(`API detalhes error: ${response.status}`);
   const data = await response.json() as any;
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
@@ -228,7 +228,8 @@ function agregarPorDispositivoInline(raw: any[], curadosSet: Set<string>): Trade
 // Agrupa registros /imei (campos novos com acentos/espaços, inclui Url Captura)
 function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeInItem[] {
   const grouped = new Map<string, {
-    imei: string; dataTradeIn: string; linkFotos: string | null;
+    imei: string; modelo: string; categoria: string;
+    dataTradeIn: string; linkFotos: string | null;
     displayGradesIa: (Grade | null)[]; displayGradesHumano: (Grade | null)[];
     carcacaGradesIa: (Grade | null)[]; carcacaGradesHumano: (Grade | null)[];
     slots: ImeiImageSlots;
@@ -236,7 +237,7 @@ function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeIn
   }>();
 
   for (const item of raw) {
-    const imei: string = item["Imei"] || "";
+    const imei: string = item["Imei"] || item.Imei || "";
     if (!imei) continue;
 
     const desc: string = item.Descricao_Captura || item["Descrição Captura"] || "";
@@ -249,10 +250,16 @@ function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeIn
     const tagsHumana: string | null = item.Tags_Humana || item["Tags Humana"] || null;
 
     if (!grouped.has(imei)) {
+      // Novo schema: Data_Avaliacao em RFC; legado: "Criação Pedido" / Criacao_Pedido
+      const rawDate = item.Data_Avaliacao || item["Criação Pedido"] || item.Criacao_Pedido || "";
+      const dataTradeIn = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
+      const linkFotosVal = typeof item.Link_Fotos === "string" && item.Link_Fotos ? item.Link_Fotos : null;
       grouped.set(imei, {
         imei,
         dataTradeIn: item.Criacao_Pedido || item["Criação Pedido"] || new Date().toISOString(),
-        linkFotos: null,
+        modelo: item.Modelo || item.Categoria || "",
+        categoria: item.Categoria || "smartphone",
+        linkFotos: linkFotosVal,
         displayGradesIa: [],
         displayGradesHumano: [],
         carcacaGradesIa: [],
@@ -310,8 +317,8 @@ function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeIn
     return {
       tradeInId: d.imei,
       imei: d.imei,
-      modelo: "",
-      categoria: "smartphone",
+      modelo: d.modelo,
+      categoria: d.categoria,
       dataTradeIn: d.dataTradeIn,
       precoMaximo: 0,
       gradeIaDisplay: worstGradeInline(d.displayGradesIa) ?? worstGradeInline(allIaGrades),
@@ -518,15 +525,6 @@ avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
     } catch {
       console.error("[avaliacoes] fetchAvaliacoesImei falhou em /pendentes — retornando lista vazia");
       allItems = [];
-    }
-
-    // Filter by start_date if provided (API only supports limit_date, so filter client-side)
-    if (start_date) {
-      const startMs = new Date(start_date).getTime();
-      allItems = allItems.filter((t) => {
-        const d = new Date(t.dataTradeIn).getTime();
-        return !isNaN(d) && d >= startMs;
-      });
     }
 
     // Filter by categoria
