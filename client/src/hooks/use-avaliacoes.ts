@@ -516,13 +516,17 @@ export function useEvolucaoCategoriaIA(filtros: AvaliacoesFilters = {}) {
 
 export interface AvaliacaoImeiItem {
   Imei: string;
-  Codigo_Voucher: string;
+  Codigo_Voucher: string | null;
   Criacao_Pedido: string;
   Descricao_Captura: string;
-  Nota_IA: string;
-  Nota_Humana: string;
-  Tags_IA: string | null;
+  Nota_Ia: string | null;
+  Nota_Humana: string | null;
+  Tags_Ia: string | null;
   Tags_Humana: string | null;
+  Url_Captura: string | null;
+  Auto_Avaliada: boolean;
+  Id_Avaliacao: string | null;
+  Id_Captura: string | null;
 }
 
 export function useImeiIA(startDate: string, enabled = false) {
