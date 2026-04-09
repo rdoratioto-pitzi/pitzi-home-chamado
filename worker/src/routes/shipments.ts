@@ -710,7 +710,7 @@ shipments.get("/api/integrations/adm-logistica/dispositivos/aggregates", async (
 // GET /api/integrations/adm-logistica/coletas/aggregates
 shipments.get("/api/integrations/adm-logistica/coletas/aggregates", async (c) => {
   const params = new URLSearchParams();
-  const queryParams = ["start_date", "end_date", "tsp", "status_controle", "responsavel"];
+  const queryParams = ["start_date", "end_date", "receipt_start", "receipt_end", "tsp", "status_controle", "responsavel"];
 
   queryParams.forEach((param) => {
     const value = c.req.query(param);
