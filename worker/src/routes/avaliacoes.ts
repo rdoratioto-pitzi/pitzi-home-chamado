@@ -240,13 +240,11 @@ function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeIn
     const imei: string = item["Imei"] || item.Imei || "";
     if (!imei) continue;
 
-    // Suporta schema legado (por foto: "Descrição Captura") e novo (por dispositivo: sem desc)
-    const desc: string = item["Descrição Captura"] || item["Descricao_Captura"] || "";
+    const desc: string = item.Descricao_Captura || item["Descrição Captura"] || "";
     if (desc.toLowerCase().includes("video") || desc.toLowerCase().includes("360")) continue;
 
-    // Novo schema usa Grade_IA/Grade_Humano; legado usava "Nota IA"/"Nota Humana"
-    const gradeIa = normalizeGradeInline(item.Grade_IA || item["Nota IA"] || item["Nota_IA"]);
-    const gradeHumano = normalizeGradeInline(item.Grade_Humano || item["Nota Humana"] || item["Nota_Humana"]);
+    const gradeIa = normalizeGradeInline(item.Nota_IA || item["Nota IA"]);
+    const gradeHumano = normalizeGradeInline(item.Nota_Humana || item["Nota Humana"]);
     const urlCaptura: string | null = item.Url_Captura || item["Url Captura"] || null;
     const tagsIa: string | null = item.Tags_IA || item["Tags IA"] || null;
     const tagsHumana: string | null = item.Tags_Humana || item["Tags Humana"] || null;
@@ -258,9 +256,9 @@ function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeIn
       const linkFotosVal = typeof item.Link_Fotos === "string" && item.Link_Fotos ? item.Link_Fotos : null;
       grouped.set(imei, {
         imei,
+        dataTradeIn: item.Criacao_Pedido || item["Criação Pedido"] || new Date().toISOString(),
         modelo: item.Modelo || item.Categoria || "",
         categoria: item.Categoria || "smartphone",
-        dataTradeIn,
         linkFotos: linkFotosVal,
         displayGradesIa: [],
         displayGradesHumano: [],
