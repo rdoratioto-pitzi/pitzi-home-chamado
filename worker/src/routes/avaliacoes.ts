@@ -158,6 +158,9 @@ interface TradeInItem {
   imagemDetalhe: string | null;
   linkFotos: string | null;
   fotos: FotoAvaliacao[];
+  codigoVoucher: string | null;
+  autoAvaliada: boolean;
+  idAvaliacao: string | null;
   foiCurado: boolean;
 }
 
@@ -220,57 +223,83 @@ function agregarPorDispositivoInline(raw: any[], curadosSet: Set<string>): Trade
       imagemDetalhe: null,
       linkFotos: d.linkFotos,
       fotos,
+      codigoVoucher: null,
+      autoAvaliada: false,
+      idAvaliacao: null,
       foiCurado: curadosSet.has(d.imei),
     };
   });
 }
 
-// Agrupa registros /imei (campos novos com acentos/espaços, inclui Url Captura)
+// Agrupa registros /imei (campos underscore definitivos da API)
 function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeInItem[] {
   const grouped = new Map<string, {
     imei: string; modelo: string; categoria: string;
     dataTradeIn: string; linkFotos: string | null;
+    codigoVoucher: string | null; autoAvaliada: boolean; idAvaliacao: string | null;
     displayGradesIa: (Grade | null)[]; displayGradesHumano: (Grade | null)[];
     carcacaGradesIa: (Grade | null)[]; carcacaGradesHumano: (Grade | null)[];
     slots: ImeiImageSlots;
     fotosMap: Map<number, FotoAvaliacao>;
+    latestCriacao: Date;
   }>();
 
+  // Pre-filter: group raw items by IMEI and pick only the most recent Id_Avaliacao
+  const imeiAvMap = new Map<string, { idAvaliacao: string; date: Date }>();
   for (const item of raw) {
-    const imei: string = item["Imei"] || item.Imei || "";
+    const imei: string = item.Imei || "";
+    if (!imei) continue;
+    const idAv: string = item.Id_Avaliacao || "";
+    const criacao = item.Criacao_Pedido ? new Date(item.Criacao_Pedido) : new Date(0);
+    const existing = imeiAvMap.get(imei);
+    if (!existing || criacao > existing.date) {
+      imeiAvMap.set(imei, { idAvaliacao: idAv, date: criacao });
+    }
+  }
+
+  for (const item of raw) {
+    const imei: string = item.Imei || "";
     if (!imei) continue;
 
-    const desc: string = item.Descricao_Captura || item["Descrição Captura"] || "";
+    // Only include photos from the most recent Id_Avaliacao for this IMEI
+    const bestAv = imeiAvMap.get(imei);
+    if (bestAv && item.Id_Avaliacao && item.Id_Avaliacao !== bestAv.idAvaliacao) continue;
+
+    const desc: string = item.Descricao_Captura || "";
     if (desc.toLowerCase().includes("video") || desc.toLowerCase().includes("360")) continue;
 
-    // /imei usa "Nota IA"/"Nota Humana" (espaços); fallbacks para underscore e Grade_IA (/detalhes)
-    const gradeIa = normalizeGradeInline(item["Nota IA"] || item.Nota_IA || item.Grade_IA);
-    const gradeHumano = normalizeGradeInline(item["Nota Humana"] || item.Nota_Humana || item.Grade_Humano);
-    const urlCaptura: string | null = item.Url_Captura || item["Url Captura"] || null;
-    const tagsIa: string | null = item.Tags_IA || item["Tags IA"] || null;
-    const tagsHumana: string | null = item.Tags_Humana || item["Tags Humana"] || null;
+    const gradeIa = normalizeGradeInline(item.Nota_Ia);
+    const gradeHumano = normalizeGradeInline(item.Nota_Humana);
+    const urlCaptura: string | null = item.Url_Captura || null;
+    const tagsIa: string | null = item.Tags_Ia ?? null;
+    const tagsHumana: string | null = item.Tags_Humana ?? null;
 
     if (!grouped.has(imei)) {
-      // Novo schema: Data_Avaliacao em RFC; legado: "Criação Pedido" / Criacao_Pedido
-      const rawDate = item.Data_Avaliacao || item["Criação Pedido"] || item.Criacao_Pedido || "";
-      const dataTradeIn = rawDate ? new Date(rawDate).toISOString() : new Date().toISOString();
+      const dataTradeIn = item.Criacao_Pedido || new Date().toISOString();
       const linkFotosVal = typeof item.Link_Fotos === "string" && item.Link_Fotos ? item.Link_Fotos : null;
       grouped.set(imei, {
         imei,
-        dataTradeIn: item.Criacao_Pedido || item["Criação Pedido"] || new Date().toISOString(),
+        dataTradeIn,
         modelo: item.Modelo || item.Categoria || "",
         categoria: item.Categoria || "smartphone",
         linkFotos: linkFotosVal,
+        codigoVoucher: item.Codigo_Voucher || null,
+        autoAvaliada: item.Auto_Avaliada === true,
+        idAvaliacao: item.Id_Avaliacao || null,
         displayGradesIa: [],
         displayGradesHumano: [],
         carcacaGradesIa: [],
         carcacaGradesHumano: [],
         slots: { imagemFrontal: null, imagemTraseira: null, imagemLateral1: null, imagemLateral2: null, imagemDetalhe: null },
         fotosMap: new Map(),
+        latestCriacao: item.Criacao_Pedido ? new Date(item.Criacao_Pedido) : new Date(0),
       });
     }
 
     const d = grouped.get(imei)!;
+
+    // Track Auto_Avaliada: if ANY photo has it true, mark device as auto-avaliada
+    if (item.Auto_Avaliada === true) d.autoAvaliada = true;
 
     // Map to named slot (1-7)
     const slotDef = matchFotoSlotInline(desc);
@@ -335,6 +364,9 @@ function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeIn
       imagemDetalhe: d.slots.imagemDetalhe,
       linkFotos: d.linkFotos,
       fotos,
+      codigoVoucher: d.codigoVoucher,
+      autoAvaliada: d.autoAvaliada,
+      idAvaliacao: d.idAvaliacao,
       foiCurado: curadosSet.has(d.imei),
     };
   });
@@ -528,6 +560,18 @@ avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
       allItems = [];
     }
 
+    // Filter Auto_Avaliada devices
+    allItems = allItems.filter((t) => !t.autoAvaliada);
+
+    // Filter by end_date
+    if (end_date) {
+      const endDateObj = new Date(end_date + "T23:59:59.999Z");
+      allItems = allItems.filter((t) => {
+        const itemDate = new Date(t.dataTradeIn);
+        return !isNaN(itemDate.getTime()) && itemDate <= endDateObj;
+      });
+    }
+
     // Filter by categoria
     if (categoria) {
       allItems = allItems.filter((t) => t.categoria.toLowerCase().includes(categoria.toLowerCase()));
@@ -542,7 +586,7 @@ avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
     // Filter by voucher
     if (voucher) {
       const voucherSearch = voucher.toLowerCase();
-      allItems = allItems.filter((t) => (t as any).codigoVoucher?.toLowerCase().includes(voucherSearch));
+      allItems = allItems.filter((t) => t.codigoVoucher?.toLowerCase().includes(voucherSearch));
     }
 
     const notCurated = allItems.filter((t) => !t.foiCurado);

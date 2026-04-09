@@ -102,35 +102,23 @@ export interface RawFotoAvaliacao {
   Imei: string;
   Categoria?: string;
   Modelo?: string;
-  // Old field names (from /detalhes endpoint)
+  // Old field names (from /detalhes endpoint only)
   Data_Avaliacao?: string;
   Grade_IA?: string;
   Grade_Humano?: string;
-  Nota_IA?: string;
-  Nota_Humana?: string;
-  Descricao_Captura?: string;
   Nome_da_Tela?: string;
   Link_Fotos?: string | boolean;
-  Codigo_Voucher?: string;
-  Criacao_Pedido?: string;
-  Tags_IA?: string | null;
-  Tags_Humana?: string | null;
   Is_Match?: number;
   Status_Assertividade?: string;
-  // New field names (from /imei endpoint, with accents/spaces) — DEPRECATED
-  "Nota IA"?: string;
-  "Nota Humana"?: string;
-  "Descrição Captura"?: string;
-  "Url Captura"?: string;
-  "Código Voucher"?: string;
-  "Criação Pedido"?: string;
-  "Tags IA"?: string | null;
-  "Tags Humana"?: string | null;
-  "Auto Avaliada"?: boolean;
-  "Id da Avaliação"?: string;
-  "Id da Captura"?: string;
-  // Current field names (from /imei endpoint, underscore format)
+  // Current field names (from /imei endpoint, underscore format — API definitive)
+  Nota_Ia?: string;
+  Nota_Humana?: string;
+  Descricao_Captura?: string;
   Url_Captura?: string;
+  Codigo_Voucher?: string;
+  Criacao_Pedido?: string;
+  Tags_Ia?: string | null;
+  Tags_Humana?: string | null;
   Auto_Avaliada?: boolean;
   Id_Avaliacao?: string;
   Id_Captura?: string;
@@ -181,24 +169,37 @@ export function agregarPorDispositivo(
 ): TradeInAvaliacao[] {
   const grouped = new Map<string, DispositivoAgrupado>();
 
+  // Pre-filter: for each IMEI, keep only photos from the most recent Id_Avaliacao
+  const imeiAvMap = new Map<string, { idAvaliacao: string; date: Date }>();
+  for (const foto of avaliacoesPorFoto) {
+    if (!foto.Imei || !foto.Id_Avaliacao) continue;
+    const criacao = foto.Criacao_Pedido ? new Date(foto.Criacao_Pedido) : new Date(0);
+    const existing = imeiAvMap.get(foto.Imei);
+    if (!existing || criacao > existing.date) {
+      imeiAvMap.set(foto.Imei, { idAvaliacao: foto.Id_Avaliacao, date: criacao });
+    }
+  }
+
   for (const foto of avaliacoesPorFoto) {
     const imei = foto.Imei;
     if (!imei) continue;
 
-    // Support old field names (/detalhes), space-separated (/imei legacy), and underscore (/imei current)
-    const gradeIaRaw = foto.Nota_IA || foto["Nota IA"] || foto.Grade_IA;
-    const gradeHumanoRaw = foto.Nota_Humana || foto["Nota Humana"] || foto.Grade_Humano;
+    // Only include photos from the most recent Id_Avaliacao for this IMEI
+    const bestAv = imeiAvMap.get(imei);
+    if (bestAv && foto.Id_Avaliacao && foto.Id_Avaliacao !== bestAv.idAvaliacao) continue;
+
+    const gradeIaRaw = foto.Nota_Ia || foto.Grade_IA;
+    const gradeHumanoRaw = foto.Nota_Humana || foto.Grade_Humano;
     const gradeIa = normalizeGrade(gradeIaRaw);
     const gradeHumano = normalizeGrade(gradeHumanoRaw);
 
-    const descCaptura = foto.Descricao_Captura || foto["Descrição Captura"] || foto.Nome_da_Tela || "";
-    const urlCaptura = foto.Url_Captura || foto["Url Captura"] || null;
+    const descCaptura = foto.Descricao_Captura || foto.Nome_da_Tela || "";
+    const urlCaptura = foto.Url_Captura || null;
     const area = mapFotoToArea(descCaptura);
 
     const dataTradeIn =
       foto.Data_Avaliacao ||
       foto.Criacao_Pedido ||
-      foto["Criação Pedido"] ||
       new Date().toISOString();
 
     if (!grouped.has(imei)) {
@@ -209,9 +210,9 @@ export function agregarPorDispositivo(
         categoria: foto.Categoria || "smartphone",
         dataTradeIn,
         linkFotos,
-        codigoVoucher: foto.Codigo_Voucher || foto["Código Voucher"] || null,
-        autoAvaliada: foto.Auto_Avaliada ?? foto["Auto Avaliada"] ?? false,
-        idAvaliacao: foto.Id_Avaliacao || foto["Id da Avaliação"] || null,
+        codigoVoucher: foto.Codigo_Voucher || null,
+        autoAvaliada: foto.Auto_Avaliada ?? false,
+        idAvaliacao: foto.Id_Avaliacao || null,
         displayGradesIa: [],
         displayGradesHumano: [],
         carcacaGradesIa: [],
@@ -227,9 +228,12 @@ export function agregarPorDispositivo(
 
     const device = grouped.get(imei)!;
 
+    // Track Auto_Avaliada: if ANY photo has it true, mark device as auto-avaliada
+    if (foto.Auto_Avaliada === true) device.autoAvaliada = true;
+
     // Map photo to named slot (1-7)
-    const tagsIa = foto.Tags_IA ?? foto["Tags IA"] ?? null;
-    const tagsHumana = foto.Tags_Humana ?? foto["Tags Humana"] ?? null;
+    const tagsIa = foto.Tags_Ia ?? null;
+    const tagsHumana = foto.Tags_Humana ?? null;
     const slotDef = matchFotoSlot(descCaptura);
     if (slotDef && !device.fotosMap.has(slotDef.slot)) {
       device.fotosMap.set(slotDef.slot, {
@@ -241,7 +245,7 @@ export function agregarPorDispositivo(
         notaHumana: gradeHumano,
         tagsIa,
         tagsHumana,
-        idCaptura: foto.Id_Captura || foto["Id da Captura"] || null,
+        idCaptura: foto.Id_Captura || null,
       });
     }
 

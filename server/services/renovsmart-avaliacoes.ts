@@ -199,9 +199,9 @@ function normalizeItem(item: any, foiCurado: boolean): TradeInAvaliacao {
     imagemDetalhe: item.imagem_detalhe || item.imagemDetalhe || null,
     linkFotos: item.link_fotos || item.linkFotos || null,
     fotos: [],
-    codigoVoucher: item.codigo_voucher || item.codigoVoucher || item["Código Voucher"] || null,
-    autoAvaliada: item.auto_avaliada ?? item.autoAvaliada ?? item["Auto Avaliada"] ?? false,
-    idAvaliacao: item.id_avaliacao || item.idAvaliacao || item["Id da Avaliação"] || null,
+    codigoVoucher: item.codigo_voucher || item.codigoVoucher || item.Codigo_Voucher || null,
+    autoAvaliada: item.auto_avaliada ?? item.autoAvaliada ?? item.Auto_Avaliada ?? false,
+    idAvaliacao: item.id_avaliacao || item.idAvaliacao || item.Id_Avaliacao || null,
     foiCurado,
   };
 }
@@ -770,10 +770,14 @@ export async function getCuradoriaPendentes(tenantId?: string | null, filtros: C
     all = [];
   }
 
-  // Apply filters
-  let filtered = all.filter((t) => !t.foiCurado);
+  // Filter Auto_Avaliada devices
+  let filtered = all.filter((t) => !t.autoAvaliada && !t.foiCurado);
   if (filtros.endDate) {
-    filtered = filtered.filter((t) => t.dataTradeIn.slice(0, 10) <= filtros.endDate!);
+    const endDateObj = new Date(filtros.endDate + "T23:59:59.999Z");
+    filtered = filtered.filter((t) => {
+      const itemDate = new Date(t.dataTradeIn);
+      return !isNaN(itemDate.getTime()) && itemDate <= endDateObj;
+    });
   }
   if (filtros.imei) {
     const imeiSearch = filtros.imei.toLowerCase();
