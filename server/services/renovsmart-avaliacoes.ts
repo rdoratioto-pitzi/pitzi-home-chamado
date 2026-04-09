@@ -761,8 +761,8 @@ export async function getCuradoriaPendentes(tenantId?: string | null, filtros: C
 
   let all: TradeInAvaliacao[];
   try {
-    const rawPhotos = await fetchAvaliacoesApi("/avaliacoes-ia/imei", {
-      limit_date: limitDate,
+    const rawPhotos = await fetchAvaliacoesApi("/avaliacoes-ia/detalhes", {
+      start_date: limitDate,
     }) as RawFotoAvaliacao[];
     all = agregarPorDispositivo(rawPhotos, curadosSet);
   } catch (err) {
