@@ -239,19 +239,19 @@ function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeIn
     const imei: string = item["Imei"] || "";
     if (!imei) continue;
 
-    const desc: string = item["Descrição Captura"] || "";
+    const desc: string = item.Descricao_Captura || item["Descrição Captura"] || "";
     if (desc.toLowerCase().includes("video") || desc.toLowerCase().includes("360")) continue;
 
-    const gradeIa = normalizeGradeInline(item["Nota IA"]);
-    const gradeHumano = normalizeGradeInline(item["Nota Humana"]);
-    const urlCaptura: string | null = item["Url Captura"] || null;
-    const tagsIa: string | null = item["Tags IA"] || null;
-    const tagsHumana: string | null = item["Tags Humana"] || null;
+    const gradeIa = normalizeGradeInline(item.Nota_IA || item["Nota IA"]);
+    const gradeHumano = normalizeGradeInline(item.Nota_Humana || item["Nota Humana"]);
+    const urlCaptura: string | null = item.Url_Captura || item["Url Captura"] || null;
+    const tagsIa: string | null = item.Tags_IA || item["Tags IA"] || null;
+    const tagsHumana: string | null = item.Tags_Humana || item["Tags Humana"] || null;
 
     if (!grouped.has(imei)) {
       grouped.set(imei, {
         imei,
-        dataTradeIn: item["Criação Pedido"] || new Date().toISOString(),
+        dataTradeIn: item.Criacao_Pedido || item["Criação Pedido"] || new Date().toISOString(),
         linkFotos: null,
         displayGradesIa: [],
         displayGradesHumano: [],
