@@ -525,11 +525,11 @@ export interface AvaliacaoImeiItem {
   Tags_Humana: string | null;
 }
 
-export function useImeiIA(limitDate: string, enabled = false) {
+export function useImeiIA(startDate: string, enabled = false) {
   return useQuery<AvaliacaoImeiItem[]>({
-    queryKey: ["/api/avaliacoes-ia/imei", limitDate],
+    queryKey: ["/api/avaliacoes-ia/imei", startDate],
     queryFn: async () => {
-      const qs = limitDate ? `?limit_date=${limitDate}` : "";
+      const qs = startDate ? `?start_date=${startDate}` : "";
       const res = await apiRequest("GET", `/api/avaliacoes-ia/imei${qs}`);
       const data = await res.json();
       return Array.isArray(data) ? data : [];
