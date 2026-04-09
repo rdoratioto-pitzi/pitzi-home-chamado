@@ -23,6 +23,7 @@ import {
   updateConfiguracoes,
   type AvaliacoesFilters,
 } from "../services/renovsmart-avaliacoes";
+import type { VersaoIA } from "@shared/schema";
 
 export function registerAvaliacoesRoutes(router: Router) {
   // GET /api/avaliacoes/trade-ins — lista paginada com filtros
@@ -196,6 +197,70 @@ export function registerAvaliacoesRoutes(router: Router) {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro interno";
       console.error("[Avaliacoes] update configuracoes error:", message);
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  // GET /api/avaliacoes/configuracoes/versoes-ia — histórico completo de versões
+  router.get("/api/avaliacoes/configuracoes/versoes-ia", requireAuth, async (req, res) => {
+    try {
+      const { tenantId } = (req as any).session ?? {};
+      const config = await getConfiguracoes(tenantId ?? null);
+      const versoes = (config as any).versoesIa ?? [];
+      res.json({ success: true, data: versoes });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro interno";
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  // GET /api/avaliacoes/configuracoes/versao-ia — versão atual (mais recente)
+  router.get("/api/avaliacoes/configuracoes/versao-ia", requireAuth, async (req, res) => {
+    try {
+      const { tenantId } = (req as any).session ?? {};
+      const config = await getConfiguracoes(tenantId ?? null);
+      const versoes: VersaoIA[] = (config as any).versoesIa ?? [];
+      res.json({ success: true, data: versoes[0] ?? null });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro interno";
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  // PUT /api/avaliacoes/configuracoes/versao-ia — adiciona nova versão no topo
+  router.put("/api/avaliacoes/configuracoes/versao-ia", requireAuth, async (req, res) => {
+    try {
+      const { tenantId } = (req as any).session ?? {};
+      const { data, versao, descricao } = req.body as { data: string; versao: string; descricao: string };
+      if (!data || !versao || !descricao) {
+        return res.status(400).json({ success: false, error: "data, versao e descricao são obrigatórios" });
+      }
+      const config = await getConfiguracoes(tenantId ?? null);
+      const versoesAtuais: VersaoIA[] = (config as any).versoesIa ?? [];
+      const novasVersoes: VersaoIA[] = [{ data, versao, descricao }, ...versoesAtuais];
+      await updateConfiguracoes({ versoesIa: novasVersoes }, tenantId ?? null);
+      res.json({ success: true, data: novasVersoes });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro interno";
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  // DELETE /api/avaliacoes/configuracoes/versoes-ia/:index — remove versão pelo índice
+  router.delete("/api/avaliacoes/configuracoes/versoes-ia/:index", requireAuth, async (req, res) => {
+    try {
+      const { tenantId } = (req as any).session ?? {};
+      const idx = parseInt(String(req.params.index), 10);
+      const config = await getConfiguracoes(tenantId ?? null);
+      const versoesAtuais: VersaoIA[] = (config as any).versoesIa ?? [];
+      if (isNaN(idx) || idx < 0 || idx >= versoesAtuais.length) {
+        return res.status(400).json({ success: false, error: "Índice inválido" });
+      }
+      const novasVersoes: VersaoIA[] = versoesAtuais.filter((_, i) => i !== idx);
+      await updateConfiguracoes({ versoesIa: novasVersoes }, tenantId ?? null);
+      res.json({ success: true, data: novasVersoes });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erro interno";
       res.status(500).json({ success: false, error: message });
     }
   });
