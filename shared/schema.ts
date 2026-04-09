@@ -1686,11 +1686,19 @@ export type InsertCuradoriaAvaliacao = z.infer<typeof insertCuradoriaAvaliacaoSc
 export type CuradoriaAvaliacao = typeof curadoriaAvaliacoes.$inferSelect;
 
 // ============== CURADORIA CONFIGURAÇÕES ==============
+
+export interface VersaoIA {
+  data: string;    // "YYYY-MM-DD"
+  versao: string;  // "v2.3"
+  descricao: string;
+}
+
 export const curadoriaConfiguracoes = pgTable("curadoria_configuracoes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),
   percentualAmostragem: decimal("percentual_amostragem").default("15"),
   modoPrioridade: text("modo_prioridade").default("aleatorio"),
+  versoesIa: jsonb("versoes_ia").$type<VersaoIA[]>().default([]),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
 });
 
