@@ -34,11 +34,11 @@ async function fetchAvaliacoesDetalhes(
 }
 
 async function fetchAvaliacoesImei(token: string, startDate: string): Promise<any[]> {
-  const url = `${PIPELINE_RS_BASE}/avaliacoes-ia/detalhes?start_date=${encodeURIComponent(startDate)}`;
+  const url = `${PIPELINE_RS_BASE}/avaliacoes-ia/imei?start_date=${encodeURIComponent(startDate)}`;
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
   });
-  if (!response.ok) throw new Error(`API detalhes error: ${response.status}`);
+  if (!response.ok) throw new Error(`API imei error: ${response.status}`);
   const data = await response.json() as any;
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
@@ -243,8 +243,9 @@ function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeIn
     const desc: string = item.Descricao_Captura || item["Descrição Captura"] || "";
     if (desc.toLowerCase().includes("video") || desc.toLowerCase().includes("360")) continue;
 
-    const gradeIa = normalizeGradeInline(item.Nota_IA || item["Nota IA"]);
-    const gradeHumano = normalizeGradeInline(item.Nota_Humana || item["Nota Humana"]);
+    // /imei usa "Nota IA"/"Nota Humana" (espaços); fallbacks para underscore e Grade_IA (/detalhes)
+    const gradeIa = normalizeGradeInline(item["Nota IA"] || item.Nota_IA || item.Grade_IA);
+    const gradeHumano = normalizeGradeInline(item["Nota Humana"] || item.Nota_Humana || item.Grade_Humano);
     const urlCaptura: string | null = item.Url_Captura || item["Url Captura"] || null;
     const tagsIa: string | null = item.Tags_IA || item["Tags IA"] || null;
     const tagsHumana: string | null = item.Tags_Humana || item["Tags Humana"] || null;

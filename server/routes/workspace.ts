@@ -137,10 +137,13 @@ export function registerWorkspaceRoutes(router: Router) {
       const resolvidos = filtered.filter((t) => t.status === "resolved" || t.status === "closed").length;
       const total = filtered.length;
 
-      // SLA calculation
+      // SLA calculation — only count active (non-resolved) tickets
       let noPrazo = 0;
       let emAtraso = 0;
-      for (const ticket of filtered) {
+      const slaTickets = periodo === "em-tratativa"
+        ? filtered.filter((t) => t.status !== "resolved" && t.status !== "closed")
+        : filtered;
+      for (const ticket of slaTickets) {
         const slaStatus = getSlaStatus(ticket as any, slaRules);
         if (slaStatus === "dentro_prazo") noPrazo++;
         else if (slaStatus === "em_atraso") emAtraso++;
