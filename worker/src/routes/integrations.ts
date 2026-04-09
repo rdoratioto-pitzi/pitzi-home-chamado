@@ -229,13 +229,16 @@ for (const endpoint of aiEndpoints) {
 integrations.get("/api/avaliacoes-ia/imei", async (c) => {
   const token = getApiToken(c);
   const params = new URLSearchParams();
-  const limitDate = c.req.query("limit_date") || new Date().toISOString().slice(0, 10);
-  params.append("limit_date", limitDate);
-
-  const imei = c.req.query("imei");
-  if (imei) {
-    params.append("imei", imei);
+  // start_date retorna histórico completo; limit_date (legado) só retorna fila do dia atual.
+  const startDate = c.req.query("start_date");
+  if (startDate) {
+    params.append("start_date", startDate);
+  } else {
+    const limitDate = c.req.query("limit_date") || new Date().toISOString().slice(0, 10);
+    params.append("limit_date", limitDate);
   }
+  const imei = c.req.query("imei");
+  if (imei) params.append("imei", imei);
 
   const data = await fetchAiEvaluation("imei", Object.fromEntries(params.entries()) as any, token);
   return c.json(data);
