@@ -1,12 +1,33 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { format, parseISO } from "date-fns";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -38,10 +59,17 @@ import {
   Users,
   BookOpen,
   Save,
+  Plus,
+  Trash2,
+  Cpu,
 } from "lucide-react";
 import {
   useAvaliacoesConfiguracoes,
   useUpdateConfiguracoes,
+  useVersoesIA,
+  useAddVersaoIA,
+  useDeleteVersaoIA,
+  type VersaoIA,
 } from "@/hooks/use-avaliacoes";
 
 // ─── Grade config ─────────────────────────────────────────────────────────────
@@ -198,6 +226,174 @@ function SecaoAmostragem() {
   );
 }
 
+// ─── Seção: Versão do Modelo IA ───────────────────────────────────────────────
+
+function SecaoVersaoIA() {
+  const { toast } = useToast();
+  const { data: versoesData, isLoading } = useVersoesIA();
+  const addMutation = useAddVersaoIA();
+  const deleteMutation = useDeleteVersaoIA();
+
+  const versoes: VersaoIA[] = versoesData?.data ?? [];
+
+  const [dialogAberto, setDialogAberto] = useState(false);
+  const [novaData, setNovaData] = useState(new Date().toISOString().slice(0, 10));
+  const [novaVersao, setNovaVersao] = useState("");
+  const [novaDescricao, setNovaDescricao] = useState("");
+
+  async function handleAdicionar() {
+    if (!novaData || !novaVersao.trim() || !novaDescricao.trim()) {
+      toast({ title: "Campos obrigatórios", description: "Preencha data, versão e descrição.", variant: "destructive" });
+      return;
+    }
+    try {
+      await addMutation.mutateAsync({ data: novaData, versao: novaVersao.trim(), descricao: novaDescricao.trim() });
+      setNovaData(new Date().toISOString().slice(0, 10));
+      setNovaVersao("");
+      setNovaDescricao("");
+      setDialogAberto(false);
+      toast({ title: "Versão adicionada", description: `${novaVersao} registrada com sucesso.` });
+    } catch {
+      toast({ title: "Erro ao adicionar", description: "Tente novamente.", variant: "destructive" });
+    }
+  }
+
+  async function handleRemover(index: number) {
+    try {
+      await deleteMutation.mutateAsync(index);
+      toast({ title: "Versão removida" });
+    } catch {
+      toast({ title: "Erro ao remover", variant: "destructive" });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 gap-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Cpu className="h-4 w-4" />
+          Versão do Modelo IA
+        </CardTitle>
+        <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="outline" className="gap-1.5">
+              <Plus className="h-3.5 w-3.5" />
+              Nova versão
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Registrar nova versão IA</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="nova-data">Data da atualização</Label>
+                <Input
+                  id="nova-data"
+                  type="date"
+                  value={novaData}
+                  onChange={(e) => setNovaData(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="nova-versao">Versão (ex: v2.3)</Label>
+                <Input
+                  id="nova-versao"
+                  placeholder="v2.3"
+                  value={novaVersao}
+                  onChange={(e) => setNovaVersao(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="nova-descricao">Descrição</Label>
+                <Input
+                  id="nova-descricao"
+                  placeholder="Ajuste no modelo de carcaça"
+                  value={novaDescricao}
+                  onChange={(e) => setNovaDescricao(e.target.value)}
+                />
+              </div>
+              <Button
+                className="w-full gap-2"
+                onClick={handleAdicionar}
+                disabled={addMutation.isPending}
+                style={{ background: "var(--accent, #00A137)", color: "#fff" }}
+              >
+                <Save className="h-4 w-4" />
+                {addMutation.isPending ? "Salvando..." : "Salvar"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+          </div>
+        ) : versoes.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">
+            Nenhuma versão registrada. Adicione a versão atual do modelo IA da Lapisco.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="text-xs">Versão</TableHead>
+                <TableHead className="text-xs">Data</TableHead>
+                <TableHead className="text-xs hidden sm:table-cell">Descrição</TableHead>
+                <TableHead className="text-xs text-right">Ação</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {versoes.map((v, idx) => (
+                <TableRow key={v.data + v.versao + idx}>
+                  <TableCell className="text-sm font-medium">
+                    {v.versao}
+                    {idx === 0 && (
+                      <Badge className="ml-2 text-[10px] py-0" variant="outline">atual</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-sm tabular-nums">
+                    {(() => { try { return format(parseISO(v.data), "dd/MM/yyyy"); } catch { return v.data; } })()}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">{v.descricao}</TableCell>
+                  <TableCell className="text-right">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remover versão {v.versao}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação não pode ser desfeita. A versão será removida do histórico.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleRemover(idx)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Remover
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Seção 2: Percentuais por Grade ──────────────────────────────────────────
 
 function SecaoGrades() {
@@ -347,6 +543,7 @@ export default function AvaliacoesConfiguracoesPage() {
         </Breadcrumb>
 
         <SecaoAmostragem />
+        <SecaoVersaoIA />
         <SecaoGrades />
         <SecaoCuradores />
         <SecaoSobre />

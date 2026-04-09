@@ -21,22 +21,26 @@ import { EvaluatorEvolutionChart } from "@/components/avaliacoes/evaluator-evolu
 import { DashboardFilters } from "@/components/avaliacoes/dashboard-filters";
 import {
   useAvaliacoesResumo,
-  useResumoIA,
   useEvolucaoIA,
   useDispositivosIA,
   useCategoriasIA,
   useAssertividadeFotos,
   useEvolucaoCategoriaIA,
   useImeiIA,
+  useVersaoIAAtual,
+  useVersoesIA,
 } from "@/hooks/use-avaliacoes";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import {
-  BarChart2, CheckCircle2, XCircle, Camera, TrendingUp, Bot,
-  TrendingDown, Smartphone, ArrowUpRight, ArrowDownRight,
+  CheckCircle2, XCircle, Camera, TrendingUp, Bot,
+  TrendingDown, Smartphone, ArrowUpRight, ArrowDownRight, Cpu, ChevronDown, ChevronUp,
 } from "lucide-react";
-import type { AvaliacoesFilters, AvaliacaoImeiItem } from "@/hooks/use-avaliacoes";
+import {
+  Tooltip as UITooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { AvaliacoesFilters, AvaliacaoImeiItem, VersaoIA } from "@/hooks/use-avaliacoes";
 
 // ─── Grade helpers ───────────────────────────────────────────────────────────
 
@@ -74,6 +78,9 @@ interface DeviceMetrics {
   gradeIaCarcaca: Grade | null;
   gradeHumanoDisplay: Grade | null;
   gradeHumanoCarcaca: Grade | null;
+  // Grade final = pior nota entre TODAS as fotos (display + carcaça)
+  gradeIaFinal: Grade | null;
+  gradeHumanoFinal: Grade | null;
 }
 
 function aggregateDeviceMetrics(items: AvaliacaoImeiItem[], imeiFilter?: string): DeviceMetrics[] {
@@ -110,13 +117,21 @@ function aggregateDeviceMetrics(items: AvaliacaoImeiItem[], imeiFilter?: string)
     }
   }
 
-  return Array.from(grouped.entries()).map(([imei, d]) => ({
-    imei,
-    gradeIaDisplay: worstGrade(d.displayIa),
-    gradeIaCarcaca: worstGrade(d.carcacaIa),
-    gradeHumanoDisplay: worstGrade(d.displayHumano),
-    gradeHumanoCarcaca: worstGrade(d.carcacaHumano),
-  }));
+  return Array.from(grouped.entries()).map(([imei, d]) => {
+    const gradeIaDisplay = worstGrade(d.displayIa);
+    const gradeIaCarcaca = worstGrade(d.carcacaIa);
+    const gradeHumanoDisplay = worstGrade(d.displayHumano);
+    const gradeHumanoCarcaca = worstGrade(d.carcacaHumano);
+    return {
+      imei,
+      gradeIaDisplay,
+      gradeIaCarcaca,
+      gradeHumanoDisplay,
+      gradeHumanoCarcaca,
+      gradeIaFinal: worstGrade([...d.displayIa, ...d.carcacaIa]),
+      gradeHumanoFinal: worstGrade([...d.displayHumano, ...d.carcacaHumano]),
+    };
+  });
 }
 
 // ─── KPI Strip — device-level metrics ────────────────────────────────────────
@@ -134,20 +149,10 @@ function computeDeviceKpis(devices: DeviceMetrics[]): DeviceKpis {
   let comparaveis = 0;
 
   for (const d of devices) {
-    // Check display area
-    const displayMatch = d.gradeIaDisplay && d.gradeHumanoDisplay
-      ? d.gradeIaDisplay === d.gradeHumanoDisplay : null;
-    // Check carcaca area
-    const carcacaMatch = d.gradeIaCarcaca && d.gradeHumanoCarcaca
-      ? d.gradeIaCarcaca === d.gradeHumanoCarcaca : null;
-
-    // Device is concordant if ALL comparable areas match
-    if (displayMatch !== null || carcacaMatch !== null) {
+    // Assertividade pela grade final: pior nota única entre todas as fotos
+    if (d.gradeIaFinal !== null && d.gradeHumanoFinal !== null) {
       comparaveis++;
-      const allMatch =
-        (displayMatch === null || displayMatch) &&
-        (carcacaMatch === null || carcacaMatch);
-      if (allMatch) concordantes++;
+      if (d.gradeIaFinal === d.gradeHumanoFinal) concordantes++;
       else divergentes++;
     }
   }
@@ -158,6 +163,29 @@ function computeDeviceKpis(devices: DeviceMetrics[]): DeviceKpis {
     concordantes,
     divergentes,
   };
+}
+
+// ─── Assertividade por grade final (IMEI-based, não por foto) ────────────────
+
+function buildGradeBreakdown(
+  devices: DeviceMetrics[]
+): Array<{ grade: string; acertos: number; total: number; assertividade: number }> {
+  const gradeMap = new Map<string, { acertos: number; total: number }>();
+
+  for (const d of devices) {
+    if (d.gradeHumanoFinal === null || d.gradeIaFinal === null) continue;
+    const grade = d.gradeHumanoFinal;
+    const existing = gradeMap.get(grade) ?? { acertos: 0, total: 0 };
+    gradeMap.set(grade, {
+      acertos: existing.acertos + (d.gradeIaFinal === grade ? 1 : 0),
+      total: existing.total + 1,
+    });
+  }
+
+  return ["A", "B", "C"].map((grade) => {
+    const g = gradeMap.get(grade) ?? { acertos: 0, total: 0 };
+    return { grade, ...g, assertividade: g.total > 0 ? Math.round((g.acertos / g.total) * 1000) / 10 : 0 };
+  });
 }
 
 function DeviceKpiStrip({ kpis, isLoading }: { kpis: DeviceKpis; isLoading: boolean }) {
@@ -330,7 +358,7 @@ function BidirectionalErrorCard({ errors, isLoading }: { errors: ErrorBreakdown;
 
 // ─── Grafico de evolucao (proxy) ──────────────────────────────────────────────
 
-function ProxyEvolutionChart({ filtros }: { filtros: AvaliacoesFilters }) {
+function ProxyEvolutionChart({ filtros, versoes }: { filtros: AvaliacoesFilters; versoes: VersaoIA[] }) {
   const { data, isLoading } = useEvolucaoIA(filtros);
 
   const pontos = useMemo(() => {
@@ -342,6 +370,18 @@ function ProxyEvolutionChart({ filtros }: { filtros: AvaliacoesFilters }) {
     }));
   }, [data]);
 
+  // Linhas de versão que estão no range de datas do filtro
+  const versoesFiltradas = useMemo(() => {
+    if (!versoes.length || !pontos.length) return versoes;
+    const datas = pontos.map((p) => p.data);
+    const min = datas[0];
+    const max = datas[datas.length - 1];
+    return versoes.filter((v) => {
+      const mesVersao = v.data.slice(0, 7);
+      return mesVersao >= min && mesVersao <= max;
+    });
+  }, [versoes, pontos]);
+
   return (
     <Card className="border" style={{ background: "var(--bg2)", borderColor: "var(--sep)" }}>
       <CardHeader>
@@ -349,7 +389,7 @@ function ProxyEvolutionChart({ filtros }: { filtros: AvaliacoesFilters }) {
           <TrendingUp className="h-5 w-5 text-primary" />
           Evolucao da Assertividade IA
         </CardTitle>
-        <CardDescription>Precisao da IA ao longo do tempo (dados por foto)</CardDescription>
+        <CardDescription>Precisao da IA por dispositivo (grade final) ao longo do tempo</CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -373,6 +413,16 @@ function ProxyEvolutionChart({ filtros }: { filtros: AvaliacoesFilters }) {
                 formatter={(value: number, name: string) => [`${value.toFixed(1)}%`, name]}
               />
               <Legend wrapperStyle={{ fontSize: 11, color: "var(--l2)" }} />
+              {versoesFiltradas.map((v) => (
+                <ReferenceLine
+                  key={v.data}
+                  x={v.data.slice(0, 7)}
+                  stroke="var(--vf)"
+                  strokeDasharray="4 3"
+                  strokeWidth={1.5}
+                  label={{ value: v.versao, position: "top", fontSize: 9, fill: "var(--vf)" }}
+                />
+              ))}
               <Line type="monotone" dataKey="assertividade" name="Assertividade IA" stroke="#00A137" strokeWidth={2} dot={{ r: 4, fill: "#00A137" }} activeDot={{ r: 6 }} />
             </LineChart>
           </ResponsiveContainer>
@@ -738,60 +788,50 @@ function AssertividadeFotosSection({ filtros }: { filtros: AvaliacoesFilters }) 
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const DEFAULT_DATA_INICIO = "2026-03-20";
+const DEFAULT_DATA_FIM = new Date().toISOString().slice(0, 10);
+
 export default function AvaliacoesDashboardPage() {
-  const [filters, setFilters] = useState<AvaliacoesFilters>({ area: "ambas" });
+  const [filters, setFilters] = useState<AvaliacoesFilters>({
+    area: "ambas",
+    dataInicio: DEFAULT_DATA_INICIO,
+    dataFim: DEFAULT_DATA_FIM,
+  });
   const [, navigate] = useLocation();
 
-  // Dados da API proxy (reais)
-  const { data: resumoIAData, isLoading: resumoIALoading } = useResumoIA(filters);
+  // Versão IA
+  const { data: versaoAtualData } = useVersaoIAAtual();
+  const { data: versoesData } = useVersoesIA();
+  const versaoAtual = versaoAtualData?.data ?? null;
+  const versoes: VersaoIA[] = versoesData?.data ?? [];
+  const [versaoHistoricoAberto, setVersaoHistoricoAberto] = useState(false);
 
   // IMEI data for device-level KPIs (always enabled)
   const limitDate = filters.dataFim ?? new Date().toISOString().slice(0, 10);
   const { data: imeiData, isLoading: imeiLoading } = useImeiIA(limitDate, true);
 
+  // Filter IMEI data by date range on the frontend (API only accepts limit_date)
+  const imeiDataFiltrado = useMemo(() => {
+    if (!imeiData) return [];
+    const inicio = filters.dataInicio;
+    const fim = filters.dataFim;
+    return imeiData.filter((item) => {
+      const data = item.Criacao_Pedido?.slice(0, 10);
+      if (!data) return true;
+      if (inicio && data < inicio) return false;
+      if (fim && data > fim) return false;
+      return true;
+    });
+  }, [imeiData, filters.dataInicio, filters.dataFim]);
+
   // Process device-level metrics from IMEI data
   const deviceMetrics = useMemo(() => {
-    if (!imeiData) return [];
-    return aggregateDeviceMetrics(imeiData, filters.imei);
-  }, [imeiData, filters.imei]);
+    return aggregateDeviceMetrics(imeiDataFiltrado, filters.imei);
+  }, [imeiDataFiltrado, filters.imei]);
 
   const deviceKpis = useMemo(() => computeDeviceKpis(deviceMetrics), [deviceMetrics]);
   const errorBreakdown = useMemo(() => computeErrorBreakdown(deviceMetrics), [deviceMetrics]);
-
-  // Processar resumo: mesclar Grade D->C, calcular totais
-  const resumoProcessado = useMemo(() => {
-    if (!resumoIAData) return {
-      total: 0, acertos: 0, erros: 0, assertividade: 0,
-      porGrade: [] as Array<{ grade: string; acertos: number; total: number; assertividade: number }>,
-    };
-
-    const gradeMap = new Map<string, { acertos: number; total: number }>();
-    let totalGeral = 0, acertosGeral = 0;
-
-    for (const item of resumoIAData) {
-      const grade = item.Grade_Humano_Real === "D" ? "C" : item.Grade_Humano_Real;
-      const existing = gradeMap.get(grade) ?? { acertos: 0, total: 0 };
-      gradeMap.set(grade, {
-        acertos: existing.acertos + item.Qtd_Acertos_IA,
-        total: existing.total + item.Total_Avaliados,
-      });
-      totalGeral += item.Total_Avaliados;
-      acertosGeral += item.Qtd_Acertos_IA;
-    }
-
-    const porGrade = ["A", "B", "C"].map((grade) => {
-      const g = gradeMap.get(grade) ?? { acertos: 0, total: 0 };
-      return { grade, ...g, assertividade: g.total > 0 ? Math.round((g.acertos / g.total) * 1000) / 10 : 0 };
-    });
-
-    return {
-      total: totalGeral,
-      acertos: acertosGeral,
-      erros: totalGeral - acertosGeral,
-      assertividade: totalGeral > 0 ? Math.round((acertosGeral / totalGeral) * 1000) / 10 : 0,
-      porGrade,
-    };
-  }, [resumoIAData]);
+  const gradeBreakdown = useMemo(() => buildGradeBreakdown(deviceMetrics), [deviceMetrics]);
 
   // Dados de curadoria (DB local)
   const { data: resumoCuradoriaData, isLoading: curadoriaLoading } = useAvaliacoesResumo(filters);
@@ -802,14 +842,57 @@ export default function AvaliacoesDashboardPage() {
       <PageHeader title="Avaliacoes — Dashboard" />
       <div className="container mx-auto px-4 py-6 space-y-6">
 
-        {/* Breadcrumb */}
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem><BreadcrumbPage>Avaliacoes</BreadcrumbPage></BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem><BreadcrumbPage>Dashboard</BreadcrumbPage></BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+        {/* Breadcrumb + Badge de versão IA */}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem><BreadcrumbPage>Avaliacoes</BreadcrumbPage></BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem><BreadcrumbPage>Dashboard</BreadcrumbPage></BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+
+          {versaoAtual && (
+            <div className="flex flex-col items-end gap-1">
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-1.5 cursor-default">
+                      <Cpu className="h-3 w-3" style={{ color: "var(--l3)" }} />
+                      <span className="text-[11px]" style={{ color: "var(--l3)" }}>
+                        IA {versaoAtual.versao} — {(() => { try { return format(parseISO(versaoAtual.data), "dd/MM/yyyy"); } catch { return versaoAtual.data; } })()}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs max-w-[220px]">
+                    <p className="font-medium">Modelo de IA da Lapisco</p>
+                    <p className="text-muted-foreground mt-0.5">Última atualização: {versaoAtual.data}</p>
+                    {versaoAtual.descricao && <p className="mt-0.5">{versaoAtual.descricao}</p>}
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+              {versoes.length > 1 && (
+                <button
+                  className="text-[10px] flex items-center gap-0.5"
+                  style={{ color: "var(--l3)" }}
+                  onClick={() => setVersaoHistoricoAberto((v) => !v)}
+                >
+                  Histórico de versões
+                  {versaoHistoricoAberto ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                </button>
+              )}
+              {versaoHistoricoAberto && (
+                <div className="text-right space-y-0.5 mt-1">
+                  {versoes.map((v) => (
+                    <p key={v.data + v.versao} className="text-[10px]" style={{ color: "var(--l3)" }}>
+                      {v.versao} — {(() => { try { return format(parseISO(v.data), "dd/MM/yyyy"); } catch { return v.data; } })()} — {v.descricao}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Tabs principais */}
         <Tabs defaultValue="visao-geral" className="space-y-6">
@@ -834,10 +917,10 @@ export default function AvaliacoesDashboardPage() {
             {/* Grafico evolucao + Grade breakdown */}
             <div className="grid gap-4 lg:grid-cols-5">
               <div className="lg:col-span-3">
-                <ProxyEvolutionChart filtros={filters} />
+                <ProxyEvolutionChart filtros={filters} versoes={versoes} />
               </div>
               <div className="lg:col-span-2">
-                <AssertividadePorGradeCard resumoIA={resumoProcessado.porGrade} isLoading={resumoIALoading} />
+                <AssertividadePorGradeCard resumoIA={gradeBreakdown} isLoading={imeiLoading} />
               </div>
             </div>
 
