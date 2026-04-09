@@ -806,9 +806,9 @@ export default function AvaliacoesDashboardPage() {
   const versoes: VersaoIA[] = versoesData?.data ?? [];
   const [versaoHistoricoAberto, setVersaoHistoricoAberto] = useState(false);
 
-  // IMEI data for device-level KPIs (always enabled)
-  const limitDate = filters.dataFim ?? new Date().toISOString().slice(0, 10);
-  const { data: imeiData, isLoading: imeiLoading } = useImeiIA(limitDate, true);
+  // IMEI data for device-level KPIs (always enabled) — start_date para histórico completo
+  const startDateImei = filters.dataInicio ?? DEFAULT_DATA_INICIO;
+  const { data: imeiData, isLoading: imeiLoading } = useImeiIA(startDateImei, true);
 
   // Filter IMEI data by date range on the frontend (API only accepts limit_date)
   const imeiDataFiltrado = useMemo(() => {
