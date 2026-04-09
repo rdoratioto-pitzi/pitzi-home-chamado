@@ -184,7 +184,7 @@ function CuradoriaFilters({
   const todayStr = new Date().toISOString().slice(0, 10);
   const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-  const [startDate, setStartDate] = useState(filtros.startDate || yesterdayStr);
+  const [startDate, setStartDate] = useState(filtros.startDate || "2026-03-20");
   const [endDate, setEndDate] = useState(filtros.endDate || todayStr);
   const [categoria, setCategoria] = useState(filtros.categoria || "todas");
   const [imei, setImei] = useState(filtros.imei || "");

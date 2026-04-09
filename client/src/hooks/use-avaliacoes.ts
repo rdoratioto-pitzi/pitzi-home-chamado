@@ -602,6 +602,66 @@ export function useSaveCuradoria() {
   });
 }
 
+// ─── Versão IA ────────────────────────────────────────────────────────────────
+
+export interface VersaoIA {
+  data: string;    // "YYYY-MM-DD"
+  versao: string;  // "v2.3"
+  descricao: string;
+}
+
+export function useVersoesIA() {
+  return useQuery<{ success: boolean; data: VersaoIA[] }>({
+    queryKey: ["/api/avaliacoes/configuracoes/versoes-ia"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/avaliacoes/configuracoes/versoes-ia");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+export function useVersaoIAAtual() {
+  return useQuery<{ success: boolean; data: VersaoIA | null }>({
+    queryKey: ["/api/avaliacoes/configuracoes/versao-ia"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/avaliacoes/configuracoes/versao-ia");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
+
+export function useAddVersaoIA() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: VersaoIA) => {
+      const res = await apiRequest("PUT", "/api/avaliacoes/configuracoes/versao-ia", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/avaliacoes/configuracoes/versoes-ia"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/avaliacoes/configuracoes/versao-ia"] });
+    },
+  });
+}
+
+export function useDeleteVersaoIA() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (index: number) => {
+      const res = await apiRequest("DELETE", `/api/avaliacoes/configuracoes/versoes-ia/${index}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/avaliacoes/configuracoes/versoes-ia"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/avaliacoes/configuracoes/versao-ia"] });
+    },
+  });
+}
+
 export function useUpdateConfiguracoes() {
   const queryClient = useQueryClient();
   return useMutation({
