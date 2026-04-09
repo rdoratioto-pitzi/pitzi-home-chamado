@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { DateInput } from "@/components/ui/date-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Download, Filter, RefreshCw } from "lucide-react";
 import { useApoioVendas, type ApoioVendasFilters } from "@/hooks/use-apoio-vendas";
@@ -297,16 +297,14 @@ export function ApoioVendasGestaoTab() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label>Data início</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={filters.dataInicio || ""}
                 onChange={(e) => setFilters({ ...filters, dataInicio: e.target.value })}
               />
             </div>
             <div className="space-y-2">
               <Label>Data fim</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={filters.dataFim || ""}
                 onChange={(e) => setFilters({ ...filters, dataFim: e.target.value })}
               />
