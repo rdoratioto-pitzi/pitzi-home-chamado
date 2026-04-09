@@ -117,7 +117,7 @@ export interface RawFotoAvaliacao {
   Tags_Humana?: string | null;
   Is_Match?: number;
   Status_Assertividade?: string;
-  // New field names (from /imei endpoint, with accents/spaces)
+  // New field names (from /imei endpoint, with accents/spaces) — DEPRECATED
   "Nota IA"?: string;
   "Nota Humana"?: string;
   "Descrição Captura"?: string;
@@ -129,6 +129,11 @@ export interface RawFotoAvaliacao {
   "Auto Avaliada"?: boolean;
   "Id da Avaliação"?: string;
   "Id da Captura"?: string;
+  // Current field names (from /imei endpoint, underscore format)
+  Url_Captura?: string;
+  Auto_Avaliada?: boolean;
+  Id_Avaliacao?: string;
+  Id_Captura?: string;
 }
 
 interface DispositivoAgrupado {
@@ -180,20 +185,20 @@ export function agregarPorDispositivo(
     const imei = foto.Imei;
     if (!imei) continue;
 
-    // Support both old field names (/detalhes) and new ones (/imei, with accents/spaces)
-    const gradeIaRaw = foto["Nota IA"] || foto.Grade_IA || foto.Nota_IA;
-    const gradeHumanoRaw = foto["Nota Humana"] || foto.Grade_Humano || foto.Nota_Humana;
+    // Support old field names (/detalhes), space-separated (/imei legacy), and underscore (/imei current)
+    const gradeIaRaw = foto.Nota_IA || foto["Nota IA"] || foto.Grade_IA;
+    const gradeHumanoRaw = foto.Nota_Humana || foto["Nota Humana"] || foto.Grade_Humano;
     const gradeIa = normalizeGrade(gradeIaRaw);
     const gradeHumano = normalizeGrade(gradeHumanoRaw);
 
-    const descCaptura = foto["Descrição Captura"] || foto.Descricao_Captura || foto.Nome_da_Tela || "";
-    const urlCaptura = foto["Url Captura"] || null;
+    const descCaptura = foto.Descricao_Captura || foto["Descrição Captura"] || foto.Nome_da_Tela || "";
+    const urlCaptura = foto.Url_Captura || foto["Url Captura"] || null;
     const area = mapFotoToArea(descCaptura);
 
     const dataTradeIn =
       foto.Data_Avaliacao ||
-      foto["Criação Pedido"] ||
       foto.Criacao_Pedido ||
+      foto["Criação Pedido"] ||
       new Date().toISOString();
 
     if (!grouped.has(imei)) {
@@ -204,9 +209,9 @@ export function agregarPorDispositivo(
         categoria: foto.Categoria || "smartphone",
         dataTradeIn,
         linkFotos,
-        codigoVoucher: foto["Código Voucher"] ?? null,
-        autoAvaliada: foto["Auto Avaliada"] ?? false,
-        idAvaliacao: foto["Id da Avaliação"] ?? null,
+        codigoVoucher: foto.Codigo_Voucher || foto["Código Voucher"] || null,
+        autoAvaliada: foto.Auto_Avaliada ?? foto["Auto Avaliada"] ?? false,
+        idAvaliacao: foto.Id_Avaliacao || foto["Id da Avaliação"] || null,
         displayGradesIa: [],
         displayGradesHumano: [],
         carcacaGradesIa: [],
@@ -223,8 +228,8 @@ export function agregarPorDispositivo(
     const device = grouped.get(imei)!;
 
     // Map photo to named slot (1-7)
-    const tagsIa = foto["Tags IA"] ?? foto.Tags_IA ?? null;
-    const tagsHumana = foto["Tags Humana"] ?? foto.Tags_Humana ?? null;
+    const tagsIa = foto.Tags_IA ?? foto["Tags IA"] ?? null;
+    const tagsHumana = foto.Tags_Humana ?? foto["Tags Humana"] ?? null;
     const slotDef = matchFotoSlot(descCaptura);
     if (slotDef && !device.fotosMap.has(slotDef.slot)) {
       device.fotosMap.set(slotDef.slot, {
@@ -236,7 +241,7 @@ export function agregarPorDispositivo(
         notaHumana: gradeHumano,
         tagsIa,
         tagsHumana,
-        idCaptura: foto["Id da Captura"] ?? null,
+        idCaptura: foto.Id_Captura || foto["Id da Captura"] || null,
       });
     }
 
