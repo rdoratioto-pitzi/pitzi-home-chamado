@@ -252,12 +252,15 @@ export function registerIntegrationRoutes(router: Router) {
   router.get("/api/avaliacoes-ia/imei", requireAuth, async (req, res) => {
     try {
       const params = new URLSearchParams();
-      const limitDate = (req.query.limit_date as string) || new Date().toISOString().slice(0, 10);
-      params.append("limit_date", limitDate);
-
-      if (req.query.imei) {
-        params.append("imei", req.query.imei as string);
+      // start_date (data de corte inferior) retorna histórico completo.
+      // limit_date (legado) só retorna a fila do dia atual — mantido por compatibilidade.
+      if (req.query.start_date) {
+        params.append("start_date", req.query.start_date as string);
+      } else {
+        const limitDate = (req.query.limit_date as string) || new Date().toISOString().slice(0, 10);
+        params.append("limit_date", limitDate);
       }
+      if (req.query.imei) params.append("imei", req.query.imei as string);
 
       const data = await fetchAiEvaluation("imei", Object.fromEntries(params.entries()));
       res.json(data);
