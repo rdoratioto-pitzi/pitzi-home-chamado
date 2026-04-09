@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import * as XLSX from "xlsx";
+import { DateInput } from "@/components/ui/date-input";
 import {
   Select,
   SelectContent,
@@ -523,16 +523,14 @@ export function ApoioVendasInicioTab() {
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="space-y-2">
               <Label>Data início</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={filters.dataInicio || ""}
                 onChange={(e) => setFilters({ ...filters, dataInicio: e.target.value })}
               />
             </div>
             <div className="space-y-2">
               <Label>Data fim</Label>
-              <Input
-                type="date"
+              <DateInput
                 value={filters.dataFim || ""}
                 onChange={(e) => setFilters({ ...filters, dataFim: e.target.value })}
               />
