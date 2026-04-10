@@ -162,6 +162,7 @@ export function registerWorkspaceRoutes(router: Router) {
           .map((w) => w[0].toUpperCase())
           .join("");
 
+        const requester = (t as any).requesterId ? userMap.get((t as any).requesterId) : null;
         const sla = getSlaForTicket(t as any, slaRules);
 
         return {
@@ -178,6 +179,7 @@ export function registerWorkspaceRoutes(router: Router) {
           sla: sla.slaHoras,
           statusSla: sla.status,
           abertura: t.dataAbertura || t.createdAt,
+          solicitante: requester?.name || null,
           anexos: parseAnexos((t as any).attachments),
         };
       });
@@ -196,10 +198,11 @@ export function registerWorkspaceRoutes(router: Router) {
   router.post("/api/workspace/chamados", requireAuth, async (req, res) => {
     try {
       const { userId } = getSessionUser(req);
-      const { titulo, descricao, categoria, prioridade, attachments } = req.body as {
+      const { titulo, descricao, categoria, tipo, prioridade, attachments } = req.body as {
         titulo?: string;
         descricao?: string;
         categoria?: string;
+        tipo?: string;
         prioridade?: string;
         attachments?: string;
       };
@@ -220,7 +223,7 @@ export function registerWorkspaceRoutes(router: Router) {
         title: titulo.trim(),
         description: descricao || "",
         category: categoria || "geral",
-        type: "bug",
+        type: tipo || "bug",
         location: "outros",
         priority: mappedPriority,
         impact: "medio",
@@ -771,6 +774,7 @@ export function registerWorkspaceRoutes(router: Router) {
       const assignee = ticket.assigneeId ? userMap.get(ticket.assigneeId) : null;
       const name = assignee?.name || "Não atribuído";
       const initials = name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+      const requester = (ticket as any).requesterId ? userMap.get((ticket as any).requesterId) : null;
       const sla = getSlaForTicket(ticket, slaRules);
 
       return res.json({
@@ -787,6 +791,7 @@ export function registerWorkspaceRoutes(router: Router) {
         sla: sla.slaHoras,
         statusSla: sla.status,
         abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
+        solicitante: requester?.name || null,
       });
     } catch (error: any) {
       return res.status(error.status || 500).json({ error: error.message });

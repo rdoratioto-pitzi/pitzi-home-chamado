@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ChamadoItem, UnifiedItem } from "./WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { RichContent } from "@/components/rich-content";
+import { useToast } from "@/hooks/use-toast";
 
 interface ItemDetailDrawerProps {
   open: boolean;
@@ -94,6 +95,22 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
+function formatDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+}
+
 const STATUS_OPTIONS = [
   { value: "open", label: "Aberto" },
   { value: "in_progress", label: "Em Andamento" },
@@ -154,6 +171,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
   const [editingField, setEditingField] = useState<string | null>(null);
   const [availableUsers, setAvailableUsers] = useState<Array<{id: string; name: string}>>([]);
   const [isPatching, setIsPatching] = useState(false);
+  const { toast } = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -198,8 +216,9 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
       const updated: ChamadoItem = await r.json();
       onUpdate?.(updated);
       setEditingField(null);
-    } catch {
-      // silently ignore
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast({ title: "Erro ao atualizar", description: msg, variant: "destructive" });
     } finally {
       setIsPatching(false);
     }
@@ -232,8 +251,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
   const prioLabel = item ? (priorityLabels[item.prioridade] ?? item.prioridade) : "";
 
   const abertura = isChamado
-    ? formatDate((item as ChamadoItem).abertura)
-    : formatDate((item as UnifiedItem | null)?.criadoEm);
+    ? formatDateTime((item as ChamadoItem).abertura)
+    : formatDateTime((item as UnifiedItem | null)?.criadoEm);
 
   const descricao = item
     ? isChamado
@@ -487,6 +506,16 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                         </div>
                       )}
                     </div>
+
+                    {/* Solicitante — só chamados */}
+                    {isChamado && (item as ChamadoItem).solicitante && (
+                      <div className="flex items-center gap-3">
+                        <span style={ROW_LABEL_STYLE}>Solicitante</span>
+                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                          {(item as ChamadoItem).solicitante}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Abertura */}
                     <div className="flex items-center gap-3">
