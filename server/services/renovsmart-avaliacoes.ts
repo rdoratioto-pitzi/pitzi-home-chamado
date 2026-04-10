@@ -1010,7 +1010,11 @@ export async function calcularRankingAvaliadorCompleto(filtros: AvaliacoesFilter
         trend: Math.round((calcAcc(recent) - calcAcc(previous)) * 10) / 10,
       };
     })
-    .sort((a, b) => b.assertividade - a.assertividade);
+    .sort((a, b) => {
+      // Automáticas sempre ao final; entre si e entre humanos, ordenar por assertividade desc
+      if (a.isAutomatica !== b.isAutomatica) return a.isAutomatica ? 1 : -1;
+      return b.assertividade - a.assertividade;
+    });
 }
 
 // ─── Evolução Avaliadores ────────────────────────────────────────────────────
