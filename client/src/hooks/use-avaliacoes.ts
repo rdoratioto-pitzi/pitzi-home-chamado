@@ -245,15 +245,67 @@ export function useAvaliadores() {
   });
 }
 
+export interface CuradoriaHistoricoFiltros {
+  dataInicio?: string;
+  dataFim?: string;
+  curadorId?: string;
+  imei?: string;
+  divergentesOnly?: boolean;
+}
+
+export interface CuradoriaKpis {
+  totalCuradorias: number;
+  taxaConcordancia: number;
+  curadoriasHoje: number;
+  topCurador: string | null;
+}
+
+export interface CuradoriaHistoricoItem {
+  id: string;
+  tradeInId: string;
+  imei: string | null;
+  modelo: string | null;
+  categoria: string | null;
+  gradeIaDisplay: string | null;
+  gradeIaCarcaca: string | null;
+  gradeCorretaDisplay: string | null;
+  gradeCorretaCarcaca: string | null;
+  curadorId: string | null;
+  observacao: string | null;
+  dataCuradoria: string | null;
+  imagemFrontal: string | null;
+  imagemTraseira: string | null;
+  imagemLateral1: string | null;
+  imagemLateral2: string | null;
+  imagemDetalhe: string | null;
+  gradesPorFoto: Record<string, string> | null;
+  revisaoAvaliador: boolean;
+  revisaoTipo: string | null;
+}
+
 export function useCuradorias(
-  filtros: { dataInicio?: string; dataFim?: string; curadorId?: string } = {},
+  filtros: CuradoriaHistoricoFiltros = {},
   page = 1,
   limit = 50
 ) {
-  return useQuery({
-    queryKey: KEYS.curadoria({ data_inicio: filtros.dataInicio ?? "", data_fim: filtros.dataFim ?? "", curador_id: filtros.curadorId ?? "" }, page, limit),
+  return useQuery<{ success: boolean; data: CuradoriaHistoricoItem[]; total: number; page: number; totalPages: number; kpis: CuradoriaKpis }>({
+    queryKey: KEYS.curadoria({
+      data_inicio: filtros.dataInicio ?? "",
+      data_fim: filtros.dataFim ?? "",
+      curador_id: filtros.curadorId ?? "",
+      imei: filtros.imei ?? "",
+      divergentes_only: filtros.divergentesOnly ? "true" : "",
+    }, page, limit),
     queryFn: async () => {
-      const qs = buildParams({ data_inicio: filtros.dataInicio, data_fim: filtros.dataFim, curador_id: filtros.curadorId, page: String(page), limit: String(limit) });
+      const qs = buildParams({
+        data_inicio: filtros.dataInicio,
+        data_fim: filtros.dataFim,
+        curador_id: filtros.curadorId,
+        imei: filtros.imei,
+        divergentes_only: filtros.divergentesOnly ? "true" : undefined,
+        page: String(page),
+        limit: String(limit),
+      });
       const res = await apiRequest("GET", `/api/avaliacoes/curadoria${qs}`);
       return res.json();
     },

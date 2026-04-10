@@ -3,7 +3,7 @@
  * Espelho de server/routes/avaliacoes.ts
  */
 import { Hono } from "hono";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, ilike } from "drizzle-orm";
 import type { AppEnv } from "../index";
 import {
   curadoriaAvaliacoes,
@@ -599,23 +599,48 @@ avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
 
 avaliacoes.get("/api/avaliacoes/curadoria", async (c) => {
   try {
-    const { data_inicio, data_fim, curador_id, page = "1", limit = "50" } = c.req.query();
+    const { data_inicio, data_fim, curador_id, imei, divergentes_only, page = "1", limit = "50" } = c.req.query();
     const db = c.get("db");
 
     const conditions = [];
     if (data_inicio) { const s = parseDate(data_inicio); if (s) conditions.push(gte(curadoriaAvaliacoes.dataCuradoria, s)); }
     if (data_fim) { const e = parseDate(data_fim); if (e) { e.setHours(23,59,59,999); conditions.push(lte(curadoriaAvaliacoes.dataCuradoria, e)); } }
     if (curador_id) conditions.push(eq(curadoriaAvaliacoes.curadorId, curador_id));
+    if (imei) conditions.push(ilike(curadoriaAvaliacoes.imei, `%${imei}%`));
 
     const all = conditions.length > 0
       ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions)).orderBy(desc(curadoriaAvaliacoes.dataCuradoria))
       : await db.select().from(curadoriaAvaliacoes).orderBy(desc(curadoriaAvaliacoes.dataCuradoria));
 
-    const total = all.length;
-    const pageNum = parseInt(page), limitNum = parseInt(limit);
-    const data = all.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+    // KPIs from full filtered set
+    const hoje = new Date();
+    const inicioDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    const concordantes = all.filter(r =>
+      r.gradeCorretaDisplay && r.gradeIaDisplay && r.gradeCorretaCarcaca && r.gradeIaCarcaca &&
+      r.gradeCorretaDisplay === r.gradeIaDisplay && r.gradeCorretaCarcaca === r.gradeIaCarcaca
+    );
+    const curadoriasHoje = all.filter(r => r.dataCuradoria && new Date(r.dataCuradoria) >= inicioDia).length;
+    const curadorContagem: Record<string, number> = {};
+    for (const r of all) { if (r.curadorId) curadorContagem[r.curadorId] = (curadorContagem[r.curadorId] ?? 0) + 1; }
+    const topCurador = Object.keys(curadorContagem).length > 0
+      ? Object.entries(curadorContagem).sort(([, a], [, b]) => b - a)[0][0]
+      : null;
+    const kpis = {
+      totalCuradorias: all.length,
+      taxaConcordancia: all.length > 0 ? Math.round((concordantes.length / all.length) * 100) : 0,
+      curadoriasHoje,
+      topCurador,
+    };
 
-    return c.json({ success: true, data, total, page: pageNum, totalPages: Math.ceil(total / limitNum) });
+    const filtered = divergentes_only === "true"
+      ? all.filter(r => !(r.gradeCorretaDisplay === r.gradeIaDisplay && r.gradeCorretaCarcaca === r.gradeIaCarcaca))
+      : all;
+
+    const pageNum = parseInt(page), limitNum = parseInt(limit);
+    const total = filtered.length;
+    const data = filtered.slice((pageNum - 1) * limitNum, pageNum * limitNum);
+
+    return c.json({ success: true, data, total, page: pageNum, totalPages: Math.ceil(total / limitNum), kpis });
   } catch (error: unknown) {
     return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);
   }
