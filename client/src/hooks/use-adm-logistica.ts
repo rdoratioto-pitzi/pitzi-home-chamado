@@ -63,6 +63,8 @@ export interface LogisticaDispositivosResponse {
 export interface LogisticaColetasFilters {
   start_date?: string;
   end_date?: string;
+  receipt_start?: string;
+  receipt_end?: string;
   tsp?: string;
   status_controle?: string;
   responsavel?: string;

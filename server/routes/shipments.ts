@@ -567,7 +567,7 @@ export function registerShipmentRoutes(router: Router) {
   router.get("/api/integrations/adm-logistica/coletas/aggregates", requireAuth, async (req, res) => {
     try {
       const params = new URLSearchParams();
-      const queryParams = ["start_date", "end_date", "tsp", "status_controle", "responsavel"];
+      const queryParams = ["start_date", "end_date", "receipt_start", "receipt_end", "tsp", "status_controle", "responsavel"];
       queryParams.forEach(param => {
         if (req.query[param]) params.append(param, req.query[param] as string);
       });
