@@ -84,6 +84,7 @@ const impactLabels: Record<string, string> = {
 const typeLabels: Record<string, string> = {
   bug: "Bug",
   melhoria: "Melhoria",
+  processo: "Processo",
   negocio: "Negócio",
 };
 
@@ -144,6 +145,7 @@ const defaultCategories: FieldItem[] = [
 const defaultTypes: FieldItem[] = [
   { value: "bug", label: "Bug" },
   { value: "melhoria", label: "Melhoria" },
+  { value: "processo", label: "Processo" },
   { value: "negocio", label: "Negócio" },
 ];
 
@@ -159,9 +161,7 @@ const defaultLocations: FieldItem[] = [
 
 const editFormSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
-  description: z.string()
-    .min(20, "Descrição deve ter no mínimo 20 caracteres")
-    .max(5000, "Descrição deve ter no máximo 5.000 caracteres"),
+  description: z.string().max(5000, "Descrição deve ter no máximo 5.000 caracteres"),
   category: z.string().min(1, "Selecione uma categoria"),
   type: z.string().min(1, "Selecione um tipo"),
   location: z.string().min(1, "Selecione um local"),
@@ -392,7 +392,6 @@ export default function TicketDetailPage() {
         attachments: editedAttachments.length > 0 ? JSON.stringify(editedAttachments) : null,
       });
     }
-    setIsEditing(false);
   };
 
   const handleAddComment = () => {

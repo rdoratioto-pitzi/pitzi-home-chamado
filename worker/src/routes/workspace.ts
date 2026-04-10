@@ -172,6 +172,7 @@ workspace.get("/api/workspace/chamados", async (c) => {
         .slice(0, 2)
         .map((w) => w[0].toUpperCase())
         .join("");
+      const requester = (t as any).requesterId ? userMap.get((t as any).requesterId) : null;
       const sla = getSlaForTicket(t, slaRules);
 
       return {
@@ -188,6 +189,7 @@ workspace.get("/api/workspace/chamados", async (c) => {
         sla: sla.slaHoras,
         statusSla: sla.status,
         abertura: t.dataAbertura || t.createdAt,
+        solicitante: requester?.name || null,
         anexos: parseAnexos(t.attachments),
       };
     });
@@ -214,21 +216,24 @@ workspace.get("/api/workspace/chamados", async (c) => {
 workspace.post("/api/workspace/chamados", async (c) => {
   try {
     const { userId } = c.get("user");
-    const body = await c.req.json<{ titulo?: string; descricao?: string }>();
-    const { titulo, descricao } = body;
+    const body = await c.req.json<{ titulo?: string; descricao?: string; categoria?: string; tipo?: string; prioridade?: string }>();
+    const { titulo, descricao, categoria, tipo, prioridade } = body;
 
     if (!titulo?.trim()) {
       return c.json({ error: "Título obrigatório" }, 400);
     }
 
+    const prioridadeMap: Record<string, string> = { baixa: "low", media: "medium", alta: "high", critica: "critical" };
+    const mappedPriority = prioridade ? (prioridadeMap[prioridade] || prioridade) : "medium";
+
     const storage = getStorage(c.get("db"));
     const ticket = await storage.createTicket({
       title: titulo.trim(),
       description: descricao || "",
-      category: "geral",
-      type: "bug",
+      category: categoria || "geral",
+      type: tipo || "bug",
       location: "outros",
-      priority: "medium",
+      priority: mappedPriority,
       impact: "medio",
       status: "open",
       requesterId: userId,
@@ -720,6 +725,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
     const assignee = ticket.assigneeId ? userMap.get(ticket.assigneeId) : null;
     const name = assignee?.name || "Não atribuído";
     const initials = name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+    const requester = (ticket as any).requesterId ? userMap.get((ticket as any).requesterId) : null;
     const sla = getSlaForTicket(ticket, slaRules);
 
     return c.json({
@@ -736,6 +742,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
       sla: sla.slaHoras,
       statusSla: sla.status,
       abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
+      solicitante: requester?.name || null,
     });
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
