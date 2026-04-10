@@ -165,6 +165,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
 
   // Chamado chip state
   const [categoriaChamado, setCategoriaChamado] = useState("");
+  const [tipoChamado, setTipoChamado] = useState("");
   const [prioridadeChamado, setPrioridadeChamado] = useState("media");
 
   // Projeto chip state
@@ -190,6 +191,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setAttachments([]);
     setExtraOpen(false);
     setCategoriaChamado("");
+    setTipoChamado("");
     setPrioridadeChamado("media");
     setStatusTarefa("a-fazer");
     setProjetoId("");
@@ -283,6 +285,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setAttachments([]);
     setExtraOpen(false);
     setCategoriaChamado("");
+    setTipoChamado("");
     setPrioridadeChamado("media");
     setStatusTarefa("a-fazer");
     setProjetoId("");
@@ -306,6 +309,14 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
       toast({ title: "Informe o título", variant: "destructive" });
       return;
     }
+    if (type === "chamado" && !categoriaChamado) {
+      toast({ title: "Selecione a categoria", variant: "destructive" });
+      return;
+    }
+    if (type === "chamado" && !tipoChamado) {
+      toast({ title: "Selecione o tipo", variant: "destructive" });
+      return;
+    }
     setSubmitting(true);
     try {
       let response: Response;
@@ -317,7 +328,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
           body: JSON.stringify({
             titulo: titulo.trim(),
             descricao,
-            categoria: categoriaChamado || undefined,
+            categoria: categoriaChamado,
+            tipo: tipoChamado,
             prioridade: prioridadeChamado || undefined,
             attachments: attachments.length > 0 ? JSON.stringify(attachments) : undefined,
           }),
@@ -517,7 +529,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
               <ChipSelect
                 value={categoriaChamado}
                 onValueChange={setCategoriaChamado}
-                placeholder="Categoria"
+                placeholder="Categoria *"
                 options={[
                   { value: "ti-sistemas", label: "TI/Sistemas" },
                   { value: "comercial", label: "Comercial" },
@@ -525,6 +537,17 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                   { value: "financeiro", label: "Financeiro" },
                   { value: "operacoes", label: "Operações" },
                   { value: "rh", label: "RH" },
+                ]}
+              />
+              <ChipSelect
+                value={tipoChamado}
+                onValueChange={setTipoChamado}
+                placeholder="Tipo *"
+                options={[
+                  { value: "bug", label: "Bug" },
+                  { value: "melhoria", label: "Melhoria" },
+                  { value: "processo", label: "Processo" },
+                  { value: "negocio", label: "Negócio" },
                 ]}
               />
               <ChipSelect
