@@ -51,6 +51,7 @@ import {
   ScanEye,
   Filter,
   TrendingUp,
+  History,
 } from "lucide-react";
 import {
   Sidebar,
@@ -149,6 +150,7 @@ const triagemSubItems = [
 const avaliacoesSubItems = [
   { title: "Dashboard", url: "/avaliacoes/dashboard", icon: LayoutDashboard },
   { title: "Curadoria", url: "/avaliacoes/curadoria", icon: ClipboardList },
+  { title: "Histórico", url: "/avaliacoes/historico", icon: History },
   { title: "Matriz de Confusão", url: "/avaliacoes/matriz", icon: FileSpreadsheet },
   { title: "Configurações", url: "/avaliacoes/configuracoes", icon: Settings2 },
 ];

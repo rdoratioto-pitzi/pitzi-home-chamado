@@ -49,6 +49,7 @@ const TriagemDesviosPage               = lazy(() => import("@/pages/triagem/desv
 const AvaliacoesPage                   = lazy(() => import("@/pages/avaliacoes/index"));
 const AvaliacoesDashboardPage          = lazy(() => import("@/pages/avaliacoes/dashboard"));
 const AvaliacoesCuradoriaPage          = lazy(() => import("@/pages/avaliacoes/curadoria"));
+const AvaliacoesHistoricoPage          = lazy(() => import("@/pages/avaliacoes/historico"));
 const AvaliacoesMatrizPage             = lazy(() => import("@/pages/avaliacoes/matriz"));
 const AvaliacoesConfiguracoesPage      = lazy(() => import("@/pages/avaliacoes/configuracoes"));
 const RomaneiosPage                    = lazy(() => import("@/pages/logistica/romaneios"));
@@ -315,6 +316,11 @@ function Router() {
       <Route path="/avaliacoes/curadoria">
         <ProtectedRoute requiredPermission="avaliacoes">
           <AvaliacoesCuradoriaPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/avaliacoes/historico">
+        <ProtectedRoute requiredPermission="avaliacoes">
+          <AvaliacoesHistoricoPage />
         </ProtectedRoute>
       </Route>
       <Route path="/avaliacoes/matriz">

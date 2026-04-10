@@ -4,7 +4,7 @@
  */
 
 import { db } from "../db";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, ilike } from "drizzle-orm";
 import {
   curadoriaAvaliacoes,
   curadoriaConfiguracoes,
@@ -199,9 +199,9 @@ function normalizeItem(item: any, foiCurado: boolean): TradeInAvaliacao {
     imagemDetalhe: item.imagem_detalhe || item.imagemDetalhe || null,
     linkFotos: item.link_fotos || item.linkFotos || null,
     fotos: [],
-    codigoVoucher: item.codigo_voucher || item.codigoVoucher || item["Código Voucher"] || null,
-    autoAvaliada: item.auto_avaliada ?? item.autoAvaliada ?? item["Auto Avaliada"] ?? false,
-    idAvaliacao: item.id_avaliacao || item.idAvaliacao || item["Id da Avaliação"] || null,
+    codigoVoucher: item.codigo_voucher || item.codigoVoucher || item.Codigo_Voucher || null,
+    autoAvaliada: item.auto_avaliada ?? item.autoAvaliada ?? item.Auto_Avaliada ?? false,
+    idAvaliacao: item.id_avaliacao || item.idAvaliacao || item.Id_Avaliacao || null,
     foiCurado,
   };
 }
@@ -704,11 +704,11 @@ export async function saveCuradoria(data: InsertCuradoriaAvaliacao) {
 }
 
 export async function getCuradorias(
-  filtros: { dataInicio?: string; dataFim?: string; curadorId?: string },
+  filtros: { dataInicio?: string; dataFim?: string; curadorId?: string; imei?: string; divergentesOnly?: boolean },
   page = 1,
   limit = 50
 ) {
-  if (!db) return { data: [], total: 0, page, totalPages: 0 };
+  if (!db) return { data: [], total: 0, page, totalPages: 0, kpis: { totalCuradorias: 0, taxaConcordancia: 0, curadoriasHoje: 0, topCurador: null } };
 
   const conditions = [];
   if (filtros.dataInicio) {
@@ -722,15 +722,42 @@ export async function getCuradorias(
   if (filtros.curadorId) {
     conditions.push(eq(curadoriaAvaliacoes.curadorId, filtros.curadorId));
   }
+  if (filtros.imei) {
+    conditions.push(ilike(curadoriaAvaliacoes.imei, `%${filtros.imei}%`));
+  }
 
   const all = conditions.length > 0
     ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions)).orderBy(desc(curadoriaAvaliacoes.dataCuradoria))
     : await db.select().from(curadoriaAvaliacoes).orderBy(desc(curadoriaAvaliacoes.dataCuradoria));
 
-  const total = all.length;
+  // KPIs computed from full filtered set
+  const hoje = new Date();
+  const inicioDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  const concordantes = all.filter(r =>
+    r.gradeCorretaDisplay && r.gradeIaDisplay && r.gradeCorretaCarcaca && r.gradeIaCarcaca &&
+    r.gradeCorretaDisplay === r.gradeIaDisplay && r.gradeCorretaCarcaca === r.gradeIaCarcaca
+  );
+  const curadoriasHoje = all.filter(r => r.dataCuradoria && new Date(r.dataCuradoria) >= inicioDia).length;
+  const curadorContagem: Record<string, number> = {};
+  for (const r of all) { if (r.curadorId) curadorContagem[r.curadorId] = (curadorContagem[r.curadorId] ?? 0) + 1; }
+  const topCurador = Object.keys(curadorContagem).length > 0
+    ? Object.entries(curadorContagem).sort(([, a], [, b]) => b - a)[0][0]
+    : null;
+  const kpis = {
+    totalCuradorias: all.length,
+    taxaConcordancia: all.length > 0 ? Math.round((concordantes.length / all.length) * 100) : 0,
+    curadoriasHoje,
+    topCurador,
+  };
+
+  const filtered = filtros.divergentesOnly
+    ? all.filter(r => !(r.gradeCorretaDisplay === r.gradeIaDisplay && r.gradeCorretaCarcaca === r.gradeIaCarcaca))
+    : all;
+
+  const total = filtered.length;
   const totalPages = Math.ceil(total / limit);
-  const data = all.slice((page - 1) * limit, page * limit);
-  return { data, total, page, totalPages };
+  const data = filtered.slice((page - 1) * limit, page * limit);
+  return { data, total, page, totalPages, kpis };
 }
 
 interface CuradoriaFiltrosBackend {
@@ -770,10 +797,14 @@ export async function getCuradoriaPendentes(tenantId?: string | null, filtros: C
     all = [];
   }
 
-  // Apply filters
-  let filtered = all.filter((t) => !t.foiCurado);
+  // Filter Auto_Avaliada devices
+  let filtered = all.filter((t) => !t.autoAvaliada && !t.foiCurado);
   if (filtros.endDate) {
-    filtered = filtered.filter((t) => t.dataTradeIn.slice(0, 10) <= filtros.endDate!);
+    const endDateObj = new Date(filtros.endDate + "T23:59:59.999Z");
+    filtered = filtered.filter((t) => {
+      const itemDate = new Date(t.dataTradeIn);
+      return !isNaN(itemDate.getTime()) && itemDate <= endDateObj;
+    });
   }
   if (filtros.imei) {
     const imeiSearch = filtros.imei.toLowerCase();
@@ -1006,7 +1037,11 @@ export async function calcularRankingAvaliadorCompleto(filtros: AvaliacoesFilter
         trend: Math.round((calcAcc(recent) - calcAcc(previous)) * 10) / 10,
       };
     })
-    .sort((a, b) => b.assertividade - a.assertividade);
+    .sort((a, b) => {
+      // Automáticas sempre ao final; entre si e entre humanos, ordenar por assertividade desc
+      if (a.isAutomatica !== b.isAutomatica) return a.isAutomatica ? 1 : -1;
+      return b.assertividade - a.assertividade;
+    });
 }
 
 // ─── Evolução Avaliadores ────────────────────────────────────────────────────

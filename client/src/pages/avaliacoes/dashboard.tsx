@@ -84,9 +84,10 @@ interface DeviceMetrics {
 }
 
 function aggregateDeviceMetrics(items: AvaliacaoImeiItem[], imeiFilter?: string): DeviceMetrics[] {
-  const filtered = imeiFilter
+  const filtered = (imeiFilter
     ? items.filter((i) => i.Imei?.includes(imeiFilter))
-    : items;
+    : items
+  ).filter((i) => !i.Auto_Avaliada);
 
   const grouped = new Map<string, {
     displayIa: (Grade | null)[]; displayHumano: (Grade | null)[];
@@ -97,7 +98,7 @@ function aggregateDeviceMetrics(items: AvaliacaoImeiItem[], imeiFilter?: string)
     const desc = item.Descricao_Captura || "";
     if (desc.toLowerCase().includes("video") || desc.toLowerCase().includes("360")) continue;
 
-    const gradeIa = normalizeGrade(item.Nota_IA);
+    const gradeIa = normalizeGrade(item.Nota_Ia);
     const gradeHumano = normalizeGrade(item.Nota_Humana);
 
     if (!grouped.has(item.Imei)) {
@@ -810,16 +811,19 @@ export default function AvaliacoesDashboardPage() {
   const startDateImei = filters.dataInicio ?? DEFAULT_DATA_INICIO;
   const { data: imeiData, isLoading: imeiLoading } = useImeiIA(startDateImei, true);
 
-  // Filter IMEI data by date range on the frontend (API only accepts limit_date)
+  // Filter IMEI data by date range on the frontend (API only accepts start_date)
   const imeiDataFiltrado = useMemo(() => {
     if (!imeiData) return [];
     const inicio = filters.dataInicio;
     const fim = filters.dataFim;
     return imeiData.filter((item) => {
-      const data = item.Criacao_Pedido?.slice(0, 10);
-      if (!data) return true;
-      if (inicio && data < inicio) return false;
-      if (fim && data > fim) return false;
+      if (!item.Criacao_Pedido) return true;
+      // Criacao_Pedido is RFC date (e.g. "Thu, 09 Apr 2026 21:19:24 GMT")
+      const parsed = new Date(item.Criacao_Pedido);
+      if (isNaN(parsed.getTime())) return true;
+      const isoDate = parsed.toISOString().slice(0, 10);
+      if (inicio && isoDate < inicio) return false;
+      if (fim && isoDate > fim) return false;
       return true;
     });
   }, [imeiData, filters.dataInicio, filters.dataFim]);
