@@ -148,7 +148,7 @@ export function registerAvaliacoesRoutes(router: Router) {
       res.json({ success: true, ...result });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro interno";
-      res.status(500).json({ success: false, error: message instanceof Error ? message : "Erro interno" });
+      res.status(500).json({ success: false, error: message });
     }
   });
 
