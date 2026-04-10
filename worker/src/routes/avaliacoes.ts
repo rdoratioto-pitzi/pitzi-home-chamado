@@ -1159,7 +1159,11 @@ avaliacoes.get("/api/avaliacoes/metricas/ranking-avaliadores-completo", async (c
           trend: Math.round((recentAcc - prevAcc) * 10) / 10,
         };
       })
-      .sort((a, b) => b.assertividade - a.assertividade);
+      .sort((a, b) => {
+        // Automáticas sempre ao final; entre si e entre humanos, ordenar por assertividade desc
+        if (a.isAutomatica !== b.isAutomatica) return a.isAutomatica ? 1 : -1;
+        return b.assertividade - a.assertividade;
+      });
 
     return c.json({ success: true, data });
   } catch (error: unknown) {
