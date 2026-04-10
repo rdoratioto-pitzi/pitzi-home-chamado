@@ -4,7 +4,7 @@
  */
 
 import { db } from "../db";
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc, ilike } from "drizzle-orm";
 import {
   curadoriaAvaliacoes,
   curadoriaConfiguracoes,
@@ -704,11 +704,11 @@ export async function saveCuradoria(data: InsertCuradoriaAvaliacao) {
 }
 
 export async function getCuradorias(
-  filtros: { dataInicio?: string; dataFim?: string; curadorId?: string },
+  filtros: { dataInicio?: string; dataFim?: string; curadorId?: string; imei?: string; divergentesOnly?: boolean },
   page = 1,
   limit = 50
 ) {
-  if (!db) return { data: [], total: 0, page, totalPages: 0 };
+  if (!db) return { data: [], total: 0, page, totalPages: 0, kpis: { totalCuradorias: 0, taxaConcordancia: 0, curadoriasHoje: 0, topCurador: null } };
 
   const conditions = [];
   if (filtros.dataInicio) {
@@ -722,15 +722,42 @@ export async function getCuradorias(
   if (filtros.curadorId) {
     conditions.push(eq(curadoriaAvaliacoes.curadorId, filtros.curadorId));
   }
+  if (filtros.imei) {
+    conditions.push(ilike(curadoriaAvaliacoes.imei, `%${filtros.imei}%`));
+  }
 
   const all = conditions.length > 0
     ? await db.select().from(curadoriaAvaliacoes).where(and(...conditions)).orderBy(desc(curadoriaAvaliacoes.dataCuradoria))
     : await db.select().from(curadoriaAvaliacoes).orderBy(desc(curadoriaAvaliacoes.dataCuradoria));
 
-  const total = all.length;
+  // KPIs computed from full filtered set
+  const hoje = new Date();
+  const inicioDia = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  const concordantes = all.filter(r =>
+    r.gradeCorretaDisplay && r.gradeIaDisplay && r.gradeCorretaCarcaca && r.gradeIaCarcaca &&
+    r.gradeCorretaDisplay === r.gradeIaDisplay && r.gradeCorretaCarcaca === r.gradeIaCarcaca
+  );
+  const curadoriasHoje = all.filter(r => r.dataCuradoria && new Date(r.dataCuradoria) >= inicioDia).length;
+  const curadorContagem: Record<string, number> = {};
+  for (const r of all) { if (r.curadorId) curadorContagem[r.curadorId] = (curadorContagem[r.curadorId] ?? 0) + 1; }
+  const topCurador = Object.keys(curadorContagem).length > 0
+    ? Object.entries(curadorContagem).sort(([, a], [, b]) => b - a)[0][0]
+    : null;
+  const kpis = {
+    totalCuradorias: all.length,
+    taxaConcordancia: all.length > 0 ? Math.round((concordantes.length / all.length) * 100) : 0,
+    curadoriasHoje,
+    topCurador,
+  };
+
+  const filtered = filtros.divergentesOnly
+    ? all.filter(r => !(r.gradeCorretaDisplay === r.gradeIaDisplay && r.gradeCorretaCarcaca === r.gradeIaCarcaca))
+    : all;
+
+  const total = filtered.length;
   const totalPages = Math.ceil(total / limit);
-  const data = all.slice((page - 1) * limit, page * limit);
-  return { data, total, page, totalPages };
+  const data = filtered.slice((page - 1) * limit, page * limit);
+  return { data, total, page, totalPages, kpis };
 }
 
 interface CuradoriaFiltrosBackend {

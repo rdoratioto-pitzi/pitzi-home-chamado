@@ -133,12 +133,14 @@ export function registerAvaliacoesRoutes(router: Router) {
   // GET /api/avaliacoes/curadoria — registros de curadoria salvos
   router.get("/api/avaliacoes/curadoria", requireAuth, async (req, res) => {
     try {
-      const { data_inicio, data_fim, curador_id, page = "1", limit = "50" } = req.query;
+      const { data_inicio, data_fim, curador_id, imei, divergentes_only, page = "1", limit = "50" } = req.query;
       const result = await getCuradorias(
         {
           dataInicio: data_inicio ? String(data_inicio) : undefined,
           dataFim: data_fim ? String(data_fim) : undefined,
           curadorId: curador_id ? String(curador_id) : undefined,
+          imei: imei ? String(imei) : undefined,
+          divergentesOnly: divergentes_only === "true",
         },
         parseInt(String(page)),
         parseInt(String(limit))
@@ -146,8 +148,7 @@ export function registerAvaliacoesRoutes(router: Router) {
       res.json({ success: true, ...result });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Erro interno";
-      console.error("[Avaliacoes] get curadorias error:", message);
-      res.status(500).json({ success: false, error: message });
+      res.status(500).json({ success: false, error: message instanceof Error ? message : "Erro interno" });
     }
   });
 
