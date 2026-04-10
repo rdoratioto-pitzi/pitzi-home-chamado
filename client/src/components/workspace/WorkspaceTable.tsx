@@ -22,6 +22,7 @@ export interface ChamadoItem {
   sla: number | null;
   statusSla: "dentro_prazo" | "em_atraso" | null;
   abertura: string | null;
+  solicitante: string | null;
   anexos: Array<{ name: string; url: string }>;
 }
 
