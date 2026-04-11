@@ -302,3 +302,11 @@ Se skills não funcionarem: cd .claude/skills/gstack && ./setup
 | Marcelo | CTO / Code Review — **aprovação obrigatória de todos os PRs** |
 | Átila   | Senior Developer                                              |
 | Juan    | Developer                                                     |
+
+## Gestão de Secrets e Credenciais
+
+- NUNCA hardcode secrets, tokens, API keys ou senhas no código-fonte
+- NUNCA commite arquivos `.env` com valores reais (apenas `.env.example` com placeholders)
+- Secrets de desenvolvimento devem estar em `.env.local` (gitignored)
+- Secrets de produção são gerenciados via variáveis de ambiente do deploy (Cloudflare/Vercel)
+- Em caso de vazamento acidental: rotacionar o secret IMEDIATAMENTE e notificar o time
