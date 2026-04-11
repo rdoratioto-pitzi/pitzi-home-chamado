@@ -310,3 +310,23 @@ Se skills não funcionarem: cd .claude/skills/gstack && ./setup
 - Secrets de desenvolvimento devem estar em `.env.local` (gitignored)
 - Secrets de produção são gerenciados via variáveis de ambiente do deploy (Cloudflare/Vercel)
 - Em caso de vazamento acidental: rotacionar o secret IMEDIATAMENTE e notificar o time
+
+## Segundo Cérebro — rag-obsidian-renov
+
+Repo bare: /home/matheus/Documentos/workspaces/rag-obsidian-renov.git
+Clone MacBook: ~/Documents/rag-obsidian-renov/
+Clone iMac:    ~/Documents/rag-obsidian-renov/
+MCP: "obsidian" disponível no Claude Desktop de cada máquina
+
+### Consultar antes de sessões relevantes
+- projetos/renov-home/index.md — stack, git flow, status
+- projetos/renov-home/decisoes/ — decisões anteriores
+
+### Registrar após decisões arquiteturais
+Arquivo: projetos/renov-home/decisoes/YYYY-MM-DD-[tema].md
+Template: _templates/decisao-sessao.md
+Commit: git add -A && git commit -m "vault: decisao [tema]" && git push
+
+### Time técnico
+Marcelo (marcelo-maciel) — CTO · Reviewer obrigatório Hub e Home
+Juan — desenvolvedor
