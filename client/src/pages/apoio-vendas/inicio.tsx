@@ -547,6 +547,7 @@ export function ApoioVendasInicioTab() {
             <div className="space-y-2">
               <Label>Data início</Label>
               <DateInput
+                className="max-w-[160px]"
                 value={filters.dataInicio || ""}
                 onChange={(e) => setFilters({ ...filters, dataInicio: e.target.value })}
               />
@@ -554,6 +555,7 @@ export function ApoioVendasInicioTab() {
             <div className="space-y-2">
               <Label>Data fim</Label>
               <DateInput
+                className="max-w-[160px]"
                 value={filters.dataFim || ""}
                 onChange={(e) => setFilters({ ...filters, dataFim: e.target.value })}
               />
