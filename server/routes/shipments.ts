@@ -434,6 +434,41 @@ export function registerShipmentRoutes(router: Router) {
   const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
   const RS_API_TOKEN = "Renov123";
 
+  const normalizeLogisticaKey = (rawKey: string): string => {
+    let key = rawKey;
+
+    // Corrige casos comuns de mojibake, ex: "CÃ³digo" -> "Código"
+    if (/[ÃÂ]/.test(key)) {
+      const repaired = Buffer.from(key, "latin1").toString("utf8");
+      if (repaired && repaired !== key) {
+        key = repaired;
+      }
+    }
+
+    return key
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, "_")
+      .replace(/[()]/g, "")
+      .replace(/[^A-Za-z0-9_]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+  };
+
+  const normalizeLogisticaRecordKeys = (rows: unknown): unknown => {
+    if (!Array.isArray(rows)) return rows;
+
+    return rows.map((row) => {
+      if (!row || typeof row !== "object" || Array.isArray(row)) return row;
+
+      const normalized: Record<string, unknown> = {};
+      Object.entries(row as Record<string, unknown>).forEach(([key, value]) => {
+        normalized[normalizeLogisticaKey(key)] = value;
+      });
+      return normalized;
+    });
+  };
+
   // Test connection to RS Logística API
   router.post("/api/integrations/rs-logistica/test-connection", requireAdmin, async (req, res) => {
     try {
@@ -777,6 +812,15 @@ export function registerShipmentRoutes(router: Router) {
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
+
+      if (data && typeof data === "object") {
+        data.tabela_completa = normalizeLogisticaRecordKeys(data.tabela_completa);
+        data.tabela_qtd = normalizeLogisticaRecordKeys(data.tabela_qtd);
+        data.tabela_valores = normalizeLogisticaRecordKeys(data.tabela_valores);
+        data.tabela_transportadora = normalizeLogisticaRecordKeys(data.tabela_transportadora);
+        data.tabela_sla_transportadora = normalizeLogisticaRecordKeys(data.tabela_sla_transportadora);
+      }
+
       res.json(data);
     } catch (error: any) {
       console.error("Adm Logística dispositivos aggregates error:", error);

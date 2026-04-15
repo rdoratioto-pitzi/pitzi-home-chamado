@@ -212,8 +212,16 @@
 }
 
 .date-picker-full {
-  position: relative;
   cursor: pointer;
+  padding-right: 0.35rem !important;
+}
+
+html.light .date-picker-full {
+  color-scheme: light;
+}
+
+html.dark .date-picker-full {
+  color-scheme: dark;
 }
 
 @keyframes bell-ring {
@@ -229,18 +237,6 @@
 
 .animate-bell-ring {
   animation: bell-ring 0.6s ease-in-out;
-}
-
-.date-picker-full::-webkit-calendar-picker-indicator {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  cursor: pointer;
-  opacity: 0;
 }
 
 /* Custom Scrollbar Styles */
