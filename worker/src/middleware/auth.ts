@@ -41,6 +41,11 @@ const SECRET_AUTH_ROUTES = [
   { method: "POST", path: "/api/git-analytics/claude-code-usage" },
 ];
 
+/** Routes authenticated by X-API-Key header */
+const API_KEY_ROUTES: Array<{ method: string; path: string | RegExp }> = [
+  { method: "GET", path: "/api/external/chamados" },
+];
+
 function matchesRoute(
   method: string,
   path: string,
@@ -72,6 +77,16 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
     const secret = c.req.header("X-Claude-Usage-Secret");
     if (secret !== c.env.CLAUDE_USAGE_SECRET) {
       return c.json({ error: "Nao autorizado" }, 401);
+    }
+    return next();
+  }
+
+  // API-key authenticated routes (Venus external access)
+  if (matchesRoute(method, path, API_KEY_ROUTES)) {
+    const apiKey = c.req.header("X-API-Key");
+    const expectedKey = c.env.VENUS_API_KEY;
+    if (!expectedKey || apiKey !== expectedKey) {
+      return c.json({ error: "API key invalida ou ausente" }, 401);
     }
     return next();
   }
