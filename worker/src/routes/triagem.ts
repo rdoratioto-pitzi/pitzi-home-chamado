@@ -100,6 +100,39 @@ function calcDiasNoStatus(dateStr: string | null): number {
 
 export const triagem = new Hono<AppEnv>();
 
+triagem.get("/api/triagem/consulta", async (c) => {
+  try {
+    const reqUrl = new URL(c.req.url);
+    const url = `${PIPELINE_RS_BASE}/triagem/consulta${reqUrl.search || ""}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${PIPELINE_RS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const raw = await response.text();
+    if (!response.ok) {
+      return c.json({ success: false, error: raw || `Falha na consulta externa (${response.status})` }, response.status as any);
+    }
+
+    if (!raw) {
+      return c.json([]);
+    }
+
+    try {
+      return c.json(JSON.parse(raw));
+    } catch {
+      return c.json({ success: false, error: "Resposta inválida da API externa de triagem (não-JSON)." }, 502);
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Erro interno";
+    return c.json({ success: false, error: message }, 500);
+  }
+});
+
 triagem.get("/api/triagem/resumo", async (c) => {
   try {
     const [recebimentosR, triagemR, bloqueadosR, manutencaoR, divergentesR] =
