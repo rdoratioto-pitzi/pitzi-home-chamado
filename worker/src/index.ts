@@ -32,6 +32,7 @@ import { workspace } from "./routes/workspace";
 import { triagem } from "./routes/triagem";
 import { avaliacoes } from "./routes/avaliacoes";
 import { comercialKpisRoutes } from "./routes/comercial-kpis";
+import { external } from "./routes/external";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -62,6 +63,7 @@ type Bindings = {
   SENDPULSE_CLIENT_SECRET: string;
   SENDPULSE_FROM_EMAIL: string;
   SENDPULSE_FROM_NAME: string;
+  VENUS_API_KEY: string;
   DEV_TOOLS_TOKEN: string;
   APP_VERSION: string;
 };
@@ -150,5 +152,6 @@ app.route("/", workspace);
 app.route("/", triagem);
 app.route("/", avaliacoes);
 app.route("/", comercialKpisRoutes);
+app.route("/", external);
 
 export default app;
