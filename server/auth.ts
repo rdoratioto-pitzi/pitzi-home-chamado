@@ -100,6 +100,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
+  // Rotas externas usam API key própria (não sessão)
+  if (req.path.startsWith("/api/external/")) {
+    return next();
+  }
+
   if (!req.session?.userId) {
     return res.status(401).json({ error: "Não autenticado" });
   }
