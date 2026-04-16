@@ -19,7 +19,7 @@ import { useAdmColetasAggregates } from "@/hooks/use-adm-logistica";
 
 const COLETAS_COLUMNS_ORDER = [
   "Romaneio",
-  "Emissão",
+  "Emissao",
   "Recebimento",
   "Dias",
   "TSP",
@@ -31,10 +31,10 @@ const COLETAS_COLUMNS_ORDER = [
   "Cidade",
   "UF",
   "NFs",
-  "Responsável",
+  "Responsavel",
 ] as const;
 
-const COLETAS_PIVOT_GROUP_FIELDS = ["Emissão", "Responsável", "TSP", "Rede"] as const;
+const COLETAS_PIVOT_GROUP_FIELDS = ["Emissao", "Responsavel", "TSP", "Rede"] as const;
 
 type PivotBuildNode = {
   id: string;
@@ -239,20 +239,35 @@ export default function ColetasPage() {
   const [emissaoFim, setEmissaoFim] = useState<string>(todayYmd);
   const [recebimentoInicio, setRecebimentoInicio] = useState<string>("");
   const [recebimentoFim, setRecebimentoFim] = useState<string>("");
+  const [appliedTransportadora, setAppliedTransportadora] = useState<string>("all");
+  const [appliedStatus, setAppliedStatus] = useState<string>("all");
+  const [appliedResponsavel, setAppliedResponsavel] = useState<string>("all");
+  const [appliedEmissaoInicio, setAppliedEmissaoInicio] = useState<string>(todayYmd);
+  const [appliedEmissaoFim, setAppliedEmissaoFim] = useState<string>(todayYmd);
+  const [appliedRecebimentoInicio, setAppliedRecebimentoInicio] = useState<string>("");
+  const [appliedRecebimentoFim, setAppliedRecebimentoFim] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
   const [expandedAggregateRows, setExpandedAggregateRows] = useState<Set<string>>(new Set());
 
   const filters = useMemo(
     () => ({
-      start_date: emissaoInicio || undefined,
-      end_date: emissaoFim ? addDaysYmd(emissaoFim, 1) : undefined,
-      receipt_start: recebimentoInicio || undefined,
-      receipt_end: recebimentoFim ? addDaysYmd(recebimentoFim, 1) : undefined,
-      tsp: selectedTransportadora === "all" ? undefined : selectedTransportadora,
-      status_controle: selectedStatus === "all" ? undefined : selectedStatus,
-      responsavel: selectedResponsavel === "all" ? undefined : selectedResponsavel,
+      start_date: appliedEmissaoInicio || undefined,
+      end_date: appliedEmissaoFim ? addDaysYmd(appliedEmissaoFim, 1) : undefined,
+      receipt_start: appliedRecebimentoInicio || undefined,
+      receipt_end: appliedRecebimentoFim ? addDaysYmd(appliedRecebimentoFim, 1) : undefined,
+      tsp: appliedTransportadora === "all" ? undefined : appliedTransportadora,
+      status_controle: appliedStatus === "all" ? undefined : appliedStatus,
+      responsavel: appliedResponsavel === "all" ? undefined : appliedResponsavel,
     }),
-    [emissaoFim, emissaoInicio, recebimentoFim, recebimentoInicio, selectedResponsavel, selectedStatus, selectedTransportadora]
+    [
+      appliedEmissaoFim,
+      appliedEmissaoInicio,
+      appliedRecebimentoFim,
+      appliedRecebimentoInicio,
+      appliedResponsavel,
+      appliedStatus,
+      appliedTransportadora,
+    ]
   );
 
   const { data, isLoading, isError, error, refetch, isFetching } = useAdmColetasAggregates(filters);
@@ -270,24 +285,24 @@ export default function ColetasPage() {
 
   const rows = useMemo(() => normalizeRows(data?.tabela_completa), [data?.tabela_completa]);
   const visibleRows = useMemo(() => {
-    const emissãoInicio = parseDateInput(emissaoInicio);
-    const emissãoFim = parseDateInput(emissaoFim, true);
-    const recebimentoInicioDate = parseDateInput(recebimentoInicio);
-    const recebimentoFimDate = parseDateInput(recebimentoFim, true);
+    const emissãoInicio = parseDateInput(appliedEmissaoInicio);
+    const emissãoFim = parseDateInput(appliedEmissaoFim, true);
+    const recebimentoInicioDate = parseDateInput(appliedRecebimentoInicio);
+    const recebimentoFimDate = parseDateInput(appliedRecebimentoFim, true);
 
     return rows.filter((row) => {
-      const emissão = parseDateBr(String(row.Emissão ?? ""));
+      const emissão = parseDateBr(String(row.Emissao ?? ""));
       const recebimento = parseDateBr(String(row.Recebimento ?? ""));
 
       if (emissãoInicio && (!emissão || emissão < emissãoInicio)) return false;
       if (emissãoFim && (!emissão || emissão > emissãoFim)) return false;
 
-      if (recebimentoInicio && (!recebimento || recebimento < recebimentoInicioDate!)) return false;
-      if (recebimentoFim && (!recebimento || recebimento > recebimentoFimDate!)) return false;
+      if (recebimentoInicioDate && (!recebimento || recebimento < recebimentoInicioDate)) return false;
+      if (recebimentoFimDate && (!recebimento || recebimento > recebimentoFimDate)) return false;
 
       return true;
     });
-  }, [emissaoFim, emissaoInicio, recebimentoFim, recebimentoInicio, rows]);
+  }, [appliedEmissaoFim, appliedEmissaoInicio, appliedRecebimentoFim, appliedRecebimentoInicio, rows]);
 
   const columns = useMemo(() => {
     if (!rows.length) return [];
@@ -310,6 +325,48 @@ export default function ColetasPage() {
 
   const errorMessage = isError ? (error as Error)?.message : null;
 
+  const hasPendingFilterChanges = useMemo(
+    () =>
+      selectedTransportadora !== appliedTransportadora ||
+      selectedStatus !== appliedStatus ||
+      selectedResponsavel !== appliedResponsavel ||
+      emissaoInicio !== appliedEmissaoInicio ||
+      emissaoFim !== appliedEmissaoFim ||
+      recebimentoInicio !== appliedRecebimentoInicio ||
+      recebimentoFim !== appliedRecebimentoFim,
+    [
+      appliedEmissaoFim,
+      appliedEmissaoInicio,
+      appliedRecebimentoFim,
+      appliedRecebimentoInicio,
+      appliedResponsavel,
+      appliedStatus,
+      appliedTransportadora,
+      emissaoFim,
+      emissaoInicio,
+      recebimentoFim,
+      recebimentoInicio,
+      selectedResponsavel,
+      selectedStatus,
+      selectedTransportadora,
+    ]
+  );
+
+  const handleApplyFilters = () => {
+    if (!hasPendingFilterChanges) {
+      refetch();
+      return;
+    }
+
+    setAppliedTransportadora(selectedTransportadora);
+    setAppliedStatus(selectedStatus);
+    setAppliedResponsavel(selectedResponsavel);
+    setAppliedEmissaoInicio(emissaoInicio);
+    setAppliedEmissaoFim(emissaoFim);
+    setAppliedRecebimentoInicio(recebimentoInicio);
+    setAppliedRecebimentoFim(recebimentoFim);
+  };
+
   const handleClearFilters = () => {
     setSelectedTransportadora("all");
     setSelectedStatus("all");
@@ -318,6 +375,14 @@ export default function ColetasPage() {
     setEmissaoFim(todayYmd);
     setRecebimentoInicio("");
     setRecebimentoFim("");
+
+    setAppliedTransportadora("all");
+    setAppliedStatus("all");
+    setAppliedResponsavel("all");
+    setAppliedEmissaoInicio(todayYmd);
+    setAppliedEmissaoFim(todayYmd);
+    setAppliedRecebimentoInicio("");
+    setAppliedRecebimentoFim("");
   };
 
   const handleExportExcel = async () => {
@@ -448,25 +513,25 @@ export default function ColetasPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Emissão - Início</label>
-                  <DateInput value={emissaoInicio} onChange={(e) => setEmissaoInicio(e.target.value)} />
+                  <DateInput className="max-w-[160px]" value={emissaoInicio} onChange={(e) => setEmissaoInicio(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Emissão - Fim</label>
-                  <DateInput value={emissaoFim} onChange={(e) => setEmissaoFim(e.target.value)} />
+                  <DateInput className="max-w-[160px]" value={emissaoFim} onChange={(e) => setEmissaoFim(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Recebimento - Início</label>
-                  <DateInput value={recebimentoInicio} onChange={(e) => setRecebimentoInicio(e.target.value)} />
+                  <DateInput className="max-w-[160px]" value={recebimentoInicio} onChange={(e) => setRecebimentoInicio(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Recebimento - Fim</label>
-                  <DateInput value={recebimentoFim} onChange={(e) => setRecebimentoFim(e.target.value)} />
+                  <DateInput className="max-w-[160px]" value={recebimentoFim} onChange={(e) => setRecebimentoFim(e.target.value)} />
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
-                <Button onClick={() => refetch()} disabled={isLoading || isFetching}>
+                <Button onClick={handleApplyFilters} disabled={isLoading || isFetching || (!hasPendingFilterChanges && !isError)}>
                   <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-                  Atualizar
+                  {isFetching ? "Atualizando..." : "Atualizar"}
                 </Button>
                 <Button variant="outline" onClick={handleClearFilters} disabled={isLoading || isFetching}>
                   Limpar Filtros
@@ -597,25 +662,25 @@ export default function ColetasPage() {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Emissão - Início</label>
-                  <DateInput value={emissaoInicio} onChange={(e) => setEmissaoInicio(e.target.value)} />
+                  <DateInput className="max-w-[160px]" value={emissaoInicio} onChange={(e) => setEmissaoInicio(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Emissão - Fim</label>
-                  <DateInput value={emissaoFim} onChange={(e) => setEmissaoFim(e.target.value)} />
+                  <DateInput className="max-w-[160px]" value={emissaoFim} onChange={(e) => setEmissaoFim(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Recebimento - Início</label>
-                  <DateInput value={recebimentoInicio} onChange={(e) => setRecebimentoInicio(e.target.value)} />
+                  <DateInput className="max-w-[160px]" value={recebimentoInicio} onChange={(e) => setRecebimentoInicio(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Recebimento - Fim</label>
-                  <DateInput value={recebimentoFim} onChange={(e) => setRecebimentoFim(e.target.value)} />
+                  <DateInput className="max-w-[160px]" value={recebimentoFim} onChange={(e) => setRecebimentoFim(e.target.value)} />
                 </div>
               </div>
               <div className="flex gap-2 mt-4">
-                <Button onClick={() => refetch()} disabled={isLoading || isFetching}>
+                <Button onClick={handleApplyFilters} disabled={isLoading || isFetching || (!hasPendingFilterChanges && !isError)}>
                   <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
-                  Atualizar
+                  {isFetching ? "Atualizando..." : "Atualizar"}
                 </Button>
                 <Button variant="outline" onClick={handleClearFilters} disabled={isLoading || isFetching}>
                   Limpar Filtros
