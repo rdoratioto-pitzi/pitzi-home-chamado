@@ -6,10 +6,6 @@ type DateInputProps = Omit<ComponentProps<typeof Input>, "type">;
 
 export function DateInput({ className, ...props }: DateInputProps) {
   return (
-    <Input
-      {...props}
-      type="date"
-      className={cn(className)}
-    />
+    <Input {...props} type="date" className={cn("date-picker-full", className)} />
   );
 }
