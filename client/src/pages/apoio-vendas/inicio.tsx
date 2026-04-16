@@ -57,6 +57,11 @@ function formatPercent(value: number) {
   return `${value.toFixed(1)}%`;
 }
 
+function isAvaliacaoAutomaticaOuReciclagem(avaliador: string) {
+  const nome = String(avaliador || "").trim().toUpperCase();
+  return nome === "RECICLAGEM" || nome === "AUTOMÁTICA" || nome === "AUTOMATICA";
+}
+
 function parseDatePtBr(value: string): Date | null {
   const [datePart, timePart] = value.split(" ");
   if (!datePart || !timePart) return null;
@@ -191,19 +196,37 @@ function normalizeRows(rows: DadoInicioRaw[]) {
 
   // KPIs gerais devem refletir o total bruto do período (sem exclusão de "Sem Avaliador").
   const totalAvaliados = rows.length;
+  const totalAvaliacoesAvaliadores = rows.filter(
+    (r) => !isAvaliacaoAutomaticaOuReciclagem(String(r["Avaliador"] || "")),
+  ).length;
+  const percAvaliacoesAvaliadores =
+    totalAvaliados > 0 ? (totalAvaliacoesAvaliadores / totalAvaliados) * 100 : 0;
   const totalUtilizados = rows.filter((r) => String(r["Situação do voucher"] || "").toUpperCase() === "UTILIZADO").length;
   const aquisicoesPorAvaliacoes = rows.filter((r) => {
     const voucher = String(r["Situação do voucher"] || "").toUpperCase();
     const avaliador = String(r["Avaliador"] || "").toUpperCase();
     return voucher === "UTILIZADO" && avaliador !== "RECICLAGEM";
   }).length;
+  const aquisicoesPorAvaliacoesAvaliadores = rows.filter((r) => {
+    const voucher = String(r["Situação do voucher"] || "").toUpperCase();
+    const avaliador = String(r["Avaliador"] || "");
+    return voucher === "UTILIZADO" && !isAvaliacaoAutomaticaOuReciclagem(avaliador);
+  }).length;
   const conversaoGeral = totalAvaliados > 0 ? (aquisicoesPorAvaliacoes / totalAvaliados) * 100 : 0;
+  const conversaoAvaliadores =
+    totalAvaliacoesAvaliadores > 0
+      ? (aquisicoesPorAvaliacoesAvaliadores / totalAvaliacoesAvaliadores) * 100
+      : 0;
 
   return {
     totalAvaliados,
+    totalAvaliacoesAvaliadores,
+    percAvaliacoesAvaliadores,
     totalUtilizados,
     aquisicoesPorAvaliacoes,
+    aquisicoesPorAvaliacoesAvaliadores,
     conversaoGeral,
+    conversaoAvaliadores,
     avaliacoesPorAvaliador,
     conversaoPorTag,
     avaliacoesPorGrade,
@@ -524,6 +547,7 @@ export function ApoioVendasInicioTab() {
             <div className="space-y-2">
               <Label>Data início</Label>
               <DateInput
+                className="max-w-[160px]"
                 value={filters.dataInicio || ""}
                 onChange={(e) => setFilters({ ...filters, dataInicio: e.target.value })}
               />
@@ -531,6 +555,7 @@ export function ApoioVendasInicioTab() {
             <div className="space-y-2">
               <Label>Data fim</Label>
               <DateInput
+                className="max-w-[160px]"
                 value={filters.dataFim || ""}
                 onChange={(e) => setFilters({ ...filters, dataFim: e.target.value })}
               />
@@ -608,6 +633,12 @@ export function ApoioVendasInicioTab() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-semibold">{metrics.totalAvaliados}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Avaliadores: {metrics.totalAvaliacoesAvaliadores}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {formatPercent(metrics.percAvaliacoesAvaliadores)} do total
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -632,6 +663,9 @@ export function ApoioVendasInicioTab() {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-semibold">{formatPercent(metrics.conversaoGeral)}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Conversão avaliadores: {formatPercent(metrics.conversaoAvaliadores)}
+            </p>
           </CardContent>
         </Card>
       </div>

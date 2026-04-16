@@ -45,11 +45,11 @@ const QUINZENA_STATUS_COLORS = {
 
 type QuinzenaRow = {
   Quinzena: string;
-  "Pendente de Coleta": number;
-  "Criado pelo cliente": number;
-  "Coleta Solicitada": number;
+  Pendente_de_Coleta: number;
+  Criado_pelo_cliente: number;
+  Coleta_Solicitada: number;
   Recebido: number;
-  "Total Geral": number;
+  Total_Geral: number;
   pendente_qtd: number;
   criado_qtd: number;
   coleta_qtd: number;
@@ -188,7 +188,7 @@ function DataTableCard({
                         {isClickable ? (
                           <button
                             type="button"
-                            className="w-full text-left hover:underline underline-offset-2 text-primary"
+                            className="w-full text-left text-foreground hover:underline underline-offset-2"
                             onClick={() => onCellClick?.({ row, columnKey: col.key, value: row[col.key] })}
                           >
                             {renderCellValue(row[col.key], col.key)}
@@ -343,6 +343,7 @@ export default function DispositivosPage() {
     String(value ?? "")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[_\s]+/g, " ")
       .trim()
       .toLowerCase();
 
@@ -393,13 +394,17 @@ export default function DispositivosPage() {
 
   const tabelaQtdFiltrada = useMemo(() => applyLocalQuinzenaFilter(data?.tabela_qtd || []), [appliedQuinzenas, data?.tabela_qtd]);
   const tabelaValoresFiltrada = useMemo(() => applyLocalQuinzenaFilter(data?.tabela_valores || []), [appliedQuinzenas, data?.tabela_valores]);
+  const tabelaCompletaFiltrada = useMemo(
+    () => applyLocalQuinzenaFilter(data?.tabela_completa || []),
+    [appliedQuinzenas, data?.tabela_completa]
+  );
   
   // Ordem das colunas para tabelas de quantidade e valores
-  const columnOrder = ["Quinzena", "Pendente de Coleta", "Criado pelo cliente", "Coleta Solicitada", "Recebido", "Total Geral"];
+  const columnOrder = ["Quinzena", "Pendente_de_Coleta", "Criado_pelo_cliente", "Coleta_Solicitada", "Recebido", "Total_Geral"];
 
   // Ordem das colunas para Resumo por Transportadora
   const transportadoraColumnOrder = [
-    "Operador Logístico",
+    "Operador_Logistico",
     "Recebidos",
     "Coleta_Solicitada",
     "LeadTimeMedio",
@@ -410,7 +415,7 @@ export default function DispositivosPage() {
 
   // Ordem das colunas para SLA por Transportadora
   const slaColumnOrder = [
-    "Operador Logístico",
+    "Operador_Logistico",
     "Coletas_Dentro_SLA",
     "Coletas_Fora_SLA"
   ];
@@ -418,28 +423,28 @@ export default function DispositivosPage() {
   // Ordem das colunas para Tabela Completa
   const completaColumnOrder = [
     "IMEI",
-    "Código do Voucher",
-    "Descrição do Produto",
-    "Nome do Vendedor",
+    "Codigo_do_Voucher",
+    "Descricao_do_Produto",
+    "Nome_do_Vendedor",
     "Loja",
     "Rede",
     "Cidade",
     "UF",
-    "Data de Compra",
-    "Mês da Compra",
+    "Data_de_Compra",
+    "Mes_da_Compra",
     "Romaneio",
-    "Data do Romaneio",
-    "Operador Logístico",
-    "Data de Recebimento",
-    "Valor do Aparelho",
-    "Valor do Voucher",
+    "Data_do_Romaneio",
+    "Operador_Logistico",
+    "Data_de_Recebimento",
+    "Valor_do_Aparelho",
+    "Valor_do_Voucher",
     "Reciclagem",
     "Quinzena",
     "QuinzenaSort",
-    "Status da Coleta",
-    "Valor do Aparelho (float)",
-    "Lead Time (dias)",
-    "Responsável"
+    "Status_da_Coleta",
+    "Valor_do_Aparelho_float",
+    "Lead_Time_dias",
+    "Responsavel"
   ];
 
   // Função para ordenar colunas conforme a ordem especificada
@@ -538,7 +543,7 @@ export default function DispositivosPage() {
     return tabelaQtdFiltrada
       .filter((row) => {
         const quinzena = String(row["Quinzena"] ?? "");
-        const total = Number(row["Total Geral"]) || 0;
+        const total = Number(row["Total_Geral"]) || 0;
         const recebido = Number(row["Recebido"]) || 0;
         if (!quinzena || quinzena === "Total") return false;
         // Mesma regra do Python: excluir quinzenas concluídas (Total Geral == Recebido)
@@ -546,19 +551,19 @@ export default function DispositivosPage() {
       })
       .map((row) => {
         const quinzena = String(row["Quinzena"]);
-        const total = Number(row["Total Geral"]) || 0;
-        const pendente = Number(row["Pendente de Coleta"]) || 0;
-        const criado = Number(row["Criado pelo cliente"]) || 0;
-        const coleta = Number(row["Coleta Solicitada"]) || 0;
+        const total = Number(row["Total_Geral"]) || 0;
+        const pendente = Number(row["Pendente_de_Coleta"]) || 0;
+        const criado = Number(row["Criado_pelo_cliente"]) || 0;
+        const coleta = Number(row["Coleta_Solicitada"]) || 0;
         const recebido = Number(row["Recebido"]) || 0;
 
         return {
           Quinzena: quinzena,
-          "Pendente de Coleta": total > 0 ? roundOneDecimal((pendente / total) * 100) : 0,
-          "Criado pelo cliente": total > 0 ? roundOneDecimal((criado / total) * 100) : 0,
-          "Coleta Solicitada": total > 0 ? roundOneDecimal((coleta / total) * 100) : 0,
+          Pendente_de_Coleta: total > 0 ? roundOneDecimal((pendente / total) * 100) : 0,
+          Criado_pelo_cliente: total > 0 ? roundOneDecimal((criado / total) * 100) : 0,
+          Coleta_Solicitada: total > 0 ? roundOneDecimal((coleta / total) * 100) : 0,
           Recebido: total > 0 ? roundOneDecimal((recebido / total) * 100) : 0,
-          "Total Geral": total,
+          Total_Geral: total,
           pendente_qtd: pendente,
           criado_qtd: criado,
           coleta_qtd: coleta,
@@ -644,7 +649,12 @@ export default function DispositivosPage() {
       return;
     }
 
-    const status = columnKey === "Quinzena" || columnKey === "Total Geral" ? null : columnKey;
+    const normalizedColumnKey = normalizeText(columnKey);
+    const isDimensionColumn =
+      normalizedColumnKey === "quinzena" ||
+      normalizedColumnKey.startsWith("total");
+
+    const status = isDimensionColumn ? null : columnKey;
 
     setSummaryCellSelection({
       summaryType,
@@ -1038,14 +1048,14 @@ export default function DispositivosPage() {
                           />
                           <Tooltip
                             formatter={(value: number, name: string, item) => {
-                              if (name === "Total Geral") {
+                              if (name === "Total_Geral") {
                                 return [Number(value).toLocaleString("pt-BR"), name];
                               }
 
                               const qtyMap: Record<string, keyof QuinzenaRow> = {
-                                "Pendente de Coleta": "pendente_qtd",
-                                "Criado pelo cliente": "criado_qtd",
-                                "Coleta Solicitada": "coleta_qtd",
+                                "Pendente_de_Coleta": "pendente_qtd",
+                                "Criado_pelo_cliente": "criado_qtd",
+                                "Coleta_Solicitada": "coleta_qtd",
                                 "Recebido": "recebido_qtd",
                               };
 
@@ -1064,9 +1074,9 @@ export default function DispositivosPage() {
 
                           <Bar
                             yAxisId="left"
-                            dataKey="Pendente de Coleta"
+                            dataKey="Pendente_de_Coleta"
                             stackId="a"
-                            name="Pendente de Coleta"
+                            name="Pendente_de_Coleta"
                             fill={QUINZENA_STATUS_COLORS.pendente}
                           >
                             {chartData.map((entry) => (
@@ -1086,9 +1096,9 @@ export default function DispositivosPage() {
 
                           <Bar
                             yAxisId="left"
-                            dataKey="Criado pelo cliente"
+                            dataKey="Criado_pelo_cliente"
                             stackId="a"
-                            name="Criado pelo cliente"
+                            name="Criado_pelo_cliente"
                             fill={QUINZENA_STATUS_COLORS.criado}
                           >
                             {chartData.map((entry) => (
@@ -1108,9 +1118,9 @@ export default function DispositivosPage() {
 
                           <Bar
                             yAxisId="left"
-                            dataKey="Coleta Solicitada"
+                            dataKey="Coleta_Solicitada"
                             stackId="a"
-                            name="Coleta Solicitada"
+                            name="Coleta_Solicitada"
                             fill={QUINZENA_STATUS_COLORS.coleta}
                           >
                             {chartData.map((entry) => (
@@ -1318,20 +1328,20 @@ export default function DispositivosPage() {
                   size="sm"
                   onClick={() =>
                     exportTableToExcel({
-                      rows: data?.tabela_completa || [],
+                      rows: tabelaCompletaFiltrada,
                       columns: completaColumns,
                       filename: "dispositivos_tabela_completa.xlsx",
                       tableKey: "completa",
                     })
                   }
-                  disabled={exportingTable === "completa" || !(data?.tabela_completa?.length)}
+                  disabled={exportingTable === "completa" || !tabelaCompletaFiltrada.length}
                 >
                   <Download className="h-4 w-4 mr-2" />
                   {exportingTable === "completa" ? "Exportando..." : "Exportar Excel"}
                 </Button>
               </CardHeader>
               <CardContent>
-                {data?.tabela_completa && data.tabela_completa.length > 0 ? (
+                {tabelaCompletaFiltrada.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -1344,7 +1354,7 @@ export default function DispositivosPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {data.tabela_completa.slice(0, 100).map((row, idx) => (
+                        {tabelaCompletaFiltrada.slice(0, 100).map((row, idx) => (
                           <tr key={idx} className="border-b hover:bg-muted/50">
                             {completaColumns.map((col) => (
                               <td key={col.key} className="p-2">
@@ -1355,9 +1365,9 @@ export default function DispositivosPage() {
                         ))}
                       </tbody>
                     </table>
-                    {data.tabela_completa.length > 100 && (
+                    {tabelaCompletaFiltrada.length > 100 && (
                       <p className="text-sm text-muted-foreground mt-2">
-                        Mostrando 100 de {data.tabela_completa.length} registros
+                        Mostrando 100 de {tabelaCompletaFiltrada.length} registros
                       </p>
                     )}
                   </div>

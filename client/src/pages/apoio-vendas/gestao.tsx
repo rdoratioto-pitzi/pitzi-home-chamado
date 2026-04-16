@@ -294,10 +294,11 @@ export function ApoioVendasGestaoTab() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-2">
               <Label>Data início</Label>
               <DateInput
+                className="max-w-[160px]"
                 value={filters.dataInicio || ""}
                 onChange={(e) => setFilters({ ...filters, dataInicio: e.target.value })}
               />
@@ -305,11 +306,12 @@ export function ApoioVendasGestaoTab() {
             <div className="space-y-2">
               <Label>Data fim</Label>
               <DateInput
+                className="max-w-[160px]"
                 value={filters.dataFim || ""}
                 onChange={(e) => setFilters({ ...filters, dataFim: e.target.value })}
               />
             </div>
-            <div className="flex items-end">
+            <div>
               <Button onClick={handleLoadData} disabled={loading}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
                 Carregar dados
