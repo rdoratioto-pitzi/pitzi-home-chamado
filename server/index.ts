@@ -479,6 +479,15 @@ export const asyncHandler =
       },
     );
 
+    // Fallback de API: evita que /api/* sem rota caia no index.html do Vite.
+    app.use("/api", (req: Request, res: Response) => {
+      if (res.headersSent) return;
+      return res.status(404).json({
+        success: false,
+        error: `Rota não encontrada: ${req.method} ${req.originalUrl}`,
+      });
+    });
+
     /**
      * ----------------------------------------------
      * STATIC / VITE
