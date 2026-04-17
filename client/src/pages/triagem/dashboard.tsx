@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateInput } from "@/components/ui/date-input";
 import { FilterCombobox } from "@/components/ui/filter-combobox";
+import { Input } from "@/components/ui/input";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Table,
   TableBody,
@@ -104,14 +106,7 @@ async function fetchTriagemConsulta(filters: TriagemFilters): Promise<TriagemRec
   if (filters.filial) params.set("filial", filters.filial);
 
   const url = `/api/triagem/consulta${params.toString() ? `?${params.toString()}` : ""}`;
-  const response = await fetch(url, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-    },
-  });
+  const response = await apiRequest("GET", url);
   const raw = await response.text();
 
   if (!response.ok) {
@@ -279,19 +274,24 @@ function TableCard({
   description,
   icon,
   children,
+  headerAction,
 }: {
   title: string;
   description: string;
   icon: ReactNode;
   children: ReactNode;
+  headerAction?: ReactNode;
 }) {
   return (
     <Card className="border shadow-sm">
       <CardHeader className="space-y-1 border-b bg-muted/20">
-        <CardTitle className="flex items-center gap-2 text-base">
-          {icon}
-          {title}
-        </CardTitle>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            {icon}
+            {title}
+          </CardTitle>
+          {headerAction}
+        </div>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="p-0">{children}</CardContent>
@@ -303,6 +303,7 @@ export default function TriagemDashboardPage() {
   const [draftFilters, setDraftFilters] = useState<TriagemFilters>(() => defaultFilters());
   const [activeFilters, setActiveFilters] = useState<TriagemFilters>(() => defaultFilters());
   const [detailsPage, setDetailsPage] = useState(1);
+  const [imeiFilter, setImeiFilter] = useState("");
 
   const { data, isLoading, error } = useTriagemConsulta(activeFilters);
   const rows = data ?? [];
@@ -317,6 +318,13 @@ export default function TriagemDashboardPage() {
   const totalizadores = buildPeriodoRows(rows, activeFilters.startDate, activeFilters.endDate);
   const triadoresCount = buildTriadorRows(rows);
   const detalhes = buildDetailRows(rows);
+  const detalhesFiltrados = useMemo(() => {
+    const normalized = imeiFilter.trim().toLowerCase();
+    if (!normalized) return detalhes;
+
+    return detalhes.filter((item) => String(item.IMEI || "").toLowerCase().includes(normalized));
+  }, [detalhes, imeiFilter]);
+
   const kpis = useMemo(() => {
     const totalRecebidos = rows.length;
     const totalTriados = rows.reduce((acc, row) => {
@@ -373,8 +381,8 @@ export default function TriagemDashboardPage() {
     };
   }, [rows]);
 
-  const totalDetailPages = Math.max(1, Math.ceil(detalhes.length / DETAILS_PAGE_SIZE));
-  const pagedDetalhes = detalhes.slice(
+  const totalDetailPages = Math.max(1, Math.ceil(detalhesFiltrados.length / DETAILS_PAGE_SIZE));
+  const pagedDetalhesFiltrados = detalhesFiltrados.slice(
     (detailsPage - 1) * DETAILS_PAGE_SIZE,
     detailsPage * DETAILS_PAGE_SIZE,
   );
@@ -385,6 +393,10 @@ export default function TriagemDashboardPage() {
     }
   }, [detailsPage, totalDetailPages]);
 
+  useEffect(() => {
+    setDetailsPage(1);
+  }, [imeiFilter]);
+
   function applyFilters() {
     setActiveFilters({ ...draftFilters });
     setDetailsPage(1);
@@ -394,6 +406,7 @@ export default function TriagemDashboardPage() {
     const next = defaultFilters();
     setDraftFilters(next);
     setActiveFilters(next);
+    setImeiFilter("");
     setDetailsPage(1);
   }
 
@@ -609,6 +622,25 @@ export default function TriagemDashboardPage() {
               title="Tabela completa"
               description="Registro detalhado com rede, filial e demais campos trazidos pela API externa."
               icon={<Table2 className="h-4 w-4 text-primary" />}
+              headerAction={
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={imeiFilter}
+                    onChange={(event) => setImeiFilter(event.target.value)}
+                    placeholder="Filtrar por IMEI"
+                    className="h-9 w-[220px]"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setImeiFilter("")}
+                    disabled={!imeiFilter}
+                  >
+                    Limpar
+                  </Button>
+                </div>
+              }
             >
               <div className="max-h-[640px] overflow-auto">
                 <div className="w-full overflow-x-auto pb-2">
@@ -634,14 +666,14 @@ export default function TriagemDashboardPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {detalhes.length === 0 ? (
+                      {detalhesFiltrados.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={16} className="py-10 text-center text-muted-foreground">
                             Nenhum registro encontrado para os filtros aplicados.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        pagedDetalhes.map((item, index) => (
+                        pagedDetalhesFiltrados.map((item, index) => (
                           <TableRow key={`${item.IMEI || "sem-imei"}-${index}`}>
                             <TableCell className="font-mono text-xs">{item.IMEI || "—"}</TableCell>
                             <TableCell className="text-xs">{item.Voucher || "—"}</TableCell>
@@ -669,10 +701,10 @@ export default function TriagemDashboardPage() {
                 </div>
               </div>
 
-              {detalhes.length > 0 && (
+              {detalhesFiltrados.length > 0 && (
                 <div className="flex items-center justify-between border-t px-4 py-3">
                   <span className="text-sm text-muted-foreground">
-                    Página {detailsPage} de {totalDetailPages} ({detalhes.length} registros)
+                    Página {detailsPage} de {totalDetailPages} ({detalhesFiltrados.length} registros filtrados de {detalhes.length})
                   </span>
                   <div className="flex items-center gap-2">
                     <Button
