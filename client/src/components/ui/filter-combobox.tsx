@@ -48,7 +48,7 @@ export function FilterCombobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("h-8 justify-between text-xs", className)}
+          className={cn("justify-between text-xs h-8", className)}
         >
           <span className="truncate">{displayValue}</span>
           <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
