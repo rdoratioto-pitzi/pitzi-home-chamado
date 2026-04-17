@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateInput } from "@/components/ui/date-input";
 import { FilterCombobox } from "@/components/ui/filter-combobox";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Table,
   TableBody,
@@ -104,14 +105,7 @@ async function fetchTriagemConsulta(filters: TriagemFilters): Promise<TriagemRec
   if (filters.filial) params.set("filial", filters.filial);
 
   const url = `/api/triagem/consulta${params.toString() ? `?${params.toString()}` : ""}`;
-  const response = await fetch(url, {
-    method: "GET",
-    credentials: "include",
-    headers: {
-      Accept: "application/json",
-      "X-Requested-With": "XMLHttpRequest",
-    },
-  });
+  const response = await apiRequest("GET", url);
   const raw = await response.text();
 
   if (!response.ok) {
