@@ -323,6 +323,18 @@ export default function ColetasPage() {
     [aggregateTree, expandedAggregateRows]
   );
 
+  const aggregateTotals = useMemo(() => {
+    // Na pivot, a contagem de lojas é por grupo. O total deve somar
+    // os grupos de primeiro nivel (ex.: 22 + 16 + 23), nao lojas unicas globais.
+    const lojasCount = aggregateTree.reduce((sum, node) => sum + node.lojasCount, 0);
+    const itensTotal = aggregateTree.reduce((sum, node) => sum + node.itensTotal, 0);
+
+    return {
+      lojasCount,
+      itensTotal,
+    };
+  }, [aggregateTree]);
+
   const errorMessage = isError ? (error as Error)?.message : null;
 
   const hasPendingFilterChanges = useMemo(
@@ -740,6 +752,13 @@ export default function ColetasPage() {
                         );
                       })}
                     </tbody>
+                    <tfoot>
+                      <tr className="border-t-2 bg-muted/40 font-semibold">
+                        <td className="p-2">Total Geral</td>
+                        <td className="p-2 text-right tabular-nums">{aggregateTotals.lojasCount}</td>
+                        <td className="p-2 text-right tabular-nums">{aggregateTotals.itensTotal.toLocaleString("pt-BR")}</td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               )}
