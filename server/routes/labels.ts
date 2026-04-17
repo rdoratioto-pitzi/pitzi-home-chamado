@@ -28,10 +28,10 @@ export function registerLabelRoutes(router: Router) {
 
   // Zod schema for label data validation
   const labelDataSchema = z.object({
-    imei: z.string().min(1).max(50),
-    deviceDescription: z.string().min(1).max(200),
-    deviceErpCode: z.string().min(1).max(50),
-    triador: z.string().min(1).max(100),
+    imei: z.string().trim().min(1).max(50),
+    deviceDescription: z.string().trim().min(1).max(200),
+    deviceErpCode: z.string().trim().max(50).optional().default(""),
+    triador: z.string().trim().max(100).optional().default("Aguardando Triagem"),
   });
 
   // Generate PNG label with Code128 barcode

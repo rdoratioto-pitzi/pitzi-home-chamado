@@ -130,6 +130,22 @@ function getHtmlForDirectPrint(device: DeviceData, primaryImei: string) {
 // ==========================================
 // 3. API DE BUSCA (Extraída para limpar o hook)
 // ==========================================
+function normalizePossiblyMojibake(value: unknown): string {
+  const raw = typeof value === "string" ? value.trim() : "";
+  if (!raw) return "";
+
+  // Corrige textos recebidos como UTF-8 interpretado em Latin-1 (ex.: "aprovaÃ§Ã£o")
+  if (!/[ÃÂ]/.test(raw)) return raw;
+
+  try {
+    const bytes = Uint8Array.from(raw, (char) => char.charCodeAt(0) & 0xff);
+    const decoded = new TextDecoder("utf-8").decode(bytes).trim();
+    return decoded && !decoded.includes("\uFFFD") ? decoded : raw;
+  } catch {
+    return raw;
+  }
+}
+
 async function fetchDeviceFromApi(searchTerm: string): Promise<DeviceData> {
   const isImei = /^\d{15}$/.test(searchTerm);
   const isVoucher = /^[A-Za-z]/.test(searchTerm) || /^[A-Za-z]{2,}/.test(searchTerm) || /^[0-9A-Fa-f]{8,}$/.test(searchTerm);
@@ -161,14 +177,12 @@ async function fetchDeviceFromApi(searchTerm: string): Promise<DeviceData> {
   const tri = list[0];
   const imei1 = tri["IMEI"] || "";
   const imei2 = tri["IMEI2"] || "";
-  const serial = tri["Serial Number"] || tri["Numero de Serie"] || tri["Serial"] || "";
+  const serial = tri["Serial"] || tri["Serial_Number"] || "";
   
   const primaryId = imei1 || serial || searchTerm;
-  // Nota: a API pode retornar a chave com encoding errado (ex: "CÃ³digo ERP" em vez de "Código ERP")
-  const codigoErp = tri["Código ERP"] || tri["Codigo ERP"] || tri["CÃ³digo ERP"] || tri["Codigo"] || "";
-  const rawTriador = tri["Responsável pela triagem"] || tri["Responsavel pela triagem"] || tri["ResponsÃ¡vel pela triagem"] || "";
-
-  const statusRecebimento = tri["Status de recebimento"] || tri["Status de Recebimento"] || tri["status_recebimento"] || "";
+  const codigoErp = normalizePossiblyMojibake(tri["Codigo_ERP"] || tri["Codigo"] || "");
+  const rawTriador = normalizePossiblyMojibake(tri["Responsavel_pela_triagem"] || "");
+  const statusRecebimento = normalizePossiblyMojibake(tri["Status_de_recebimento"] || tri["status_de_recebimento"] || "");
   
   // A grade é o penúltimo caractere do código ERP (a letra da avaliação: A, B, C, etc.)
   // Formato típico: XXXXXA0 (ex: 10290A0, 10381A0)
@@ -176,11 +190,11 @@ async function fetchDeviceFromApi(searchTerm: string): Promise<DeviceData> {
   
   return {
     imei: imei2 ? `${primaryId} / ${imei2}` : primaryId,
-    deviceDescription: (tri["Modelo"] || "DISPOSITIVO NÃO IDENTIFICADO").toUpperCase(),
-    deviceErpCode: codigoErp || "",
+    deviceDescription: normalizePossiblyMojibake(tri["Modelo"] || "DISPOSITIVO NAO IDENTIFICADO").toUpperCase(),
+    deviceErpCode: codigoErp,
     grading: grading,
     triador: rawTriador ? rawTriador.toLowerCase().replace(/\b\w/g, (l: string) => l.toUpperCase()) : "Aguardando Triagem",
-    marca: (tri["Marca"] || "N/A").toUpperCase(),
+    marca: normalizePossiblyMojibake(tri["Marca"] || "N/A").toUpperCase(),
     statusRecebimento
   };
 }
@@ -286,9 +300,9 @@ export default function ImpressaoEtiquetasPage() {
       
       const response = await apiRequest("POST", "/api/etiquetas/imprimir", {
         imei: validImei,
-        deviceDescription: deviceData.deviceDescription,
-        deviceErpCode: deviceData.deviceErpCode,
-        triador: deviceData.triador,
+        deviceDescription: deviceData.deviceDescription?.trim() || "DISPOSITIVO NAO IDENTIFICADO",
+        deviceErpCode: deviceData.deviceErpCode?.trim() || "",
+        triador: deviceData.triador?.trim() || "Aguardando Triagem",
       });
       return response.json();
     },
