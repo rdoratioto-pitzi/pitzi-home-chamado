@@ -7,7 +7,8 @@ import {
   insertInitiativeSchema,
   type Objective,
 } from "@shared/schema";
-import { getSessionUser, requireAuth } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
+import { assertOkrAccess } from "../middleware/okr-access";
 import { z } from "zod";
 
 type OkrNode = Objective & { children: OkrNode[] };
@@ -141,33 +142,15 @@ export function registerOkrRoutes(router: Router) {
   // ============== DASHBOARD ==============
   router.get("/api/okrs/dashboard", requireAuth, async (req, res) => {
     try {
-      const { userId, isAdmin } = getSessionUser(req);
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const cycle = (req.query.cycle as string) || "";
 
       const allObjectives = await storage.getObjectives();
       const allKeyResults = await storage.getKeyResults();
       const allInitiatives = await storage.getInitiatives();
 
-      // Filtrar objectives pelo cycle
-      let cycleObjectives = allObjectives.filter((o) => o.cycle === cycle);
-
-      // Aplicar filtro de permissão igual ao GET /api/objectives
-      if (!isAdmin) {
-        cycleObjectives = cycleObjectives.filter((obj) => {
-          if (obj.ownerId === userId) return true;
-          return allKeyResults.some((kr) => {
-            if (kr.objectiveId !== obj.id) return false;
-            try {
-              const ids = typeof kr.responsibleIds === "string"
-                ? JSON.parse(kr.responsibleIds)
-                : kr.responsibleIds;
-              return Array.isArray(ids) && ids.includes(userId);
-            } catch {
-              return false;
-            }
-          });
-        });
-      }
+      const cycleObjectives = allObjectives.filter((o) => o.cycle === cycle);
 
       const objectiveIds = new Set(cycleObjectives.map((o) => o.id));
       const cycleKrs = allKeyResults.filter((kr) => objectiveIds.has(kr.objectiveId));
@@ -301,10 +284,11 @@ export function registerOkrRoutes(router: Router) {
   // ============== OKRs ==============
   router.get("/api/objectives", requireAuth, async (req, res) => {
     try {
-      const { userId, isAdmin } = getSessionUser(req);
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
+
       const objectives = await storage.getObjectives();
 
-      // Modo arquivo: retorna apenas objetivos encerrados de todos os cycles
       if (req.query.archived === "true") {
         const archived = objectives
           .filter((o) => o.closedAt != null)
@@ -312,32 +296,11 @@ export function registerOkrRoutes(router: Router) {
         return res.json(archived);
       }
 
-      let list: Objective[];
-      if (isAdmin) {
-        list = objectives;
-      } else {
-        const keyResults = await storage.getKeyResults();
-        list = objectives.filter(obj => {
-          if (obj.ownerId === userId) return true;
-          return keyResults.some(kr => {
-            if (kr.objectiveId !== obj.id) return false;
-            try {
-              const ids = typeof kr.responsibleIds === "string"
-                ? JSON.parse(kr.responsibleIds)
-                : kr.responsibleIds;
-              return Array.isArray(ids) && ids.includes(userId);
-            } catch {
-              return false;
-            }
-          });
-        });
-      }
-
       if (req.query.tree === "true") {
-        return res.json(buildOkrTree(list));
+        return res.json(buildOkrTree(objectives));
       }
 
-      res.json(list);
+      res.json(objectives);
     } catch (error) {
       console.error("Error fetching objectives:", error);
       res.status(500).json({ error: "Failed to fetch objectives" });
@@ -347,14 +310,12 @@ export function registerOkrRoutes(router: Router) {
   // POST /api/objectives/:id/close — encerrar quarter de um objetivo
   router.post("/api/objectives/:id/close", requireAuth, async (req, res) => {
     try {
-      const { userId, isAdmin } = getSessionUser(req);
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const id = getId(req);
 
       const existing = await storage.getObjective(id);
       if (!existing) return res.status(404).json({ error: "Objetivo não encontrado" });
-      if (!isAdmin && existing.ownerId !== userId) {
-        return res.status(403).json({ error: "Acesso negado" });
-      }
       if (existing.closedAt != null) {
         return res.status(400).json({ error: "Este objetivo já foi encerrado." });
       }
@@ -385,24 +346,10 @@ export function registerOkrRoutes(router: Router) {
 
   router.get("/api/objectives/:id", requireAuth, async (req, res) => {
     try {
-      const { userId, isAdmin } = getSessionUser(req);
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const objective = await storage.getObjective(getId(req));
       if (!objective) return res.status(404).json({ error: "Objective not found" });
-      if (!isAdmin && objective.ownerId !== userId) {
-        const keyResults = await storage.getKeyResults();
-        const hasAccess = keyResults.some(kr => {
-          if (kr.objectiveId !== objective.id) return false;
-          try {
-            const ids = typeof kr.responsibleIds === "string"
-              ? JSON.parse(kr.responsibleIds)
-              : kr.responsibleIds;
-            return Array.isArray(ids) && ids.includes(userId);
-          } catch {
-            return false;
-          }
-        });
-        if (!hasAccess) return res.status(403).json({ error: "Access denied" });
-      }
       res.json(objective);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch objective" });
@@ -411,6 +358,8 @@ export function registerOkrRoutes(router: Router) {
 
   router.post("/api/objectives", requireAuth, async (req, res) => {
     try {
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const validated = insertObjectiveSchema.parse(req.body);
 
       if (validated.parentOkrId) {
@@ -430,12 +379,10 @@ export function registerOkrRoutes(router: Router) {
 
   router.patch("/api/objectives/:id", requireAuth, async (req, res) => {
     try {
-      const { userId, isAdmin } = getSessionUser(req);
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const existing = await storage.getObjective(getId(req));
       if (!existing) return res.status(404).json({ error: "Objective not found" });
-      if (!isAdmin && existing.ownerId !== userId) {
-        return res.status(403).json({ error: "Access denied" });
-      }
 
       const partialSchema = insertObjectiveSchema.partial();
       const validated = partialSchema.parse(req.body);
@@ -458,12 +405,10 @@ export function registerOkrRoutes(router: Router) {
   });
 
   router.delete("/api/objectives/:id", requireAuth, async (req, res) => {
-    const { userId, isAdmin } = getSessionUser(req);
+    const session = await assertOkrAccess(req, res);
+    if (!session) return;
     const objective = await storage.getObjective(getId(req));
     if (!objective) return res.status(404).json({ error: "Objective not found" });
-    if (!isAdmin && objective.ownerId !== userId) {
-      return res.status(403).json({ error: "Access denied" });
-    }
     const deleted = await storage.deleteObjective(getId(req));
     if (!deleted) return res.status(404).json({ error: "Objective not found" });
     res.status(204).send();
@@ -471,6 +416,8 @@ export function registerOkrRoutes(router: Router) {
 
   // ============== KEY RESULTS ==============
   router.get("/api/key-results", requireAuth, async (req, res) => {
+    const session = await assertOkrAccess(req, res);
+    if (!session) return;
     const [keyResults, krsWithCheckins] = await Promise.all([
       storage.getKeyResults(),
       storage.getKRsWithCheckins(),
@@ -480,6 +427,8 @@ export function registerOkrRoutes(router: Router) {
 
   router.post("/api/key-results", requireAuth, async (req, res) => {
     try {
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const validated = insertKeyResultSchema.parse(req.body);
       const kr = await storage.createKeyResult(validated);
       res.status(201).json(kr);
@@ -493,6 +442,8 @@ export function registerOkrRoutes(router: Router) {
 
   router.patch("/api/key-results/:id", requireAuth, async (req, res) => {
     try {
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const partialSchema = insertKeyResultSchema.partial();
       const validated = partialSchema.parse(req.body);
       const kr = await storage.updateKeyResult(getId(req), validated);
@@ -507,12 +458,16 @@ export function registerOkrRoutes(router: Router) {
   });
 
   router.get("/api/key-results/:id", requireAuth, async (req, res) => {
+    const session = await assertOkrAccess(req, res);
+    if (!session) return;
     const kr = await storage.getKeyResult(getId(req));
     if (!kr) return res.status(404).json({ error: "Key result not found" });
     res.json(kr);
   });
 
   router.delete("/api/key-results/:id", requireAuth, async (req, res) => {
+    const session = await assertOkrAccess(req, res);
+    if (!session) return;
     const deleted = await storage.deleteKeyResult(getId(req));
     if (!deleted) return res.status(404).json({ error: "Key result not found" });
     res.status(204).send();
@@ -521,6 +476,8 @@ export function registerOkrRoutes(router: Router) {
   // ============== INITIATIVES ==============
   router.get("/api/initiatives", requireAuth, async (req, res) => {
     try {
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const keyResultId = req.query.keyResultId as string | undefined;
       const list = keyResultId
         ? await storage.getInitiativesByKeyResult(keyResultId)
@@ -533,6 +490,8 @@ export function registerOkrRoutes(router: Router) {
 
   router.post("/api/initiatives", requireAuth, async (req, res) => {
     try {
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const validated = insertInitiativeSchema.parse(req.body);
       const kr = await storage.getKeyResult(validated.keyResultId);
       if (!kr) return res.status(400).json({ error: "Key result não encontrado" });
@@ -548,6 +507,8 @@ export function registerOkrRoutes(router: Router) {
 
   router.patch("/api/initiatives/:id", requireAuth, async (req, res) => {
     try {
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const id = req.params.id as string;
       const existing = await storage.getInitiative(id);
       if (!existing) return res.status(404).json({ error: "Initiative not found" });
@@ -565,6 +526,8 @@ export function registerOkrRoutes(router: Router) {
   });
 
   router.delete("/api/initiatives/:id", requireAuth, async (req, res) => {
+    const session = await assertOkrAccess(req, res);
+    if (!session) return;
     const id = req.params.id as string;
     const existing = await storage.getInitiative(id);
     if (!existing) return res.status(404).json({ error: "Initiative not found" });
@@ -575,6 +538,8 @@ export function registerOkrRoutes(router: Router) {
 
   // ============== KEY RESULT UPDATES (Check-ins) ==============
   router.get("/api/key-results/:id/updates", requireAuth, async (req, res) => {
+    const session = await assertOkrAccess(req, res);
+    if (!session) return;
     const updates = await storage.getKeyResultUpdates(getId(req));
     const users = await storage.getUsers();
 
@@ -588,6 +553,8 @@ export function registerOkrRoutes(router: Router) {
 
   router.post("/api/key-results/:id/updates", requireAuth, async (req, res) => {
     try {
+      const session = await assertOkrAccess(req, res);
+      if (!session) return;
       const kr = await storage.getKeyResult(getId(req));
       if (!kr) return res.status(404).json({ error: "Key result not found" });
 
