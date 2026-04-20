@@ -321,7 +321,8 @@ export function AppSidebar() {
     });
   }, [permissions]);
 
-  const hasMetasAccess = permissions.okrs === true;
+  const hasMetasAccess = permissions.metas === true;
+  const hasOkrsAccess = permissions.okrs === true;
   const hasLogisticaAccess = permissions.logistica === true;
   const hasTriagemAccess = permissions.triagem === true;
   const hasPricingAccess = permissions.pricing === true;
@@ -478,7 +479,7 @@ export function AppSidebar() {
                 </Collapsible>
               )}
 
-              {hasMetasAccess && (
+              {hasOkrsAccess && (
                 <Collapsible open={okrsOpen} onOpenChange={setOkrsOpen}>
                   <SidebarMenuItem>
                     <CollapsibleTrigger asChild>
