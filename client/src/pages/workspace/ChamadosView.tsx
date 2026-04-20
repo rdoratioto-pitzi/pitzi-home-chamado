@@ -153,7 +153,7 @@ export function ChamadosView() {
         </div>
 
         {/* Period toggle */}
-        <div className="flex items-center gap-0 border rounded-md overflow-hidden" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+        <div className="flex items-center gap-0 border rounded-md overflow-hidden" style={{ borderColor: "var(--sep)" }}>
           {(Object.keys(periodLabels) as Periodo[]).map((p) => (
             <button
               key={p}
@@ -161,7 +161,7 @@ export function ChamadosView() {
               className="px-3 py-1.5 text-xs font-medium transition-colors"
               style={{
                 background: periodo === p ? "rgba(0,200,83,0.15)" : "transparent",
-                color: periodo === p ? "#00c853" : "rgba(255,255,255,0.4)",
+                color: periodo === p ? "#00c853" : "var(--l2)",
               }}
             >
               {periodLabels[p]}
@@ -195,7 +195,7 @@ export function ChamadosView() {
         />
 
         {/* View mode toggle */}
-        <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+        <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "var(--sep)" }}>
           {(Object.keys(viewIcons) as ViewMode[]).map((mode) => (
             <button
               key={mode}
@@ -203,7 +203,7 @@ export function ChamadosView() {
               className="p-1.5 transition-colors"
               style={{
                 background: viewMode === mode ? "rgba(0,200,83,0.15)" : "transparent",
-                color: viewMode === mode ? "#00c853" : "rgba(255,255,255,0.3)",
+                color: viewMode === mode ? "#00c853" : "var(--l3)",
               }}
               title={mode.charAt(0).toUpperCase() + mode.slice(1)}
             >
@@ -268,7 +268,7 @@ export function ChamadosView() {
         />
       )}
       {viewMode !== "lista" && viewMode !== "kanban" && (
-        <div style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "14px" }}>
+        <div style={{ padding: "40px", textAlign: "center", color: "var(--l3)", fontSize: "14px" }}>
           Visualização {viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} em desenvolvimento
         </div>
       )}
