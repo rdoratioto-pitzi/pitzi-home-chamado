@@ -373,6 +373,74 @@ app.use((req, res, next) => {
   }
 });
 
+// Compat: endpoint de versão disponível também no runtime Express.
+app.get("/api/version", (req, res) => {
+  const version = process.env.APP_VERSION || "dev";
+  const parts = version.split("-");
+  const commit = parts.length > 1 ? parts[parts.length - 1] : "local";
+  const buildDate = parts.length > 1 ? parts.slice(0, -1).join("-") : "local";
+
+  return res.json({
+    version,
+    commit,
+    buildDate,
+    environment: process.env.NODE_ENV === "production" ? "production" : "development",
+  });
+});
+
+// Compat: fallback do dashboard de geração de estoque no runtime Express.
+app.post("/api/estoques/dashboard/gerar-estoque", async (req, res) => {
+  try {
+    if (req.session?.isAdmin !== true) {
+      return res.status(403).json({ success: false, error: "Forbidden: Admin access required" });
+    }
+
+    const rawImeis = Array.isArray(req.body?.imeis)
+      ? req.body.imeis
+      : typeof req.body?.imeis === "string"
+        ? req.body.imeis.split(/[\n,;\t\s]+/)
+        : [];
+
+    const cleanedImeis = rawImeis
+      .map((item: unknown) => String(item ?? "").trim())
+      .filter((item: string) => item.length > 0)
+      .map((item: string) => item.replace(/\.0$/, ""));
+
+    const imeis = Array.from(new Set(cleanedImeis));
+
+    if (imeis.length === 0) {
+      return res.status(400).json({ success: false, error: "Informe o campo 'imeis' (lista ou string)." });
+    }
+
+    const response = await fetch("https://dash.renovsmart.com.br/api/dash_estoque/defeitos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer Renov123",
+      },
+      body: JSON.stringify({ imeis }),
+    });
+
+    const payload = await response.json().catch(() => []);
+    if (!response.ok) {
+      const remoteError = (payload as any)?.error;
+      return res.status(response.status).json({ success: false, error: remoteError || `Erro ${response.status} na API externa` });
+    }
+
+    const rows = Array.isArray(payload)
+      ? payload
+      : Array.isArray((payload as any)?.data)
+        ? (payload as any).data
+        : Array.isArray((payload as any)?.results)
+          ? (payload as any).results
+          : [];
+
+    return res.json({ success: true, data: { rows, total: rows.length } });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message || "Erro interno ao gerar estoque" });
+  }
+});
+
 /**
  * --------------------------------------------------
  * LOGGER
