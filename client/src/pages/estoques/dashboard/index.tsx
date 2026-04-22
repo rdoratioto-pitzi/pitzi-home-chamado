@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCw, AlertCircle, LayoutDashboard, Warehouse } from "lucide-react";
+import { RefreshCw, AlertCircle, LayoutDashboard, Warehouse, FileSpreadsheet } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,6 +21,7 @@ import { GraficosExecutivo }  from "./components/graficos-executivo";
 import { AgingEstoque }       from "./components/aging-estoque";
 import { Tendencias }         from "./components/tendencias";
 import { LinksRapidos }       from "./components/links-rapidos";
+import { GerarEstoque }       from "./components/gerar-estoque";
 
 // ── fetcher helper ──────────────────────────────────────────────────────────
 
@@ -162,6 +163,10 @@ export default function EstoquesDashboardPage() {
               <Warehouse className="h-3.5 w-3.5" />
               Visão Estoque
             </TabsTrigger>
+            <TabsTrigger value="gerar-estoque" className="flex items-center gap-1.5">
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Gerar Estoque
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -191,6 +196,9 @@ export default function EstoquesDashboardPage() {
         </TabsContent>
         <TabsContent value="estoque" className="mt-0">
           <VisaoEstoque periodo={periodo} />
+        </TabsContent>
+        <TabsContent value="gerar-estoque" className="mt-0">
+          <GerarEstoque />
         </TabsContent>
       </Tabs>
 
