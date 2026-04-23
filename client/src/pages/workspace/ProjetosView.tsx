@@ -97,7 +97,7 @@ const statusDotColors: Record<string, string> = {
   "concluido": "#4ade80",
   "a-fazer": "#f59e0b",
   bloqueado: "#ef4444",
-  backlog: "rgba(255,255,255,0.25)",
+  backlog: "hsl(var(--muted-foreground) / 0.45)",
 };
 
 const priorityLabels: Record<string, string> = {
@@ -133,15 +133,13 @@ function ProjectGroupHeader({
 
   return (
     <div
-      className="flex items-center gap-2 px-4 py-2 group cursor-pointer select-none"
-      style={{ background: "rgba(255,255,255,0.02)" }}
+      className="flex items-center gap-2 px-4 py-2 group cursor-pointer select-none bg-muted/20"
       onClick={onToggle}
     >
       <ChevronRight
         size={14}
-        className="transition-transform duration-200 flex-shrink-0"
+        className="transition-transform duration-200 flex-shrink-0 text-muted-foreground"
         style={{
-          color: "rgba(255,255,255,0.3)",
           transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
         }}
       />
@@ -156,12 +154,12 @@ function ProjectGroupHeader({
         }}
       />
       <span
+        className="text-muted-foreground"
         style={{
           fontFamily: "'JetBrains Mono', monospace",
           textTransform: "uppercase",
           fontSize: "10px",
           letterSpacing: "0.05em",
-          color: "rgba(255,255,255,0.5)",
         }}
       >
         {projeto.nome}
@@ -178,20 +176,18 @@ function ProjectGroupHeader({
         {prog}%
       </Badge>
       <span
+        className="text-muted-foreground/70"
         style={{
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: "10px",
-          color: "rgba(255,255,255,0.2)",
         }}
       >
         {projeto.codigo}
       </span>
       {collapsed && tarefaCount > 0 && (
         <span
-          className="text-[10px] px-1.5 py-0.5 rounded-full"
+          className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
           style={{
-            background: "rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.35)",
             fontFamily: "'JetBrains Mono', monospace",
           }}
         >
@@ -201,10 +197,10 @@ function ProjectGroupHeader({
       {onEdit && (
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10"
+          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
           title="Editar projeto"
         >
-          <Pencil size={12} style={{ color: "rgba(255,255,255,0.5)" }} />
+          <Pencil size={12} className="text-muted-foreground" />
         </button>
       )}
     </div>
@@ -226,21 +222,20 @@ function HeaderRow() {
   ];
   return (
     <div
-      className="grid items-center px-4 py-2 gap-2"
+      className="grid items-center px-4 py-2 gap-2 border-b border-border/40"
       style={{
         gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
       }}
     >
       {headers.map((h, i) => (
         <span
           key={i}
+          className="text-muted-foreground/70"
           style={{
             fontFamily: "'JetBrains Mono', monospace",
             textTransform: "uppercase",
             fontSize: "9px",
             letterSpacing: "0.05em",
-            color: "rgba(255,255,255,0.25)",
           }}
         >
           {h}
@@ -252,11 +247,8 @@ function HeaderRow() {
 
 function EmptyTarefasRow() {
   return (
-    <div
-      className="flex items-center px-4 py-3"
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
-    >
-      <span className="text-xs italic" style={{ color: "rgba(255,255,255,0.2)", paddingLeft: 18 }}>
+    <div className="flex items-center px-4 py-3 border-b border-border/30">
+      <span className="text-xs italic text-muted-foreground" style={{ paddingLeft: 18 }}>
         Nenhuma atividade neste projeto
       </span>
     </div>
@@ -276,14 +268,11 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
 
   return (
     <div
-      className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer"
+      className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer border-b border-border/30 hover:bg-muted/40"
       onClick={onClick}
       style={{
         gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-        borderBottom: "1px solid rgba(255,255,255,0.03)",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#141814")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       {/* Código */}
       <div className="flex items-center gap-2 min-w-0">
@@ -300,7 +289,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
       </div>
 
       {/* Título */}
-      <span className="text-sm truncate" style={{ color: "rgba(255,255,255,0.85)" }}>
+      <span className="text-sm truncate text-foreground">
         {tarefa.titulo}
       </span>
 
@@ -309,7 +298,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
         <span className="text-xs truncate" style={{ color: projetoCor, opacity: 0.7 }}>
           {tarefa.sprint || "—"}
         </span>
-        <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+        <span className="text-muted-foreground/40">·</span>
         <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-slate-500/10 text-slate-400">
           atividade
         </Badge>
@@ -318,20 +307,19 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
       {/* Responsável */}
       <div className="flex items-center gap-1.5 min-w-0">
         <div
-          className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
-          style={{ width: 22, height: 22, background: "rgba(0,200,83,0.15)", color: "#00c853" }}
+          className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold h-[22px] w-[22px] bg-primary/15 text-primary"
         >
           {tarefa.responsavelInitials}
         </div>
         {tarefa.responsavel && tarefa.responsavel !== "Não atribuído" && (
-          <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+          <span className="text-xs truncate text-muted-foreground">
             {tarefa.responsavel}
           </span>
         )}
       </div>
 
       {/* Status */}
-      <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
+      <span className="text-xs text-muted-foreground">
         {statusLabels[status] || status}
       </span>
 
@@ -342,7 +330,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
 
       {/* Progresso */}
       <div className="flex items-center gap-1">
-        <div style={{ width: 56, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)" }}>
+        <div style={{ width: 56, height: 4, borderRadius: 2, background: "hsl(var(--muted))" }}>
           <div
             style={{
               width: `${Math.min(prog, 100)}%`,
@@ -374,7 +362,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
       <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="p-1 rounded hover:bg-white/5">
+            <button className="p-1 rounded hover:bg-muted">
               <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
@@ -471,19 +459,19 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
             <div className="flex items-center gap-2 mb-2 px-1">
               <span style={{ width: 7, height: 7, borderRadius: "50%", background: col.color, display: "inline-block" }} />
               <span
+                className="text-foreground"
                 style={{
                   fontFamily: "'JetBrains Mono', monospace",
                   textTransform: "uppercase",
                   fontSize: "10px",
                   letterSpacing: "0.05em",
-                  color: "rgba(255,255,255,0.85)",
                 }}
               >
                 {col.label}
               </span>
               <span
-                className="text-xs px-1.5 py-0.5 rounded-full"
-                style={{ background: "rgba(255,255,255,0.06)", color: "#00c853", fontSize: "10px" }}
+                className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-primary"
+                style={{ fontSize: "10px" }}
               >
                 {columnTarefas.length}
               </span>
@@ -501,8 +489,8 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                   onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }}
                   className="p-3 rounded cursor-grab active:cursor-grabbing"
                   style={{
-                    background: draggingId === t.id ? "rgba(0,200,83,0.1)" : "rgba(255,255,255,0.03)",
-                    border: draggingId === t.id ? "1px solid rgba(0,200,83,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                    background: draggingId === t.id ? "hsl(var(--primary) / 0.1)" : "hsl(var(--muted) / 0.35)",
+                    border: draggingId === t.id ? "1px solid hsl(var(--primary) / 0.35)" : "1px solid hsl(var(--border) / 0.8)",
                     opacity: draggingId === t.id ? 0.6 : 1,
                   }}
                 >
@@ -518,7 +506,7 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                       {t.codigo}
                     </span>
                   </div>
-                  <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.8)" }}>
+                  <p className="text-xs mb-2 text-foreground">
                     {t.titulo}
                   </p>
                   <div className="flex items-center justify-between">
@@ -535,8 +523,7 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                     </Badge>
                     {t.responsavelInitials && (
                       <div
-                        className="flex items-center justify-center rounded-full text-[10px] font-semibold"
-                        style={{ width: 22, height: 22, background: "rgba(0,200,83,0.15)", color: "#00c853" }}
+                        className="flex items-center justify-center rounded-full text-[10px] font-semibold h-[22px] w-[22px] bg-primary/15 text-primary"
                       >
                         {t.responsavelInitials}
                       </div>
@@ -546,11 +533,10 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
               ))}
               {columnTarefas.length === 0 && (
                 <div
-                  className="p-4 rounded text-center text-xs italic"
+                  className="p-4 rounded text-center text-xs italic text-muted-foreground"
                   style={{
-                    background: isOver ? "rgba(0,200,83,0.05)" : "rgba(255,255,255,0.01)",
-                    border: "1px dashed rgba(255,255,255,0.06)",
-                    color: "rgba(255,255,255,0.2)",
+                    background: isOver ? "hsl(var(--primary) / 0.05)" : "hsl(var(--muted) / 0.2)",
+                    border: "1px dashed hsl(var(--border) / 0.8)",
                   }}
                 >
                   {isOver ? "Soltar aqui" : "Vazio"}
@@ -1016,15 +1002,15 @@ export function ProjetosView() {
         />
 
         {/* View mode toggle */}
-        <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+        <div className="flex items-center gap-0 border border-border rounded-md overflow-hidden ml-auto">
           {(Object.keys(viewIcons) as ViewMode[]).map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
-              className="p-1.5 transition-colors"
+              className={`p-1.5 transition-colors ${
+                viewMode === mode ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
               style={{
-                background: viewMode === mode ? "rgba(0,200,83,0.15)" : "transparent",
-                color: viewMode === mode ? "#00c853" : "rgba(255,255,255,0.3)",
               }}
               title={mode.charAt(0).toUpperCase() + mode.slice(1)}
             >
@@ -1104,7 +1090,7 @@ export function ProjetosView() {
         <ProjectsKanbanView projetos={filteredProjetos} onStatusChange={refreshData} />
       )}
       {viewMode !== "lista" && viewMode !== "kanban" && (
-        <div style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "14px" }}>
+        <div className="py-10 text-center text-sm text-muted-foreground">
           Visualização {viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} em desenvolvimento
         </div>
       )}

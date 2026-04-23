@@ -133,7 +133,7 @@ function StatusDot({ status }: { status: string }) {
           width: 7,
           height: 7,
           borderRadius: "50%",
-          border: "1.5px solid rgba(255,255,255,0.2)",
+          border: "1.5px solid var(--l4)",
         }}
       />
     );
@@ -166,14 +166,14 @@ function GroupHeader({
   return (
     <div
       className="flex items-center gap-2 px-4 py-2 cursor-pointer select-none"
-      style={{ background: "rgba(255,255,255,0.02)" }}
+      style={{ background: "var(--bg3)" }}
       onClick={onToggle}
     >
       <ChevronRight
         size={14}
         className="transition-transform duration-200 flex-shrink-0"
         style={{
-          color: "rgba(255,255,255,0.3)",
+          color: "var(--l3)",
           transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
         }}
       />
@@ -193,7 +193,7 @@ function GroupHeader({
             width: 7,
             height: 7,
             borderRadius: "50%",
-            border: "1.5px solid rgba(255,255,255,0.2)",
+            border: "1.5px solid var(--l4)",
             display: "inline-block",
           }}
         />
@@ -204,7 +204,7 @@ function GroupHeader({
           textTransform: "uppercase",
           fontSize: "10px",
           letterSpacing: "0.05em",
-          color: "rgba(255,255,255,0.85)",
+          color: "var(--l1)",
         }}
       >
         {statusGroupLabels[status] || status}
@@ -212,7 +212,7 @@ function GroupHeader({
       <span
         className="text-xs px-1.5 py-0.5 rounded-full"
         style={{
-          background: "rgba(255,255,255,0.06)",
+          background: "var(--bg4)",
           color: "#00c853",
           fontSize: "10px",
         }}
@@ -225,8 +225,8 @@ function GroupHeader({
 
 const skeletonKeyframes = `
 @keyframes ws-skeleton-pulse {
-  from { background-color: rgba(255,255,255,0.04); }
-  to   { background-color: rgba(255,255,255,0.08); }
+  from { background-color: var(--l4); }
+  to   { background-color: var(--l3); }
 }
 `;
 
@@ -383,7 +383,7 @@ function HeaderRow({ headers }: { headers: string[] }) {
       className="ws-table-row grid items-center px-4 py-2 gap-2"
       style={{
         gridTemplateColumns: COL_TEMPLATE,
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid var(--sep)",
       }}
     >
       {headers.map((h, i) => (
@@ -395,7 +395,7 @@ function HeaderRow({ headers }: { headers: string[] }) {
             textTransform: "uppercase",
             fontSize: "9px",
             letterSpacing: "0.05em",
-            color: "rgba(255,255,255,0.25)",
+            color: "var(--l3)",
           }}
         >
           {h}
@@ -415,9 +415,9 @@ function ChamadoItemRow({ item, onRowClick, onDelete }: { item: ChamadoItem; onR
       onClick={() => onRowClick?.(item)}
       style={{
         gridTemplateColumns: COL_TEMPLATE,
-        borderBottom: "1px solid rgba(255,255,255,0.03)",
+        borderBottom: "1px solid var(--sep)",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#141814")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg3)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <div className="flex items-center gap-2 min-w-0">
@@ -426,20 +426,20 @@ function ChamadoItemRow({ item, onRowClick, onDelete }: { item: ChamadoItem; onR
           {item.codigo}
         </span>
       </div>
-      <span className="text-sm truncate" style={{ color: "rgba(255,255,255,0.85)" }}>
+      <span className="text-sm truncate" style={{ color: "var(--l1)" }}>
         {item.titulo}
       </span>
       <div className="flex items-center gap-1.5 min-w-0 truncate">
-        <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.5)" }}>
+        <span className="text-xs truncate" style={{ color: "var(--l2)" }}>
           {item.categoria}
         </span>
-        <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+        <span style={{ color: "var(--l4)" }}>·</span>
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${typeColor}`}>
           {item.tipo}
         </Badge>
       </div>
       <ResponsavelCell initials={item.responsavelInitials} name={item.responsavel} />
-      <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
+      <span className="text-xs" style={{ color: "var(--l2)" }}>
         {statusLabels[item.status] || item.status}
       </span>
       <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
@@ -464,7 +464,7 @@ function UnifiedItemRow({ item, onRowClick }: { item: UnifiedItem; onRowClick?: 
   const contextoColor =
     item.tipo === "tarefa" && item.corContexto
       ? `${item.corContexto}b3`
-      : "rgba(255,255,255,0.5)";
+      : "var(--l2)";
 
   return (
     <div
@@ -472,9 +472,9 @@ function UnifiedItemRow({ item, onRowClick }: { item: UnifiedItem; onRowClick?: 
       onClick={() => onRowClick?.(item)}
       style={{
         gridTemplateColumns: COL_TEMPLATE,
-        borderBottom: "1px solid rgba(255,255,255,0.03)",
+        borderBottom: "1px solid var(--sep)",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#141814")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg3)")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <div className="flex items-center gap-2 min-w-0">
@@ -483,20 +483,20 @@ function UnifiedItemRow({ item, onRowClick }: { item: UnifiedItem; onRowClick?: 
           {item.codigo}
         </span>
       </div>
-      <span className="text-sm truncate" style={{ color: "rgba(255,255,255,0.85)" }}>
+      <span className="text-sm truncate" style={{ color: "var(--l1)" }}>
         {item.titulo}
       </span>
       <div className="flex items-center gap-1.5 min-w-0 truncate">
         <span className="text-xs truncate" style={{ color: contextoColor }}>
           {item.contexto}
         </span>
-        <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+        <span style={{ color: "var(--l4)" }}>·</span>
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${badgeColor}`}>
           {item.badgeLabel}
         </Badge>
       </div>
       <ResponsavelCell initials={item.responsavelInitials} name={item.responsavel} />
-      <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
+      <span className="text-xs" style={{ color: "var(--l2)" }}>
         {statusLabels[item.status] || item.status}
       </span>
       <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
@@ -528,7 +528,7 @@ function ResponsavelCell({ initials, name }: { initials: string; name: string })
         {initials}
       </div>
       {displayName && (
-        <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+        <span className="text-xs truncate" style={{ color: "var(--l2)" }}>
           {displayName}
         </span>
       )}
@@ -546,7 +546,7 @@ function SlaStatusCell({ statusSla, className }: { statusSla: "dentro_prazo" | "
             ? "#00c853"
             : statusSla === "em_atraso"
               ? "#ff5050"
-              : "rgba(255,255,255,0.2)",
+              : "var(--l4)",
       }}
     >
       {statusSla === "dentro_prazo" ? "No Prazo" : statusSla === "em_atraso" ? "Em Atraso" : "—"}
@@ -559,7 +559,7 @@ function ActionsMenu({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () 
     <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="p-1 rounded hover:bg-white/5">
+          <button className="p-1 rounded hover:bg-muted/60">
             <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
           </button>
         </DropdownMenuTrigger>
