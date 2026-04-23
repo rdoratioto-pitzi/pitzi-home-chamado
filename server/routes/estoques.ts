@@ -1540,6 +1540,40 @@ export function registerEstoqueRoutes(router: Router) {
     return [];
   }
 
+  async function postPipelineApi(path: string, payload: Record<string, unknown>): Promise<any> {
+    const url = `${PIPELINE_RS_BASE}${path}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${PIPELINE_RS_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error(`API ${path} error: ${response.status}`);
+    return response.json();
+  }
+
+  function normalizeImeisInput(input: unknown): string[] {
+    const source = Array.isArray(input)
+      ? input
+      : typeof input === 'string'
+        ? input.split(/[\n,;\t\s]+/)
+        : [];
+
+    const cleaned = source
+      .map((item) => String(item ?? '').trim())
+      .filter((item) => item.length > 0)
+      .map((item) => item.replace(/\.0$/, ''));
+
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const imei of cleaned) {
+      if (seen.has(imei)) continue;
+      seen.add(imei);
+      unique.push(imei);
+    }
+
+    return unique;
+  }
+
   function extractItemDate(item: any): string | null {
     const candidates = [
       'data_utilizacao', 'used_at', 'voucher_used_at', 'dt_voucher_use', 'voucher_use_date',
@@ -2877,6 +2911,32 @@ export function registerEstoqueRoutes(router: Router) {
       }});
     } catch (error: any) {
       console.error('[Estoque Routes] Error aging-estoque:', error.message);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // POST /api/estoques/dashboard/gerar-estoque – Defeitos por IMEI
+  router.post('/api/estoques/dashboard/gerar-estoque', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      console.log('[Estoque Routes] POST /api/estoques/dashboard/gerar-estoque');
+
+      const imeis = normalizeImeisInput(req.body?.imeis);
+      if (imeis.length === 0) {
+        return res.status(400).json({ success: false, error: "Informe o campo 'imeis' (lista ou string)." });
+      }
+
+      const pipelineData = await postPipelineApi('/dash_estoque/defeitos', { imeis });
+      const rows = Array.isArray(pipelineData)
+        ? pipelineData
+        : Array.isArray(pipelineData?.data)
+          ? pipelineData.data
+          : Array.isArray(pipelineData?.results)
+            ? pipelineData.results
+            : [];
+
+      res.json({ success: true, data: { rows, total: rows.length } });
+    } catch (error: any) {
+      console.error('[Estoque Routes] Error gerar-estoque:', error.message);
       res.status(500).json({ success: false, error: error.message });
     }
   });

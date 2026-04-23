@@ -66,6 +66,40 @@ async function fetchPipelineApi(path: string, params: Record<string, string> = {
   return [];
 }
 
+async function postPipelineApi(path: string, payload: Record<string, unknown>): Promise<any> {
+  const url = `${PIPELINE_RS_BASE}${path}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${PIPELINE_RS_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`API ${path} error: ${response.status}`);
+  return response.json();
+}
+
+function normalizeImeisInput(input: unknown): string[] {
+  const source = Array.isArray(input)
+    ? input
+    : typeof input === "string"
+      ? input.split(/[\n,;\t\s]+/)
+      : [];
+
+  const cleaned = source
+    .map((item) => String(item ?? "").trim())
+    .filter((item) => item.length > 0)
+    .map((item) => item.replace(/\.0$/, ""));
+
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const imei of cleaned) {
+    if (seen.has(imei)) continue;
+    seen.add(imei);
+    unique.push(imei);
+  }
+
+  return unique;
+}
+
 function extractItemDate(item: any): string | null {
   const candidates = [
     "data_utilizacao", "used_at", "voucher_used_at", "dt_voucher_use", "voucher_use_date",
@@ -2743,6 +2777,31 @@ estoques.get("/api/estoques/dashboard/aging-estoque", requireAdmin, async (c) =>
       totais: { quantidade: triagem.length, valor: parseFloat(faixas.reduce((a, f) => a + f.valor, 0).toFixed(2)) },
     },
   });
+});
+
+// POST /api/estoques/dashboard/gerar-estoque
+estoques.post("/api/estoques/dashboard/gerar-estoque", requireAdmin, async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({} as Record<string, unknown>));
+    const imeis = normalizeImeisInput(body?.imeis);
+
+    if (imeis.length === 0) {
+      return c.json({ success: false, error: "Informe o campo 'imeis' (lista ou string)." }, 400);
+    }
+
+    const pipelineData = await postPipelineApi("/dash_estoque/defeitos", { imeis });
+    const rows = Array.isArray(pipelineData)
+      ? pipelineData
+      : Array.isArray(pipelineData?.data)
+        ? pipelineData.data
+        : Array.isArray(pipelineData?.results)
+          ? pipelineData.results
+          : [];
+
+    return c.json({ success: true, data: { rows, total: rows.length } });
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
 });
 
 // ─── Endpoints da camada de serviço (estoque.service) ────────────────────────

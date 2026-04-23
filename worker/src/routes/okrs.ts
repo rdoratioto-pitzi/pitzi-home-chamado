@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
+import { assertOkrAccess } from "../middleware/okr-access";
 import {
   insertObjectiveSchema,
   insertKeyResultSchema,
@@ -128,7 +129,9 @@ const okrs = new Hono<AppEnv>();
 // ============== DASHBOARD ==============
 okrs.get("/api/okrs/dashboard", async (c) => {
   try {
-    const user = c.get("user");
+    const guard = await assertOkrAccess(c);
+    if (!guard.ok) return guard.response;
+
     const storage = getStorage(c.get("db"));
     const cycle = c.req.query("cycle") ?? "";
 
@@ -136,24 +139,7 @@ okrs.get("/api/okrs/dashboard", async (c) => {
     const allKeyResults = await storage.getKeyResults();
     const allInitiatives = await storage.getInitiatives();
 
-    let cycleObjectives = allObjectives.filter((o) => o.cycle === cycle);
-
-    if (user.role !== "admin") {
-      cycleObjectives = cycleObjectives.filter((obj) => {
-        if (obj.ownerId === user.userId) return true;
-        return allKeyResults.some((kr) => {
-          if (kr.objectiveId !== obj.id) return false;
-          try {
-            const ids = typeof kr.responsibleIds === "string"
-              ? JSON.parse(kr.responsibleIds)
-              : kr.responsibleIds;
-            return Array.isArray(ids) && ids.includes(user.userId);
-          } catch {
-            return false;
-          }
-        });
-      });
-    }
+    const cycleObjectives = allObjectives.filter((o) => o.cycle === cycle);
 
     const objectiveIds = new Set(cycleObjectives.map((o) => o.id));
     const cycleKrs = allKeyResults.filter((kr) => objectiveIds.has(kr.objectiveId));
@@ -281,11 +267,12 @@ okrs.get("/api/okrs/dashboard", async (c) => {
 
 // GET /api/objectives
 okrs.get("/api/objectives", async (c) => {
-  const user = c.get("user");
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
+
   const storage = getStorage(c.get("db"));
   const objectives = await storage.getObjectives();
 
-  // Modo arquivo: retorna apenas objetivos encerrados de todos os cycles
   if (c.req.query("archived") === "true") {
     const archived = objectives
       .filter((o) => o.closedAt != null)
@@ -293,43 +280,20 @@ okrs.get("/api/objectives", async (c) => {
     return c.json(archived);
   }
 
-  let list: Objective[];
-  if (user.role === "admin") {
-    list = objectives;
-  } else {
-    const keyResults = await storage.getKeyResults();
-    list = objectives.filter((obj) => {
-      if (obj.ownerId === user.userId) return true;
-      return keyResults.some((kr) => {
-        if (kr.objectiveId !== obj.id) return false;
-        try {
-          const ids =
-            typeof kr.responsibleIds === "string"
-              ? JSON.parse(kr.responsibleIds)
-              : kr.responsibleIds;
-          return Array.isArray(ids) && ids.includes(user.userId);
-        } catch {
-          return false;
-        }
-      });
-    });
-  }
-
-  if (c.req.query("tree") === "true") return c.json(buildOkrTree(list));
-  return c.json(list);
+  if (c.req.query("tree") === "true") return c.json(buildOkrTree(objectives));
+  return c.json(objectives);
 });
 
 // POST /api/objectives/:id/close — encerrar quarter de um objetivo
 okrs.post("/api/objectives/:id/close", async (c) => {
-  const user = c.get("user");
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
+
   const storage = getStorage(c.get("db"));
   const id = c.req.param("id");
 
   const existing = await storage.getObjective(id);
   if (!existing) return c.json({ error: "Objetivo não encontrado" }, 404);
-  if (user.role !== "admin" && existing.ownerId !== user.userId) {
-    return c.json({ error: "Acesso negado" }, 403);
-  }
   if (existing.closedAt != null) {
     return c.json({ error: "Este objetivo já foi encerrado." }, 400);
   }
@@ -357,33 +321,18 @@ okrs.post("/api/objectives/:id/close", async (c) => {
 
 // GET /api/objectives/:id
 okrs.get("/api/objectives/:id", async (c) => {
-  const user = c.get("user");
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
-  const id = c.req.param("id");
-  const objective = await storage.getObjective(id);
+  const objective = await storage.getObjective(c.req.param("id"));
   if (!objective) return c.json({ error: "Objective not found" }, 404);
-
-  if (user.role !== "admin" && objective.ownerId !== user.userId) {
-    const keyResults = await storage.getKeyResults();
-    const hasAccess = keyResults.some((kr) => {
-      if (kr.objectiveId !== objective.id) return false;
-      try {
-        const ids =
-          typeof kr.responsibleIds === "string"
-            ? JSON.parse(kr.responsibleIds)
-            : kr.responsibleIds;
-        return Array.isArray(ids) && ids.includes(user.userId);
-      } catch {
-        return false;
-      }
-    });
-    if (!hasAccess) return c.json({ error: "Access denied" }, 403);
-  }
   return c.json(objective);
 });
 
 // POST /api/objectives
 okrs.post("/api/objectives", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const body = await c.req.json();
   const validated = insertObjectiveSchema.parse(body);
@@ -397,14 +346,12 @@ okrs.post("/api/objectives", async (c) => {
 
 // PATCH /api/objectives/:id
 okrs.patch("/api/objectives/:id", async (c) => {
-  const user = c.get("user");
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const id = c.req.param("id");
   const existing = await storage.getObjective(id);
   if (!existing) return c.json({ error: "Objective not found" }, 404);
-  if (user.role !== "admin" && existing.ownerId !== user.userId) {
-    return c.json({ error: "Access denied" }, 403);
-  }
   const body = await c.req.json();
   const validated = insertObjectiveSchema.partial().parse(body);
   if (validated.parentOkrId) {
@@ -419,14 +366,12 @@ okrs.patch("/api/objectives/:id", async (c) => {
 
 // DELETE /api/objectives/:id
 okrs.delete("/api/objectives/:id", async (c) => {
-  const user = c.get("user");
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const id = c.req.param("id");
   const objective = await storage.getObjective(id);
   if (!objective) return c.json({ error: "Objective not found" }, 404);
-  if (user.role !== "admin" && objective.ownerId !== user.userId) {
-    return c.json({ error: "Access denied" }, 403);
-  }
   const deleted = await storage.deleteObjective(id);
   if (!deleted) return c.json({ error: "Objective not found" }, 404);
   return c.body(null, 204);
@@ -436,6 +381,8 @@ okrs.delete("/api/objectives/:id", async (c) => {
 
 // GET /api/key-results
 okrs.get("/api/key-results", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const [keyResults, krsWithCheckins] = await Promise.all([
     storage.getKeyResults(),
@@ -446,6 +393,8 @@ okrs.get("/api/key-results", async (c) => {
 
 // GET /api/key-results/:id
 okrs.get("/api/key-results/:id", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const kr = await storage.getKeyResult(c.req.param("id"));
   if (!kr) return c.json({ error: "Key result not found" }, 404);
@@ -454,6 +403,8 @@ okrs.get("/api/key-results/:id", async (c) => {
 
 // POST /api/key-results
 okrs.post("/api/key-results", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const body = await c.req.json();
   const validated = insertKeyResultSchema.parse(body);
@@ -463,6 +414,8 @@ okrs.post("/api/key-results", async (c) => {
 
 // PATCH /api/key-results/:id
 okrs.patch("/api/key-results/:id", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const body = await c.req.json();
   const validated = insertKeyResultSchema.partial().parse(body);
@@ -473,6 +426,8 @@ okrs.patch("/api/key-results/:id", async (c) => {
 
 // DELETE /api/key-results/:id
 okrs.delete("/api/key-results/:id", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const deleted = await storage.deleteKeyResult(c.req.param("id"));
   if (!deleted) return c.json({ error: "Key result not found" }, 404);
@@ -483,6 +438,8 @@ okrs.delete("/api/key-results/:id", async (c) => {
 
 // GET /api/initiatives?keyResultId=... (keyResultId optional — returns all if omitted)
 okrs.get("/api/initiatives", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const keyResultId = c.req.query("keyResultId");
   const list = keyResultId
@@ -493,6 +450,8 @@ okrs.get("/api/initiatives", async (c) => {
 
 // POST /api/initiatives
 okrs.post("/api/initiatives", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const body = await c.req.json();
   const validated = insertInitiativeSchema.parse(body);
@@ -504,6 +463,8 @@ okrs.post("/api/initiatives", async (c) => {
 
 // PATCH /api/initiatives/:id
 okrs.patch("/api/initiatives/:id", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const id = c.req.param("id");
   const existing = await storage.getInitiative(id);
@@ -517,6 +478,8 @@ okrs.patch("/api/initiatives/:id", async (c) => {
 
 // DELETE /api/initiatives/:id
 okrs.delete("/api/initiatives/:id", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const id = c.req.param("id");
   const existing = await storage.getInitiative(id);
@@ -530,6 +493,8 @@ okrs.delete("/api/initiatives/:id", async (c) => {
 
 // GET /api/key-results/:id/updates
 okrs.get("/api/key-results/:id/updates", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const id = c.req.param("id");
   const updates = await storage.getKeyResultUpdates(id);
@@ -543,6 +508,8 @@ okrs.get("/api/key-results/:id/updates", async (c) => {
 
 // POST /api/key-results/:id/updates
 okrs.post("/api/key-results/:id/updates", async (c) => {
+  const guard = await assertOkrAccess(c);
+  if (!guard.ok) return guard.response;
   const storage = getStorage(c.get("db"));
   const id = c.req.param("id");
   const kr = await storage.getKeyResult(id);
