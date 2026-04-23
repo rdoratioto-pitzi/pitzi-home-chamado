@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { Loader2, Search, X, CalendarDays, Table2, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Search, X, CalendarDays, Table2, Users, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -269,6 +270,14 @@ function defaultFilters(): TriagemFilters {
   };
 }
 
+function exportDetalhesToExcel(rows: Array<Record<string, string>>, filters: TriagemFilters) {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Tabela Completa");
+  const filename = `triagem-dashboard-${filters.startDate || "inicio"}_a_${filters.endDate || "fim"}`;
+  XLSX.writeFile(wb, `${filename}.xlsx`);
+}
+
 function TableCard({
   title,
   description,
@@ -408,6 +417,31 @@ export default function TriagemDashboardPage() {
     setActiveFilters(next);
     setImeiFilter("");
     setDetailsPage(1);
+  }
+
+  function handleExportDetalhes() {
+    if (detalhesFiltrados.length === 0) return;
+
+    const exportRows = detalhesFiltrados.map((item) => ({
+      IMEI: String(item.IMEI || "—"),
+      Voucher: String(item.Voucher || "—"),
+      Rede: String(item.Rede || "—"),
+      Filial: String(item.Filial || "—"),
+      Categoria: String(item.Categoria || "—"),
+      Fabricante: String(item.Fabricante || "—"),
+      Status: String(item.Status || "—"),
+      "Descrição": String(item.Descricao || "—"),
+      Recebimento: String(item.DataRecebimento || "—"),
+      Triagem: String(item.DataTriagem || "—"),
+      Triador: String(item.Triador || "—"),
+      "Grade da Avaliação": String(item.GradeAvaliacao || "—"),
+      "Grade da Triagem": String(item.GradeTriagem || "—"),
+      Avaliador: String(item.Avaliador || "—"),
+      Defeitos: String(item.Defeitos || "—"),
+      "Observação da Triagem": String(item.ObservacaoTriagem || "—"),
+    }));
+
+    exportDetalhesToExcel(exportRows, activeFilters);
   }
 
   return (
@@ -624,6 +658,16 @@ export default function TriagemDashboardPage() {
               icon={<Table2 className="h-4 w-4 text-primary" />}
               headerAction={
                 <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportDetalhes}
+                    disabled={detalhesFiltrados.length === 0}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar Excel
+                  </Button>
                   <Input
                     value={imeiFilter}
                     onChange={(event) => setImeiFilter(event.target.value)}
