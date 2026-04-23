@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Warehouse, Download, Filter, RefreshCw, AlertCircle, Loader2, ChevronsUpDown } from "lucide-react";
+import { Warehouse, Download, Filter, RefreshCw, AlertCircle, Loader2, ChevronsUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAdmDispositivosAggregates, LogisticaFilters, LogisticaDispositivosResponse } from "@/hooks/use-adm-logistica";
 import { DataTable } from "@/components/data-table";
 import { useToast } from "@/hooks/use-toast";
@@ -100,6 +100,7 @@ const UF_COORDS: Record<string, [number, number]> = {
 };
 
 const BLUE_SCALE = ["#EAF2FB", "#D2E3F6", "#A9C8EA", "#7BA8DA", "#4D87C5", "#1F5EA8"];
+const COMPLETA_PAGE_SIZE = 30;
 
 // Função para formatar valores em reais (R$)
 const formatCurrency = (value: unknown): string => {
@@ -218,6 +219,7 @@ export default function DispositivosPage() {
   const [summaryCellSelection, setSummaryCellSelection] = useState<SummaryCellSelection | null>(null);
   const [isExportingDetail, setIsExportingDetail] = useState(false);
   const [exportingTable, setExportingTable] = useState<"qtd" | "valores" | "completa" | null>(null);
+  const [completaPage, setCompletaPage] = useState(1);
   
   // Chamar a API com os filtros
   const { data, isLoading, isError, error, refetch, isFetching } = useAdmDispositivosAggregates(filters);
@@ -398,6 +400,20 @@ export default function DispositivosPage() {
     () => applyLocalQuinzenaFilter(data?.tabela_completa || []),
     [appliedQuinzenas, data?.tabela_completa]
   );
+
+  const totalCompletaPages = useMemo(
+    () => Math.max(1, Math.ceil(tabelaCompletaFiltrada.length / COMPLETA_PAGE_SIZE)),
+    [tabelaCompletaFiltrada.length]
+  );
+
+  const tabelaCompletaPaginada = useMemo(() => {
+    const start = (completaPage - 1) * COMPLETA_PAGE_SIZE;
+    return tabelaCompletaFiltrada.slice(start, start + COMPLETA_PAGE_SIZE);
+  }, [completaPage, tabelaCompletaFiltrada]);
+
+  useEffect(() => {
+    setCompletaPage(1);
+  }, [tabelaCompletaFiltrada.length]);
   
   // Ordem das colunas para tabelas de quantidade e valores
   const columnOrder = ["Quinzena", "Pendente_de_Coleta", "Criado_pelo_cliente", "Coleta_Solicitada", "Recebido", "Total_Geral"];
@@ -497,50 +513,13 @@ export default function DispositivosPage() {
     return orderColumns(columns, completaColumnOrder);
   }, [data?.tabela_completa]);
 
-  const latestQuinzena = useMemo(() => {
-    if (!data?.tabela_completa?.length) return null;
-
-    const candidates = data.tabela_completa
-      .map((row) => {
-        const quinzena = row["Quinzena"];
-        if (!quinzena) return null;
-        return {
-          quinzena: String(quinzena),
-          sort: row["QuinzenaSort"],
-        };
-      })
-      .filter((item): item is { quinzena: string; sort: unknown } => item !== null);
-
-    if (!candidates.length) return null;
-
-    const sorted = [...candidates].sort((a, b) => {
-      const aNum = Number(a.sort);
-      const bNum = Number(b.sort);
-
-      if (Number.isFinite(aNum) && Number.isFinite(bNum)) {
-        return aNum - bNum;
-      }
-
-      const aKey = a.sort === undefined || a.sort === null || String(a.sort).trim() === ""
-        ? a.quinzena
-        : String(a.sort);
-      const bKey = b.sort === undefined || b.sort === null || String(b.sort).trim() === ""
-        ? b.quinzena
-        : String(b.sort);
-
-      return aKey.localeCompare(bKey, "pt-BR", { numeric: true, sensitivity: "base" });
-    });
-
-    return sorted[sorted.length - 1]?.quinzena ?? null;
-  }, [data?.tabela_completa]);
-
   // Dados transformados para o gráfico de conclusão de quinzenas (espelhando app_logistica.py)
   const chartData = useMemo<QuinzenaRow[]>(() => {
     if (!tabelaQtdFiltrada.length) return [];
 
     const roundOneDecimal = (value: number) => Math.round(value * 10) / 10;
 
-    return tabelaQtdFiltrada
+    const validRows = tabelaQtdFiltrada
       .filter((row) => {
         const quinzena = String(row["Quinzena"] ?? "");
         const total = Number(row["Total_Geral"]) || 0;
@@ -548,8 +527,9 @@ export default function DispositivosPage() {
         if (!quinzena || quinzena === "Total") return false;
         // Mesma regra do Python: excluir quinzenas concluídas (Total Geral == Recebido)
         return total !== recebido;
-      })
-      .map((row) => {
+      });
+
+    return validRows.map((row, index) => {
         const quinzena = String(row["Quinzena"]);
         const total = Number(row["Total_Geral"]) || 0;
         const pendente = Number(row["Pendente_de_Coleta"]) || 0;
@@ -568,10 +548,10 @@ export default function DispositivosPage() {
           criado_qtd: criado,
           coleta_qtd: coleta,
           recebido_qtd: recebido,
-          isLatestQuinzena: latestQuinzena === quinzena,
+          isLatestQuinzena: index === validRows.length - 1,
         };
       });
-  }, [tabelaQtdFiltrada, latestQuinzena]);
+  }, [tabelaQtdFiltrada]);
 
   const ufCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -1048,7 +1028,7 @@ export default function DispositivosPage() {
                           />
                           <Tooltip
                             formatter={(value: number, name: string, item) => {
-                              if (name === "Total_Geral") {
+                              if (name === "Total_Geral" || name === "Total Geral") {
                                 return [Number(value).toLocaleString("pt-BR"), name];
                               }
 
@@ -1163,14 +1143,14 @@ export default function DispositivosPage() {
                           <Line
                             yAxisId="right"
                             type="monotone"
-                            dataKey="Total Geral"
+                            dataKey="Total_Geral"
                             stroke={QUINZENA_STATUS_COLORS.totalGeral}
                             strokeWidth={3}
                             dot={{ fill: QUINZENA_STATUS_COLORS.totalGeral, r: 5 }}
                             name="Total Geral"
                           >
                             <LabelList
-                              dataKey="Total Geral"
+                              dataKey="Total_Geral"
                               position="top"
                               formatter={(value: number) => value.toLocaleString("pt-BR")}
                             />
@@ -1354,7 +1334,7 @@ export default function DispositivosPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {tabelaCompletaFiltrada.slice(0, 100).map((row, idx) => (
+                        {tabelaCompletaPaginada.map((row, idx) => (
                           <tr key={idx} className="border-b hover:bg-muted/50">
                             {completaColumns.map((col) => (
                               <td key={col.key} className="p-2">
@@ -1365,11 +1345,34 @@ export default function DispositivosPage() {
                         ))}
                       </tbody>
                     </table>
-                    {tabelaCompletaFiltrada.length > 100 && (
-                      <p className="text-sm text-muted-foreground mt-2">
-                        Mostrando 100 de {tabelaCompletaFiltrada.length} registros
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Mostrando {(completaPage - 1) * COMPLETA_PAGE_SIZE + 1} a {Math.min(completaPage * COMPLETA_PAGE_SIZE, tabelaCompletaFiltrada.length)} de {tabelaCompletaFiltrada.length} registros
                       </p>
-                    )}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCompletaPage((page) => Math.max(1, page - 1))}
+                          disabled={completaPage === 1}
+                        >
+                          <ChevronLeft className="h-4 w-4 mr-1" />
+                          Anterior
+                        </Button>
+                        <span className="text-sm text-muted-foreground">
+                          Página {completaPage} de {totalCompletaPages}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCompletaPage((page) => Math.min(totalCompletaPages, page + 1))}
+                          disabled={completaPage === totalCompletaPages}
+                        >
+                          Próxima
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
