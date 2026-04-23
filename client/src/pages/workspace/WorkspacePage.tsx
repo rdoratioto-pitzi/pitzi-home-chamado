@@ -187,13 +187,13 @@ export default function WorkspacePage() {
               <button
                 onClick={() => handleTabClick(tab.key)}
                 className={`relative px-4 py-3 text-sm font-medium transition-colors ${
-                  isActive ? "text-[#00c853] border-b-2 border-[#00c853]" : "text-muted-foreground border-b-2 border-transparent"
+                  isActive ? "text-primary border-b-2 border-primary" : "text-muted-foreground border-b-2 border-transparent hover:text-foreground"
                 }`}
               >
                 {tab.label}
                 <span
                   className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
-                    isActive ? "bg-[#00c853]/15 text-[#00c853]" : "bg-muted text-muted-foreground"
+                    isActive ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {tab.count}
