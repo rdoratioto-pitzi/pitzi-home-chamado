@@ -181,7 +181,7 @@ function agregarPorDispositivoInline(raw: any[], curadosSet: Set<string>): Trade
     if (!grouped.has(imei)) {
       grouped.set(imei, {
         imei,
-        modelo: item.Modelo || item.Categoria || "",
+        modelo: item.Modelo || item.Model || item.model || item.device_model || item.Descricao || "",
         categoria: item.Categoria || "smartphone",
         dataTradeIn: item.Data_Avaliacao || new Date().toISOString(),
         linkFotos: link,
@@ -280,7 +280,7 @@ function agregarPorDispositivoImei(raw: any[], curadosSet: Set<string>): TradeIn
       grouped.set(imei, {
         imei,
         dataTradeIn,
-        modelo: item.Modelo || item.Categoria || "",
+        modelo: item.Modelo || item.Model || item.model || item.device_model || item.Descricao || "",
         categoria: item.Categoria || "smartphone",
         linkFotos: linkFotosVal,
         codigoVoucher: item.Codigo_Voucher || null,

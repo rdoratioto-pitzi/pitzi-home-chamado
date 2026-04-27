@@ -249,7 +249,11 @@ function DetailSheet({
 // ─── CSV export ───────────────────────────────────────────────────────────────
 
 function exportCsv(rows: CuradoriaHistoricoItem[]) {
+  // Use semicolon as delimiter (Excel PT-BR friendly) and prepend BOM for UTF-8
+  const delimiter = ";";
   const header = ["IMEI", "Modelo", "Categoria", "Data Curadoria", "Curador", "Display IA", "Display Curador", "Carcaça IA", "Carcaça Curador", "Status", "Observação"];
+  const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
   const lines = rows.map((r) => [
     r.imei ?? "",
     r.modelo ?? "",
@@ -262,9 +266,11 @@ function exportCsv(rows: CuradoriaHistoricoItem[]) {
     r.gradeCorretaCarcaca ?? "",
     isConcordante(r) ? "Concordante" : "Divergente",
     r.observacao ?? "",
-  ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
-  const csv = [header.join(","), ...lines].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  ].map(escape).join(delimiter));
+
+  const csvBody = [header.map(escape).join(delimiter), ...lines].join("\n");
+  const csvWithBom = "\uFEFF" + csvBody;
+  const blob = new Blob([csvWithBom], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -289,14 +295,15 @@ function HistoricoSkeleton() {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 const LIMIT = 20;
+const HISTORICO_MIN_START_DATE = "2026-04-23";
 
 export default function HistoricoCuradoriaPage() {
-  const [filtros, setFiltros] = useState<CuradoriaHistoricoFiltros>({});
+  const [filtros, setFiltros] = useState<CuradoriaHistoricoFiltros>({ dataInicio: HISTORICO_MIN_START_DATE });
   const [page, setPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState<CuradoriaHistoricoItem | null>(null);
 
   // draft filter state
-  const [draft, setDraft] = useState<CuradoriaHistoricoFiltros>({});
+  const [draft, setDraft] = useState<CuradoriaHistoricoFiltros>({ dataInicio: HISTORICO_MIN_START_DATE });
 
   const { data, isLoading, isFetching } = useCuradorias(filtros, page, LIMIT);
   const { data: avaliadoresData } = useAvaliadores();
@@ -313,8 +320,8 @@ export default function HistoricoCuradoriaPage() {
   }, [draft]);
 
   const clearFiltros = useCallback(() => {
-    setDraft({});
-    setFiltros({});
+    setDraft({ dataInicio: HISTORICO_MIN_START_DATE });
+    setFiltros({ dataInicio: HISTORICO_MIN_START_DATE });
     setPage(1);
   }, []);
 
@@ -328,18 +335,6 @@ export default function HistoricoCuradoriaPage() {
           { label: "Avaliações", href: "/avaliacoes/dashboard" },
           { label: "Histórico" },
         ]}
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => exportCsv(registros)}
-            disabled={registros.length === 0}
-            className="gap-1.5"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Exportar CSV
-          </Button>
-        }
       />
 
       <div className="flex-1 p-6 flex flex-col gap-5">
@@ -354,6 +349,7 @@ export default function HistoricoCuradoriaPage() {
                   <Input
                     type="date"
                     className="pl-8 h-9 text-sm"
+                    min={HISTORICO_MIN_START_DATE}
                     value={draft.dataInicio ?? ""}
                     onChange={(e) => setDraft((p) => ({ ...p, dataInicio: e.target.value || undefined }))}
                   />
@@ -367,6 +363,7 @@ export default function HistoricoCuradoriaPage() {
                   <Input
                     type="date"
                     className="pl-8 h-9 text-sm"
+                    min={HISTORICO_MIN_START_DATE}
                     value={draft.dataFim ?? ""}
                     onChange={(e) => setDraft((p) => ({ ...p, dataFim: e.target.value || undefined }))}
                   />
@@ -414,6 +411,16 @@ export default function HistoricoCuradoriaPage() {
               </div>
 
               <div className="flex items-center gap-2 pb-0.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportCsv(registros)}
+                  disabled={registros.length === 0}
+                  className="gap-1.5 h-9"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Exportar Excel
+                </Button>
                 <Button size="sm" onClick={applyFiltros} className="gap-1.5 h-9">
                   <Filter className="h-3.5 w-3.5" />
                   Filtrar
