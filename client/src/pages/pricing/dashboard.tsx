@@ -1,325 +1,231 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from "recharts";
-import {
-  Smartphone,
-  RefreshCw,
-  BarChart3,
-  Package,
-} from "lucide-react";
-import { Link } from "wouter";
-import { usePricingCategories } from "@/hooks/use-pricing-categories";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Loader2, Download } from "lucide-react";
+import { PricingFilters } from "./components/PricingFilters";
+import { PricingKPIs } from "./components/PricingKPIs";
+import { TopRankingTable } from "./components/TopRankingTable";
+import { MonthlyEvolutionTable } from "./components/MonthlyEvolutionTable";
+import { DistributionChart } from "./components/DistributionChart";
+import { TimelineChart } from "./components/TimelineChart";
+import { ExportUtils } from "@/lib/export-utils";
 
-interface EligibleDevice {
-  categoryId: string;
-  manufacturerName: string;
-  modelName: string;
-  storage: number;
+interface FilterState {
+  networks?: string[];
+  categories?: Array<string | number>;
+  weeks?: string[];
+  limit: number;
 }
 
-interface EligibleDevicesResponse {
-  items: EligibleDevice[];
-  currentPage: number;
-  hasNextPage: boolean;
-}
-
-const COLORS = ["#00A137", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#14B8A6", "#EF4444", "#84CC16"];
-
-export default function DashboardPage() {
-  const [selectedCategory, setSelectedCategory] = useState<string>("");
-  const { data: categoriesData } = usePricingCategories();
-
-  useEffect(() => {
-    if (categoriesData && categoriesData.length > 0 && !selectedCategory) {
-      setSelectedCategory(categoriesData[0].id);
-    }
-  }, [categoriesData, selectedCategory]);
-
-  const { data: devicesData, isLoading, refetch } = useQuery<EligibleDevicesResponse>({
-    queryKey: ["pricing-devices", selectedCategory],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/pricing/eligible-devices?categoryId=${selectedCategory}&pageNumber=1&pageSize=200`
-      );
-      if (!response.ok) throw new Error("Erro ao carregar dispositivos");
-      return response.json();
-    },
-    staleTime: 5 * 60 * 1000,
+export function PricingDashboard() {
+  const [filters, setFilters] = useState<FilterState>({
+    limit: 50,
   });
 
-  const devices = devicesData?.items || [];
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const categoryName = categoriesData?.find((c) => c.id === selectedCategory)?.name || "Dispositivos";
+  // Fetch metadados (redes, categorias, semanas)
+  const { data: metadata } = useQuery({
+    queryKey: ["pricing-metadata"],
+    queryFn: async () => {
+      const res = await fetch("/api/pricing/metadata", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch metadata");
+      return res.json();
+    },
+  });
 
-  const brandData = devices.reduce((acc, device) => {
-    const brand = device.manufacturerName;
-    acc[brand] = (acc[brand] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const barData = Object.entries(brandData)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
-  const storageData = devices.reduce((acc, device) => {
-    const storage = `${device.storage}GB`;
-    acc[storage] = (acc[storage] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const pieData = Object.entries(storageData)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => {
-      const aNum = parseInt(a.name);
-      const bNum = parseInt(b.name);
-      return aNum - bNum;
+  useEffect(() => {
+    if (!metadata?.defaultWeeks?.length) return;
+    setFilters((prev) => {
+      if (prev.weeks && prev.weeks.length > 0) return prev;
+      return { ...prev, weeks: metadata.defaultWeeks };
     });
+  }, [metadata]);
 
-  const uniqueModels = new Set(devices.map(d => `${d.manufacturerName} ${d.modelName}`)).size;
-  const uniqueBrands = new Set(devices.map(d => d.manufacturerName)).size;
-  const uniqueStorages = new Set(devices.map(d => d.storage)).size;
+  // Fetch top 50 data
+  const { data: top50Data, isLoading: isLoadingTop50, refetch: refetchTop50 } = useQuery({
+    queryKey: ["pricing-top50", filters],
+    queryFn: async () => {
+      const res = await fetch("/api/pricing/top50", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          networks: filters.networks,
+          weeks: filters.weeks,
+          categories: filters.categories,
+          limit: filters.limit,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to fetch top50");
+      return res.json();
+    },
+  });
+
+  // Fetch monthly evolution
+  const { data: monthlyData, isLoading: isLoadingMonthly, refetch: refetchMonthly } = useQuery({
+    queryKey: ["pricing-monthly", filters],
+    queryFn: async () => {
+      const res = await fetch("/api/pricing/monthly", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          networks: filters.networks,
+          categories: filters.categories,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to fetch monthly");
+      return res.json();
+    },
+  });
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([
+      refetchTop50(),
+      refetchMonthly()
+    ]);
+    setIsRefreshing(false);
+  };
+
+  const handleExportTop50 = () => {
+    if (top50Data?.data) {
+      ExportUtils.exportToExcel(
+        top50Data.data,
+        `pricing-top${filters.limit}-${new Date().toISOString().split("T")[0]}.xlsx`,
+        `Top ${filters.limit} Modelos`
+      );
+    }
+  };
+
+  const handleExportMonthly = () => {
+    if (monthlyData?.data) {
+      ExportUtils.exportToExcel(
+        monthlyData.data,
+        `pricing-mensal-${new Date().toISOString().split("T")[0]}.xlsx`,
+        "Evolução Mensal"
+      );
+    }
+  };
+
+  // Calcular KPIs agregadas
+  const calculateKPIs = () => {
+    if (!top50Data?.data) return null;
+
+    const data = top50Data.data as Array<{
+      Digitado?: number;
+      Avaliado?: number;
+      Comprado?: number;
+      RR?: number;
+      CR?: number;
+    }>;
+    const totalDigitado = data.reduce((sum: number, row) => sum + (row.Digitado || 0), 0);
+    const totalAvaliado = data.reduce((sum: number, row) => sum + (row.Avaliado || 0), 0);
+    const totalComprado = data.reduce((sum: number, row) => sum + (row.Comprado || 0), 0);
+    const avgRR =
+      data.reduce((sum: number, row) => sum + (row.RR || 0), 0) / (data.length || 1);
+    const avgCR =
+      data.reduce((sum: number, row) => sum + (row.CR || 0), 0) / (data.length || 1);
+
+    return {
+      totalDigitado,
+      totalAvaliado,
+      totalComprado,
+      avgRR,
+      avgCR,
+      modelosCount: data.length,
+    };
+  };
+
+  const kpis = calculateKPIs();
 
   return (
     <div className="flex flex-col h-full">
       <PageHeader
-        title="Dashboard - Pricing"
-        description="Visão geral dos dispositivos monitorados via API RenovSmart"
+        title="Dashboard de Pricing"
+        description="Análise de volumes, avaliações, conversões e performance de modelos"
       />
 
-      <div className="flex-1 p-6 space-y-6 overflow-auto">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-48" data-testid="select-category">
-              <SelectValue placeholder="Selecione" />
-            </SelectTrigger>
-            <SelectContent>
-              {categoriesData?.map((cat) => (
-                <SelectItem key={cat.id} value={cat.id}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              disabled={isLoading}
-              data-testid="button-refresh"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-              Atualizar
-            </Button>
-            <Link href="/pricing">
-              <Button variant="default" size="sm" data-testid="button-view-all">
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Ver Dispositivos
-              </Button>
-            </Link>
-          </div>
-        </div>
+      <div className="flex-1 overflow-auto p-6 space-y-6 bg-background">
+        <PricingFilters
+          metadata={metadata}
+          filters={filters}
+          onFiltersChange={setFilters}
+          onRefresh={handleRefresh}
+          isRefreshing={isRefreshing}
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card style={{ background: 'var(--vf)', border: 'none' }}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                  <Smartphone className="h-6 w-6" style={{ color: '#FFFFFF' }} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: '#FFFFFF' }}>Total de Variantes</p>
-                  <p className="text-[28px] font-bold" style={{ color: '#FFFFFF' }}>{devices.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-blue-500/10">
-                  <Package className="h-6 w-6 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Modelos Únicos</p>
-                  <p className="text-[28px] font-bold" style={{ color: 'var(--l1)' }}>{uniqueModels}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-purple-500/10">
-                  <BarChart3 className="h-6 w-6 text-purple-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Marcas</p>
-                  <p className="text-[28px] font-bold" style={{ color: 'var(--l1)' }}>{uniqueBrands}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border" style={{ background: 'var(--bg2)', borderColor: 'var(--sep)' }}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-orange-500/10">
-                  <Smartphone className="h-6 w-6 text-orange-500" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--l3)' }}>Capacidades</p>
-                  <p className="text-[28px] font-bold" style={{ color: 'var(--l1)' }}>{uniqueStorages}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {kpis && <PricingKPIs kpis={kpis} />}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Dispositivos por Marca - {categoryName}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-64" />
-              ) : barData.length === 0 ? (
-                <div className="h-64 flex items-center justify-center text-muted-foreground">
-                  Nenhum dado disponível
-                </div>
-              ) : (
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={barData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis type="number" className="text-xs" />
-                      <YAxis 
-                        type="category" 
-                        dataKey="name" 
-                        className="text-xs" 
-                        width={80}
-                        tick={{ fontSize: 11 }}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                      <Bar 
-                        dataKey="count" 
-                        name="Variantes" 
-                        fill="hsl(var(--primary))" 
-                        radius={[0, 4, 4, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Smartphone className="h-5 w-5" />
-                Distribuição por Capacidade
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-64" />
-              ) : pieData.length === 0 ? (
-                <div className="h-64 flex items-center justify-center text-muted-foreground">
-                  Nenhum dado disponível
-                </div>
-              ) : (
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                      >
-                        {pieData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value: number) => [value, "Variantes"]}
-                        contentStyle={{
-                          backgroundColor: "hsl(var(--card))",
-                          borderColor: "hsl(var(--border))",
-                          borderRadius: "8px",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {top50Data?.data && <DistributionChart data={top50Data.data} />}
+          {top50Data?.data && <TimelineChart data={top50Data.data} />}
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Modelos Recentes - {categoryName}</CardTitle>
+        <Card className="shadow-sm border-border/70 bg-card">
+          <CardHeader className="border-b border-border/70 bg-card">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl font-bold text-foreground">
+                Ranking de Modelos
+              </CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleExportTop50}
+                disabled={!top50Data?.data}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Excel
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <Skeleton key={i} className="h-8" />
-                ))}
+          <CardContent className="p-6">
+            {isLoadingTop50 ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
+            ) : top50Data?.data ? (
+              <TopRankingTable data={top50Data.data} />
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {Array.from(new Set(devices.map(d => `${d.manufacturerName} ${d.modelName}`)))
-                  .slice(0, 20)
-                  .map((model) => (
-                    <Badge key={model} variant="secondary">
-                      {model}
-                    </Badge>
-                  ))}
-                {devices.length > 20 && (
-                  <Badge variant="outline">+{devices.length - 20} mais</Badge>
-                )}
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum dado disponível com os filtros selecionados
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border/70 bg-card">
+          <CardHeader className="border-b border-border/70 bg-card">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl font-bold text-foreground">
+                Evolução Mensal - Top 3 Fabricantes
+              </CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleExportMonthly}
+                disabled={!monthlyData?.data}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Excel
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            {isLoadingMonthly ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : monthlyData?.data ? (
+              <MonthlyEvolutionTable data={monthlyData.data} />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhum dado disponível
               </div>
             )}
           </CardContent>
@@ -328,3 +234,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+export default PricingDashboard;
