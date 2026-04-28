@@ -11,6 +11,27 @@ import {
   workspaceComentarios,
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
+import {
+  notifyChamadoCriado,
+  notifyChamadoAtribuido,
+  notifyChamadoFechado,
+  notifyProjetoCriado,
+  notifyAtividadeCriada,
+  notifyAtividadeMovida,
+  notifyAtividadeConcluida,
+  type SlackDb,
+} from "../../../server/services/slack-notifier.service";
+
+/** Extrai env Slack do binding do Worker. */
+function slackEnv(envBindings: { SLACK_BOT_TOKEN?: string; SLACK_INTEGRATION_ENABLED?: string; SLACK_CHANNEL_DEVS?: string }) {
+  return {
+    SLACK_BOT_TOKEN: envBindings.SLACK_BOT_TOKEN,
+    SLACK_INTEGRATION_ENABLED: envBindings.SLACK_INTEGRATION_ENABLED,
+    SLACK_CHANNEL_DEVS: envBindings.SLACK_CHANNEL_DEVS,
+  };
+}
+
+const STATUS_FECHADO = new Set(["resolved", "closed"]);
 
 interface Anexo { name: string; url: string }
 
@@ -56,6 +77,24 @@ const kanbanStatusToPtBr: Record<string, string> = {
   doing: "em-andamento",
   done: "concluido",
 };
+
+/**
+ * Fire-and-forget para notificações Slack no Worker.
+ * Usa executionCtx.waitUntil para garantir que a Promise execute mesmo após
+ * a resposta HTTP ser enviada — sem bloquear o cliente.
+ */
+function fireSlack(
+  c: { executionCtx?: { waitUntil: (p: Promise<unknown>) => void } },
+  fn: () => Promise<void>,
+): void {
+  const promise = fn().catch((err) =>
+    console.error("[slack-notifier] dispatch falhou:", err),
+  );
+  if (c.executionCtx?.waitUntil) {
+    c.executionCtx.waitUntil(promise);
+  }
+  // Fora do Worker (ex: testes), a Promise apenas roda no event loop.
+}
 
 const workspace = new Hono<AppEnv>();
 
@@ -226,7 +265,8 @@ workspace.post("/api/workspace/chamados", async (c) => {
     const prioridadeMap: Record<string, string> = { baixa: "low", media: "medium", alta: "high", critica: "critical" };
     const mappedPriority = prioridade ? (prioridadeMap[prioridade] || prioridade) : "medium";
 
-    const storage = getStorage(c.get("db"));
+    const db = c.get("db");
+    const storage = getStorage(db);
     const ticket = await storage.createTicket({
       title: titulo.trim(),
       description: descricao || "",
@@ -239,6 +279,11 @@ workspace.post("/api/workspace/chamados", async (c) => {
       requesterId: userId,
       tenantId: null,
     } as any);
+
+    // Slack: notifica criação no canal #devs-renov (fire-and-forget via waitUntil).
+    fireSlack(c, () =>
+      notifyChamadoCriado({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id),
+    );
 
     const [allUsers, slaRules] = await Promise.all([
       storage.getUsers(),
@@ -344,6 +389,11 @@ workspace.post("/api/workspace/tarefas", async (c) => {
       })
       .returning();
 
+    // Slack: reply na thread do projeto pai (se mapeado).
+    fireSlack(c, () =>
+      notifyAtividadeCriada({ db: db as SlackDb, env: slackEnv(c.env) }, card.id),
+    );
+
     const storage = getStorage(db);
     const allUsers = await storage.getUsers();
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
@@ -433,6 +483,11 @@ workspace.post("/api/workspace/projetos", async (c) => {
         progress: 0,
       })
       .returning();
+
+    // Slack: notifica criação no canal (skipa se visibility=private).
+    fireSlack(c, () =>
+      notifyProjetoCriado({ db: db as SlackDb, env: slackEnv(c.env) }, projeto.id),
+    );
 
     const storage = getStorage(db);
     const allUsers = await storage.getUsers();
@@ -692,6 +747,7 @@ workspace.get("/api/workspace/projetos", async (c) => {
 workspace.patch("/api/workspace/chamados/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
+    const { userId: actorId } = c.get("user");
     const { status, prioridade, responsavelId, titulo, descricao } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
@@ -702,6 +758,9 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
     const priorityRevMap: Record<string, string> = {
       low: "baixa", medium: "media", high: "alta", critical: "critica",
     };
+
+    // Captura estado anterior para detectar transições (atribuição, fechamento).
+    const previous = await storage.getTicket(String(id));
 
     const updateData: Partial<Ticket> = {};
     if (status !== undefined) updateData.status = status;
@@ -716,6 +775,22 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
 
     const ticket = await storage.updateTicket(String(id), updateData);
     if (!ticket) return c.json({ error: "Chamado não encontrado" }, 404);
+
+    // Slack: dispara hooks por transição (apenas o que mudou).
+    const oldAssignee = previous?.assigneeId || null;
+    const newAssignee = ticket.assigneeId || null;
+    if (newAssignee && newAssignee !== oldAssignee) {
+      fireSlack(c, () =>
+        notifyChamadoAtribuido({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id, newAssignee),
+      );
+    }
+    const wasOpen = previous && !STATUS_FECHADO.has(previous.status);
+    const isClosed = STATUS_FECHADO.has(ticket.status);
+    if (wasOpen && isClosed) {
+      fireSlack(c, () =>
+        notifyChamadoFechado({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id, actorId),
+      );
+    }
 
     const [allUsers, slaRules] = await Promise.all([
       storage.getUsers(),
@@ -761,6 +836,13 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
       "a-fazer": "todo", "em-andamento": "doing", concluido: "done", bloqueado: "blocked",
     };
 
+    // Captura estado anterior para detectar mudança de status.
+    const [prevCard] = await db
+      .select()
+      .from(kanbanCards)
+      .where(eq(kanbanCards.id, String(id)))
+      .limit(1);
+
     const updateData: Record<string, any> = {};
     if (status !== undefined) updateData.status = ptBrToKanban[status] || status;
     if (prioridade !== undefined) updateData.priority = prioridade;
@@ -779,6 +861,19 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
       .returning();
 
     if (!card) return c.json({ error: "Tarefa não encontrada" }, 404);
+
+    // Slack: hook de transição de status na atividade.
+    if (prevCard && prevCard.status !== card.status) {
+      if (card.status === "done") {
+        fireSlack(c, () =>
+          notifyAtividadeConcluida({ db: db as SlackDb, env: slackEnv(c.env) }, card.id),
+        );
+      } else {
+        fireSlack(c, () =>
+          notifyAtividadeMovida({ db: db as SlackDb, env: slackEnv(c.env) }, card.id, card.status),
+        );
+      }
+    }
 
     const allUsers = await storage.getUsers();
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
