@@ -7,6 +7,7 @@ import {
   projects,
   kanbanCards,
   kanbanColumns,
+  kanbanComments,
   users,
   workspaceComentarios,
 } from "../../../shared/schema";
@@ -753,7 +754,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
 workspace.patch("/api/workspace/tarefas/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
-    const { status, prioridade, responsavelId, dataEntrega, progresso } = await c.req.json();
+    const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
 
@@ -767,6 +768,8 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
     if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
     if (dataEntrega !== undefined) updateData.dueDate = dataEntrega ? new Date(dataEntrega) : null;
     if (progresso !== undefined) updateData.progress = progresso;
+    if (titulo !== undefined) updateData.title = titulo.trim();
+    if (descricao !== undefined) updateData.objectives = descricao;
 
     if (Object.keys(updateData).length === 0) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
@@ -851,6 +854,163 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
       status: updated.status,
       prioridade: updated.priority,
     });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── GET tarefa individual ────────────────────────────────────────────────────
+workspace.get("/api/workspace/tarefas/:id", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const db = c.get("db");
+    const storage = getStorage(db);
+
+    const [card] = await db
+      .select()
+      .from(kanbanCards)
+      .where(eq(kanbanCards.id, id))
+      .limit(1);
+
+    if (!card) return c.json({ error: "Tarefa não encontrada" }, 404);
+
+    const [projeto] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, card.projectId))
+      .limit(1);
+
+    const allUsers = await storage.getUsers();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const resp = card.assigneeId ? userMap.get(card.assigneeId) : null;
+    const respNome = resp?.name || "Não atribuído";
+    const respInitials = respNome.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("");
+
+    const kanbanStatusToPtBrLocal: Record<string, string> = {
+      todo: "a-fazer", doing: "em-andamento", done: "concluido", blocked: "bloqueado",
+    };
+
+    const rawAtt = card.attachments || [];
+    const anexos = rawAtt.map((url: string, i: number) => ({ name: `Anexo ${i + 1}`, url }));
+
+    return c.json({
+      id: card.id,
+      codigo: card.code,
+      titulo: card.title,
+      descricao: card.objectives || null,
+      status: kanbanStatusToPtBrLocal[card.status] || card.status,
+      prioridade: card.priority,
+      responsavelId: card.assigneeId,
+      responsavel: respNome,
+      responsavelInitials: respInitials,
+      dataEntrega: card.dueDate ? String(card.dueDate) : null,
+      dataInicio: card.startDate ? String(card.startDate) : null,
+      progresso: card.progress ?? 0,
+      criadoEm: card.createdAt ? String(card.createdAt) : null,
+      anexos,
+      projeto: projeto ? {
+        id: projeto.id,
+        codigo: projeto.code,
+        nome: projeto.name,
+        cor: projeto.color || "#00c853",
+      } : null,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── DELETE tarefa ────────────────────────────────────────────────────────────
+workspace.delete("/api/workspace/tarefas/:id", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const db = c.get("db");
+
+    const [deleted] = await db
+      .delete(kanbanCards)
+      .where(eq(kanbanCards.id, id))
+      .returning({ id: kanbanCards.id });
+
+    if (!deleted) return c.json({ error: "Tarefa não encontrada" }, 404);
+
+    return c.json({ ok: true });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── GET comentarios de tarefa ────────────────────────────────────────────────
+workspace.get("/api/workspace/tarefas/:id/comentarios", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const db = c.get("db");
+    const storage = getStorage(db);
+
+    const comentarios = await db
+      .select()
+      .from(kanbanComments)
+      .where(eq(kanbanComments.cardId, id))
+      .orderBy(kanbanComments.createdAt);
+
+    const allUsers = await storage.getUsers();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+    const items = comentarios.map((row: any) => {
+      const autor = userMap.get(row.userId);
+      const autorNome = autor?.name || "Usuário";
+      const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("");
+      return {
+        id: row.id,
+        texto: row.content,
+        autorId: row.userId,
+        autorNome,
+        autorInitials,
+        criadoEm: row.createdAt ? String(row.createdAt) : null,
+      };
+    });
+
+    return c.json({ comentarios: items });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── POST comentario em tarefa ────────────────────────────────────────────────
+workspace.post("/api/workspace/tarefas/:id/comentarios", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const { userId } = c.get("user");
+    const db = c.get("db");
+    const storage = getStorage(db);
+    const { texto } = await c.req.json();
+
+    if (!texto?.trim()) {
+      return c.json({ error: "Texto obrigatório" }, 400);
+    }
+
+    const [comentario] = await db
+      .insert(kanbanComments)
+      .values({
+        cardId: id,
+        userId,
+        content: texto.trim(),
+      })
+      .returning();
+
+    const allUsers = await storage.getUsers();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const autor = userMap.get(comentario.userId);
+    const autorNome = autor?.name || "Usuário";
+    const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("");
+
+    return c.json({
+      id: comentario.id,
+      texto: comentario.content,
+      autorId: comentario.userId,
+      autorNome,
+      autorInitials,
+      criadoEm: comentario.createdAt ? String(comentario.createdAt) : null,
+    }, 201);
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
   }
