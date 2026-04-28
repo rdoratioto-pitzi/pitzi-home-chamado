@@ -104,7 +104,7 @@ const statusDotColors: Record<string, string> = {
   "concluido": "#4ade80",
   "a-fazer": "#f59e0b",
   bloqueado: "#ef4444",
-  backlog: "rgba(255,255,255,0.25)",
+  backlog: "hsl(var(--muted-foreground) / 0.4)",
 };
 
 const priorityLabels: Record<string, string> = {
@@ -141,14 +141,14 @@ function ProjectGroupHeader({
   return (
     <div
       className="flex items-center gap-2 px-4 py-2 group cursor-pointer select-none"
-      style={{ background: "rgba(255,255,255,0.02)" }}
+      style={{ background: "hsl(var(--muted) / 0.4)" }}
       onClick={onToggle}
     >
       <ChevronRight
         size={14}
         className="transition-transform duration-200 flex-shrink-0"
         style={{
-          color: "rgba(255,255,255,0.3)",
+          color: "hsl(var(--muted-foreground) / 0.6)",
           transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
         }}
       />
@@ -168,7 +168,7 @@ function ProjectGroupHeader({
           textTransform: "uppercase",
           fontSize: "10px",
           letterSpacing: "0.05em",
-          color: "rgba(255,255,255,0.5)",
+          color: "hsl(var(--muted-foreground))",
         }}
       >
         {projeto.nome}
@@ -188,7 +188,7 @@ function ProjectGroupHeader({
         style={{
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: "10px",
-          color: "rgba(255,255,255,0.2)",
+          color: "hsl(var(--muted-foreground) / 0.45)",
         }}
       >
         {projeto.codigo}
@@ -197,8 +197,8 @@ function ProjectGroupHeader({
         <span
           className="text-[10px] px-1.5 py-0.5 rounded-full"
           style={{
-            background: "rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.35)",
+            background: "hsl(var(--muted))",
+            color: "hsl(var(--muted-foreground) / 0.7)",
             fontFamily: "'JetBrains Mono', monospace",
           }}
         >
@@ -208,10 +208,10 @@ function ProjectGroupHeader({
       {onEdit && (
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10"
+          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
           title="Editar projeto"
         >
-          <Pencil size={12} style={{ color: "rgba(255,255,255,0.5)" }} />
+          <Pencil size={12} style={{ color: "hsl(var(--muted-foreground))" }} />
         </button>
       )}
     </div>
@@ -236,7 +236,7 @@ function HeaderRow() {
       className="grid items-center px-4 py-2 gap-2"
       style={{
         gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid hsl(var(--border))",
       }}
     >
       {headers.map((h, i) => (
@@ -247,7 +247,7 @@ function HeaderRow() {
             textTransform: "uppercase",
             fontSize: "9px",
             letterSpacing: "0.05em",
-            color: "rgba(255,255,255,0.25)",
+            color: "hsl(var(--muted-foreground) / 0.55)",
           }}
         >
           {h}
@@ -261,9 +261,9 @@ function EmptyTarefasRow() {
   return (
     <div
       className="flex items-center px-4 py-3"
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
+      style={{ borderBottom: "1px solid hsl(var(--border) / 0.5)" }}
     >
-      <span className="text-xs italic" style={{ color: "rgba(255,255,255,0.2)", paddingLeft: 18 }}>
+      <span className="text-xs italic" style={{ color: "hsl(var(--muted-foreground) / 0.45)", paddingLeft: 18 }}>
         Nenhuma atividade neste projeto
       </span>
     </div>
@@ -288,7 +288,7 @@ function FlatHeaderRow({ sortField, sortDir, onSort }: { sortField: SortField; s
   return (
     <div
       className="grid items-center px-4 py-2 gap-2"
-      style={{ gridTemplateColumns: FLAT_GRID, borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+      style={{ gridTemplateColumns: FLAT_GRID, borderBottom: "1px solid hsl(var(--border))" }}
     >
       {FLAT_HEADERS.map(({ label, field }, i) => (
         <button
@@ -301,7 +301,7 @@ function FlatHeaderRow({ sortField, sortDir, onSort }: { sortField: SortField; s
             textTransform: "uppercase",
             fontSize: "9px",
             letterSpacing: "0.05em",
-            color: field && sortField === field ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.25)",
+            color: field && sortField === field ? "hsl(var(--foreground) / 0.85)" : "hsl(var(--muted-foreground) / 0.55)",
             background: "none",
             border: "none",
             padding: 0,
@@ -323,7 +323,7 @@ function FlatHeaderRow({ sortField, sortDir, onSort }: { sortField: SortField; s
 
 function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFlat; onClick?: () => void; onEdit?: () => void; onDelete?: () => void }) {
   const status = tarefa.status || "a-fazer";
-  const dotColor = statusDotColors[status] || "rgba(255,255,255,0.2)";
+  const dotColor = statusDotColors[status] || "hsl(var(--muted-foreground) / 0.45)";
   const prioridade = tarefa.prioridade || "media";
   const prioColor = priorityColors[prioridade] || priorityColors.media;
   const prog = tarefa.progresso ?? 0;
@@ -332,8 +332,8 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
     <div
       className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer"
       onClick={onClick}
-      style={{ gridTemplateColumns: FLAT_GRID, borderBottom: "1px solid rgba(255,255,255,0.03)" }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#141814")}
+      style={{ gridTemplateColumns: FLAT_GRID, borderBottom: "1px solid hsl(var(--border) / 0.5)" }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(var(--muted))")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       {/* Código */}
@@ -345,7 +345,7 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
       </div>
 
       {/* Título */}
-      <span className="text-sm truncate" style={{ color: "rgba(255,255,255,0.85)" }}>
+      <span className="text-sm truncate" style={{ color: "hsl(var(--foreground))" }}>
         {tarefa.titulo}
       </span>
 
@@ -366,14 +366,14 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
           {tarefa.responsavelInitials}
         </div>
         {tarefa.responsavel && tarefa.responsavel !== "Não atribuído" && (
-          <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+          <span className="text-xs truncate" style={{ color: "hsl(var(--muted-foreground))" }}>
             {tarefa.responsavel}
           </span>
         )}
       </div>
 
       {/* Status */}
-      <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
+      <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
         {statusLabels[status] || status}
       </span>
 
@@ -384,7 +384,7 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
 
       {/* Progresso */}
       <div className="flex items-center gap-1">
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)" }}>
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: "hsl(var(--border))" }}>
           <div style={{ width: `${Math.min(prog, 100)}%`, height: "100%", borderRadius: 2, background: tarefa.projetoCor }} />
         </div>
         <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
@@ -425,7 +425,7 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
 
 function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: TarefaItem; projetoCor: string; onClick?: () => void; onEdit?: () => void; onDelete?: () => void }) {
   const status = tarefa.status || "a-fazer";
-  const dotColor = statusDotColors[status] || "rgba(255,255,255,0.2)";
+  const dotColor = statusDotColors[status] || "hsl(var(--muted-foreground) / 0.45)";
   const prioridade = tarefa.prioridade || "media";
   const prioColor = priorityColors[prioridade] || priorityColors.media;
   const prog = tarefa.progresso ?? 0;
@@ -440,9 +440,9 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
       onClick={onClick}
       style={{
         gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-        borderBottom: "1px solid rgba(255,255,255,0.03)",
+        borderBottom: "1px solid hsl(var(--border) / 0.5)",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#141814")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(var(--muted))")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       {/* Código */}
@@ -460,7 +460,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
       </div>
 
       {/* Título */}
-      <span className="text-sm truncate" style={{ color: "rgba(255,255,255,0.85)" }}>
+      <span className="text-sm truncate" style={{ color: "hsl(var(--foreground))" }}>
         {tarefa.titulo}
       </span>
 
@@ -469,7 +469,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
         <span className="text-xs truncate" style={{ color: projetoCor, opacity: 0.7 }}>
           {tarefa.sprint || "—"}
         </span>
-        <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+        <span style={{ color: "hsl(var(--border))" }}>·</span>
         <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-slate-500/10 text-slate-400">
           atividade
         </Badge>
@@ -484,14 +484,14 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
           {tarefa.responsavelInitials}
         </div>
         {tarefa.responsavel && tarefa.responsavel !== "Não atribuído" && (
-          <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+          <span className="text-xs truncate" style={{ color: "hsl(var(--muted-foreground))" }}>
             {tarefa.responsavel}
           </span>
         )}
       </div>
 
       {/* Status */}
-      <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
+      <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
         {statusLabels[status] || status}
       </span>
 
@@ -502,7 +502,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
 
       {/* Progresso */}
       <div className="flex items-center gap-1">
-        <div style={{ width: 56, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)" }}>
+        <div style={{ width: 56, height: 4, borderRadius: 2, background: "hsl(var(--border))" }}>
           <div
             style={{
               width: `${Math.min(prog, 100)}%`,
@@ -636,14 +636,14 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                   textTransform: "uppercase",
                   fontSize: "10px",
                   letterSpacing: "0.05em",
-                  color: "rgba(255,255,255,0.85)",
+                  color: "hsl(var(--foreground))",
                 }}
               >
                 {col.label}
               </span>
               <span
                 className="text-xs px-1.5 py-0.5 rounded-full"
-                style={{ background: "rgba(255,255,255,0.06)", color: "#00c853", fontSize: "10px" }}
+                style={{ background: "hsl(var(--muted))", color: "#00c853", fontSize: "10px" }}
               >
                 {columnTarefas.length}
               </span>
@@ -661,8 +661,8 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                   onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }}
                   className="p-3 rounded cursor-grab active:cursor-grabbing"
                   style={{
-                    background: draggingId === t.id ? "rgba(0,200,83,0.1)" : "rgba(255,255,255,0.03)",
-                    border: draggingId === t.id ? "1px solid rgba(0,200,83,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                    background: draggingId === t.id ? "rgba(0,200,83,0.1)" : "hsl(var(--muted) / 0.5)",
+                    border: draggingId === t.id ? "1px solid rgba(0,200,83,0.3)" : "1px solid hsl(var(--border))",
                     opacity: draggingId === t.id ? 0.6 : 1,
                   }}
                 >
@@ -678,7 +678,7 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                       {t.codigo}
                     </span>
                   </div>
-                  <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.8)" }}>
+                  <p className="text-xs mb-2" style={{ color: "hsl(var(--foreground))" }}>
                     {t.titulo}
                   </p>
                   <div className="flex items-center justify-between">
@@ -708,9 +708,9 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                 <div
                   className="p-4 rounded text-center text-xs italic"
                   style={{
-                    background: isOver ? "rgba(0,200,83,0.05)" : "rgba(255,255,255,0.01)",
-                    border: "1px dashed rgba(255,255,255,0.06)",
-                    color: "rgba(255,255,255,0.2)",
+                    background: isOver ? "rgba(0,200,83,0.05)" : "hsl(var(--muted) / 0.3)",
+                    border: "1px dashed hsl(var(--border))",
+                    color: "hsl(var(--muted-foreground) / 0.45)",
                   }}
                 >
                   {isOver ? "Soltar aqui" : "Vazio"}
@@ -1200,8 +1200,8 @@ export function ProjetosView() {
           className="h-8 px-3 text-xs rounded-md border transition-colors flex-shrink-0"
           style={{
             background: emTratativa ? "rgba(0,200,83,0.12)" : "transparent",
-            borderColor: emTratativa ? "#00c853" : "rgba(255,255,255,0.12)",
-            color: emTratativa ? "#00c853" : "rgba(255,255,255,0.5)",
+            borderColor: emTratativa ? "#00c853" : "hsl(var(--border))",
+            color: emTratativa ? "#00c853" : "hsl(var(--muted-foreground))",
             fontWeight: emTratativa ? 600 : 400,
           }}
         >
@@ -1263,7 +1263,7 @@ export function ProjetosView() {
         />
 
         {/* View mode toggle */}
-        <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+        <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "hsl(var(--border))" }}>
           {(Object.keys(viewIcons) as ViewMode[]).map((mode) => (
             <button
               key={mode}
@@ -1271,7 +1271,7 @@ export function ProjetosView() {
               className="p-1.5 transition-colors"
               style={{
                 background: viewMode === mode ? "rgba(0,200,83,0.15)" : "transparent",
-                color: viewMode === mode ? "#00c853" : "rgba(255,255,255,0.3)",
+                color: viewMode === mode ? "#00c853" : "hsl(var(--muted-foreground) / 0.6)",
               }}
               title={mode.charAt(0).toUpperCase() + mode.slice(1)}
             >
@@ -1379,7 +1379,7 @@ export function ProjetosView() {
         <ProjectsKanbanView projetos={filteredProjetos} onStatusChange={refreshData} />
       )}
       {!emTratativa && viewMode !== "lista" && viewMode !== "kanban" && (
-        <div style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "14px" }}>
+        <div style={{ padding: "40px", textAlign: "center", color: "hsl(var(--muted-foreground) / 0.6)", fontSize: "14px" }}>
           Visualização {viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} em desenvolvimento
         </div>
       )}
