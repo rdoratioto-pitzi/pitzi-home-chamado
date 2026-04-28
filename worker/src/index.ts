@@ -58,6 +58,12 @@ type Bindings = {
   CLAUDE_USAGE_SECRET: string;
   GITHUB_TOKEN: string;
   GITHUB_WEBHOOK_SECRET: string;
+  // Slack (Fase 1 — outbound only). Todos opcionais — service desabilita
+  // silenciosamente se SLACK_BOT_TOKEN ausente ou SLACK_INTEGRATION_ENABLED=false.
+  SLACK_BOT_TOKEN?: string;
+  SLACK_SIGNING_SECRET?: string; // Reservado para Fase 2 (eventos inbound)
+  SLACK_CHANNEL_DEVS?: string;
+  SLACK_INTEGRATION_ENABLED?: string;
   // SendPulse (Phase 2A — replaces nodemailer)
   SENDPULSE_CLIENT_ID: string;
   SENDPULSE_CLIENT_SECRET: string;
