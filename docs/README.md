@@ -38,6 +38,7 @@ docs/
 | [01-arquitetura.md](arquitetura/01-arquitetura.md) | Stack técnico e estrutura de pastas |
 | [02-modulos.md](arquitetura/02-modulos.md) | Overview de todos os módulos do sistema |
 | [04-apis-integracao.md](arquitetura/04-apis-integracao.md) | Integrações externas (Omie, Correios, OpenRouter...) |
+| [integrations/SLACK-SETUP.md](integrations/SLACK-SETUP.md) | Slack — canal #devs-renov (Workspace + bot Pitzi) |
 
 ---
 
