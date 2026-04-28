@@ -16,5 +16,11 @@
       "drizzle-orm/*": ["../node_modules/drizzle-orm/*"]
     }
   },
-  "include": ["src/**/*.ts", "../shared/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "../shared/**/*.ts",
+    "../server/services/slack.service.ts",
+    "../server/services/slack-templates.service.ts",
+    "../server/services/slack-notifier.service.ts"
+  ]
 }
