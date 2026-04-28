@@ -163,7 +163,6 @@ const apisSubItems = [
   { title: "Relatório Pedidos", url: "/apis/relatorio-pedidos", icon: FileText },
   { title: "Avaliações IA", url: "/apis/avaliacoes-ia", icon: Bot },
   { title: "Estoque", url: "/apis/estoque", icon: Package },
-  { title: "Git Analytics", url: "/git-analytics", icon: GitBranch },
 ];
 
 const pricingSubItems = [
@@ -342,6 +341,9 @@ export function AppSidebar() {
   const hasAvaliacoesAccess = permissions.avaliacoes === true;
   const hasApoioVendasAccess = permissions.apoio_vendas === true;
   const hasOperacoesAccess = hasEstoquesAccess || hasLogisticaAccess || hasTriagemAccess || hasAvaliacoesAccess;
+  const hasNegociosVisible = hasPricingAccess || hasComercialAccess || hasApoioVendasAccess;
+  const hasGestaoVisible = hasOkrsAccess || hasMetasAccess;
+  const hasAnalyticsVisible = hasApisAccess;
 
   const handleLogout = async () => {
     await logout();
@@ -440,83 +442,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               </Collapsible>
 
-              {hasMetasAccess && (
-                <Collapsible open={metasOpen} onOpenChange={setMetasOpen}>
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        className="h-9 px-3"
-                        isActive={isMetasActive}
-                        data-testid="link-metas"
-                      >
-                        <BarChart3 className="h-[20px] w-[20px]" />
-                        <span className="text-[12px]">Metas</span>
-                        {metasOpen ? (
-                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
-                        ) : (
-                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
-                        )}
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
-                        {metasSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url || location.startsWith(subItem.url + "/");
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-metas-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-
-              {hasOkrsAccess && (
-                <Collapsible open={okrsOpen} onOpenChange={setOkrsOpen}>
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        className="h-9 px-3"
-                        isActive={isOkrsActive}
-                        data-testid="link-okrs"
-                      >
-                        <Target className="h-[20px] w-[20px]" />
-                        <span className="text-[12px]">OKRs</span>
-                        {okrsOpen ? (
-                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
-                        ) : (
-                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
-                        )}
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
-                        {okrsSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-okrs-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -751,127 +676,267 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* ── Grupo 3: Demais módulos ── */}
+        {/* ── Grupo 3: Negócios ── */}
+        {hasNegociosVisible && (
+          <SidebarGroup>
+            <SidebarGroupLabel
+              className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-3 mt-1"
+              data-testid="label-negocios"
+            >
+              Negócios
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0.5">
+
+                {hasPricingAccess && (
+                  <Collapsible open={pricingOpen} onOpenChange={setPricingOpen}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="h-9 px-3"
+                          isActive={isPricingActive}
+                          data-testid="link-pricing"
+                        >
+                          <DollarSign className="h-[20px] w-[20px]" />
+                          <span className="text-[12px]">Pricing</span>
+                          {pricingOpen ? (
+                            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                          {pricingSubItems.map((subItem) => {
+                            const isSubActive = location === subItem.url;
+                            return (
+                              <SidebarMenuSubItem key={subItem.url}>
+                                <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                  <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
+                                    <subItem.icon className="h-4 w-4 mr-2" />
+                                    <span className="text-[12px]">{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+                {hasComercialAccess && (
+                  <Collapsible open={comercialOpen} onOpenChange={setComercialOpen}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="h-9 px-3"
+                          isActive={isComercialActive}
+                          data-testid="link-comercial"
+                        >
+                          <TrendingUp className="h-[20px] w-[20px]" />
+                          <span className="text-[12px]">Comercial</span>
+                          {comercialOpen ? (
+                            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                          {comercialSubItems.map((subItem) => {
+                            const isSubActive = location === subItem.url;
+                            return (
+                              <SidebarMenuSubItem key={subItem.url}>
+                                <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                  <Link href={subItem.url} data-testid={`link-comercial-${subItem.url.split("/").pop()}`}>
+                                    <subItem.icon className="h-4 w-4 mr-2" />
+                                    <span className="text-[12px]">{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+                {hasApoioVendasAccess && (
+                  <Collapsible open={apoioVendasOpen} onOpenChange={setApoioVendasOpen}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="h-9 px-3"
+                          isActive={isApoioVendasActive}
+                          data-testid="link-apoio-vendas"
+                        >
+                          <TrendingUp className="h-[20px] w-[20px]" />
+                          <span className="text-[12px]">Apoio a Vendas</span>
+                          {apoioVendasOpen ? (
+                            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                          {apoioVendasSubItems.map((subItem) => {
+                            const isSubActive = location === subItem.url;
+                            return (
+                              <SidebarMenuSubItem key={subItem.url}>
+                                <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                  <Link href={subItem.url} data-testid={`link-apoio-vendas-${subItem.url.split("/").pop()}`}>
+                                    <subItem.icon className="h-4 w-4 mr-2" />
+                                    <span className="text-[12px]">{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* ── Grupo 4: Gestão ── */}
+        {hasGestaoVisible && (
+          <SidebarGroup>
+            <SidebarGroupLabel
+              className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-3 mt-1"
+              data-testid="label-gestao"
+            >
+              Gestão
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0.5">
+
+                {hasOkrsAccess && (
+                  <Collapsible open={okrsOpen} onOpenChange={setOkrsOpen}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="h-9 px-3"
+                          isActive={isOkrsActive}
+                          data-testid="link-okrs"
+                        >
+                          <Target className="h-[20px] w-[20px]" />
+                          <span className="text-[12px]">OKRs</span>
+                          {okrsOpen ? (
+                            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                          {okrsSubItems.map((subItem) => {
+                            const isSubActive = location === subItem.url;
+                            return (
+                              <SidebarMenuSubItem key={subItem.url}>
+                                <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                  <Link href={subItem.url} data-testid={`link-okrs-${subItem.url.split("/").pop()}`}>
+                                    <subItem.icon className="h-4 w-4 mr-2" />
+                                    <span className="text-[12px]">{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+                {hasMetasAccess && (
+                  <Collapsible open={metasOpen} onOpenChange={setMetasOpen}>
+                    <SidebarMenuItem>
+                      <CollapsibleTrigger asChild>
+                        <SidebarMenuButton
+                          className="h-9 px-3"
+                          isActive={isMetasActive}
+                          data-testid="link-metas"
+                        >
+                          <BarChart3 className="h-[20px] w-[20px]" />
+                          <span className="text-[12px]">Metas</span>
+                          {metasOpen ? (
+                            <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
+                          ) : (
+                            <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
+                          )}
+                        </SidebarMenuButton>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
+                          {metasSubItems.map((subItem) => {
+                            const isSubActive = location === subItem.url || location.startsWith(subItem.url + "/");
+                            return (
+                              <SidebarMenuSubItem key={subItem.url}>
+                                <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
+                                  <Link href={subItem.url} data-testid={`link-metas-${subItem.url.split("/").pop()}`}>
+                                    <subItem.icon className="h-4 w-4 mr-2" />
+                                    <span className="text-[12px]">{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              </SidebarMenuSubItem>
+                            );
+                          })}
+                        </SidebarMenuSub>
+                      </CollapsibleContent>
+                    </SidebarMenuItem>
+                  </Collapsible>
+                )}
+
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* ── Grupo 5: Analytics ── */}
+        {hasAnalyticsVisible && (
+          <SidebarGroup>
+            <SidebarGroupLabel
+              className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-3 mt-1"
+              data-testid="label-analytics"
+            >
+              Analytics
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-0.5">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === "/git-analytics" || location.startsWith("/git-analytics/")}
+                    className="h-9 px-3"
+                  >
+                    <Link href="/git-analytics" data-testid="link-git-analytics">
+                      <GitBranch className="h-[20px] w-[20px]" />
+                      <span className="text-[12px]">Git Analytics</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {/* ── Grupo 6: Rodapé (sem label) ── */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="gap-0.5">
-
-              {hasPricingAccess && (
-                <Collapsible open={pricingOpen} onOpenChange={setPricingOpen}>
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        className="h-9 px-3"
-                        isActive={isPricingActive}
-                        data-testid="link-pricing"
-                      >
-                        <DollarSign className="h-[20px] w-[20px]" />
-                        <span className="text-[12px]">Pricing</span>
-                        {pricingOpen ? (
-                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
-                        ) : (
-                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
-                        )}
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
-                        {pricingSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-pricing-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-
-              {hasComercialAccess && (
-                <Collapsible open={comercialOpen} onOpenChange={setComercialOpen}>
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        className="h-9 px-3"
-                        isActive={isComercialActive}
-                        data-testid="link-comercial"
-                      >
-                        <TrendingUp className="h-[20px] w-[20px]" />
-                        <span className="text-[12px]">Comercial</span>
-                        {comercialOpen ? (
-                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
-                        ) : (
-                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
-                        )}
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
-                        {comercialSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-comercial-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-
-              {hasApoioVendasAccess && (
-                <Collapsible open={apoioVendasOpen} onOpenChange={setApoioVendasOpen}>
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton
-                        className="h-9 px-3"
-                        isActive={isApoioVendasActive}
-                        data-testid="link-apoio-vendas"
-                      >
-                        <TrendingUp className="h-[20px] w-[20px]" />
-                        <span className="text-[12px]">Apoio a Vendas</span>
-                        {apoioVendasOpen ? (
-                          <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
-                        ) : (
-                          <ChevronRight className="ml-auto h-4 w-4 opacity-50" />
-                        )}
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub className="ml-2 mt-1 border-l pl-1.5 gap-0.5">
-                        {apoioVendasSubItems.map((subItem) => {
-                          const isSubActive = location === subItem.url;
-                          return (
-                            <SidebarMenuSubItem key={subItem.url}>
-                              <SidebarMenuSubButton asChild isActive={isSubActive} className="h-8 px-2 rounded-md">
-                                <Link href={subItem.url} data-testid={`link-apoio-vendas-${subItem.url.split("/").pop()}`}>
-                                  <subItem.icon className="h-4 w-4 mr-2" />
-                                  <span className="text-[12px]">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
-                            </SidebarMenuSubItem>
-                          );
-                        })}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
 
               {hasBibliotecaAccess && (
                 <Collapsible open={bibliotecaOpen} onOpenChange={setBibliotecaOpen}>
