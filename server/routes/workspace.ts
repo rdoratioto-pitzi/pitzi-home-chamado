@@ -5,6 +5,37 @@ import { requireAuth, getSessionUser } from "../middleware/auth";
 import { projects, kanbanCards, kanbanColumns, kanbanComments, users, workspaceComentarios } from "@shared/schema";
 import type { Ticket, User, SlaRule, InsertTicket } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
+import {
+  notifyChamadoCriado,
+  notifyChamadoAtribuido,
+  notifyChamadoFechado,
+  notifyProjetoCriado,
+  notifyAtividadeCriada,
+  notifyAtividadeMovida,
+  notifyAtividadeConcluida,
+  type SlackDb,
+} from "../services/slack-notifier.service";
+
+/**
+ * Slack notifier env (Express runtime). Apenas as variáveis necessárias —
+ * o service ignora chaves ausentes e respeita SLACK_INTEGRATION_ENABLED.
+ */
+function slackEnv() {
+  return {
+    SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,
+    SLACK_INTEGRATION_ENABLED: process.env.SLACK_INTEGRATION_ENABLED,
+    SLACK_CHANNEL_DEVS: process.env.SLACK_CHANNEL_DEVS,
+  };
+}
+
+/** Fire-and-forget no Express: setImmediate evita bloquear a resposta HTTP. */
+function fireSlack(fn: () => Promise<void>): void {
+  setImmediate(() => {
+    fn().catch((err) => console.error("[slack-notifier] dispatch falhou:", err));
+  });
+}
+
+const STATUS_FECHADO = new Set(["resolved", "closed"]);
 
 const kanbanStatusToPtBr: Record<string, string> = {
   todo: "a-fazer",
@@ -233,6 +264,11 @@ export function registerWorkspaceRoutes(router: Router) {
         attachments: attachments || null,
       } as InsertTicket);
 
+      // Slack: notifica criação no canal #devs-renov (fire-and-forget).
+      if (db) {
+        fireSlack(() => notifyChamadoCriado({ db: db as SlackDb, env: slackEnv() }, ticket.id));
+      }
+
       const [allUsers, slaRules] = await Promise.all([
         storage.getUsers(),
         storage.getSlaRules(),
@@ -337,6 +373,9 @@ export function registerWorkspaceRoutes(router: Router) {
         })
         .returning();
 
+      // Slack: reply na thread do projeto pai (se mapeado).
+      fireSlack(() => notifyAtividadeCriada({ db: db as SlackDb, env: slackEnv() }, card.id));
+
       const allUsers = await storage.getUsers();
       const userMap = new Map(allUsers.map((u) => [u.id, u]));
       const responsavel = card.assigneeId ? userMap.get(card.assigneeId) : null;
@@ -415,6 +454,9 @@ export function registerWorkspaceRoutes(router: Router) {
           progress: 0,
         })
         .returning();
+
+      // Slack: notifica criação no canal (skipa se visibility=private).
+      fireSlack(() => notifyProjetoCriado({ db: db as SlackDb, env: slackEnv() }, projeto.id));
 
       const allUsers = await storage.getUsers();
       const userMap = new Map(allUsers.map((u) => [u.id, u]));
@@ -731,6 +773,7 @@ export function registerWorkspaceRoutes(router: Router) {
   router.patch("/api/workspace/chamados/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
+      const { userId: actorId } = getSessionUser(req);
       const { status, prioridade, responsavelId, titulo, descricao } = req.body as {
         status?: string;
         prioridade?: string;
@@ -752,6 +795,9 @@ export function registerWorkspaceRoutes(router: Router) {
         critical: "critica",
       };
 
+      // Captura estado anterior para detectar transições (atribuição, fechamento).
+      const previous = await storage.getTicket(String(id));
+
       const updateData: Partial<Ticket> = {};
       if (status !== undefined) updateData.status = status;
       if (prioridade !== undefined) updateData.priority = prioridadeMap[prioridade] || prioridade;
@@ -765,6 +811,24 @@ export function registerWorkspaceRoutes(router: Router) {
 
       const ticket = await storage.updateTicket(String(id), updateData);
       if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+
+      // Slack: dispara hooks por transição (apenas o que mudou).
+      if (db) {
+        const oldAssignee = previous?.assigneeId || null;
+        const newAssignee = ticket.assigneeId || null;
+        if (newAssignee && newAssignee !== oldAssignee) {
+          fireSlack(() =>
+            notifyChamadoAtribuido({ db: db as SlackDb, env: slackEnv() }, ticket.id, newAssignee),
+          );
+        }
+        const wasOpen = previous && !STATUS_FECHADO.has(previous.status);
+        const isClosed = STATUS_FECHADO.has(ticket.status);
+        if (wasOpen && isClosed) {
+          fireSlack(() =>
+            notifyChamadoFechado({ db: db as SlackDb, env: slackEnv() }, ticket.id, actorId),
+          );
+        }
+      }
 
       const [allUsers, slaRules] = await Promise.all([
         storage.getUsers(),
@@ -877,6 +941,13 @@ export function registerWorkspaceRoutes(router: Router) {
         bloqueado: "blocked",
       };
 
+      // Captura estado anterior para detectar mudança de status.
+      const [prevCard] = await db
+        .select()
+        .from(kanbanCards)
+        .where(eq(kanbanCards.id, String(id)))
+        .limit(1);
+
       const updateData: Record<string, any> = {};
       if (status !== undefined) updateData.status = ptBrToKanban[status] || status;
       if (prioridade !== undefined) updateData.priority = prioridade;
@@ -897,6 +968,19 @@ export function registerWorkspaceRoutes(router: Router) {
         .returning();
 
       if (!card) return res.status(404).json({ error: "Tarefa não encontrada" });
+
+      // Slack: hook de transição de status na atividade.
+      if (prevCard && prevCard.status !== card.status) {
+        if (card.status === "done") {
+          fireSlack(() =>
+            notifyAtividadeConcluida({ db: db as SlackDb, env: slackEnv() }, card.id),
+          );
+        } else {
+          fireSlack(() =>
+            notifyAtividadeMovida({ db: db as SlackDb, env: slackEnv() }, card.id, card.status),
+          );
+        }
+      }
 
       const allUsers = await storage.getUsers();
       const userMap = new Map(allUsers.map((u) => [u.id, u]));

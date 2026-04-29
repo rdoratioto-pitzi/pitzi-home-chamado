@@ -66,6 +66,8 @@ const GRADE_BADGE_COLORS: Record<Grade, string> = {
   C: "bg-[#A32D2D] text-white",
 };
 
+const CURADORIA_MIN_START_DATE = "2026-04-23";
+
 // ─── Loading skeleton ─────────────────────────────────────────────────────────
 
 function CuradoriaLoadingSkeleton() {
@@ -182,9 +184,8 @@ function CuradoriaFilters({
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const todayStr = new Date().toISOString().slice(0, 10);
-  const yesterdayStr = yesterday.toISOString().slice(0, 10);
 
-  const [startDate, setStartDate] = useState(filtros.startDate || "2026-03-20");
+  const [startDate, setStartDate] = useState(filtros.startDate || CURADORIA_MIN_START_DATE);
   const [endDate, setEndDate] = useState(filtros.endDate || todayStr);
   const [categoria, setCategoria] = useState(filtros.categoria || "todas");
   const [imei, setImei] = useState(filtros.imei || "");
@@ -209,7 +210,7 @@ function CuradoriaFilters({
             <Input
               type="date"
               value={startDate}
-              min="2026-03-27"
+              min={CURADORIA_MIN_START_DATE}
               onChange={(e) => setStartDate(e.target.value)}
               className="w-[150px] h-9 text-sm"
             />
@@ -219,7 +220,7 @@ function CuradoriaFilters({
             <Input
               type="date"
               value={endDate}
-              min="2026-03-27"
+              min={CURADORIA_MIN_START_DATE}
               onChange={(e) => setEndDate(e.target.value)}
               className="w-[150px] h-9 text-sm"
             />
@@ -365,7 +366,7 @@ export default function AvaliacoesCuradoriaPage() {
   const { toast } = useToast();
 
   // Filters
-  const [filtros, setFiltros] = useState<CuradoriaFiltros>({});
+  const [filtros, setFiltros] = useState<CuradoriaFiltros>({ startDate: CURADORIA_MIN_START_DATE });
   const {
     data: pendentesData,
     isLoading,

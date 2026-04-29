@@ -7,10 +7,32 @@ import {
   projects,
   kanbanCards,
   kanbanColumns,
+  kanbanComments,
   users,
   workspaceComentarios,
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
+import {
+  notifyChamadoCriado,
+  notifyChamadoAtribuido,
+  notifyChamadoFechado,
+  notifyProjetoCriado,
+  notifyAtividadeCriada,
+  notifyAtividadeMovida,
+  notifyAtividadeConcluida,
+  type SlackDb,
+} from "../../../server/services/slack-notifier.service";
+
+/** Extrai env Slack do binding do Worker. */
+function slackEnv(envBindings: { SLACK_BOT_TOKEN?: string; SLACK_INTEGRATION_ENABLED?: string; SLACK_CHANNEL_DEVS?: string }) {
+  return {
+    SLACK_BOT_TOKEN: envBindings.SLACK_BOT_TOKEN,
+    SLACK_INTEGRATION_ENABLED: envBindings.SLACK_INTEGRATION_ENABLED,
+    SLACK_CHANNEL_DEVS: envBindings.SLACK_CHANNEL_DEVS,
+  };
+}
+
+const STATUS_FECHADO = new Set(["resolved", "closed"]);
 
 interface Anexo { name: string; url: string }
 
@@ -56,6 +78,24 @@ const kanbanStatusToPtBr: Record<string, string> = {
   doing: "em-andamento",
   done: "concluido",
 };
+
+/**
+ * Fire-and-forget para notificações Slack no Worker.
+ * Usa executionCtx.waitUntil para garantir que a Promise execute mesmo após
+ * a resposta HTTP ser enviada — sem bloquear o cliente.
+ */
+function fireSlack(
+  c: { executionCtx?: { waitUntil: (p: Promise<unknown>) => void } },
+  fn: () => Promise<void>,
+): void {
+  const promise = fn().catch((err) =>
+    console.error("[slack-notifier] dispatch falhou:", err),
+  );
+  if (c.executionCtx?.waitUntil) {
+    c.executionCtx.waitUntil(promise);
+  }
+  // Fora do Worker (ex: testes), a Promise apenas roda no event loop.
+}
 
 const workspace = new Hono<AppEnv>();
 
@@ -226,7 +266,8 @@ workspace.post("/api/workspace/chamados", async (c) => {
     const prioridadeMap: Record<string, string> = { baixa: "low", media: "medium", alta: "high", critica: "critical" };
     const mappedPriority = prioridade ? (prioridadeMap[prioridade] || prioridade) : "medium";
 
-    const storage = getStorage(c.get("db"));
+    const db = c.get("db");
+    const storage = getStorage(db);
     const ticket = await storage.createTicket({
       title: titulo.trim(),
       description: descricao || "",
@@ -239,6 +280,11 @@ workspace.post("/api/workspace/chamados", async (c) => {
       requesterId: userId,
       tenantId: null,
     } as any);
+
+    // Slack: notifica criação no canal #devs-renov (fire-and-forget via waitUntil).
+    fireSlack(c, () =>
+      notifyChamadoCriado({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id),
+    );
 
     const [allUsers, slaRules] = await Promise.all([
       storage.getUsers(),
@@ -344,6 +390,11 @@ workspace.post("/api/workspace/tarefas", async (c) => {
       })
       .returning();
 
+    // Slack: reply na thread do projeto pai (se mapeado).
+    fireSlack(c, () =>
+      notifyAtividadeCriada({ db: db as SlackDb, env: slackEnv(c.env) }, card.id),
+    );
+
     const storage = getStorage(db);
     const allUsers = await storage.getUsers();
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
@@ -433,6 +484,11 @@ workspace.post("/api/workspace/projetos", async (c) => {
         progress: 0,
       })
       .returning();
+
+    // Slack: notifica criação no canal (skipa se visibility=private).
+    fireSlack(c, () =>
+      notifyProjetoCriado({ db: db as SlackDb, env: slackEnv(c.env) }, projeto.id),
+    );
 
     const storage = getStorage(db);
     const allUsers = await storage.getUsers();
@@ -692,6 +748,7 @@ workspace.get("/api/workspace/projetos", async (c) => {
 workspace.patch("/api/workspace/chamados/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
+    const { userId: actorId } = c.get("user");
     const { status, prioridade, responsavelId, titulo, descricao } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
@@ -702,6 +759,9 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
     const priorityRevMap: Record<string, string> = {
       low: "baixa", medium: "media", high: "alta", critical: "critica",
     };
+
+    // Captura estado anterior para detectar transições (atribuição, fechamento).
+    const previous = await storage.getTicket(String(id));
 
     const updateData: Partial<Ticket> = {};
     if (status !== undefined) updateData.status = status;
@@ -716,6 +776,22 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
 
     const ticket = await storage.updateTicket(String(id), updateData);
     if (!ticket) return c.json({ error: "Chamado não encontrado" }, 404);
+
+    // Slack: dispara hooks por transição (apenas o que mudou).
+    const oldAssignee = previous?.assigneeId || null;
+    const newAssignee = ticket.assigneeId || null;
+    if (newAssignee && newAssignee !== oldAssignee) {
+      fireSlack(c, () =>
+        notifyChamadoAtribuido({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id, newAssignee),
+      );
+    }
+    const wasOpen = previous && !STATUS_FECHADO.has(previous.status);
+    const isClosed = STATUS_FECHADO.has(ticket.status);
+    if (wasOpen && isClosed) {
+      fireSlack(c, () =>
+        notifyChamadoFechado({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id, actorId),
+      );
+    }
 
     const [allUsers, slaRules] = await Promise.all([
       storage.getUsers(),
@@ -753,7 +829,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
 workspace.patch("/api/workspace/tarefas/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
-    const { status, prioridade, responsavelId, dataEntrega, progresso } = await c.req.json();
+    const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
 
@@ -761,12 +837,21 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
       "a-fazer": "todo", "em-andamento": "doing", concluido: "done", bloqueado: "blocked",
     };
 
+    // Captura estado anterior para detectar mudança de status.
+    const [prevCard] = await db
+      .select()
+      .from(kanbanCards)
+      .where(eq(kanbanCards.id, String(id)))
+      .limit(1);
+
     const updateData: Record<string, any> = {};
     if (status !== undefined) updateData.status = ptBrToKanban[status] || status;
     if (prioridade !== undefined) updateData.priority = prioridade;
     if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
     if (dataEntrega !== undefined) updateData.dueDate = dataEntrega ? new Date(dataEntrega) : null;
     if (progresso !== undefined) updateData.progress = progresso;
+    if (titulo !== undefined) updateData.title = titulo.trim();
+    if (descricao !== undefined) updateData.objectives = descricao;
 
     if (Object.keys(updateData).length === 0) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
@@ -779,6 +864,19 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
       .returning();
 
     if (!card) return c.json({ error: "Tarefa não encontrada" }, 404);
+
+    // Slack: hook de transição de status na atividade.
+    if (prevCard && prevCard.status !== card.status) {
+      if (card.status === "done") {
+        fireSlack(c, () =>
+          notifyAtividadeConcluida({ db: db as SlackDb, env: slackEnv(c.env) }, card.id),
+        );
+      } else {
+        fireSlack(c, () =>
+          notifyAtividadeMovida({ db: db as SlackDb, env: slackEnv(c.env) }, card.id, card.status),
+        );
+      }
+    }
 
     const allUsers = await storage.getUsers();
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
@@ -851,6 +949,163 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
       status: updated.status,
       prioridade: updated.priority,
     });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── GET tarefa individual ────────────────────────────────────────────────────
+workspace.get("/api/workspace/tarefas/:id", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const db = c.get("db");
+    const storage = getStorage(db);
+
+    const [card] = await db
+      .select()
+      .from(kanbanCards)
+      .where(eq(kanbanCards.id, id))
+      .limit(1);
+
+    if (!card) return c.json({ error: "Tarefa não encontrada" }, 404);
+
+    const [projeto] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, card.projectId))
+      .limit(1);
+
+    const allUsers = await storage.getUsers();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const resp = card.assigneeId ? userMap.get(card.assigneeId) : null;
+    const respNome = resp?.name || "Não atribuído";
+    const respInitials = respNome.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("");
+
+    const kanbanStatusToPtBrLocal: Record<string, string> = {
+      todo: "a-fazer", doing: "em-andamento", done: "concluido", blocked: "bloqueado",
+    };
+
+    const rawAtt = card.attachments || [];
+    const anexos = rawAtt.map((url: string, i: number) => ({ name: `Anexo ${i + 1}`, url }));
+
+    return c.json({
+      id: card.id,
+      codigo: card.code,
+      titulo: card.title,
+      descricao: card.objectives || null,
+      status: kanbanStatusToPtBrLocal[card.status] || card.status,
+      prioridade: card.priority,
+      responsavelId: card.assigneeId,
+      responsavel: respNome,
+      responsavelInitials: respInitials,
+      dataEntrega: card.dueDate ? String(card.dueDate) : null,
+      dataInicio: card.startDate ? String(card.startDate) : null,
+      progresso: card.progress ?? 0,
+      criadoEm: card.createdAt ? String(card.createdAt) : null,
+      anexos,
+      projeto: projeto ? {
+        id: projeto.id,
+        codigo: projeto.code,
+        nome: projeto.name,
+        cor: projeto.color || "#00c853",
+      } : null,
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── DELETE tarefa ────────────────────────────────────────────────────────────
+workspace.delete("/api/workspace/tarefas/:id", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const db = c.get("db");
+
+    const [deleted] = await db
+      .delete(kanbanCards)
+      .where(eq(kanbanCards.id, id))
+      .returning({ id: kanbanCards.id });
+
+    if (!deleted) return c.json({ error: "Tarefa não encontrada" }, 404);
+
+    return c.json({ ok: true });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── GET comentarios de tarefa ────────────────────────────────────────────────
+workspace.get("/api/workspace/tarefas/:id/comentarios", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const db = c.get("db");
+    const storage = getStorage(db);
+
+    const comentarios = await db
+      .select()
+      .from(kanbanComments)
+      .where(eq(kanbanComments.cardId, id))
+      .orderBy(kanbanComments.createdAt);
+
+    const allUsers = await storage.getUsers();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+    const items = comentarios.map((row: any) => {
+      const autor = userMap.get(row.userId);
+      const autorNome = autor?.name || "Usuário";
+      const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("");
+      return {
+        id: row.id,
+        texto: row.content,
+        autorId: row.userId,
+        autorNome,
+        autorInitials,
+        criadoEm: row.createdAt ? String(row.createdAt) : null,
+      };
+    });
+
+    return c.json({ comentarios: items });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── POST comentario em tarefa ────────────────────────────────────────────────
+workspace.post("/api/workspace/tarefas/:id/comentarios", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const { userId } = c.get("user");
+    const db = c.get("db");
+    const storage = getStorage(db);
+    const { texto } = await c.req.json();
+
+    if (!texto?.trim()) {
+      return c.json({ error: "Texto obrigatório" }, 400);
+    }
+
+    const [comentario] = await db
+      .insert(kanbanComments)
+      .values({
+        cardId: id,
+        userId,
+        content: texto.trim(),
+      })
+      .returning();
+
+    const allUsers = await storage.getUsers();
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const autor = userMap.get(comentario.userId);
+    const autorNome = autor?.name || "Usuário";
+    const autorInitials = autorNome.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("");
+
+    return c.json({
+      id: comentario.id,
+      texto: comentario.content,
+      autorId: comentario.userId,
+      autorNome,
+      autorInitials,
+      criadoEm: comentario.createdAt ? String(comentario.createdAt) : null,
+    }, 201);
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
   }
