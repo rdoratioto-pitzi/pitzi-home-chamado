@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil, ChevronRight, MoreHorizontal, Edit, Trash2 } from "lucide-react";
+import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil, ChevronRight, MoreHorizontal, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { KpiStrip } from "@/components/workspace/KpiStrip";
 import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import type { UnifiedItem } from "@/components/workspace/WorkspaceTable";
@@ -82,6 +82,13 @@ interface WorkspaceProjetosResponse {
 
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
 
+type SortField = "codigo" | "titulo" | "projeto" | "responsavel" | "status" | "prioridade" | "progresso" | "dataFim";
+
+interface TarefaFlat extends TarefaItem {
+  projetoNome: string;
+  projetoCor: string;
+}
+
 const statusLabels: Record<string, string> = {
   "a-fazer": "A Fazer",
   "em-andamento": "Em Andamento",
@@ -97,7 +104,7 @@ const statusDotColors: Record<string, string> = {
   "concluido": "#4ade80",
   "a-fazer": "#f59e0b",
   bloqueado: "#ef4444",
-  backlog: "rgba(255,255,255,0.25)",
+  backlog: "hsl(var(--muted-foreground) / 0.4)",
 };
 
 const priorityLabels: Record<string, string> = {
@@ -134,14 +141,14 @@ function ProjectGroupHeader({
   return (
     <div
       className="flex items-center gap-2 px-4 py-2 group cursor-pointer select-none"
-      style={{ background: "rgba(255,255,255,0.02)" }}
+      style={{ background: "hsl(var(--muted) / 0.4)" }}
       onClick={onToggle}
     >
       <ChevronRight
         size={14}
         className="transition-transform duration-200 flex-shrink-0"
         style={{
-          color: "rgba(255,255,255,0.3)",
+          color: "hsl(var(--muted-foreground) / 0.6)",
           transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
         }}
       />
@@ -161,7 +168,7 @@ function ProjectGroupHeader({
           textTransform: "uppercase",
           fontSize: "10px",
           letterSpacing: "0.05em",
-          color: "rgba(255,255,255,0.5)",
+          color: "hsl(var(--muted-foreground))",
         }}
       >
         {projeto.nome}
@@ -181,7 +188,7 @@ function ProjectGroupHeader({
         style={{
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: "10px",
-          color: "rgba(255,255,255,0.2)",
+          color: "hsl(var(--muted-foreground) / 0.45)",
         }}
       >
         {projeto.codigo}
@@ -190,8 +197,8 @@ function ProjectGroupHeader({
         <span
           className="text-[10px] px-1.5 py-0.5 rounded-full"
           style={{
-            background: "rgba(255,255,255,0.06)",
-            color: "rgba(255,255,255,0.35)",
+            background: "hsl(var(--muted))",
+            color: "hsl(var(--muted-foreground) / 0.7)",
             fontFamily: "'JetBrains Mono', monospace",
           }}
         >
@@ -201,10 +208,10 @@ function ProjectGroupHeader({
       {onEdit && (
         <button
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/10"
+          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
           title="Editar projeto"
         >
-          <Pencil size={12} style={{ color: "rgba(255,255,255,0.5)" }} />
+          <Pencil size={12} style={{ color: "hsl(var(--muted-foreground))" }} />
         </button>
       )}
     </div>
@@ -229,7 +236,7 @@ function HeaderRow() {
       className="grid items-center px-4 py-2 gap-2"
       style={{
         gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid hsl(var(--border))",
       }}
     >
       {headers.map((h, i) => (
@@ -240,7 +247,7 @@ function HeaderRow() {
             textTransform: "uppercase",
             fontSize: "9px",
             letterSpacing: "0.05em",
-            color: "rgba(255,255,255,0.25)",
+            color: "hsl(var(--muted-foreground) / 0.55)",
           }}
         >
           {h}
@@ -254,18 +261,171 @@ function EmptyTarefasRow() {
   return (
     <div
       className="flex items-center px-4 py-3"
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
+      style={{ borderBottom: "1px solid hsl(var(--border) / 0.5)" }}
     >
-      <span className="text-xs italic" style={{ color: "rgba(255,255,255,0.2)", paddingLeft: 18 }}>
+      <span className="text-xs italic" style={{ color: "hsl(var(--muted-foreground) / 0.45)", paddingLeft: 18 }}>
         Nenhuma atividade neste projeto
       </span>
     </div>
   );
 }
 
+const FLAT_GRID = "96px 1fr 175px 100px 115px 110px 62px 88px 30px";
+
+const FLAT_HEADERS: { label: string; field: SortField | null }[] = [
+  { label: "Código", field: "codigo" },
+  { label: "Título", field: "titulo" },
+  { label: "Projeto", field: "projeto" },
+  { label: "Responsável", field: "responsavel" },
+  { label: "Status", field: "status" },
+  { label: "Prioridade", field: "prioridade" },
+  { label: "Progresso", field: "progresso" },
+  { label: "Data Fim", field: "dataFim" },
+  { label: "", field: null },
+];
+
+function FlatHeaderRow({ sortField, sortDir, onSort }: { sortField: SortField; sortDir: "asc" | "desc"; onSort: (f: SortField) => void }) {
+  return (
+    <div
+      className="grid items-center px-4 py-2 gap-2"
+      style={{ gridTemplateColumns: FLAT_GRID, borderBottom: "1px solid hsl(var(--border))" }}
+    >
+      {FLAT_HEADERS.map(({ label, field }, i) => (
+        <button
+          key={i}
+          disabled={!field}
+          onClick={() => field && onSort(field)}
+          className="flex items-center gap-1 text-left disabled:cursor-default"
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            textTransform: "uppercase",
+            fontSize: "9px",
+            letterSpacing: "0.05em",
+            color: field && sortField === field ? "hsl(var(--foreground) / 0.85)" : "hsl(var(--muted-foreground) / 0.55)",
+            background: "none",
+            border: "none",
+            padding: 0,
+          }}
+        >
+          {label}
+          {field && (
+            sortField === field
+              ? sortDir === "asc"
+                ? <ArrowUp className="h-2.5 w-2.5 flex-shrink-0" />
+                : <ArrowDown className="h-2.5 w-2.5 flex-shrink-0" />
+              : <ArrowUpDown className="h-2.5 w-2.5 flex-shrink-0 opacity-30" />
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFlat; onClick?: () => void; onEdit?: () => void; onDelete?: () => void }) {
+  const status = tarefa.status || "a-fazer";
+  const dotColor = statusDotColors[status] || "hsl(var(--muted-foreground) / 0.45)";
+  const prioridade = tarefa.prioridade || "media";
+  const prioColor = priorityColors[prioridade] || priorityColors.media;
+  const prog = tarefa.progresso ?? 0;
+
+  return (
+    <div
+      className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer"
+      onClick={onClick}
+      style={{ gridTemplateColumns: FLAT_GRID, borderBottom: "1px solid hsl(var(--border) / 0.5)" }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(var(--muted))")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      {/* Código */}
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="inline-block flex-shrink-0" style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor }} />
+        <span className="text-xs text-muted-foreground truncate" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {tarefa.codigo}
+        </span>
+      </div>
+
+      {/* Título */}
+      <span className="text-sm truncate" style={{ color: "hsl(var(--foreground))" }}>
+        {tarefa.titulo}
+      </span>
+
+      {/* Projeto */}
+      <div className="flex items-center gap-1.5 min-w-0 truncate">
+        <span className="inline-block flex-shrink-0" style={{ width: 7, height: 7, borderRadius: "50%", background: tarefa.projetoCor }} />
+        <span className="text-xs truncate" style={{ color: tarefa.projetoCor, opacity: 0.85 }}>
+          {tarefa.projetoNome}
+        </span>
+      </div>
+
+      {/* Responsável */}
+      <div className="flex items-center gap-1.5 min-w-0">
+        <div
+          className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
+          style={{ width: 22, height: 22, background: "rgba(0,200,83,0.15)", color: "#00c853" }}
+        >
+          {tarefa.responsavelInitials}
+        </div>
+        {tarefa.responsavel && tarefa.responsavel !== "Não atribuído" && (
+          <span className="text-xs truncate" style={{ color: "hsl(var(--muted-foreground))" }}>
+            {tarefa.responsavel}
+          </span>
+        )}
+      </div>
+
+      {/* Status */}
+      <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
+        {statusLabels[status] || status}
+      </span>
+
+      {/* Prioridade */}
+      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
+        {priorityLabels[prioridade] || prioridade}
+      </Badge>
+
+      {/* Progresso */}
+      <div className="flex items-center gap-1">
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: "hsl(var(--border))" }}>
+          <div style={{ width: `${Math.min(prog, 100)}%`, height: "100%", borderRadius: 2, background: tarefa.projetoCor }} />
+        </div>
+        <span className="text-[10px] text-muted-foreground" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+          {prog}%
+        </span>
+      </div>
+
+      {/* Data Fim */}
+      <span className="text-xs text-muted-foreground">
+        {tarefa.dataEntrega
+          ? new Date(tarefa.dataEntrega).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+          : "—"}
+      </span>
+
+      {/* Actions */}
+      <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="p-1 rounded hover:bg-white/5">
+              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(); }}>
+              <Edit className="h-3.5 w-3.5 mr-2" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem className="text-red-400" onClick={(e) => { e.stopPropagation(); onDelete?.(); }}>
+              <Trash2 className="h-3.5 w-3.5 mr-2" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
+
 function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: TarefaItem; projetoCor: string; onClick?: () => void; onEdit?: () => void; onDelete?: () => void }) {
   const status = tarefa.status || "a-fazer";
-  const dotColor = statusDotColors[status] || "rgba(255,255,255,0.2)";
+  const dotColor = statusDotColors[status] || "hsl(var(--muted-foreground) / 0.45)";
   const prioridade = tarefa.prioridade || "media";
   const prioColor = priorityColors[prioridade] || priorityColors.media;
   const prog = tarefa.progresso ?? 0;
@@ -280,9 +440,9 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
       onClick={onClick}
       style={{
         gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-        borderBottom: "1px solid rgba(255,255,255,0.03)",
+        borderBottom: "1px solid hsl(var(--border) / 0.5)",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#141814")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(var(--muted))")}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       {/* Código */}
@@ -300,7 +460,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
       </div>
 
       {/* Título */}
-      <span className="text-sm truncate" style={{ color: "rgba(255,255,255,0.85)" }}>
+      <span className="text-sm truncate" style={{ color: "hsl(var(--foreground))" }}>
         {tarefa.titulo}
       </span>
 
@@ -309,7 +469,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
         <span className="text-xs truncate" style={{ color: projetoCor, opacity: 0.7 }}>
           {tarefa.sprint || "—"}
         </span>
-        <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+        <span style={{ color: "hsl(var(--border))" }}>·</span>
         <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-slate-500/10 text-slate-400">
           atividade
         </Badge>
@@ -324,14 +484,14 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
           {tarefa.responsavelInitials}
         </div>
         {tarefa.responsavel && tarefa.responsavel !== "Não atribuído" && (
-          <span className="text-xs truncate" style={{ color: "rgba(255,255,255,0.55)" }}>
+          <span className="text-xs truncate" style={{ color: "hsl(var(--muted-foreground))" }}>
             {tarefa.responsavel}
           </span>
         )}
       </div>
 
       {/* Status */}
-      <span className="text-xs" style={{ color: "rgba(255,255,255,0.5)" }}>
+      <span className="text-xs" style={{ color: "hsl(var(--muted-foreground))" }}>
         {statusLabels[status] || status}
       </span>
 
@@ -342,7 +502,7 @@ function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: 
 
       {/* Progresso */}
       <div className="flex items-center gap-1">
-        <div style={{ width: 56, height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)" }}>
+        <div style={{ width: 56, height: 4, borderRadius: 2, background: "hsl(var(--border))" }}>
           <div
             style={{
               width: `${Math.min(prog, 100)}%`,
@@ -476,14 +636,14 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                   textTransform: "uppercase",
                   fontSize: "10px",
                   letterSpacing: "0.05em",
-                  color: "rgba(255,255,255,0.85)",
+                  color: "hsl(var(--foreground))",
                 }}
               >
                 {col.label}
               </span>
               <span
                 className="text-xs px-1.5 py-0.5 rounded-full"
-                style={{ background: "rgba(255,255,255,0.06)", color: "#00c853", fontSize: "10px" }}
+                style={{ background: "hsl(var(--muted))", color: "#00c853", fontSize: "10px" }}
               >
                 {columnTarefas.length}
               </span>
@@ -501,8 +661,8 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                   onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }}
                   className="p-3 rounded cursor-grab active:cursor-grabbing"
                   style={{
-                    background: draggingId === t.id ? "rgba(0,200,83,0.1)" : "rgba(255,255,255,0.03)",
-                    border: draggingId === t.id ? "1px solid rgba(0,200,83,0.3)" : "1px solid rgba(255,255,255,0.06)",
+                    background: draggingId === t.id ? "rgba(0,200,83,0.1)" : "hsl(var(--muted) / 0.5)",
+                    border: draggingId === t.id ? "1px solid rgba(0,200,83,0.3)" : "1px solid hsl(var(--border))",
                     opacity: draggingId === t.id ? 0.6 : 1,
                   }}
                 >
@@ -518,7 +678,7 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                       {t.codigo}
                     </span>
                   </div>
-                  <p className="text-xs mb-2" style={{ color: "rgba(255,255,255,0.8)" }}>
+                  <p className="text-xs mb-2" style={{ color: "hsl(var(--foreground))" }}>
                     {t.titulo}
                   </p>
                   <div className="flex items-center justify-between">
@@ -548,9 +708,9 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                 <div
                   className="p-4 rounded text-center text-xs italic"
                   style={{
-                    background: isOver ? "rgba(0,200,83,0.05)" : "rgba(255,255,255,0.01)",
-                    border: "1px dashed rgba(255,255,255,0.06)",
-                    color: "rgba(255,255,255,0.2)",
+                    background: isOver ? "rgba(0,200,83,0.05)" : "hsl(var(--muted) / 0.3)",
+                    border: "1px dashed hsl(var(--border))",
+                    color: "hsl(var(--muted-foreground) / 0.45)",
                   }}
                 >
                   {isOver ? "Soltar aqui" : "Vazio"}
@@ -797,6 +957,75 @@ export function ProjetosView() {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const [emTratativa, setEmTratativa] = useState(false);
+  const [sortField, setSortField] = useState<SortField>("projeto");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  };
+
+  const EM_TRATATIVA_STATUSES = ["a-fazer", "em-andamento", "bloqueado"];
+
+  const sortedFlatTarefas = useMemo<TarefaFlat[]>(() => {
+    if (!emTratativa) return [];
+    let list: TarefaFlat[] = projetos.flatMap((p) =>
+      p.tarefas
+        .filter((t) => EM_TRATATIVA_STATUSES.includes(t.status || ""))
+        .map((t) => ({ ...t, projetoNome: p.nome, projetoCor: p.cor || "#00c853" }))
+    );
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.titulo.toLowerCase().includes(q) ||
+          t.codigo.toLowerCase().includes(q) ||
+          t.responsavel.toLowerCase().includes(q) ||
+          t.projetoNome.toLowerCase().includes(q)
+      );
+    }
+    if (responsavelFilter !== "all") {
+      list = list.filter((t) => t.responsavel === responsavelFilter);
+    }
+    return [...list].sort((a, b) => {
+      if (sortField === "prioridade") {
+        const order: Record<string, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
+        const diff = (order[a.prioridade || ""] ?? 4) - (order[b.prioridade || ""] ?? 4);
+        return sortDir === "asc" ? diff : -diff;
+      }
+      if (sortField === "progresso") {
+        const diff = (a.progresso ?? 0) - (b.progresso ?? 0);
+        return sortDir === "asc" ? diff : -diff;
+      }
+      const map: Record<SortField, string> = {
+        codigo: a.codigo,
+        titulo: a.titulo,
+        projeto: a.projetoNome,
+        responsavel: a.responsavel,
+        status: a.status || "",
+        dataFim: a.dataEntrega || "",
+        prioridade: "",
+        progresso: "",
+      };
+      const mapB: Record<SortField, string> = {
+        codigo: b.codigo,
+        titulo: b.titulo,
+        projeto: b.projetoNome,
+        responsavel: b.responsavel,
+        status: b.status || "",
+        dataFim: b.dataEntrega || "",
+        prioridade: "",
+        progresso: "",
+      };
+      const cmp = map[sortField].localeCompare(mapB[sortField], "pt-BR");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [emTratativa, projetos, searchQuery, responsavelFilter, sortField, sortDir]);
 
   const handleSaveEdit = async (formData: ProjectEditFormData) => {
     if (!editProjeto) return;
@@ -965,6 +1194,20 @@ export function ProjetosView() {
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Em Tratativa toggle */}
+        <button
+          onClick={() => setEmTratativa((v) => !v)}
+          className="h-8 px-3 text-xs rounded-md border transition-colors flex-shrink-0"
+          style={{
+            background: emTratativa ? "rgba(0,200,83,0.12)" : "transparent",
+            borderColor: emTratativa ? "#00c853" : "hsl(var(--border))",
+            color: emTratativa ? "#00c853" : "hsl(var(--muted-foreground))",
+            fontWeight: emTratativa ? 600 : 400,
+          }}
+        >
+          Em Tratativa
+        </button>
+
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-[300px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -976,34 +1219,38 @@ export function ProjetosView() {
           />
         </div>
 
-        {/* Projeto filter */}
-        <Select value={projetoFilter} onValueChange={setProjetoFilter}>
-          <SelectTrigger className="h-8 w-[200px] text-xs">
-            <SelectValue placeholder="Projeto" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os Projetos</SelectItem>
-            {projetos.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.nome}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Projeto filter — hidden in Em Tratativa */}
+        {!emTratativa && (
+          <Select value={projetoFilter} onValueChange={setProjetoFilter}>
+            <SelectTrigger className="h-8 w-[200px] text-xs">
+              <SelectValue placeholder="Projeto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Projetos</SelectItem>
+              {projetos.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
-        {/* Status filter */}
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-8 w-[140px] text-xs">
-            <SelectValue placeholder="Todos Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos Status</SelectItem>
-            <SelectItem value="a-fazer">A Fazer</SelectItem>
-            <SelectItem value="em-andamento">Em Andamento</SelectItem>
-            <SelectItem value="bloqueado">Bloqueado</SelectItem>
-            <SelectItem value="concluido">Concluído</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Status filter — hidden in Em Tratativa */}
+        {!emTratativa && (
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-8 w-[140px] text-xs">
+              <SelectValue placeholder="Todos Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos Status</SelectItem>
+              <SelectItem value="a-fazer">A Fazer</SelectItem>
+              <SelectItem value="em-andamento">Em Andamento</SelectItem>
+              <SelectItem value="bloqueado">Bloqueado</SelectItem>
+              <SelectItem value="concluido">Concluído</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Responsável filter */}
         <FilterCombobox
@@ -1016,7 +1263,7 @@ export function ProjetosView() {
         />
 
         {/* View mode toggle */}
-        <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+        <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "hsl(var(--border))" }}>
           {(Object.keys(viewIcons) as ViewMode[]).map((mode) => (
             <button
               key={mode}
@@ -1024,7 +1271,7 @@ export function ProjetosView() {
               className="p-1.5 transition-colors"
               style={{
                 background: viewMode === mode ? "rgba(0,200,83,0.15)" : "transparent",
-                color: viewMode === mode ? "#00c853" : "rgba(255,255,255,0.3)",
+                color: viewMode === mode ? "#00c853" : "hsl(var(--muted-foreground) / 0.6)",
               }}
               title={mode.charAt(0).toUpperCase() + mode.slice(1)}
             >
@@ -1035,7 +1282,35 @@ export function ProjetosView() {
       </div>
 
       {/* Content by view mode */}
-      {viewMode === "lista" && (
+      {emTratativa && (
+        <div className="w-full">
+          <FlatHeaderRow sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+          {loading ? (
+            <SkeletonRows />
+          ) : sortedFlatTarefas.length === 0 ? (
+            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+              Nenhuma atividade em tratativa
+            </div>
+          ) : (
+            sortedFlatTarefas.map((tarefa) => (
+              <TarefaFlatRow
+                key={tarefa.id}
+                tarefa={tarefa}
+                onClick={() => {
+                  setSelectedTarefa(toUnifiedItem(tarefa, tarefa.projetoNome));
+                  setDrawerOpen(true);
+                }}
+                onEdit={() => {
+                  setSelectedTarefa(toUnifiedItem(tarefa, tarefa.projetoNome));
+                  setDrawerOpen(true);
+                }}
+                onDelete={() => handleDeleteTarefa(tarefa.id)}
+              />
+            ))
+          )}
+        </div>
+      )}
+      {!emTratativa && viewMode === "lista" && (
         <div className="w-full">
           <HeaderRow />
           {loading ? (
@@ -1100,11 +1375,11 @@ export function ProjetosView() {
           )}
         </div>
       )}
-      {viewMode === "kanban" && !loading && (
+      {!emTratativa && viewMode === "kanban" && !loading && (
         <ProjectsKanbanView projetos={filteredProjetos} onStatusChange={refreshData} />
       )}
-      {viewMode !== "lista" && viewMode !== "kanban" && (
-        <div style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.3)", fontSize: "14px" }}>
+      {!emTratativa && viewMode !== "lista" && viewMode !== "kanban" && (
+        <div style={{ padding: "40px", textAlign: "center", color: "hsl(var(--muted-foreground) / 0.6)", fontSize: "14px" }}>
           Visualização {viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} em desenvolvimento
         </div>
       )}
