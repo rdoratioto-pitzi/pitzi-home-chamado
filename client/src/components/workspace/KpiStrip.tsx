@@ -1,7 +1,7 @@
 const kpiSkeletonKeyframes = `
 @keyframes kpi-skeleton-pulse {
-  from { background-color: hsl(var(--muted) / 0.5); }
-  to   { background-color: hsl(var(--muted)); }
+  from { background-color: var(--l4); }
+  to   { background-color: var(--l3); }
 }
 `;
 
@@ -97,7 +97,7 @@ export function KpiStrip({ kpis, variant, loading, activeKpi, onKpiClick }: KpiS
         const isNegative = item.negativeWhen?.(item.value);
         const valueColor = isNegative
           ? "#ff5050"
-          : item.color || "hsl(var(--foreground))";
+          : item.color || "var(--l1)";
         const isActive = activeKpi === item.label;
         const isClickable = !!onKpiClick;
 
@@ -116,7 +116,7 @@ export function KpiStrip({ kpis, variant, loading, activeKpi, onKpiClick }: KpiS
               background: isActive
                 ? "rgba(0,200,83,0.08)"
                 : item.isFirst
-                ? "hsl(var(--muted))"
+                ? "var(--bg3)"
                 : undefined,
               borderRadius: item.isFirst ? "4px 0 0 4px" : undefined,
               outline: isActive && !item.isFirst ? "1px solid rgba(0,200,83,0.3)" : undefined,
@@ -129,7 +129,7 @@ export function KpiStrip({ kpis, variant, loading, activeKpi, onKpiClick }: KpiS
                 textTransform: "uppercase",
                 fontSize: "9px",
                 letterSpacing: "0.05em",
-                color: isActive ? "rgba(0,200,83,0.7)" : "hsl(var(--muted-foreground) / 0.55)",
+                color: isActive ? "rgba(0,200,83,0.7)" : "var(--l3)",
                 marginBottom: "4px",
               }}
             >
