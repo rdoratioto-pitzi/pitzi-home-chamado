@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique, bigint, date, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique, bigint, date, index, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -34,6 +34,8 @@ export const users = pgTable("users", {
   perfilAcesso: text("perfil_acesso"), // assistente, analista, gestor, diretor
   // Module permissions as JSON
   modulePermissions: text("module_permissions"), // JSON: { chamados: true, projetos: false, ... }
+  // Slack integration — preenchido on-demand a partir do email corporativo (@pitzi.com.br)
+  slackUserId: varchar("slack_user_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -1757,4 +1759,38 @@ export const insertComercialKpiSchema = createInsertSchema(comercialKpis, {
 }).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertComercialKpi = z.infer<typeof insertComercialKpiSchema>;
 export type ComercialKpi = typeof comercialKpis.$inferSelect;
+
+// ============== SLACK THREAD MAPPING ==============
+// Mapeia 1 entidade do Renov Home (chamado/projeto) → 1 thread no Slack.
+// Idempotência: garante que cada CHA-XXXX e PRO-XXXX tenha exatamente uma
+// mensagem-mãe no canal #devs-renov, e que updates (replies, reações) usem
+// sempre o mesmo thread_ts. Atividades (kanban_cards) NÃO têm linha aqui —
+// suas notificações replicam na thread do projeto pai.
+export const slackThreadMapping = pgTable(
+  "slack_thread_mapping",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    entityType: varchar("entity_type", { length: 20 }).notNull(), // 'chamado' | 'projeto'
+    entityId: varchar("entity_id").notNull(), // FK lógica para tickets.id ou projects.id
+    entityCode: varchar("entity_code", { length: 20 }).notNull(), // 'CHA-0159' | 'PRO-0006'
+    slackChannel: varchar("slack_channel", { length: 50 }).notNull(),
+    slackThreadTs: varchar("slack_thread_ts", { length: 50 }).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    uniqEntity: uniqueIndex("slack_thread_mapping_entity_uniq").on(table.entityType, table.entityId),
+    codeIdx: index("slack_thread_mapping_code_idx").on(table.entityCode),
+    threadTsIdx: index("slack_thread_mapping_thread_ts_idx").on(table.slackThreadTs),
+  }),
+);
+
+export const insertSlackThreadMappingSchema = createInsertSchema(slackThreadMapping).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertSlackThreadMapping = z.infer<typeof insertSlackThreadMappingSchema>;
+export type SlackThreadMapping = typeof slackThreadMapping.$inferSelect;
+export type SlackEntityType = "chamado" | "projeto";
 
