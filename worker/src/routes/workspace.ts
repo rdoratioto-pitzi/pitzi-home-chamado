@@ -35,6 +35,20 @@ function slackEnv(envBindings: { SLACK_BOT_TOKEN?: string; SLACK_INTEGRATION_ENA
 
 const STATUS_FECHADO = new Set(["resolved", "closed"]);
 
+/**
+ * Converte input do payload (que pode ser "", " ", null, undefined, ou string ISO/yyyy-MM-dd)
+ * em Date válido OU null. Evita `new Date("")` que produz Invalid Date e quebra o
+ * `mapToDriverValue` do Drizzle (RangeError: Invalid time value em toISOString).
+ */
+function toDateOrNull(v: unknown): Date | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== "string" && !(v instanceof Date) && typeof v !== "number") return null;
+  const s = typeof v === "string" ? v.trim() : v;
+  if (s === "") return null;
+  const d = s instanceof Date ? s : new Date(s as string | number);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 interface Anexo { name: string; url: string }
 
 function mimeToName(mime: string, idx: number): string {
@@ -385,7 +399,7 @@ workspace.post("/api/workspace/tarefas", async (c) => {
         columnId,
         priority: prioridade || "normal",
         assigneeId: responsavelId || null,
-        dueDate: dataEntrega ? new Date(dataEntrega) : null,
+        dueDate: toDateOrNull(dataEntrega),
         status: "todo",
         progress: 0,
       })
@@ -489,8 +503,8 @@ workspace.post("/api/workspace/projetos", async (c) => {
         status: "backlog",
         priority: prioridade || "media",
         ownerId: responsavelId || userId,
-        startDate: dataInicio ? new Date(dataInicio) : null,
-        endDate: dataFim ? new Date(dataFim) : null,
+        startDate: toDateOrNull(dataInicio),
+        endDate: toDateOrNull(dataFim),
         color: "#00c853",
         category: categoria || null,
         visibility: finalVisibility,
@@ -886,7 +900,7 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
     if (status !== undefined) updateData.status = ptBrToKanban[status] || status;
     if (prioridade !== undefined) updateData.priority = prioridade;
     if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
-    if (dataEntrega !== undefined) updateData.dueDate = dataEntrega ? new Date(dataEntrega) : null;
+    if (dataEntrega !== undefined) updateData.dueDate = toDateOrNull(dataEntrega);
     if (progresso !== undefined) updateData.progress = progresso;
     if (titulo !== undefined) updateData.title = titulo.trim();
     if (descricao !== undefined) updateData.objectives = descricao;
@@ -976,8 +990,8 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     if (status !== undefined) updateData.status = status;
     if (prioridade !== undefined) updateData.priority = prioridade;
     if (responsavelId !== undefined) updateData.ownerId = responsavelId;
-    if (dataInicio !== undefined) updateData.startDate = dataInicio ? new Date(dataInicio) : null;
-    if (dataFim !== undefined) updateData.endDate = dataFim ? new Date(dataFim) : null;
+    if (dataInicio !== undefined) updateData.startDate = toDateOrNull(dataInicio);
+    if (dataFim !== undefined) updateData.endDate = toDateOrNull(dataFim);
     if (categoria !== undefined) updateData.category = categoria;
     if (cor !== undefined) updateData.color = cor;
     if (progresso !== undefined) updateData.progress = Math.max(0, Math.min(100, progresso));
