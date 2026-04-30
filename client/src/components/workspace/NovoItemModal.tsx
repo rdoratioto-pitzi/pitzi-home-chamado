@@ -10,7 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Paperclip, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Paperclip, X, ChevronDown, ChevronUp, User as UserIcon, Users, Globe, UserPlus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { UserSelect } from "@/components/ui/user-select";
@@ -176,6 +177,9 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
   const [dataFim, setDataFim] = useState("");
   const [categoriaProjeto, setCategoriaProjeto] = useState("");
   const [budget, setBudget] = useState("");
+  const [visibilityProjeto, setVisibilityProjeto] = useState<"private" | "shared" | "public">("private");
+  const [memberIdsProjeto, setMemberIdsProjeto] = useState<string[]>([]);
+  const [memberSearchProjeto, setMemberSearchProjeto] = useState("");
 
   const [users, setUsers] = useState<UserOption[]>([]);
   const [projetos, setProjetos] = useState<ProjetoOption[]>([]);
@@ -208,6 +212,9 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setDataFim("");
     setCategoriaProjeto("");
     setBudget("");
+    setVisibilityProjeto("private");
+    setMemberIdsProjeto([]);
+    setMemberSearchProjeto("");
   }, [open, defaultType]);
 
   // Fetch users and projetos on open
@@ -302,6 +309,9 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setDataFim("");
     setCategoriaProjeto("");
     setBudget("");
+    setVisibilityProjeto("private");
+    setMemberIdsProjeto([]);
+    setMemberSearchProjeto("");
   }
 
   async function handleSubmit() {
@@ -360,6 +370,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             dataInicio: dataInicio || undefined,
             dataFim: dataFim || undefined,
             categoria: categoriaProjeto || undefined,
+            visibility: visibilityProjeto,
+            memberIds: visibilityProjeto === "shared" ? memberIdsProjeto : [],
           }),
         });
       }
@@ -814,6 +826,109 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                         />
                       </div>
                     </>
+                  )}
+                </div>
+              )}
+              {/*
+                Visibilidade do projeto fica em "Campos adicionais" (full-width)
+                porque a linha principal de chips já está densa (status, prioridade,
+                responsável, datas, categoria) — adicionar outro chip quebraria o layout.
+              */}
+              {extraOpen && type === "projeto" && (
+                <div className="pt-3 mt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                  <label className="text-xs mb-1 block" style={{ color: "rgba(255,255,255,0.35)" }}>
+                    Visibilidade
+                  </label>
+                  <Select
+                    value={visibilityProjeto}
+                    onValueChange={(v) => setVisibilityProjeto(v as "private" | "shared" | "public")}
+                  >
+                    <SelectTrigger
+                      className="w-full h-8 px-3 text-sm outline-none"
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        color: "rgba(255,255,255,0.7)",
+                      }}
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="private">
+                        <div className="flex items-center gap-2"><UserIcon className="h-4 w-4" /> Privada</div>
+                      </SelectItem>
+                      <SelectItem value="shared">
+                        <div className="flex items-center gap-2"><Users className="h-4 w-4" /> Compartilhada</div>
+                      </SelectItem>
+                      <SelectItem value="public">
+                        <div className="flex items-center gap-2"><Globe className="h-4 w-4" /> Pública</div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>
+                    {visibilityProjeto === "private"
+                      ? "Apenas o responsável pode ver este projeto."
+                      : visibilityProjeto === "shared"
+                      ? "O responsável e os membros selecionados podem ver este projeto."
+                      : "Todos os usuários podem ver este projeto."}
+                  </p>
+
+                  {visibilityProjeto === "shared" && (
+                    <div className="mt-3 space-y-2">
+                      <div className="relative">
+                        <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar usuário para adicionar..."
+                          value={memberSearchProjeto}
+                          onChange={(e) => setMemberSearchProjeto(e.target.value)}
+                          className="pl-9 h-8 text-sm"
+                        />
+                      </div>
+                      {memberSearchProjeto && (
+                        <div
+                          className="rounded-md max-h-32 overflow-y-auto"
+                          style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+                        >
+                          {users
+                            .filter((u) => !memberIdsProjeto.includes(u.id))
+                            .filter((u) =>
+                              u.name.toLowerCase().includes(memberSearchProjeto.toLowerCase()),
+                            )
+                            .slice(0, 5)
+                            .map((u) => (
+                              <button
+                                key={u.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 text-sm hover-elevate"
+                                onClick={() => {
+                                  setMemberIdsProjeto((prev) => [...prev, u.id]);
+                                  setMemberSearchProjeto("");
+                                }}
+                              >
+                                {u.name}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+                      {memberIdsProjeto.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {memberIdsProjeto.map((uid) => {
+                            const u = users.find((x) => x.id === uid);
+                            return (
+                              <Badge key={uid} variant="secondary" className="gap-1">
+                                {u?.name || uid}
+                                <button
+                                  type="button"
+                                  onClick={() => setMemberIdsProjeto((prev) => prev.filter((id) => id !== uid))}
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

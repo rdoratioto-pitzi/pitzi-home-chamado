@@ -2,7 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import { requireAuth, getSessionUser } from "../middleware/auth";
-import { projects, kanbanCards, kanbanColumns, kanbanComments, users, workspaceComentarios } from "@shared/schema";
+import { projects, projectMembers, kanbanCards, kanbanColumns, kanbanComments, users, workspaceComentarios } from "@shared/schema";
 import type { Ticket, User, SlaRule, InsertTicket } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import {
@@ -415,7 +415,7 @@ export function registerWorkspaceRoutes(router: Router) {
       if (!db) return res.status(500).json({ error: "Database not available" });
 
       const { userId } = getSessionUser(req);
-      const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria } =
+      const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, visibility, memberIds } =
         req.body as {
           nome?: string;
           descricao?: string;
@@ -424,10 +424,21 @@ export function registerWorkspaceRoutes(router: Router) {
           dataInicio?: string;
           dataFim?: string;
           categoria?: string;
+          visibility?: string;
+          memberIds?: string[];
         };
 
       if (!nome?.trim()) {
         return res.status(400).json({ error: "Nome obrigatório" });
+      }
+
+      const validVisibilities = ["private", "shared", "public"] as const;
+      type Visibility = typeof validVisibilities[number];
+      const finalVisibility: Visibility = (validVisibilities as readonly string[]).includes(visibility ?? "")
+        ? (visibility as Visibility)
+        : "private";
+      if (visibility !== undefined && !validVisibilities.includes(visibility as Visibility)) {
+        return res.status(400).json({ error: `Visibilidade inválida. Aceitos: ${validVisibilities.join(", ")}` });
       }
 
       // Generate next PRO-XXXX code
@@ -451,9 +462,25 @@ export function registerWorkspaceRoutes(router: Router) {
           endDate: dataFim ? new Date(dataFim) : null,
           color: "#00c853",
           category: categoria || null,
+          visibility: finalVisibility,
           progress: 0,
         })
         .returning();
+
+      // Insere membros quando shared (espelha worker/src/routes/projects.ts)
+      if (finalVisibility === "shared" && Array.isArray(memberIds) && memberIds.length > 0) {
+        for (const uid of memberIds) {
+          try {
+            await storage.addProjectMember({
+              projectId: projeto.id,
+              userId: uid,
+              role: "member",
+            });
+          } catch (_e) {
+            // Silenciosamente ignora membros inválidos para não bloquear criação
+          }
+        }
+      }
 
       // Slack: notifica criação no canal (skipa se visibility=private).
       fireSlack(() => notifyProjetoCriado({ db: db as SlackDb, env: slackEnv() }, projeto.id));
@@ -479,6 +506,7 @@ export function registerWorkspaceRoutes(router: Router) {
         responsavel: respNome,
         responsavelInitials: respInitials,
         cor: projeto.color,
+        visibility: projeto.visibility,
         criadoEm: (projeto.createdAt || "").toString(),
       });
     } catch (error: any) {
@@ -491,8 +519,8 @@ export function registerWorkspaceRoutes(router: Router) {
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
 
-      const { id } = req.params;
-      const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso } =
+      const id = String(req.params.id);
+      const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } =
         req.body as {
           nome?: string;
           descricao?: string;
@@ -504,11 +532,24 @@ export function registerWorkspaceRoutes(router: Router) {
           categoria?: string;
           cor?: string;
           progresso?: number;
+          visibility?: string;
+          memberIds?: string[];
         };
 
       const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
       if (status && !validStatuses.includes(status)) {
         return res.status(400).json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` });
+      }
+
+      const validVisibilities = ["private", "shared", "public"] as const;
+      type Visibility = typeof validVisibilities[number];
+      if (visibility !== undefined && !(validVisibilities as readonly string[]).includes(visibility)) {
+        return res.status(400).json({ error: `Visibilidade inválida. Aceitos: ${validVisibilities.join(", ")}` });
+      }
+
+      const existing = await storage.getProject(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Projeto não encontrado" });
       }
 
       const updateData: Record<string, any> = {};
@@ -522,19 +563,48 @@ export function registerWorkspaceRoutes(router: Router) {
       if (categoria !== undefined) updateData.category = categoria;
       if (cor !== undefined) updateData.color = cor;
       if (progresso !== undefined) updateData.progress = Math.max(0, Math.min(100, progresso));
+      if (visibility !== undefined) updateData.visibility = visibility;
 
-      if (Object.keys(updateData).length === 0) {
+      if (Object.keys(updateData).length === 0 && memberIds === undefined) {
         return res.status(400).json({ error: "Nenhum campo para atualizar" });
       }
 
-      const [updated] = await db
-        .update(projects)
-        .set(updateData)
-        .where(eq(projects.id, id))
-        .returning();
+      let updated = existing;
+      if (Object.keys(updateData).length > 0) {
+        const [u] = await db
+          .update(projects)
+          .set(updateData)
+          .where(eq(projects.id, id))
+          .returning();
+        if (!u) return res.status(404).json({ error: "Projeto não encontrado" });
+        updated = u;
+      }
 
-      if (!updated) {
-        return res.status(404).json({ error: "Projeto não encontrado" });
+      // Upsert de project_members (espelha worker/src/routes/projects.ts)
+      const effectiveVisibility = (visibility as Visibility | undefined) ?? (existing.visibility as Visibility);
+      if (effectiveVisibility === "shared" && Array.isArray(memberIds)) {
+        const currentMembers = await storage.getProjectMembers(id);
+        const currentMemberIds = new Set(currentMembers.map((m) => m.userId));
+        const newMemberIds = new Set(memberIds);
+
+        for (const uid of memberIds) {
+          if (!currentMemberIds.has(uid)) {
+            try {
+              await storage.addProjectMember({ projectId: id, userId: uid, role: "member" });
+            } catch (_e) { /* ignora */ }
+          }
+        }
+        for (const member of currentMembers) {
+          if (!newMemberIds.has(member.userId)) {
+            await storage.removeProjectMember(member.id);
+          }
+        }
+      } else if (effectiveVisibility !== "shared") {
+        // Limpa membros se virou private/public
+        const currentMembers = await storage.getProjectMembers(id);
+        for (const member of currentMembers) {
+          await storage.removeProjectMember(member.id);
+        }
       }
 
       return res.json({
@@ -543,6 +613,7 @@ export function registerWorkspaceRoutes(router: Router) {
         nome: updated.name,
         status: updated.status,
         prioridade: updated.priority,
+        visibility: updated.visibility,
       });
     } catch (error: any) {
       return res.status(error.status || 500).json({ error: error.message });
@@ -679,13 +750,20 @@ export function registerWorkspaceRoutes(router: Router) {
         return res.status(500).json({ error: "Database not available" });
       }
 
-      const [allProjects, cards, allUsers] = await Promise.all([
+      const [allProjects, cards, allUsers, allMembers] = await Promise.all([
         db.select().from(projects),
         db.select().from(kanbanCards),
         db.select().from(users),
+        db.select().from(projectMembers),
       ]);
 
       const userMap = new Map(allUsers.map((u) => [u.id, u]));
+      const membersByProject = new Map<string, string[]>();
+      for (const m of allMembers) {
+        const arr = membersByProject.get(m.projectId) ?? [];
+        arr.push(m.userId);
+        membersByProject.set(m.projectId, arr);
+      }
 
       // Map projects (EN) -> formato frontend (PT-BR)
       const projetosComTarefas = allProjects.map((p) => {
@@ -713,6 +791,8 @@ export function registerWorkspaceRoutes(router: Router) {
           progresso: p.progress,
           cor: p.color,
           categoria: p.category,
+          visibility: p.visibility,
+          memberIds: membersByProject.get(p.id) ?? [],
           criadoEm: p.createdAt ? String(p.createdAt) : null,
           tarefas: cardsDoProjeto.map((c) => {
             const tResp = c.assigneeId ? userMap.get(c.assigneeId) : null;
