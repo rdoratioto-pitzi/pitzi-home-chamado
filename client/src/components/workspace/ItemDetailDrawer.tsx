@@ -8,12 +8,31 @@ import type { ChamadoItem, UnifiedItem } from "./WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { RichContent } from "@/components/rich-content";
 import { useToast } from "@/hooks/use-toast";
+import {
+  statusOptionsForKind,
+  statusLabelOf,
+  statusColorOf,
+  priorityOptionsForKind,
+  priorityLabelOf,
+  priorityClassOf,
+  type ItemKind,
+} from "@/lib/workspace-status";
 
 interface ItemDetailDrawerProps {
   open: boolean;
   item: ChamadoItem | UnifiedItem | null;
   onClose: () => void;
-  onUpdate?: (updatedItem: ChamadoItem) => void;
+  onUpdate?: (updatedItem: ChamadoItem | UnifiedItem) => void;
+}
+
+interface TarefaDetailExtras {
+  projetoId: string | null;
+  responsavelId: string | null;
+}
+
+interface ProjetoOption {
+  id: string;
+  nome: string;
 }
 
 const SECTION_LABEL_STYLE: React.CSSProperties = {
@@ -29,48 +48,6 @@ const ROW_LABEL_STYLE: React.CSSProperties = {
   fontSize: "11px",
   color: "rgba(255,255,255,0.35)",
   minWidth: "90px",
-};
-
-const statusColors: Record<string, string> = {
-  open: "#f59e0b",
-  in_progress: "#00c853",
-  blocked: "#ef4444",
-  resolved: "#4ade80",
-  closed: "#4ade80",
-  "a-fazer": "#f59e0b",
-  "em-andamento": "#00c853",
-  concluido: "#4ade80",
-};
-
-const statusLabels: Record<string, string> = {
-  open: "Aberto",
-  in_progress: "Em Andamento",
-  blocked: "Bloqueado",
-  resolved: "Resolvido",
-  closed: "Fechado",
-  "a-fazer": "A Fazer",
-  "em-andamento": "Em Andamento",
-  concluido: "Concluído",
-};
-
-const priorityColors: Record<string, string> = {
-  low: "bg-slate-500/10 text-slate-400 border-slate-700",
-  medium: "bg-yellow-500/10 text-yellow-400 border-yellow-700",
-  high: "bg-orange-500/10 text-orange-400 border-orange-700",
-  critical: "bg-red-500/10 text-red-400 border-red-700",
-  baixa: "bg-slate-500/10 text-slate-400 border-slate-700",
-  media: "bg-yellow-500/10 text-yellow-400 border-yellow-700",
-  alta: "bg-orange-500/10 text-orange-400 border-orange-700",
-};
-
-const priorityLabels: Record<string, string> = {
-  low: "Baixa",
-  medium: "Média",
-  high: "Alta",
-  critical: "Crítica",
-  baixa: "Baixa",
-  media: "Média",
-  alta: "Alta",
 };
 
 interface Comentario {
@@ -110,21 +87,6 @@ function formatDateTime(dateStr: string | null | undefined): string {
     return "—";
   }
 }
-
-const STATUS_OPTIONS = [
-  { value: "open", label: "Aberto" },
-  { value: "in_progress", label: "Em Andamento" },
-  { value: "blocked", label: "Bloqueado" },
-  { value: "resolved", label: "Resolvido" },
-  { value: "closed", label: "Fechado" },
-];
-
-const PRIORIDADE_OPTIONS_EDIT = [
-  { value: "baixa", label: "Baixa" },
-  { value: "media", label: "Média" },
-  { value: "alta", label: "Alta" },
-  { value: "critica", label: "Crítica" },
-];
 
 function isImageAnexo(anexo: { name: string; url: string }): boolean {
   if (anexo.url.startsWith("data:image/")) return true;
@@ -170,6 +132,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
   const [enviandoComentario, setEnviandoComentario] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [availableUsers, setAvailableUsers] = useState<Array<{id: string; name: string}>>([]);
+  const [availableProjetos, setAvailableProjetos] = useState<ProjetoOption[]>([]);
+  const [tarefaExtras, setTarefaExtras] = useState<TarefaDetailExtras>({ projetoId: null, responsavelId: null });
   const [isPatching, setIsPatching] = useState(false);
   const { toast } = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -185,36 +149,113 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
   }, [onClose]);
 
   const isChamado = item !== null && "tipo" in item && typeof (item as ChamadoItem).categoria === "string";
+  const kind: ItemKind = isChamado ? "chamado" : "tarefa";
 
+  // Comentários: chamados e tarefas têm endpoints separados, ambos suportados.
   useEffect(() => {
     if (!item || !open) { setComentarios([]); return; }
-    if (!isChamado) { setComentarios([]); return; }
-    fetchWithAuth(`/api/workspace/chamados/${item.id}/comentarios`)
+    const url = isChamado
+      ? `/api/workspace/chamados/${item.id}/comentarios`
+      : `/api/workspace/tarefas/${item.id}/comentarios`;
+    fetchWithAuth(url)
       .then((r) => r.json())
       .then((data: { comentarios: Comentario[] }) => setComentarios(data.comentarios || []))
       .catch(() => setComentarios([]));
-  }, [item?.id, open]);
+  }, [item?.id, open, isChamado]);
 
+  // Lista de usuários para o select de Responsável (chamados e tarefas).
   useEffect(() => {
-    if (!open || !isChamado) return;
+    if (!open) return;
     fetchWithAuth("/api/users")
       .then((r) => r.json())
       .then((data: Array<{id: string; name: string}>) => setAvailableUsers(data || []))
       .catch(() => {});
+  }, [open]);
+
+  // Para tarefa: busca projetoId/responsavelId atuais (não vêm em UnifiedItem)
+  // e a lista de projetos disponíveis para o select de Projeto.
+  useEffect(() => {
+    if (!open || !item || isChamado) {
+      setTarefaExtras({ projetoId: null, responsavelId: null });
+      return;
+    }
+    fetchWithAuth(`/api/workspace/tarefas/${item.id}`)
+      .then((r) => r.json())
+      .then((data: { projeto?: { id: string } | null; responsavelId?: string | null }) => {
+        setTarefaExtras({
+          projetoId: data.projeto?.id ?? null,
+          responsavelId: data.responsavelId ?? null,
+        });
+      })
+      .catch(() => setTarefaExtras({ projetoId: null, responsavelId: null }));
+  }, [item?.id, open, isChamado]);
+
+  useEffect(() => {
+    if (!open || isChamado) return;
+    fetchWithAuth("/api/workspace/projetos")
+      .then((r) => r.json())
+      .then((data: { projetos?: Array<{ id: string; nome: string }> }) => {
+        setAvailableProjetos(data.projetos ?? []);
+      })
+      .catch(() => setAvailableProjetos([]));
   }, [open, isChamado]);
 
-  async function handlePatch(field: string, value: string) {
-    if (!item || !isChamado) return;
+  // Mapeia a resposta do PATCH /tarefas/:id de volta para o shape UnifiedItem,
+  // preservando campos que o backend não retorna (contexto, badge, sla...).
+  function mergeTarefaResponseIntoUnified(prev: UnifiedItem, resp: {
+    id: string;
+    codigo: string;
+    titulo: string;
+    descricao: string | null;
+    status: string;
+    prioridade: string;
+    responsavelId: string | null;
+    responsavel: string;
+    responsavelInitials: string;
+    dataEntrega: string | null;
+    progresso: number | null;
+    criadoEm: string | null;
+  }): UnifiedItem {
+    return {
+      ...prev,
+      id: resp.id,
+      codigo: resp.codigo,
+      titulo: resp.titulo,
+      descricao: resp.descricao,
+      status: resp.status,
+      prioridade: resp.prioridade,
+      responsavel: resp.responsavel,
+      responsavelInitials: resp.responsavelInitials,
+      dataEntrega: resp.dataEntrega,
+      progresso: resp.progresso,
+      criadoEm: resp.criadoEm,
+    };
+  }
+
+  async function handlePatch(field: string, value: string | number | null) {
+    if (!item) return;
     setIsPatching(true);
     try {
-      const r = await fetchWithAuth(`/api/workspace/chamados/${item.id}`, {
+      const url = isChamado
+        ? `/api/workspace/chamados/${item.id}`
+        : `/api/workspace/tarefas/${item.id}`;
+      const r = await fetchWithAuth(url, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: value }),
       });
       if (!r.ok) throw new Error("Erro ao atualizar");
-      const updated: ChamadoItem = await r.json();
-      onUpdate?.(updated);
+      const updated = await r.json();
+
+      if (isChamado) {
+        onUpdate?.(updated as ChamadoItem);
+      } else {
+        const merged = mergeTarefaResponseIntoUnified(item as UnifiedItem, updated);
+        onUpdate?.(merged);
+        if (field === "responsavelId") {
+          setTarefaExtras((prev) => ({ ...prev, responsavelId: value === "" ? null : (value as string) }));
+        }
+      }
       setEditingField(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
@@ -223,6 +264,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
       setIsPatching(false);
     }
   }
+
 
   async function handleEnviarComentario() {
     if (!item || !novoComentario.trim()) return;
@@ -244,11 +286,11 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
     }
   }
 
-  const statusColor = item ? (statusColors[item.status] ?? "rgba(255,255,255,0.3)") : "rgba(255,255,255,0.3)";
-  const statusLabel = item ? (statusLabels[item.status] ?? item.status) : "";
+  const statusColor = item ? statusColorOf(item.status) : "rgba(255,255,255,0.3)";
+  const statusLabel = item ? statusLabelOf(item.status) : "";
 
-  const prioColor = item ? (priorityColors[item.prioridade] ?? priorityColors.medium) : priorityColors.medium;
-  const prioLabel = item ? (priorityLabels[item.prioridade] ?? item.prioridade) : "";
+  const prioClass = item ? priorityClassOf(item.prioridade) : priorityClassOf("media");
+  const prioLabel = item ? priorityLabelOf(item.prioridade) : "";
 
   const abertura = isChamado
     ? formatDateTime((item as ChamadoItem).abertura)
@@ -374,7 +416,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     {/* Status */}
                     <div className="flex items-center gap-3">
                       <span style={ROW_LABEL_STYLE}>Status</span>
-                      {isChamado && editingField === "status" ? (
+                      {editingField === "status" ? (
                         <select
                           autoFocus
                           defaultValue={item!.status}
@@ -383,19 +425,19 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                           className="text-xs rounded px-2 py-0.5 outline-none"
                           style={{ background: "#1a201a", border: "1px solid rgba(0,200,83,0.3)", color: "#00c853" }}
                         >
-                          {STATUS_OPTIONS.map((o) => (
+                          {statusOptionsForKind(kind).map((o) => (
                             <option key={o.value} value={o.value}>{o.label}</option>
                           ))}
                         </select>
                       ) : (
                         <span
                           className="text-xs font-medium px-2 py-0.5 rounded"
-                          onClick={() => isChamado && setEditingField("status")}
+                          onClick={() => setEditingField("status")}
                           style={{
                             background: `${statusColor}1a`,
                             color: statusColor,
                             border: `1px solid ${statusColor}33`,
-                            cursor: isChamado ? "pointer" : "default",
+                            cursor: "pointer",
                           }}
                         >
                           {statusLabel}
@@ -406,7 +448,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     {/* Prioridade */}
                     <div className="flex items-center gap-3">
                       <span style={ROW_LABEL_STYLE}>Prioridade</span>
-                      {isChamado && editingField === "prioridade" ? (
+                      {editingField === "prioridade" ? (
                         <select
                           autoFocus
                           defaultValue={item!.prioridade}
@@ -415,16 +457,16 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                           className="text-xs rounded px-2 py-0.5 outline-none"
                           style={{ background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
                         >
-                          {PRIORIDADE_OPTIONS_EDIT.map((o) => (
+                          {priorityOptionsForKind(kind).map((o) => (
                             <option key={o.value} value={o.value}>{o.label}</option>
                           ))}
                         </select>
                       ) : (
                         <Badge
                           variant="outline"
-                          className={`text-[10px] px-1.5 py-0 border ${prioColor}`}
-                          onClick={() => isChamado && setEditingField("prioridade")}
-                          style={{ cursor: isChamado ? "pointer" : "default" }}
+                          className={`text-[10px] px-1.5 py-0 border ${prioClass}`}
+                          onClick={() => setEditingField("prioridade")}
+                          style={{ cursor: "pointer" }}
                         >
                           {prioLabel}
                         </Badge>
@@ -452,12 +494,31 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     )}
 
                     {/* Projeto — só tarefas */}
-                    {!isChamado && (item as UnifiedItem).contexto && (
+                    {!isChamado && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>Projeto</span>
-                        <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>
-                          {(item as UnifiedItem).contexto}
-                        </span>
+                        {editingField === "projeto" ? (
+                          <select
+                            autoFocus
+                            defaultValue={tarefaExtras.projetoId ?? ""}
+                            onChange={(e) => { if (e.target.value) handlePatch("projetoId", e.target.value); }}
+                            onBlur={() => setEditingField(null)}
+                            className="text-xs rounded px-2 py-0.5 outline-none"
+                            style={{ background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                          >
+                            {availableProjetos.map((p) => (
+                              <option key={p.id} value={p.id}>{p.nome}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span
+                            className="text-xs font-medium"
+                            onClick={() => setEditingField("projeto")}
+                            style={{ color: "rgba(255,255,255,0.65)", cursor: "pointer" }}
+                          >
+                            {(item as UnifiedItem).contexto || "—"}
+                          </span>
+                        )}
                       </div>
                     )}
 
@@ -474,16 +535,16 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     {/* Responsável */}
                     <div className="flex items-center gap-3">
                       <span style={ROW_LABEL_STYLE}>Responsável</span>
-                      {isChamado && editingField === "responsavel" ? (
+                      {editingField === "responsavel" ? (
                         <select
                           autoFocus
-                          defaultValue={""}
+                          defaultValue={isChamado ? "" : (tarefaExtras.responsavelId ?? "")}
                           onChange={(e) => { if (e.target.value) handlePatch("responsavelId", e.target.value); }}
                           onBlur={() => setEditingField(null)}
                           className="text-xs rounded px-2 py-0.5 outline-none"
                           style={{ background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
                         >
-                          <option value="">Manter atual</option>
+                          {isChamado && <option value="">Manter atual</option>}
                           {availableUsers.map((u) => (
                             <option key={u.id} value={u.id}>{u.name}</option>
                           ))}
@@ -491,8 +552,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                       ) : (
                         <div
                           className="flex items-center gap-1.5"
-                          onClick={() => isChamado && setEditingField("responsavel")}
-                          style={{ cursor: isChamado ? "pointer" : "default" }}
+                          onClick={() => setEditingField("responsavel")}
+                          style={{ cursor: "pointer" }}
                         >
                           <div
                             className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
@@ -529,9 +590,25 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     {!isChamado && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>Entrega</span>
-                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
-                          {formatDate((item as UnifiedItem).dataEntrega)}
-                        </span>
+                        {editingField === "entrega" ? (
+                          <input
+                            autoFocus
+                            type="date"
+                            defaultValue={(item as UnifiedItem).dataEntrega ? String((item as UnifiedItem).dataEntrega).split("T")[0] : ""}
+                            onChange={(e) => { handlePatch("dataEntrega", e.target.value || null); }}
+                            onBlur={() => setEditingField(null)}
+                            className="text-xs rounded px-2 py-0.5 outline-none"
+                            style={{ background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                          />
+                        ) : (
+                          <span
+                            className="text-xs"
+                            onClick={() => setEditingField("entrega")}
+                            style={{ color: "rgba(255,255,255,0.55)", cursor: "pointer" }}
+                          >
+                            {formatDate((item as UnifiedItem).dataEntrega)}
+                          </span>
+                        )}
                       </div>
                     )}
 
@@ -539,21 +616,49 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     {!isChamado && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>Progresso</span>
-                        <div className="flex items-center gap-2">
-                          <div style={{ width: 80, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.08)" }}>
-                            <div
-                              style={{
-                                width: `${Math.min((item as UnifiedItem).progresso ?? 0, 100)}%`,
-                                height: "100%",
-                                borderRadius: 3,
-                                background: "#00c853",
-                              }}
-                            />
+                        {editingField === "progresso" ? (
+                          <input
+                            autoFocus
+                            type="number"
+                            min={0}
+                            max={100}
+                            defaultValue={(item as UnifiedItem).progresso ?? 0}
+                            onBlur={(e) => {
+                              const n = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+                              handlePatch("progresso", n);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                const n = Math.max(0, Math.min(100, Number((e.target as HTMLInputElement).value) || 0));
+                                handlePatch("progresso", n);
+                              } else if (e.key === "Escape") {
+                                setEditingField(null);
+                              }
+                            }}
+                            className="text-xs rounded px-2 py-0.5 outline-none"
+                            style={{ width: 64, background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                          />
+                        ) : (
+                          <div
+                            className="flex items-center gap-2"
+                            onClick={() => setEditingField("progresso")}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <div style={{ width: 80, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.08)" }}>
+                              <div
+                                style={{
+                                  width: `${Math.min((item as UnifiedItem).progresso ?? 0, 100)}%`,
+                                  height: "100%",
+                                  borderRadius: 3,
+                                  background: "#00c853",
+                                }}
+                              />
+                            </div>
+                            <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "'JetBrains Mono', monospace" }}>
+                              {(item as UnifiedItem).progresso ?? 0}%
+                            </span>
                           </div>
-                          <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "'JetBrains Mono', monospace" }}>
-                            {(item as UnifiedItem).progresso ?? 0}%
-                          </span>
-                        </div>
+                        )}
                       </div>
                     )}
 

@@ -241,8 +241,10 @@ export function ChamadosView() {
             item={selectedItem}
             onClose={() => setDrawerOpen(false)}
             onUpdate={(updated) => {
-              setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i));
-              setSelectedItem(updated);
+              // Em ChamadosView, o drawer só lida com chamados; cast seguro.
+              const ch = updated as ChamadoItem;
+              setItems((prev) => prev.map((i) => (i.id === ch.id ? ch : i)));
+              setSelectedItem(ch);
             }}
           />
         </>

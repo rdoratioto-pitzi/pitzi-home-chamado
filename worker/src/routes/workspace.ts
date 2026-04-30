@@ -867,7 +867,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
 workspace.patch("/api/workspace/tarefas/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
-    const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao } = await c.req.json();
+    const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao, projetoId } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
 
@@ -890,6 +890,33 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
     if (progresso !== undefined) updateData.progress = progresso;
     if (titulo !== undefined) updateData.title = titulo.trim();
     if (descricao !== undefined) updateData.objectives = descricao;
+
+    // Mover tarefa para outro projeto: precisa reatribuir columnId,
+    // pois a coluna atual pertence ao projeto antigo.
+    if (projetoId !== undefined && projetoId !== prevCard?.projectId) {
+      const [targetProject] = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.id, projetoId))
+        .limit(1);
+      if (!targetProject) {
+        return c.json({ error: "Projeto destino não encontrado" }, 404);
+      }
+      let [targetCol] = await db
+        .select({ id: kanbanColumns.id })
+        .from(kanbanColumns)
+        .where(eq(kanbanColumns.projectId, projetoId))
+        .orderBy(kanbanColumns.order)
+        .limit(1);
+      if (!targetCol) {
+        [targetCol] = await db
+          .insert(kanbanColumns)
+          .values({ projectId: projetoId, name: "A Fazer", order: 0 })
+          .returning({ id: kanbanColumns.id });
+      }
+      updateData.projectId = projetoId;
+      updateData.columnId = targetCol.id;
+    }
 
     if (Object.keys(updateData).length === 0) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
