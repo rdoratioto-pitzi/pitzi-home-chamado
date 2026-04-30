@@ -28,6 +28,50 @@ import type { UnifiedItem } from "@/components/workspace/WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Migração lazy de status legado → canônico (espelha backend). Defesa em
+ * profundidade: backend já normaliza, mas se o form fizer round-trip antes
+ * de salvar, o Select fica vazio quando recebe valor desconhecido. Aqui
+ * traduz na hidratação.
+ */
+const STATUS_LEGACY_MAP: Record<string, string> = {
+  active: "ativo",
+  sprint_active: "ativo",
+  planning: "backlog",
+  on_hold: "pausado",
+  completed: "concluido",
+  archived: "inativo",
+};
+
+function normalizeStatusForForm(s: string | null | undefined): string {
+  if (!s) return "backlog";
+  return STATUS_LEGACY_MAP[s] ?? s;
+}
+
+/**
+ * Garante valor compatível com `<Input type="date">` (formato yyyy-MM-dd).
+ * Aceita ISO string, yyyy-MM-dd, Date object, ou null/undefined/"".
+ * Retorna "" pra valores vazios/inválidos (input fica em branco, sem warnings).
+ */
+function toDateInputValue(value: string | Date | null | undefined): string {
+  if (!value) return "";
+  if (typeof value === "string") {
+    // Já está em yyyy-MM-dd? Aceita direto.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    // ISO ou outro formato — parseia e formata.
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+  }
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return "";
+    return value.toISOString().slice(0, 10);
+  }
+  return "";
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ProjetosKpis {
@@ -724,8 +768,8 @@ interface ProjectEditFormData {
   prioridade: string;
   categoria: string;
   responsavelId?: string;
-  dataInicio: string;
-  dataFim: string;
+  dataInicio: string | null;
+  dataFim: string | null;
   cor: string;
   progresso: number;
   visibility: "private" | "shared" | "public";
@@ -764,13 +808,13 @@ function ProjectEditDialog({
     if (projeto) {
       setNome(projeto.nome);
       setDescricao(projeto.descricao || "");
-      setStatus(projeto.status || "backlog");
+      setStatus(normalizeStatusForForm(projeto.status));
       setPrioridade(projeto.prioridade || "media");
       setCategoria(projeto.categoria || "");
       setCor(projeto.cor || "#00c853");
       setProgresso(projeto.progresso ?? 0);
-      setDataInicio(projeto.dataInicio ? projeto.dataInicio.split("T")[0] : "");
-      setDataFim(projeto.dataFim ? projeto.dataFim.split("T")[0] : "");
+      setDataInicio(toDateInputValue(projeto.dataInicio));
+      setDataFim(toDateInputValue(projeto.dataFim));
       setResponsavelId("keep");
       setVisibility(projeto.visibility ?? "private");
       setMemberIds(projeto.memberIds ?? []);
@@ -788,7 +832,9 @@ function ProjectEditDialog({
 
   const filteredUsersForMembers = useMemo(() => {
     return users
-      .filter((u) => (u.status ? u.status === "active" : true))
+      // Estritamente ativos — alinha com /api/users do projeto-dialog legado
+      // e evita "alguns aleatórios" quando a flag status vem ausente/legada.
+      .filter((u) => u.status === "active")
       .filter((u) => {
         if (memberIds.includes(u.id)) return false;
         if (!memberSearchInput) return true;
@@ -983,7 +1029,11 @@ function ProjectEditDialog({
             onClick={() => onSave({
               nome, descricao, status, prioridade, categoria,
               responsavelId: responsavelId && responsavelId !== "keep" ? responsavelId : undefined,
-              dataInicio, dataFim, cor, progresso,
+              // Defesa em profundidade — string vazia vira null antes de sair do client
+              // (backend já trata via toDateOrNull, mas evita ambiguidade do payload).
+              dataInicio: dataInicio || null,
+              dataFim: dataFim || null,
+              cor, progresso,
               visibility,
               memberIds: visibility === "shared" ? memberIds : [],
             })}

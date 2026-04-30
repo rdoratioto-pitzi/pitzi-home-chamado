@@ -49,6 +49,31 @@ function toDateOrNull(v: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * Mapa de migração lazy: status legado (criados pelo modal /projetos antigo ou
+ * pelo default do schema) → status canônico do workspace. Quando user edita um
+ * projeto antigo, o backend normaliza on-the-fly e persiste no formato novo.
+ */
+const STATUS_LEGACY_MAP: Record<string, string> = {
+  active: "ativo",
+  sprint_active: "ativo",
+  planning: "backlog",
+  on_hold: "pausado",
+  completed: "concluido",
+  archived: "inativo",
+};
+
+function normalizeProjectStatus(s: unknown): string | undefined {
+  if (s === null || s === undefined) return undefined;
+  const str = String(s);
+  const mapped = STATUS_LEGACY_MAP[str];
+  if (mapped) {
+    console.log("[normalize-status] migrated", { from: str, to: mapped });
+    return mapped;
+  }
+  return str;
+}
+
 interface Anexo { name: string; url: string }
 
 function mimeToName(mime: string, idx: number): string {
@@ -963,10 +988,12 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     const db = c.get("db");
     stage = "parse-body";
     const body = await c.req.json();
-    const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } = body;
+    const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } = body;
+    const status = normalizeProjectStatus(body.status);
 
+    stage = "validate-status";
     const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
-    if (status && !validStatuses.includes(status)) {
+    if (status !== undefined && !validStatuses.includes(status)) {
       return c.json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` }, 400);
     }
 

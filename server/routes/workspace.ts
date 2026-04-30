@@ -51,6 +51,31 @@ function toDateOrNull(v: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+/**
+ * Mapa de migração lazy: status legado (criados pelo modal /projetos antigo ou
+ * pelo default do schema) → status canônico do workspace. Quando user edita um
+ * projeto antigo, o backend normaliza on-the-fly e persiste no formato novo.
+ */
+const STATUS_LEGACY_MAP: Record<string, string> = {
+  active: "ativo",
+  sprint_active: "ativo",
+  planning: "backlog",
+  on_hold: "pausado",
+  completed: "concluido",
+  archived: "inativo",
+};
+
+function normalizeProjectStatus(s: unknown): string | undefined {
+  if (s === null || s === undefined) return undefined;
+  const str = String(s);
+  const mapped = STATUS_LEGACY_MAP[str];
+  if (mapped) {
+    console.log("[normalize-status] migrated", { from: str, to: mapped });
+    return mapped;
+  }
+  return str;
+}
+
 const kanbanStatusToPtBr: Record<string, string> = {
   todo: "a-fazer",
   doing: "em-andamento",
@@ -536,7 +561,7 @@ export function registerWorkspaceRoutes(router: Router) {
       if (!db) return res.status(500).json({ error: "Database not available" });
 
       stage = "parse-body";
-      const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } =
+      const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } =
         req.body as {
           nome?: string;
           descricao?: string;
@@ -551,10 +576,11 @@ export function registerWorkspaceRoutes(router: Router) {
           visibility?: string;
           memberIds?: string[];
         };
+      const status = normalizeProjectStatus((req.body as any).status);
 
       stage = "validate-status";
       const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
-      if (status && !validStatuses.includes(status)) {
+      if (status !== undefined && !validStatuses.includes(status)) {
         return res.status(400).json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` });
       }
 
