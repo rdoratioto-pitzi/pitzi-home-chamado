@@ -1477,6 +1477,35 @@ export function ProjetosView() {
         open={drawerOpen}
         item={selectedTarefa}
         onClose={() => setDrawerOpen(false)}
+        onUpdate={(updated) => {
+          // Drawer só nos chama com UnifiedItem aqui (selectedTarefa é UnifiedItem | null).
+          if (updated && "tipo" in updated && updated.tipo === "tarefa") {
+            const u = updated as UnifiedItem;
+            setSelectedTarefa(u);
+            // Atualiza a lista de projetos/tarefas para refletir a edição
+            // sem precisar refetch completo.
+            setProjetos((prev) =>
+              prev.map((p) => ({
+                ...p,
+                tarefas: p.tarefas.map((t) =>
+                  t.id === u.id
+                    ? {
+                        ...t,
+                        titulo: u.titulo,
+                        descricao: u.descricao ?? null,
+                        status: u.status,
+                        prioridade: u.prioridade,
+                        responsavel: u.responsavel,
+                        responsavelInitials: u.responsavelInitials,
+                        dataEntrega: u.dataEntrega ?? null,
+                        progresso: u.progresso ?? 0,
+                      }
+                    : t,
+                ),
+              })),
+            );
+          }
+        }}
       />
       <ProjectEditDialog
         projeto={editProjeto}

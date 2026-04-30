@@ -1004,14 +1004,15 @@ export function registerWorkspaceRoutes(router: Router) {
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
       const { id } = req.params;
-      const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao } = req.body as {
+      const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao, projetoId } = req.body as {
         status?: string;
         prioridade?: string;
         responsavelId?: string;
-        dataEntrega?: string;
+        dataEntrega?: string | null;
         progresso?: number;
         titulo?: string;
         descricao?: string;
+        projetoId?: string;
       };
 
       const ptBrToKanban: Record<string, string> = {
@@ -1036,6 +1037,33 @@ export function registerWorkspaceRoutes(router: Router) {
       if (progresso !== undefined) updateData.progress = progresso;
       if (titulo !== undefined) updateData.title = titulo.trim();
       if (descricao !== undefined) updateData.objectives = descricao;
+
+      // Mover tarefa para outro projeto: precisa reatribuir columnId,
+      // pois a coluna atual pertence ao projeto antigo.
+      if (projetoId !== undefined && projetoId !== prevCard?.projectId) {
+        const [targetProject] = await db
+          .select({ id: projects.id })
+          .from(projects)
+          .where(eq(projects.id, projetoId))
+          .limit(1);
+        if (!targetProject) {
+          return res.status(404).json({ error: "Projeto destino não encontrado" });
+        }
+        let [targetCol] = await db
+          .select({ id: kanbanColumns.id })
+          .from(kanbanColumns)
+          .where(eq(kanbanColumns.projectId, projetoId))
+          .orderBy(kanbanColumns.order)
+          .limit(1);
+        if (!targetCol) {
+          [targetCol] = await db
+            .insert(kanbanColumns)
+            .values({ projectId: projetoId, name: "A Fazer", order: 0 })
+            .returning({ id: kanbanColumns.id });
+        }
+        updateData.projectId = projetoId;
+        updateData.columnId = targetCol.id;
+      }
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ error: "Nenhum campo para atualizar" });
