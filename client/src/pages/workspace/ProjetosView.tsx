@@ -746,7 +746,7 @@ function ProjectEditDialog({
   const [status, setStatus] = useState("backlog");
   const [prioridade, setPrioridade] = useState("media");
   const [categoria, setCategoria] = useState("");
-  const [responsavelId, setResponsavelId] = useState("");
+  const [responsavelId, setResponsavelId] = useState("keep");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [cor, setCor] = useState("#00c853");
@@ -764,7 +764,7 @@ function ProjectEditDialog({
       setProgresso(projeto.progresso ?? 0);
       setDataInicio(projeto.dataInicio ? projeto.dataInicio.split("T")[0] : "");
       setDataFim(projeto.dataFim ? projeto.dataFim.split("T")[0] : "");
-      setResponsavelId("");
+      setResponsavelId("keep");
     }
   }, [projeto]);
 
@@ -830,7 +830,7 @@ function ProjectEditDialog({
               <Select value={responsavelId} onValueChange={setResponsavelId}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder={projeto?.responsavel || "Manter atual"} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Manter atual ({projeto?.responsavel})</SelectItem>
+                  <SelectItem value="keep">Manter atual ({projeto?.responsavel})</SelectItem>
                   {users.map((u) => (
                     <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                   ))}
@@ -884,7 +884,7 @@ function ProjectEditDialog({
           <Button
             onClick={() => onSave({
               nome, descricao, status, prioridade, categoria,
-              responsavelId: responsavelId || undefined,
+              responsavelId: responsavelId && responsavelId !== "keep" ? responsavelId : undefined,
               dataInicio, dataFim, cor, progresso,
             })}
             disabled={saving || !nome.trim()}
