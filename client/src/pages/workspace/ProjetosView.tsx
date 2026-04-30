@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil, ChevronRight, MoreHorizontal, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil, ChevronRight, MoreHorizontal, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown, User as UserIcon, Users, Globe, UserPlus, X } from "lucide-react";
 import { KpiStrip } from "@/components/workspace/KpiStrip";
 import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import type { UnifiedItem } from "@/components/workspace/WorkspaceTable";
@@ -69,6 +69,8 @@ interface ProjetoComTarefas {
   progresso: number | null;
   cor: string | null;
   categoria: string | null;
+  visibility?: "private" | "shared" | "public" | null;
+  memberIds?: string[];
   criadoEm: string | null;
   tarefas: TarefaItem[];
 }
@@ -726,6 +728,8 @@ interface ProjectEditFormData {
   dataFim: string;
   cor: string;
   progresso: number;
+  visibility: "private" | "shared" | "public";
+  memberIds: string[];
 }
 
 function ProjectEditDialog({
@@ -746,12 +750,15 @@ function ProjectEditDialog({
   const [status, setStatus] = useState("backlog");
   const [prioridade, setPrioridade] = useState("media");
   const [categoria, setCategoria] = useState("");
-  const [responsavelId, setResponsavelId] = useState("");
+  const [responsavelId, setResponsavelId] = useState("keep");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [cor, setCor] = useState("#00c853");
   const [progresso, setProgresso] = useState(0);
-  const [users, setUsers] = useState<Array<{ id: string; name: string }>>([]);
+  const [visibility, setVisibility] = useState<"private" | "shared" | "public">("private");
+  const [memberIds, setMemberIds] = useState<string[]>([]);
+  const [memberSearchInput, setMemberSearchInput] = useState("");
+  const [users, setUsers] = useState<Array<{ id: string; name: string; email?: string; status?: string }>>([]);
 
   useEffect(() => {
     if (projeto) {
@@ -764,7 +771,10 @@ function ProjectEditDialog({
       setProgresso(projeto.progresso ?? 0);
       setDataInicio(projeto.dataInicio ? projeto.dataInicio.split("T")[0] : "");
       setDataFim(projeto.dataFim ? projeto.dataFim.split("T")[0] : "");
-      setResponsavelId("");
+      setResponsavelId("keep");
+      setVisibility(projeto.visibility ?? "private");
+      setMemberIds(projeto.memberIds ?? []);
+      setMemberSearchInput("");
     }
   }, [projeto]);
 
@@ -772,9 +782,21 @@ function ProjectEditDialog({
     if (!open) return;
     fetchWithAuth("/api/users")
       .then((r) => r.json())
-      .then((data: Array<{ id: string; name: string }>) => setUsers(data || []))
+      .then((data: Array<{ id: string; name: string; email?: string; status?: string }>) => setUsers(data || []))
       .catch(() => {});
   }, [open]);
+
+  const filteredUsersForMembers = useMemo(() => {
+    return users
+      .filter((u) => (u.status ? u.status === "active" : true))
+      .filter((u) => {
+        if (memberIds.includes(u.id)) return false;
+        if (!memberSearchInput) return true;
+        const q = memberSearchInput.toLowerCase();
+        return u.name.toLowerCase().includes(q) || (u.email?.toLowerCase().includes(q) ?? false);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [users, memberIds, memberSearchInput]);
 
   const formatDate = (d: string | null) =>
     d ? new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—";
@@ -830,7 +852,7 @@ function ProjectEditDialog({
               <Select value={responsavelId} onValueChange={setResponsavelId}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder={projeto?.responsavel || "Manter atual"} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Manter atual ({projeto?.responsavel})</SelectItem>
+                  <SelectItem value="keep">Manter atual ({projeto?.responsavel})</SelectItem>
                   {users.map((u) => (
                     <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                   ))}
@@ -842,6 +864,82 @@ function ProjectEditDialog({
               <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} className="mt-1" />
             </div>
           </div>
+          <div>
+            <Label className="text-xs">Visibilidade</Label>
+            <Select value={visibility} onValueChange={(v) => setVisibility(v as "private" | "shared" | "public")}>
+              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">
+                  <div className="flex items-center gap-2"><UserIcon className="h-4 w-4" /> Privada</div>
+                </SelectItem>
+                <SelectItem value="shared">
+                  <div className="flex items-center gap-2"><Users className="h-4 w-4" /> Compartilhada</div>
+                </SelectItem>
+                <SelectItem value="public">
+                  <div className="flex items-center gap-2"><Globe className="h-4 w-4" /> Pública</div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {visibility === "private"
+                ? "Apenas o responsável pode ver este projeto."
+                : visibility === "shared"
+                ? "O responsável e os membros selecionados podem ver este projeto."
+                : "Todos os usuários podem ver este projeto."}
+            </p>
+          </div>
+
+          {visibility === "shared" && (
+            <div className="space-y-2">
+              <Label className="text-xs">Membros</Label>
+              <div className="relative">
+                <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar usuário para adicionar..."
+                  value={memberSearchInput}
+                  onChange={(e) => setMemberSearchInput(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              {memberSearchInput && filteredUsersForMembers.length > 0 && (
+                <div className="border rounded-md max-h-32 overflow-y-auto">
+                  {filteredUsersForMembers.slice(0, 5).map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover-elevate"
+                      onClick={() => {
+                        setMemberIds((prev) => [...prev, user.id]);
+                        setMemberSearchInput("");
+                      }}
+                    >
+                      {user.name}
+                      {user.email && <span className="text-muted-foreground"> ({user.email})</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {memberIds.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {memberIds.map((uid) => {
+                    const user = users.find((u) => u.id === uid);
+                    return (
+                      <Badge key={uid} variant="secondary" className="gap-1">
+                        {user?.name || uid}
+                        <button
+                          type="button"
+                          onClick={() => setMemberIds((prev) => prev.filter((id) => id !== uid))}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs">Data Início</Label>
@@ -884,8 +982,10 @@ function ProjectEditDialog({
           <Button
             onClick={() => onSave({
               nome, descricao, status, prioridade, categoria,
-              responsavelId: responsavelId || undefined,
+              responsavelId: responsavelId && responsavelId !== "keep" ? responsavelId : undefined,
               dataInicio, dataFim, cor, progresso,
+              visibility,
+              memberIds: visibility === "shared" ? memberIds : [],
             })}
             disabled={saving || !nome.trim()}
           >
