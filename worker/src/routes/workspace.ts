@@ -5,6 +5,7 @@ import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import {
   projects,
+  projectMembers,
   kanbanCards,
   kanbanColumns,
   kanbanComments,
@@ -446,6 +447,8 @@ workspace.post("/api/workspace/projetos", async (c) => {
       dataInicio?: string;
       dataFim?: string;
       categoria?: string;
+      visibility?: string;
+      memberIds?: string[];
     }>();
     const {
       nome,
@@ -455,11 +458,20 @@ workspace.post("/api/workspace/projetos", async (c) => {
       dataInicio,
       dataFim,
       categoria,
+      visibility,
+      memberIds,
     } = body;
 
     if (!nome?.trim()) {
       return c.json({ error: "Nome obrigatório" }, 400);
     }
+
+    const validVisibilities = ["private", "shared", "public"] as const;
+    type Visibility = typeof validVisibilities[number];
+    if (visibility !== undefined && !(validVisibilities as readonly string[]).includes(visibility)) {
+      return c.json({ error: `Visibilidade inválida. Aceitos: ${validVisibilities.join(", ")}` }, 400);
+    }
+    const finalVisibility: Visibility = (visibility as Visibility | undefined) ?? "private";
 
     const allProjects = await db.select().from(projects);
     const maxCode = allProjects
@@ -481,16 +493,32 @@ workspace.post("/api/workspace/projetos", async (c) => {
         endDate: dataFim ? new Date(dataFim) : null,
         color: "#00c853",
         category: categoria || null,
+        visibility: finalVisibility,
         progress: 0,
       })
       .returning();
+
+    const storage = getStorage(db);
+
+    // Insere membros quando shared (espelha worker/src/routes/projects.ts)
+    if (finalVisibility === "shared" && Array.isArray(memberIds) && memberIds.length > 0) {
+      for (const uid of memberIds) {
+        try {
+          await storage.addProjectMember({
+            projectId: projeto.id,
+            userId: uid,
+            role: "member",
+          });
+        } catch (_e) {
+          // Ignora membros inválidos
+        }
+      }
+    }
 
     // Slack: notifica criação no canal (skipa se visibility=private).
     fireSlack(c, () =>
       notifyProjetoCriado({ db: db as SlackDb, env: slackEnv(c.env) }, projeto.id),
     );
-
-    const storage = getStorage(db);
     const allUsers = await storage.getUsers();
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
     const responsavel = projeto.ownerId
@@ -515,6 +543,7 @@ workspace.post("/api/workspace/projetos", async (c) => {
         responsavel: respNome,
         responsavelInitials: respInitials,
         cor: projeto.color,
+        visibility: projeto.visibility,
         criadoEm: (projeto.createdAt || "").toString(),
       },
       201,
@@ -661,13 +690,20 @@ workspace.get("/api/workspace/projetos", async (c) => {
   try {
     const db = c.get("db");
 
-    const [allProjects, cards, allUsers] = await Promise.all([
+    const [allProjects, cards, allUsers, allMembers] = await Promise.all([
       db.select().from(projects),
       db.select().from(kanbanCards),
       db.select().from(users),
+      db.select().from(projectMembers),
     ]);
 
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
+    const membersByProject = new Map<string, string[]>();
+    for (const m of allMembers) {
+      const arr = membersByProject.get(m.projectId) ?? [];
+      arr.push(m.userId);
+      membersByProject.set(m.projectId, arr);
+    }
 
     const projetosComTarefas = allProjects.map((p) => {
       const cardsDoProjeto = cards.filter((c) => c.projectId === p.id);
@@ -694,6 +730,8 @@ workspace.get("/api/workspace/projetos", async (c) => {
         progresso: p.progress,
         cor: p.color,
         categoria: p.category,
+        visibility: p.visibility,
+        memberIds: membersByProject.get(p.id) ?? [],
         criadoEm: p.createdAt ? String(p.createdAt) : null,
         tarefas: cardsDoProjeto.map((c) => {
           const tResp = c.assigneeId ? userMap.get(c.assigneeId) : null;
@@ -909,11 +947,23 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     const db = c.get("db");
     const id = c.req.param("id");
     const body = await c.req.json();
-    const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso } = body;
+    const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } = body;
 
     const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
     if (status && !validStatuses.includes(status)) {
       return c.json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` }, 400);
+    }
+
+    const validVisibilities = ["private", "shared", "public"] as const;
+    type Visibility = typeof validVisibilities[number];
+    if (visibility !== undefined && !(validVisibilities as readonly string[]).includes(visibility)) {
+      return c.json({ error: `Visibilidade inválida. Aceitos: ${validVisibilities.join(", ")}` }, 400);
+    }
+
+    const storage = getStorage(db);
+    const existing = await storage.getProject(id);
+    if (!existing) {
+      return c.json({ error: "Projeto não encontrado" }, 404);
     }
 
     const updateData: Record<string, any> = {};
@@ -927,19 +977,48 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     if (categoria !== undefined) updateData.category = categoria;
     if (cor !== undefined) updateData.color = cor;
     if (progresso !== undefined) updateData.progress = Math.max(0, Math.min(100, progresso));
+    if (visibility !== undefined) updateData.visibility = visibility;
 
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(updateData).length === 0 && memberIds === undefined) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
     }
 
-    const [updated] = await db
-      .update(projects)
-      .set(updateData)
-      .where(eq(projects.id, id))
-      .returning();
+    let updated = existing;
+    if (Object.keys(updateData).length > 0) {
+      const [u] = await db
+        .update(projects)
+        .set(updateData)
+        .where(eq(projects.id, id))
+        .returning();
+      if (!u) return c.json({ error: "Projeto não encontrado" }, 404);
+      updated = u;
+    }
 
-    if (!updated) {
-      return c.json({ error: "Projeto não encontrado" }, 404);
+    // Upsert de project_members (espelha worker/src/routes/projects.ts)
+    const effectiveVisibility = (visibility as Visibility | undefined) ?? (existing.visibility as Visibility);
+    if (effectiveVisibility === "shared" && Array.isArray(memberIds)) {
+      const currentMembers = await storage.getProjectMembers(id);
+      const currentMemberIds = new Set(currentMembers.map((m) => m.userId));
+      const newMemberIds = new Set(memberIds as string[]);
+
+      for (const uid of memberIds as string[]) {
+        if (!currentMemberIds.has(uid)) {
+          try {
+            await storage.addProjectMember({ projectId: id, userId: uid, role: "member" });
+          } catch (_e) { /* ignora */ }
+        }
+      }
+      for (const member of currentMembers) {
+        if (!newMemberIds.has(member.userId)) {
+          await storage.removeProjectMember(member.id);
+        }
+      }
+    } else if (effectiveVisibility !== "shared") {
+      // Limpa membros se virou private/public
+      const currentMembers = await storage.getProjectMembers(id);
+      for (const member of currentMembers) {
+        await storage.removeProjectMember(member.id);
+      }
     }
 
     return c.json({
@@ -948,6 +1027,7 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
       nome: updated.name,
       status: updated.status,
       prioridade: updated.priority,
+      visibility: updated.visibility,
     });
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
