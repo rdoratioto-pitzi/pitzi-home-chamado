@@ -943,9 +943,11 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
 
 // ─── PATCH projetos ───────────────────────────────────────────────────────────
 workspace.patch("/api/workspace/projetos/:id", async (c) => {
+  const id = c.req.param("id");
+  let stage = "init";
   try {
     const db = c.get("db");
-    const id = c.req.param("id");
+    stage = "parse-body";
     const body = await c.req.json();
     const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } = body;
 
@@ -961,11 +963,13 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     }
 
     const storage = getStorage(db);
+    stage = "load-existing";
     const existing = await storage.getProject(id);
     if (!existing) {
       return c.json({ error: "Projeto não encontrado" }, 404);
     }
 
+    stage = "build-updateData";
     const updateData: Record<string, any> = {};
     if (nome !== undefined) updateData.name = nome.trim();
     if (descricao !== undefined) updateData.description = descricao;
@@ -985,6 +989,8 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
 
     let updated = existing;
     if (Object.keys(updateData).length > 0) {
+      stage = "db.update";
+      console.log("[PATCH /api/workspace/projetos/:id] db.update", { id, fields: Object.keys(updateData) });
       const [u] = await db
         .update(projects)
         .set(updateData)
@@ -997,27 +1003,42 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     // Upsert de project_members (espelha worker/src/routes/projects.ts)
     const effectiveVisibility = (visibility as Visibility | undefined) ?? (existing.visibility as Visibility);
     if (effectiveVisibility === "shared" && Array.isArray(memberIds)) {
+      stage = "members.shared.load";
       const currentMembers = await storage.getProjectMembers(id);
       const currentMemberIds = new Set(currentMembers.map((m) => m.userId));
       const newMemberIds = new Set(memberIds as string[]);
 
       for (const uid of memberIds as string[]) {
         if (!currentMemberIds.has(uid)) {
+          stage = `members.add(${uid})`;
           try {
             await storage.addProjectMember({ projectId: id, userId: uid, role: "member" });
-          } catch (_e) { /* ignora */ }
+          } catch (e: any) {
+            console.error("[PATCH /api/workspace/projetos/:id] addProjectMember falhou (ignorado)", { id, uid, msg: e?.message, stack: e?.stack });
+          }
         }
       }
       for (const member of currentMembers) {
         if (!newMemberIds.has(member.userId)) {
-          await storage.removeProjectMember(member.id);
+          stage = `members.remove(${member.id})`;
+          try {
+            await storage.removeProjectMember(member.id);
+          } catch (e: any) {
+            console.error("[PATCH /api/workspace/projetos/:id] removeProjectMember falhou (ignorado)", { id, memberId: member.id, msg: e?.message, stack: e?.stack });
+          }
         }
       }
     } else if (effectiveVisibility !== "shared") {
       // Limpa membros se virou private/public
+      stage = "members.cleanup.load";
       const currentMembers = await storage.getProjectMembers(id);
       for (const member of currentMembers) {
-        await storage.removeProjectMember(member.id);
+        stage = `members.cleanup(${member.id})`;
+        try {
+          await storage.removeProjectMember(member.id);
+        } catch (e: any) {
+          console.error("[PATCH /api/workspace/projetos/:id] cleanup removeProjectMember falhou (ignorado)", { id, memberId: member.id, msg: e?.message, stack: e?.stack });
+        }
       }
     }
 
@@ -1030,7 +1051,15 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
       visibility: updated.visibility,
     });
   } catch (error: any) {
-    return c.json({ error: error.message }, error.status || 500);
+    console.error("[PATCH /api/workspace/projetos/:id] FALHOU", {
+      id,
+      stage,
+      msg: error?.message,
+      name: error?.name,
+      code: error?.code,
+      stack: error?.stack,
+    });
+    return c.json({ error: error.message, stage }, error.status || 500);
   }
 });
 

@@ -516,10 +516,12 @@ export function registerWorkspaceRoutes(router: Router) {
 
   // ─── PATCH projetos ───────────────────────────────────────────────────────────
   router.patch("/api/workspace/projetos/:id", requireAuth, async (req, res) => {
+    const id = String(req.params.id);
+    let stage = "init";
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
 
-      const id = String(req.params.id);
+      stage = "parse-body";
       const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } =
         req.body as {
           nome?: string;
@@ -536,22 +538,26 @@ export function registerWorkspaceRoutes(router: Router) {
           memberIds?: string[];
         };
 
+      stage = "validate-status";
       const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
       if (status && !validStatuses.includes(status)) {
         return res.status(400).json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` });
       }
 
+      stage = "validate-visibility";
       const validVisibilities = ["private", "shared", "public"] as const;
       type Visibility = typeof validVisibilities[number];
       if (visibility !== undefined && !(validVisibilities as readonly string[]).includes(visibility)) {
         return res.status(400).json({ error: `Visibilidade inválida. Aceitos: ${validVisibilities.join(", ")}` });
       }
 
+      stage = "load-existing";
       const existing = await storage.getProject(id);
       if (!existing) {
         return res.status(404).json({ error: "Projeto não encontrado" });
       }
 
+      stage = "build-updateData";
       const updateData: Record<string, any> = {};
       if (nome !== undefined) updateData.name = nome.trim();
       if (descricao !== undefined) updateData.description = descricao;
@@ -571,6 +577,8 @@ export function registerWorkspaceRoutes(router: Router) {
 
       let updated = existing;
       if (Object.keys(updateData).length > 0) {
+        stage = "db.update";
+        console.log("[PATCH /api/workspace/projetos/:id] db.update", { id, fields: Object.keys(updateData) });
         const [u] = await db
           .update(projects)
           .set(updateData)
@@ -583,27 +591,42 @@ export function registerWorkspaceRoutes(router: Router) {
       // Upsert de project_members (espelha worker/src/routes/projects.ts)
       const effectiveVisibility = (visibility as Visibility | undefined) ?? (existing.visibility as Visibility);
       if (effectiveVisibility === "shared" && Array.isArray(memberIds)) {
+        stage = "members.shared.load";
         const currentMembers = await storage.getProjectMembers(id);
         const currentMemberIds = new Set(currentMembers.map((m) => m.userId));
         const newMemberIds = new Set(memberIds);
 
         for (const uid of memberIds) {
           if (!currentMemberIds.has(uid)) {
+            stage = `members.add(${uid})`;
             try {
               await storage.addProjectMember({ projectId: id, userId: uid, role: "member" });
-            } catch (_e) { /* ignora */ }
+            } catch (e: any) {
+              console.error("[PATCH /api/workspace/projetos/:id] addProjectMember falhou (ignorado)", { id, uid, msg: e?.message, stack: e?.stack });
+            }
           }
         }
         for (const member of currentMembers) {
           if (!newMemberIds.has(member.userId)) {
-            await storage.removeProjectMember(member.id);
+            stage = `members.remove(${member.id})`;
+            try {
+              await storage.removeProjectMember(member.id);
+            } catch (e: any) {
+              console.error("[PATCH /api/workspace/projetos/:id] removeProjectMember falhou (ignorado)", { id, memberId: member.id, msg: e?.message, stack: e?.stack });
+            }
           }
         }
       } else if (effectiveVisibility !== "shared") {
         // Limpa membros se virou private/public
+        stage = "members.cleanup.load";
         const currentMembers = await storage.getProjectMembers(id);
         for (const member of currentMembers) {
-          await storage.removeProjectMember(member.id);
+          stage = `members.cleanup(${member.id})`;
+          try {
+            await storage.removeProjectMember(member.id);
+          } catch (e: any) {
+            console.error("[PATCH /api/workspace/projetos/:id] cleanup removeProjectMember falhou (ignorado)", { id, memberId: member.id, msg: e?.message, stack: e?.stack });
+          }
         }
       }
 
@@ -616,7 +639,15 @@ export function registerWorkspaceRoutes(router: Router) {
         visibility: updated.visibility,
       });
     } catch (error: any) {
-      return res.status(error.status || 500).json({ error: error.message });
+      console.error("[PATCH /api/workspace/projetos/:id] FALHOU", {
+        id,
+        stage,
+        msg: error?.message,
+        name: error?.name,
+        code: error?.code,
+        stack: error?.stack,
+      });
+      return res.status(error.status || 500).json({ error: error.message, stage });
     }
   });
 
