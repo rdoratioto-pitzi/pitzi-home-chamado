@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil, ChevronRight, MoreHorizontal, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown, User as UserIcon, Users, Globe, UserPlus, X } from "lucide-react";
+import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil, MoreHorizontal, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown, User as UserIcon, Users, Globe, UserPlus, X } from "lucide-react";
 import { KpiStrip } from "@/components/workspace/KpiStrip";
 import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import type { UnifiedItem } from "@/components/workspace/WorkspaceTable";
@@ -169,151 +169,14 @@ const priorityColors: Record<string, string> = {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function ProjectGroupHeader({
-  projeto,
-  collapsed,
-  onToggle,
-  onEdit,
-}: {
-  projeto: ProjetoComTarefas;
-  collapsed: boolean;
-  onToggle: () => void;
-  onEdit?: () => void;
-}) {
-  const cor = projeto.cor || "#00c853";
-  const prog = projeto.progresso ?? 0;
-  const tarefaCount = projeto.tarefas.length;
 
-  return (
-    <div
-      className="flex items-center gap-2 px-4 py-2 group cursor-pointer select-none bg-muted/20"
-      onClick={onToggle}
-    >
-      <ChevronRight
-        size={14}
-        className="transition-transform duration-200 flex-shrink-0 text-muted-foreground"
-        style={{
-          transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
-        }}
-      />
-      <span
-        style={{
-          width: 7,
-          height: 7,
-          borderRadius: "50%",
-          background: cor,
-          display: "inline-block",
-          flexShrink: 0,
-        }}
-      />
-      <span
-        className="text-muted-foreground"
-        style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          textTransform: "uppercase",
-          fontSize: "10px",
-          letterSpacing: "0.05em",
-        }}
-      >
-        {projeto.nome}
-      </span>
-      <Badge
-        variant="outline"
-        className="text-[10px] px-1.5 py-0 border"
-        style={{
-          background: `${cor}15`,
-          color: cor,
-          borderColor: `${cor}40`,
-        }}
-      >
-        {prog}%
-      </Badge>
-      <span
-        className="text-muted-foreground/70"
-        style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "10px",
-        }}
-      >
-        {projeto.codigo}
-      </span>
-      {collapsed && tarefaCount > 0 && (
-        <span
-          className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-          }}
-        >
-          {tarefaCount} {tarefaCount === 1 ? "atividade" : "atividades"}
-        </span>
-      )}
-      {onEdit && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
-          title="Editar projeto"
-        >
-          <Pencil size={12} className="text-muted-foreground" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function HeaderRow() {
-  const headers = [
-    "Código",
-    "Título",
-    "Categoria / Tipo",
-    "Responsável",
-    "Status",
-    "Prioridade",
-    "Progresso",
-    "Data Início",
-    "Data Fim",
-    "",
-  ];
-  return (
-    <div
-      className="grid items-center px-4 py-2 gap-2 border-b border-border/40"
-      style={{
-        gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-      }}
-    >
-      {headers.map((h, i) => (
-        <span
-          key={i}
-          className="text-muted-foreground/70"
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            textTransform: "uppercase",
-            fontSize: "9px",
-            letterSpacing: "0.05em",
-          }}
-        >
-          {h}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function EmptyTarefasRow() {
-  return (
-    <div className="flex items-center px-4 py-3 border-b border-border/30">
-      <span className="text-xs italic text-muted-foreground" style={{ paddingLeft: 18 }}>
-        Nenhuma atividade neste projeto
-      </span>
-    </div>
-  );
-}
-
-const FLAT_GRID = "96px 1fr 175px 100px 115px 110px 62px 88px 30px";
+const FLAT_GRID = "96px 1fr 175px 130px 100px 115px 110px 62px 88px 30px";
 
 const FLAT_HEADERS: { label: string; field: SortField | null }[] = [
   { label: "Código", field: "codigo" },
   { label: "Título", field: "titulo" },
   { label: "Projeto", field: "projeto" },
+  { label: "Categoria / Tipo", field: null },
   { label: "Responsável", field: "responsavel" },
   { label: "Status", field: "status" },
   { label: "Prioridade", field: "prioridade" },
@@ -388,11 +251,22 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
       </span>
 
       {/* Projeto */}
-      <div className="flex items-center gap-1.5 min-w-0 truncate">
+      <div className="flex items-center gap-1.5 min-w-0 truncate" title={tarefa.projetoNome}>
         <span className="inline-block flex-shrink-0" style={{ width: 7, height: 7, borderRadius: "50%", background: tarefa.projetoCor }} />
         <span className="text-xs truncate" style={{ color: tarefa.projetoCor, opacity: 0.85 }}>
-          {tarefa.projetoNome}
+          {tarefa.projetoNome || "—"}
         </span>
+      </div>
+
+      {/* Categoria / Tipo */}
+      <div className="flex items-center gap-1.5 min-w-0 truncate">
+        <span className="text-xs truncate" style={{ color: "hsl(var(--muted-foreground))" }}>
+          {tarefa.sprint || "—"}
+        </span>
+        <span style={{ color: "hsl(var(--muted-foreground) / 0.4)" }}>·</span>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-teal-500/10 text-teal-400 border-teal-700">
+          Tarefa
+        </Badge>
       </div>
 
       {/* Responsável */}
@@ -461,135 +335,6 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
   );
 }
 
-function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: TarefaItem; projetoCor: string; onClick?: () => void; onEdit?: () => void; onDelete?: () => void }) {
-  const status = tarefa.status || "a-fazer";
-  const dotColor = statusDotColors[status] || "hsl(var(--muted-foreground) / 0.45)";
-  const prioridade = tarefa.prioridade || "media";
-  const prioColor = priorityColors[prioridade] || priorityColors.media;
-  const prog = tarefa.progresso ?? 0;
-
-  const dataInicio = tarefa.criadoEm
-    ? new Date(tarefa.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-    : "—";
-
-  return (
-    <div
-      className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer border-b border-border/30 hover:bg-muted/40"
-      onClick={onClick}
-      style={{
-        gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-        borderBottom: "1px solid hsl(var(--border) / 0.5)",
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(var(--muted))")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-    >
-      {/* Código */}
-      <div className="flex items-center gap-2 min-w-0">
-        <span
-          className="inline-block flex-shrink-0"
-          style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor }}
-        />
-        <span
-          className="text-xs text-muted-foreground truncate"
-          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-        >
-          {tarefa.codigo}
-        </span>
-      </div>
-
-      {/* Título */}
-      <span className="text-sm truncate text-foreground">
-        {tarefa.titulo}
-      </span>
-
-      {/* Categoria / Tipo */}
-      <div className="flex items-center gap-1.5 min-w-0 truncate">
-        <span className="text-xs truncate" style={{ color: projetoCor, opacity: 0.7 }}>
-          {tarefa.sprint || "—"}
-        </span>
-        <span className="text-muted-foreground/40">·</span>
-        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-slate-500/10 text-slate-400">
-          atividade
-        </Badge>
-      </div>
-
-      {/* Responsável */}
-      <div className="flex items-center gap-1.5 min-w-0">
-        <div
-          className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold h-[22px] w-[22px] bg-primary/15 text-primary"
-        >
-          {tarefa.responsavelInitials}
-        </div>
-        {tarefa.responsavel && tarefa.responsavel !== "Não atribuído" && (
-          <span className="text-xs truncate text-muted-foreground">
-            {tarefa.responsavel}
-          </span>
-        )}
-      </div>
-
-      {/* Status */}
-      <span className="text-xs text-muted-foreground">
-        {statusLabels[status] || status}
-      </span>
-
-      {/* Prioridade */}
-      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
-        {priorityLabels[prioridade] || prioridade}
-      </Badge>
-
-      {/* Progresso */}
-      <div className="flex items-center gap-1">
-        <div style={{ width: 56, height: 4, borderRadius: 2, background: "hsl(var(--muted))" }}>
-          <div
-            style={{
-              width: `${Math.min(prog, 100)}%`,
-              height: "100%",
-              borderRadius: 2,
-              background: projetoCor,
-            }}
-          />
-        </div>
-        <span
-          className="text-[10px] text-muted-foreground"
-          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-        >
-          {prog}%
-        </span>
-      </div>
-
-      {/* Data Início */}
-      <span className="text-xs text-muted-foreground">{dataInicio}</span>
-
-      {/* Data Fim */}
-      <span className="text-xs text-muted-foreground">
-        {tarefa.dataEntrega
-          ? new Date(tarefa.dataEntrega).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-          : "—"}
-      </span>
-
-      {/* Actions */}
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="p-1 rounded hover:bg-muted">
-              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(); }}>
-              <Edit className="h-3.5 w-3.5 mr-2" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-400" onClick={(e) => { e.stopPropagation(); onDelete?.(); }}>
-              <Trash2 className="h-3.5 w-3.5 mr-2" />
-              Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
-  );
-}
 
 function SkeletonRows() {
   return (
@@ -620,7 +365,15 @@ function SkeletonRows() {
 
 // ─── Kanban View ─────────────────────────────────────────────────────────────
 
-function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoComTarefas[]; onStatusChange?: () => void }) {
+function ProjectsKanbanView({
+  projetos,
+  onStatusChange,
+  onTarefaClick,
+}: {
+  projetos: ProjetoComTarefas[];
+  onStatusChange?: () => void;
+  onTarefaClick?: (tarefa: ProjetoComTarefas["tarefas"][number] & { projetoCor: string; projetoNome: string }) => void;
+}) {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
@@ -696,14 +449,15 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                   draggable
                   onDragStart={() => setDraggingId(t.id)}
                   onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }}
-                  className="p-3 rounded cursor-grab active:cursor-grabbing"
+                  onClick={() => { if (onTarefaClick) onTarefaClick(t); }}
+                  className="p-3 rounded cursor-pointer active:cursor-grabbing transition-colors"
                   style={{
                     background: draggingId === t.id ? "hsl(var(--primary) / 0.1)" : "hsl(var(--muted) / 0.35)",
                     border: draggingId === t.id ? "1px solid hsl(var(--primary) / 0.35)" : "1px solid hsl(var(--border) / 0.8)",
                     opacity: draggingId === t.id ? 0.6 : 1,
                   }}
                 >
-                  <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="flex items-center gap-1.5 mb-1">
                     <span
                       style={{
                         fontFamily: "'JetBrains Mono', monospace",
@@ -715,6 +469,15 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                       {t.codigo}
                     </span>
                   </div>
+                  {t.projetoNome && (
+                    <p
+                      className="text-[10px] truncate mb-1"
+                      title={t.projetoNome}
+                      style={{ color: "hsl(var(--muted-foreground))" }}
+                    >
+                      {t.projetoNome}
+                    </p>
+                  )}
                   <p className="text-xs mb-2 text-foreground">
                     {t.titulo}
                   </p>
@@ -1085,17 +848,22 @@ export function ProjetosView() {
   });
   const [projetos, setProjetos] = useState<ProjetoComTarefas[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [codigoQuery, setCodigoQuery] = useState("");
+  const [codigoQueryDebounced, setCodigoQueryDebounced] = useState("");
   const [projetoFilter, setProjetoFilter] = useState("all");
   const [filtroKpi, setFiltroKpi] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("lista");
-  const [statusFilter, setStatusFilter] = useState("all");
+  // Dois filtros independentes, aplicados em AND:
+  // - statusFilter: status do PROJETO (default "ativo")
+  // - tarefaStatusFilter: status da TAREFA (default "all")
+  const [statusFilter, setStatusFilter] = useState<string>("ativo");
+  const [tarefaStatusFilter, setTarefaStatusFilter] = useState<string>("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [selectedTarefa, setSelectedTarefa] = useState<UnifiedItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editProjeto, setEditProjeto] = useState<ProjetoComTarefas | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [emTratativa, setEmTratativa] = useState(false);
   const [sortField, setSortField] = useState<SortField>("projeto");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -1110,61 +878,6 @@ export function ProjetosView() {
   };
 
   const EM_TRATATIVA_STATUSES = ["a-fazer", "em-andamento", "bloqueado"];
-
-  const sortedFlatTarefas = useMemo<TarefaFlat[]>(() => {
-    if (!emTratativa) return [];
-    let list: TarefaFlat[] = projetos.flatMap((p) =>
-      p.tarefas
-        .filter((t) => EM_TRATATIVA_STATUSES.includes(t.status || ""))
-        .map((t) => ({ ...t, projetoNome: p.nome, projetoCor: p.cor || "#00c853" }))
-    );
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (t) =>
-          t.titulo.toLowerCase().includes(q) ||
-          t.codigo.toLowerCase().includes(q) ||
-          t.responsavel.toLowerCase().includes(q) ||
-          t.projetoNome.toLowerCase().includes(q)
-      );
-    }
-    if (responsavelFilter !== "all") {
-      list = list.filter((t) => t.responsavel === responsavelFilter);
-    }
-    return [...list].sort((a, b) => {
-      if (sortField === "prioridade") {
-        const order: Record<string, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
-        const diff = (order[a.prioridade || ""] ?? 4) - (order[b.prioridade || ""] ?? 4);
-        return sortDir === "asc" ? diff : -diff;
-      }
-      if (sortField === "progresso") {
-        const diff = (a.progresso ?? 0) - (b.progresso ?? 0);
-        return sortDir === "asc" ? diff : -diff;
-      }
-      const map: Record<SortField, string> = {
-        codigo: a.codigo,
-        titulo: a.titulo,
-        projeto: a.projetoNome,
-        responsavel: a.responsavel,
-        status: a.status || "",
-        dataFim: a.dataEntrega || "",
-        prioridade: "",
-        progresso: "",
-      };
-      const mapB: Record<SortField, string> = {
-        codigo: b.codigo,
-        titulo: b.titulo,
-        projeto: b.projetoNome,
-        responsavel: b.responsavel,
-        status: b.status || "",
-        dataFim: b.dataEntrega || "",
-        prioridade: "",
-        progresso: "",
-      };
-      const cmp = map[sortField].localeCompare(mapB[sortField], "pt-BR");
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [emTratativa, projetos, searchQuery, responsavelFilter, sortField, sortDir]);
 
   const handleSaveEdit = async (formData: ProjectEditFormData) => {
     if (!editProjeto) return;
@@ -1230,7 +943,7 @@ export function ProjetosView() {
       toast({ title: "Atividade excluída com sucesso" });
       refreshData();
     } catch {
-      toast({ title: "Erro ao excluir atividade", variant: "destructive" });
+      toast({ title: "Erro ao excluir tarefa", variant: "destructive" });
     }
   };
 
@@ -1270,55 +983,112 @@ export function ProjetosView() {
     return true;
   }
 
+  // Debounce 250ms pra busca por código
+  useEffect(() => {
+    const t = setTimeout(() => setCodigoQueryDebounced(codigoQuery.trim().toLowerCase()), 250);
+    return () => clearTimeout(t);
+  }, [codigoQuery]);
+
+  const matchProjetoStatus = (p: ProjetoComTarefas) =>
+    statusFilter === "all" || normalizeStatusForForm(p.status) === statusFilter;
+
+  const matchTarefaStatus = (t: TarefaItem) =>
+    tarefaStatusFilter === "all" || (t.status || "a-fazer") === tarefaStatusFilter;
+
+  const matchCodigo = (t: TarefaItem) =>
+    !codigoQueryDebounced || t.codigo.toLowerCase().includes(codigoQueryDebounced);
+
   const filteredProjetos = projetos
     .filter((p) => projetoFilter === "all" || p.id === projetoFilter)
+    .filter(matchProjetoStatus)
     .map((p) => {
       if (!searchQuery) {
-        // Apply KPI filter, status filter, and responsavel filter even without search query
         const kpiFiltered = p.tarefas.filter((t) => {
           const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
-          const matchStatus = statusFilter === "all" || t.status === statusFilter;
           const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-          return matchKpi && matchStatus && matchResp;
+          return matchKpi && matchResp && matchTarefaStatus(t) && matchCodigo(t);
         });
-        const needsFilter = (filtroKpi && filtroKpi !== "Proj. Ativos") || statusFilter !== "all" || responsavelFilter !== "all";
+        const needsFilter =
+          (filtroKpi && filtroKpi !== "Proj. Ativos") ||
+          responsavelFilter !== "all" ||
+          tarefaStatusFilter !== "all" ||
+          codigoQueryDebounced !== "";
         return needsFilter ? { ...p, tarefas: kpiFiltered } : p;
       }
       const q = searchQuery.toLowerCase();
-      // Search projects by name/code too
       const projetoMatch =
         p.nome.toLowerCase().includes(q) ||
         p.codigo.toLowerCase().includes(q);
-      const tarefasFiltradas = p.tarefas.filter(
-        (t) => {
-          const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
-          const matchStatus = statusFilter === "all" || t.status === statusFilter;
-          const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-          return (
-            matchKpi &&
-            matchStatus &&
-            matchResp &&
-            (t.codigo.toLowerCase().includes(q) ||
-              t.titulo.toLowerCase().includes(q) ||
-              t.responsavel.toLowerCase().includes(q))
-          );
-        },
-      );
-      // Show project if name matches or has matching tarefas
+      const tarefasFiltradas = p.tarefas.filter((t) => {
+        const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
+        const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
+        return (
+          matchKpi &&
+          matchResp &&
+          matchTarefaStatus(t) &&
+          matchCodigo(t) &&
+          (t.codigo.toLowerCase().includes(q) ||
+            t.titulo.toLowerCase().includes(q) ||
+            t.responsavel.toLowerCase().includes(q))
+        );
+      });
       if (!projetoMatch && tarefasFiltradas.length === 0) return null;
       return {
         ...p,
         tarefas: projetoMatch
           ? p.tarefas.filter((t) => {
               const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
-              const matchStatus = statusFilter === "all" || t.status === statusFilter;
               const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-              return matchKpi && matchStatus && matchResp;
+              return matchKpi && matchResp && matchTarefaStatus(t) && matchCodigo(t);
             })
           : tarefasFiltradas,
       };
     })
     .filter((p): p is ProjetoComTarefas => p !== null);
+
+  // Flat: sempre flatten, derivado de filteredProjetos pra herdar TODOS os filtros
+  // (projeto, status, KPI, responsavel, search). emTratativa restringe pra status
+  // em treatment.
+  const sortedFlatTarefas: TarefaFlat[] = (() => {
+    const list: TarefaFlat[] = filteredProjetos.flatMap((p) =>
+      p.tarefas
+        .filter((t) => !emTratativa || EM_TRATATIVA_STATUSES.includes(t.status || ""))
+        .map((t) => ({ ...t, projetoNome: p.nome, projetoCor: p.cor || "#00c853" })),
+    );
+    return [...list].sort((a, b) => {
+      if (sortField === "prioridade") {
+        const order: Record<string, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
+        const diff = (order[a.prioridade || ""] ?? 4) - (order[b.prioridade || ""] ?? 4);
+        return sortDir === "asc" ? diff : -diff;
+      }
+      if (sortField === "progresso") {
+        const diff = (a.progresso ?? 0) - (b.progresso ?? 0);
+        return sortDir === "asc" ? diff : -diff;
+      }
+      const map: Record<SortField, string> = {
+        codigo: a.codigo,
+        titulo: a.titulo,
+        projeto: a.projetoNome,
+        responsavel: a.responsavel,
+        status: a.status || "",
+        dataFim: a.dataEntrega || "",
+        prioridade: "",
+        progresso: "",
+      };
+      const mapB: Record<SortField, string> = {
+        codigo: b.codigo,
+        titulo: b.titulo,
+        projeto: b.projetoNome,
+        responsavel: b.responsavel,
+        status: b.status || "",
+        dataFim: b.dataEntrega || "",
+        prioridade: "",
+        progresso: "",
+      };
+      const cmp = map[sortField].localeCompare(mapB[sortField], "pt-BR");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  })();
 
   return (
     <div className="flex flex-col gap-4">
@@ -1333,6 +1103,26 @@ export function ProjetosView() {
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Busca por código */}
+        <div className="relative w-[180px] flex-shrink-0">
+          <Input
+            placeholder="Código (REN-...)"
+            value={codigoQuery}
+            onChange={(e) => setCodigoQuery(e.target.value)}
+            className="h-8 text-xs pr-7"
+          />
+          {codigoQuery && (
+            <button
+              type="button"
+              onClick={() => setCodigoQuery("")}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted"
+              title="Limpar"
+            >
+              <X className="h-3 w-3 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+
         {/* Em Tratativa toggle */}
         <button
           onClick={() => setEmTratativa((v) => !v)}
@@ -1351,7 +1141,7 @@ export function ProjetosView() {
         <div className="relative flex-1 min-w-[200px] max-w-[300px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar atividades..."
+            placeholder="Buscar tarefas..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8 h-8 text-sm"
@@ -1375,14 +1165,59 @@ export function ProjetosView() {
           </Select>
         )}
 
-        {/* Status filter — hidden in Em Tratativa */}
+        {/* Status do Projeto — default Ativo, hidden em Em Tratativa */}
         {!emTratativa && (
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue placeholder="Todos Status" />
+            <SelectTrigger className="h-8 w-[200px] text-xs">
+              <span className="truncate">
+                {`Status do Projeto: ${
+                  statusFilter === "all"
+                    ? "Todos"
+                    : statusFilter === "backlog"
+                      ? "Backlog"
+                      : statusFilter === "ativo"
+                        ? "Ativo"
+                        : statusFilter === "pausado"
+                          ? "Pausado"
+                          : statusFilter === "concluido"
+                            ? "Concluído"
+                            : statusFilter === "inativo"
+                              ? "Inativo"
+                              : statusFilter
+                }`}
+              </span>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos Status</SelectItem>
+              <SelectItem value="all">Todos os Status</SelectItem>
+              <SelectItem value="backlog">Backlog</SelectItem>
+              <SelectItem value="ativo">Ativo</SelectItem>
+              <SelectItem value="pausado">Pausado</SelectItem>
+              <SelectItem value="concluido">Concluído</SelectItem>
+              <SelectItem value="inativo">Inativo</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+
+        {/* Status da Tarefa — default Todos, hidden em Em Tratativa */}
+        {!emTratativa && (
+          <Select value={tarefaStatusFilter} onValueChange={setTarefaStatusFilter}>
+            <SelectTrigger className="h-8 w-[180px] text-xs">
+              <span className="truncate">
+                {tarefaStatusFilter === "all"
+                  ? "Status da Tarefa: Todos"
+                  : tarefaStatusFilter === "a-fazer"
+                    ? "A Fazer"
+                    : tarefaStatusFilter === "em-andamento"
+                      ? "Em Andamento"
+                      : tarefaStatusFilter === "bloqueado"
+                        ? "Bloqueado"
+                        : tarefaStatusFilter === "concluido"
+                          ? "Concluído"
+                          : tarefaStatusFilter}
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Status</SelectItem>
               <SelectItem value="a-fazer">A Fazer</SelectItem>
               <SelectItem value="em-andamento">Em Andamento</SelectItem>
               <SelectItem value="bloqueado">Bloqueado</SelectItem>
@@ -1420,15 +1255,15 @@ export function ProjetosView() {
         </div>
       </div>
 
-      {/* Content by view mode */}
-      {emTratativa && (
+      {/* Content: lista flat (sem agrupamento por projeto) */}
+      {viewMode === "lista" && (
         <div className="w-full">
           <FlatHeaderRow sortField={sortField} sortDir={sortDir} onSort={handleSort} />
           {loading ? (
             <SkeletonRows />
           ) : sortedFlatTarefas.length === 0 ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-              Nenhuma atividade em tratativa
+              {emTratativa ? "Nenhuma tarefa em tratativa" : "Nenhuma tarefa encontrada"}
             </div>
           ) : (
             sortedFlatTarefas.map((tarefa) => (
@@ -1449,73 +1284,15 @@ export function ProjetosView() {
           )}
         </div>
       )}
-      {!emTratativa && viewMode === "lista" && (
-        <div className="w-full">
-          <HeaderRow />
-          {loading ? (
-            <SkeletonRows />
-          ) : filteredProjetos.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-              Nenhum projeto encontrado
-            </div>
-          ) : (
-            <>
-              {filteredProjetos.map((projeto) => {
-                const isCollapsed = collapsedProjects.has(projeto.id);
-                return (
-                  <div key={projeto.id}>
-                    <ProjectGroupHeader
-                      projeto={projeto}
-                      collapsed={isCollapsed}
-                      onToggle={() => {
-                        setCollapsedProjects((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(projeto.id)) {
-                            next.delete(projeto.id);
-                          } else {
-                            next.add(projeto.id);
-                          }
-                          return next;
-                        });
-                      }}
-                      onEdit={() => {
-                        setEditProjeto(projeto);
-                        setEditOpen(true);
-                      }}
-                    />
-                    {!isCollapsed && (
-                      <>
-                        {projeto.tarefas.length === 0 ? (
-                          <EmptyTarefasRow />
-                        ) : (
-                          projeto.tarefas.map((tarefa) => (
-                            <TarefaRow
-                              key={tarefa.id}
-                              tarefa={tarefa}
-                              projetoCor={projeto.cor || "#00c853"}
-                              onClick={() => {
-                                setSelectedTarefa(toUnifiedItem(tarefa, projeto.nome));
-                                setDrawerOpen(true);
-                              }}
-                              onEdit={() => {
-                                setSelectedTarefa(toUnifiedItem(tarefa, projeto.nome));
-                                setDrawerOpen(true);
-                              }}
-                              onDelete={() => handleDeleteTarefa(tarefa.id)}
-                            />
-                          ))
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </>
-          )}
-        </div>
-      )}
       {!emTratativa && viewMode === "kanban" && !loading && (
-        <ProjectsKanbanView projetos={filteredProjetos} onStatusChange={refreshData} />
+        <ProjectsKanbanView
+          projetos={filteredProjetos}
+          onStatusChange={refreshData}
+          onTarefaClick={(tarefa) => {
+            setSelectedTarefa(toUnifiedItem(tarefa, tarefa.projetoNome));
+            setDrawerOpen(true);
+          }}
+        />
       )}
       {viewMode !== "lista" && viewMode !== "kanban" && (
         <div className="py-10 text-center text-sm text-muted-foreground">
@@ -1527,6 +1304,43 @@ export function ProjetosView() {
         open={drawerOpen}
         item={selectedTarefa}
         onClose={() => setDrawerOpen(false)}
+        onUpdate={(updated) => {
+          // Drawer só nos chama com UnifiedItem aqui (selectedTarefa é UnifiedItem | null).
+          if (updated && "tipo" in updated && updated.tipo === "tarefa") {
+            const u = updated as UnifiedItem;
+            setSelectedTarefa(u);
+            // Atualiza a lista de projetos/tarefas para refletir a edição
+            // sem precisar refetch completo.
+            setProjetos((prev) =>
+              prev.map((p) => ({
+                ...p,
+                tarefas: p.tarefas.map((t) =>
+                  t.id === u.id
+                    ? {
+                        ...t,
+                        titulo: u.titulo,
+                        descricao: u.descricao ?? null,
+                        status: u.status,
+                        prioridade: u.prioridade,
+                        responsavel: u.responsavel,
+                        responsavelInitials: u.responsavelInitials,
+                        dataEntrega: u.dataEntrega ?? null,
+                        progresso: u.progresso ?? 0,
+                      }
+                    : t,
+                ),
+              })),
+            );
+          }
+        }}
+        onDelete={(id) => {
+          setProjetos((prev) =>
+            prev.map((p) => ({
+              ...p,
+              tarefas: p.tarefas.filter((t) => t.id !== id),
+            })),
+          );
+        }}
       />
       <ProjectEditDialog
         projeto={editProjeto}
