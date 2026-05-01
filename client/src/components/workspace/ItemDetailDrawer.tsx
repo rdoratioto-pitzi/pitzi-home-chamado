@@ -271,7 +271,10 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
     if (!item || !novoComentario.trim()) return;
     setEnviandoComentario(true);
     try {
-      const r = await fetchWithAuth(`/api/workspace/chamados/${item.id}/comentarios`, {
+      const url = isChamado
+        ? `/api/workspace/chamados/${item.id}/comentarios`
+        : `/api/workspace/tarefas/${item.id}/comentarios`;
+      const r = await fetchWithAuth(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ texto: novoComentario.trim() }),
@@ -280,8 +283,9 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
       const novo: Comentario = await r.json();
       setComentarios((prev) => [...prev, novo]);
       setNovoComentario("");
-    } catch {
-      // silently ignore for now
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast({ title: "Erro ao comentar", description: msg, variant: "destructive" });
     } finally {
       setEnviandoComentario(false);
     }
@@ -880,8 +884,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                   );
                 })()}
 
-                {/* COMENTÁRIOS section — só chamados */}
-                {isChamado && (
+                {/* COMENTÁRIOS section — chamados e tarefas */}
+                {(
                   <div
                     style={{
                       paddingTop: 20,
