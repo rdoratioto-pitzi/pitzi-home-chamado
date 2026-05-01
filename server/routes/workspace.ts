@@ -4,7 +4,7 @@ import { db } from "../db";
 import { requireAuth, getSessionUser } from "../middleware/auth";
 import { projects, projectMembers, kanbanCards, kanbanColumns, kanbanComments, users, workspaceComentarios } from "@shared/schema";
 import type { Ticket, User, SlaRule, InsertTicket } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import {
   notifyChamadoCriado,
   notifyChamadoAtribuido,
@@ -137,7 +137,7 @@ export function registerWorkspaceRoutes(router: Router) {
         isAdmin
           ? storage.getTicketsForWorkspace()
           : storage.getTicketsForWorkspace({ requesterId: userId, assigneeId: userId }),
-        db ? db.select().from(kanbanCards) : Promise.resolve([]),
+        db ? db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)) : Promise.resolve([]),
       ]);
 
       const chamados = allTickets.filter(
@@ -433,7 +433,7 @@ export function registerWorkspaceRoutes(router: Router) {
         titulo: card.title,
         contexto: projeto.name,
         corContexto: projeto.color || null,
-        badgeLabel: "TAREFA",
+        badgeLabel: "Tarefa",
         badgeVariant: "tarefa",
         responsavel: respNome,
         responsavelInitials: respInitials,
@@ -704,7 +704,7 @@ export function registerWorkspaceRoutes(router: Router) {
         isAdmin
           ? storage.getTickets()
           : storage.getTickets({ requesterId: userId, assigneeId: userId }),
-        db.select().from(kanbanCards),
+        db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
         db.select().from(projects),
         storage.getUsers(),
         storage.getSlaRules(),
@@ -766,7 +766,7 @@ export function registerWorkspaceRoutes(router: Router) {
           titulo: c.title,
           contexto: proj?.nome || "Sem projeto",
           corContexto: proj?.cor || null,
-          badgeLabel: "TAREFA",
+          badgeLabel: "Tarefa",
           badgeVariant: "tarefa",
           responsavel: name,
           responsavelInitials: getInitials(name),
@@ -823,7 +823,7 @@ export function registerWorkspaceRoutes(router: Router) {
 
       const [allProjects, cards, allUsers, allMembers] = await Promise.all([
         db.select().from(projects),
-        db.select().from(kanbanCards),
+        db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
         db.select().from(users),
         db.select().from(projectMembers),
       ]);
@@ -1075,14 +1075,15 @@ export function registerWorkspaceRoutes(router: Router) {
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
       const { id } = req.params;
-      const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao } = req.body as {
+      const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao, projetoId } = req.body as {
         status?: string;
         prioridade?: string;
         responsavelId?: string;
-        dataEntrega?: string;
+        dataEntrega?: string | null;
         progresso?: number;
         titulo?: string;
         descricao?: string;
+        projetoId?: string;
       };
 
       const ptBrToKanban: Record<string, string> = {
@@ -1107,6 +1108,33 @@ export function registerWorkspaceRoutes(router: Router) {
       if (progresso !== undefined) updateData.progress = progresso;
       if (titulo !== undefined) updateData.title = titulo.trim();
       if (descricao !== undefined) updateData.objectives = descricao;
+
+      // Mover tarefa para outro projeto: precisa reatribuir columnId,
+      // pois a coluna atual pertence ao projeto antigo.
+      if (projetoId !== undefined && projetoId !== prevCard?.projectId) {
+        const [targetProject] = await db
+          .select({ id: projects.id })
+          .from(projects)
+          .where(eq(projects.id, projetoId))
+          .limit(1);
+        if (!targetProject) {
+          return res.status(404).json({ error: "Projeto destino não encontrado" });
+        }
+        let [targetCol] = await db
+          .select({ id: kanbanColumns.id })
+          .from(kanbanColumns)
+          .where(eq(kanbanColumns.projectId, projetoId))
+          .orderBy(kanbanColumns.order)
+          .limit(1);
+        if (!targetCol) {
+          [targetCol] = await db
+            .insert(kanbanColumns)
+            .values({ projectId: projetoId, name: "A Fazer", order: 0 })
+            .returning({ id: kanbanColumns.id });
+        }
+        updateData.projectId = projetoId;
+        updateData.columnId = targetCol.id;
+      }
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ error: "Nenhum campo para atualizar" });
@@ -1153,6 +1181,120 @@ export function registerWorkspaceRoutes(router: Router) {
         progresso: card.progress,
         criadoEm: card.createdAt ? String(card.createdAt) : null,
       });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── GET subtarefas ────────────────────────────────────────────────────────────
+  router.get("/api/workspace/tarefas/:id/subtarefas", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { id } = req.params;
+      const rows = await db
+        .select()
+        .from(kanbanCards)
+        .where(eq(kanbanCards.parentCardId, String(id)))
+        .orderBy(kanbanCards.order, kanbanCards.createdAt);
+      return res.json({
+        subtarefas: rows.map((c) => ({
+          id: c.id,
+          title: c.title,
+          done: c.status === "done",
+        })),
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── POST subtarefa ────────────────────────────────────────────────────────────
+  router.post("/api/workspace/tarefas/:id/subtarefas", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { id } = req.params;
+      const { title } = req.body as { title?: string };
+      const t = (title || "").trim();
+      if (!t) return res.status(400).json({ error: "Título obrigatório" });
+
+      const [parent] = await db
+        .select()
+        .from(kanbanCards)
+        .where(eq(kanbanCards.id, String(id)))
+        .limit(1);
+      if (!parent) return res.status(404).json({ error: "Tarefa pai não encontrada" });
+
+      const existing = await db
+        .select({ id: kanbanCards.id })
+        .from(kanbanCards)
+        .where(eq(kanbanCards.parentCardId, parent.id));
+      const code = `${parent.code || parent.id.slice(0, 6)}·S${existing.length + 1}`;
+
+      const [created] = await db
+        .insert(kanbanCards)
+        .values({
+          code,
+          projectId: parent.projectId,
+          columnId: parent.columnId,
+          parentCardId: parent.id,
+          title: t,
+          status: "todo",
+          priority: "normal",
+        })
+        .returning();
+
+      return res.status(201).json({
+        id: created.id,
+        title: created.title,
+        done: created.status === "done",
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── PATCH subtarefa (toggle done) ─────────────────────────────────────────────
+  router.patch("/api/workspace/subtarefas/:subtaskId", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { subtaskId } = req.params;
+      const { done, title } = req.body as { done?: boolean; title?: string };
+
+      const updateData: Record<string, any> = {};
+      if (done !== undefined) updateData.status = done ? "done" : "todo";
+      if (title !== undefined) updateData.title = String(title).trim();
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "Nenhum campo para atualizar" });
+      }
+
+      const [updated] = await db
+        .update(kanbanCards)
+        .set(updateData)
+        .where(eq(kanbanCards.id, String(subtaskId)))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Subtarefa não encontrada" });
+
+      return res.json({
+        id: updated.id,
+        title: updated.title,
+        done: updated.status === "done",
+      });
+    } catch (error: any) {
+      return res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  // ─── DELETE subtarefa ──────────────────────────────────────────────────────────
+  router.delete("/api/workspace/subtarefas/:subtaskId", requireAuth, async (req, res) => {
+    try {
+      if (!db) return res.status(500).json({ error: "Database not available" });
+      const { subtaskId } = req.params;
+      const [deleted] = await db
+        .delete(kanbanCards)
+        .where(eq(kanbanCards.id, String(subtaskId)))
+        .returning({ id: kanbanCards.id });
+      if (!deleted) return res.status(404).json({ error: "Subtarefa não encontrada" });
+      return res.json({ ok: true });
     } catch (error: any) {
       return res.status(error.status || 500).json({ error: error.message });
     }
