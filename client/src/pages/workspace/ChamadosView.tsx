@@ -297,6 +297,9 @@ export function ChamadosView() {
             setItems((prev) => prev.map((i) => (i.id === ch.id ? ch : i)));
             setSelectedItem(ch);
           }}
+          onDelete={(id) => {
+            setItems((prev) => prev.filter((i) => i.id !== id));
+          }}
         />
       )}
       {viewMode !== "lista" && viewMode !== "kanban" && (

@@ -1572,6 +1572,14 @@ export function ProjetosView() {
             );
           }
         }}
+        onDelete={(id) => {
+          setProjetos((prev) =>
+            prev.map((p) => ({
+              ...p,
+              tarefas: p.tarefas.filter((t) => t.id !== id),
+            })),
+          );
+        }}
       />
       <ProjectEditDialog
         projeto={editProjeto}
