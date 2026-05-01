@@ -5,6 +5,7 @@ interface KanbanViewProps {
   items: (ChamadoItem | UnifiedItem)[];
   variant?: "chamados" | "todos";
   onStatusChange?: (itemId: string, newStatus: string) => void;
+  onItemClick?: (item: ChamadoItem | UnifiedItem) => void;
 }
 
 interface KanbanColumn {
@@ -75,7 +76,7 @@ function getItemTipoBadge(item: ChamadoItem | UnifiedItem): { label: string; col
   return null;
 }
 
-function KanbanCard({ item, draggable }: { item: ChamadoItem | UnifiedItem; draggable?: boolean }) {
+function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedItem; draggable?: boolean; onClick?: () => void }) {
   const badge = getItemTipoBadge(item);
   const date = getItemDate(item);
 
@@ -99,14 +100,17 @@ function KanbanCard({ item, draggable }: { item: ChamadoItem | UnifiedItem; drag
         e.dataTransfer.setData("itemId", item.id);
         e.dataTransfer.effectAllowed = "move";
       }}
+      onClick={onClick}
       style={{
         background: "#111411",
         border: "1px solid rgba(255,255,255,0.07)",
         borderRadius: 8,
         padding: "10px 12px",
         marginBottom: 8,
-        cursor: draggable ? "grab" : "pointer",
+        cursor: onClick ? "pointer" : draggable ? "grab" : "default",
       }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
     >
       {/* Top row: codigo + badge */}
       <div
@@ -272,7 +276,7 @@ function KanbanColumnHeader({ column, count }: { column: KanbanColumn; count: nu
   );
 }
 
-export function KanbanView({ items, onStatusChange }: KanbanViewProps) {
+export function KanbanView({ items, onStatusChange, onItemClick }: KanbanViewProps) {
   const columnItems = COLUMNS.map((col) => ({
     column: col,
     items: items.filter((item) => col.statuses.includes(item.status)),
@@ -321,7 +325,12 @@ export function KanbanView({ items, onStatusChange }: KanbanViewProps) {
               }}
             >
               {colItems.map((item) => (
-                <KanbanCard key={item.id} item={item} draggable={isDraggable} />
+                <KanbanCard
+                  key={item.id}
+                  item={item}
+                  draggable={isDraggable}
+                  onClick={onItemClick ? () => onItemClick(item) : undefined}
+                />
               ))}
               {colItems.length === 0 && (
                 <div

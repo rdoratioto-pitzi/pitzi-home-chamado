@@ -620,7 +620,15 @@ function SkeletonRows() {
 
 // ─── Kanban View ─────────────────────────────────────────────────────────────
 
-function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoComTarefas[]; onStatusChange?: () => void }) {
+function ProjectsKanbanView({
+  projetos,
+  onStatusChange,
+  onTarefaClick,
+}: {
+  projetos: ProjetoComTarefas[];
+  onStatusChange?: () => void;
+  onTarefaClick?: (tarefa: ProjetoComTarefas["tarefas"][number] & { projetoCor: string; projetoNome: string }) => void;
+}) {
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
@@ -696,7 +704,8 @@ function ProjectsKanbanView({ projetos, onStatusChange }: { projetos: ProjetoCom
                   draggable
                   onDragStart={() => setDraggingId(t.id)}
                   onDragEnd={() => { setDraggingId(null); setDragOverCol(null); }}
-                  className="p-3 rounded cursor-grab active:cursor-grabbing"
+                  onClick={() => { if (onTarefaClick) onTarefaClick(t); }}
+                  className="p-3 rounded cursor-pointer active:cursor-grabbing transition-colors"
                   style={{
                     background: draggingId === t.id ? "hsl(var(--primary) / 0.1)" : "hsl(var(--muted) / 0.35)",
                     border: draggingId === t.id ? "1px solid hsl(var(--primary) / 0.35)" : "1px solid hsl(var(--border) / 0.8)",
@@ -1515,7 +1524,14 @@ export function ProjetosView() {
         </div>
       )}
       {!emTratativa && viewMode === "kanban" && !loading && (
-        <ProjectsKanbanView projetos={filteredProjetos} onStatusChange={refreshData} />
+        <ProjectsKanbanView
+          projetos={filteredProjetos}
+          onStatusChange={refreshData}
+          onTarefaClick={(tarefa) => {
+            setSelectedTarefa(toUnifiedItem(tarefa, tarefa.projetoNome));
+            setDrawerOpen(true);
+          }}
+        />
       )}
       {viewMode !== "lista" && viewMode !== "kanban" && (
         <div className="py-10 text-center text-sm text-muted-foreground">
