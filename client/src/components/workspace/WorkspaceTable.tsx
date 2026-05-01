@@ -290,13 +290,16 @@ function SkeletonRows({ colTemplate }: { colTemplate: string }) {
   );
 }
 
-const COL_TEMPLATE = "96px 1fr 220px 140px 115px 85px 62px 78px 30px";
-const COL_TEMPLATE_MOBILE = "96px 1fr 220px 140px 115px 85px 30px";
+const COL_TEMPLATE_CHAMADOS = "96px 1fr 220px 140px 115px 85px 62px 78px 30px";
+const COL_TEMPLATE_TODOS = "96px 1fr 175px 220px 140px 115px 85px 62px 78px 30px";
+const COL_TEMPLATE_CHAMADOS_MOBILE = "96px 1fr 220px 140px 115px 85px 30px";
+const COL_TEMPLATE_TODOS_MOBILE = "96px 1fr 175px 220px 140px 115px 85px 30px";
 
 const responsiveStyles = `
 @media (max-width: 767px) {
   .ws-col-sla { display: none !important; }
-  .ws-table-row { grid-template-columns: ${COL_TEMPLATE_MOBILE} !important; }
+  .ws-table-chamados .ws-table-row { grid-template-columns: ${COL_TEMPLATE_CHAMADOS_MOBILE} !important; }
+  .ws-table-todos .ws-table-row { grid-template-columns: ${COL_TEMPLATE_TODOS_MOBILE} !important; }
 }
 `;
 
@@ -308,15 +311,20 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
   const onStatusChange = "onStatusChange" in props ? props.onStatusChange : undefined;
   const onPriorityChange = "onPriorityChange" in props ? props.onPriorityChange : undefined;
 
-  const col3Header = variant === "todos" ? "Tipo / Contexto" : "Categoria / Tipo";
-  const headers = ["Código", "Título", col3Header, "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""];
+  const COL_TEMPLATE = variant === "todos" ? COL_TEMPLATE_TODOS : COL_TEMPLATE_CHAMADOS;
+  const headers = variant === "todos"
+    ? ["Código", "Título", "Projeto", "Tipo / Contexto", "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""]
+    : ["Código", "Título", "Categoria / Tipo", "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""];
+  const tableClass = variant === "todos" ? "ws-table-todos" : "ws-table-chamados";
+  const slaCol1Idx = variant === "todos" ? 7 : 6;
+  const slaCol2Idx = variant === "todos" ? 8 : 7;
 
   if (loading) {
     return (
-      <div style={{ overflowX: "auto" }}>
+      <div className={tableClass} style={{ overflowX: "auto" }}>
         <style>{responsiveStyles}</style>
         <div style={{ minWidth: 900 }}>
-          <HeaderRow headers={headers} />
+          <HeaderRow headers={headers} colTemplate={COL_TEMPLATE} slaCol1Idx={slaCol1Idx} slaCol2Idx={slaCol2Idx} />
           <SkeletonRows colTemplate={COL_TEMPLATE} />
         </div>
       </div>
@@ -356,10 +364,10 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
   };
 
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div className={tableClass} style={{ overflowX: "auto" }}>
       <style>{responsiveStyles}</style>
       <div style={{ minWidth: 900 }}>
-        <HeaderRow headers={headers} />
+        <HeaderRow headers={headers} colTemplate={COL_TEMPLATE} slaCol1Idx={slaCol1Idx} slaCol2Idx={slaCol2Idx} />
         {statusGroupOrder.map((status) => {
           const groupItems = grouped.get(status) || [];
           if (groupItems.length === 0) return null;
@@ -379,6 +387,7 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
                       <UnifiedItemRow
                         key={item.id}
                         item={item as UnifiedItem}
+                        colTemplate={COL_TEMPLATE}
                         onRowClick={onRowClick as ((item: UnifiedItem) => void) | undefined}
                         onStatusChange={onStatusChange as ((item: UnifiedItem, s: string) => void) | undefined}
                         onPriorityChange={onPriorityChange as ((item: UnifiedItem, p: string) => void) | undefined}
@@ -387,6 +396,7 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
                       <ChamadoItemRow
                         key={(item as ChamadoItem).id}
                         item={item as ChamadoItem}
+                        colTemplate={COL_TEMPLATE}
                         onRowClick={onRowClick as ((item: ChamadoItem) => void) | undefined}
                         onDelete={onDelete}
                         onStatusChange={onStatusChange as ((item: ChamadoItem, s: string) => void) | undefined}
@@ -404,19 +414,19 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
   );
 }
 
-function HeaderRow({ headers }: { headers: string[] }) {
+function HeaderRow({ headers, colTemplate, slaCol1Idx, slaCol2Idx }: { headers: string[]; colTemplate: string; slaCol1Idx: number; slaCol2Idx: number }) {
   return (
     <div
       className="ws-table-row grid items-center px-4 py-2 gap-2"
       style={{
-        gridTemplateColumns: COL_TEMPLATE,
+        gridTemplateColumns: colTemplate,
         borderBottom: "1px solid var(--sep)",
       }}
     >
       {headers.map((h, i) => (
         <span
           key={i}
-          className={i === 6 || i === 7 ? "ws-col-sla" : undefined}
+          className={i === slaCol1Idx || i === slaCol2Idx ? "ws-col-sla" : undefined}
           style={{
             fontFamily: "'JetBrains Mono', monospace",
             textTransform: "uppercase",
@@ -494,8 +504,9 @@ function InlineSelectChip({
   );
 }
 
-function ChamadoItemRow({ item, onRowClick, onDelete, onStatusChange, onPriorityChange }: {
+function ChamadoItemRow({ item, colTemplate, onRowClick, onDelete, onStatusChange, onPriorityChange }: {
   item: ChamadoItem;
+  colTemplate: string;
   onRowClick?: (item: ChamadoItem) => void;
   onDelete?: (item: ChamadoItem) => void;
   onStatusChange?: (item: ChamadoItem, s: string) => void;
@@ -509,7 +520,7 @@ function ChamadoItemRow({ item, onRowClick, onDelete, onStatusChange, onPriority
       className="ws-table-row group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer"
       onClick={() => onRowClick?.(item)}
       style={{
-        gridTemplateColumns: COL_TEMPLATE,
+        gridTemplateColumns: colTemplate,
         borderBottom: "1px solid var(--sep)",
       }}
       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg3)")}
@@ -564,8 +575,9 @@ function ChamadoItemRow({ item, onRowClick, onDelete, onStatusChange, onPriority
   );
 }
 
-function UnifiedItemRow({ item, onRowClick, onStatusChange, onPriorityChange }: {
+function UnifiedItemRow({ item, colTemplate, onRowClick, onStatusChange, onPriorityChange }: {
   item: UnifiedItem;
+  colTemplate: string;
   onRowClick?: (item: UnifiedItem) => void;
   onStatusChange?: (item: UnifiedItem, s: string) => void;
   onPriorityChange?: (item: UnifiedItem, p: string) => void;
@@ -584,7 +596,7 @@ function UnifiedItemRow({ item, onRowClick, onStatusChange, onPriorityChange }: 
       className="ws-table-row group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer"
       onClick={() => onRowClick?.(item)}
       style={{
-        gridTemplateColumns: COL_TEMPLATE,
+        gridTemplateColumns: colTemplate,
         borderBottom: "1px solid var(--sep)",
       }}
       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg3)")}
@@ -599,14 +611,44 @@ function UnifiedItemRow({ item, onRowClick, onStatusChange, onPriorityChange }: 
       <span className="text-sm truncate" style={{ color: "var(--l1)" }}>
         {item.titulo}
       </span>
+      {/* Projeto: tarefa = nome do projeto + bolinha cor; chamado = "—" */}
+      <div className="flex items-center gap-1.5 min-w-0 truncate" title={item.tipo === "tarefa" ? item.contexto : undefined}>
+        {item.tipo === "tarefa" ? (
+          <>
+            <span
+              className="inline-block flex-shrink-0"
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: "50%",
+                background: item.corContexto || "rgba(255,255,255,0.3)",
+              }}
+            />
+            <span className="text-xs truncate" style={{ color: item.corContexto || "var(--l2)", opacity: 0.85 }}>
+              {item.contexto || "—"}
+            </span>
+          </>
+        ) : (
+          <span className="text-xs" style={{ color: "var(--l4)" }}>—</span>
+        )}
+      </div>
+      {/* Tipo / Contexto: tarefa = badge; chamado = categoria + badge tipo */}
       <div className="flex items-center gap-1.5 min-w-0 truncate">
-        <span className="text-xs truncate" style={{ color: contextoColor }}>
-          {item.contexto}
-        </span>
-        <span style={{ color: "var(--l4)" }}>·</span>
-        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${badgeColor}`}>
-          {item.badgeLabel}
-        </Badge>
+        {item.tipo === "chamado" ? (
+          <>
+            <span className="text-xs truncate" style={{ color: contextoColor }}>
+              {item.contexto}
+            </span>
+            <span style={{ color: "var(--l4)" }}>·</span>
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${badgeColor}`}>
+              {item.badgeLabel}
+            </Badge>
+          </>
+        ) : (
+          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${badgeColor}`}>
+            {item.badgeLabel}
+          </Badge>
+        )}
       </div>
       <ResponsavelCell initials={item.responsavelInitials} name={item.responsavel} />
       <InlineSelectChip
