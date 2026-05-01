@@ -219,6 +219,36 @@ export function ChamadosView() {
           items={filteredItems}
           loading={loading}
           onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
+          onStatusChange={async (item, newStatus) => {
+            try {
+              const res = await fetchWithAuth(`/api/workspace/chamados/${item.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+              });
+              if (!res.ok) throw new Error("Erro ao atualizar status");
+              const updated: ChamadoItem = await res.json();
+              setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "Erro desconhecido";
+              toast({ title: "Erro ao atualizar status", description: msg, variant: "destructive" });
+            }
+          }}
+          onPriorityChange={async (item, newPriority) => {
+            try {
+              const res = await fetchWithAuth(`/api/workspace/chamados/${item.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prioridade: newPriority }),
+              });
+              if (!res.ok) throw new Error("Erro ao atualizar prioridade");
+              const updated: ChamadoItem = await res.json();
+              setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "Erro desconhecido";
+              toast({ title: "Erro ao atualizar prioridade", description: msg, variant: "destructive" });
+            }
+          }}
           onDelete={async (item) => {
             if (!confirm(`Excluir chamado ${item.codigo}?`)) return;
             try {

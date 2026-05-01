@@ -220,7 +220,45 @@ export function TodosView() {
       </div>
 
       {/* Table */}
-      <WorkspaceTable variant="todos" items={filteredItems} loading={loading} />
+      <WorkspaceTable
+        variant="todos"
+        items={filteredItems}
+        loading={loading}
+        onStatusChange={async (item, newStatus) => {
+          try {
+            const url = item.tipo === "chamado"
+              ? `/api/workspace/chamados/${item.id}`
+              : `/api/workspace/tarefas/${item.id}`;
+            const res = await fetchWithAuth(url, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: newStatus }),
+            });
+            if (!res.ok) throw new Error("Erro ao atualizar status");
+            setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, status: newStatus } : i));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Erro desconhecido";
+            toast({ title: "Erro ao atualizar status", description: msg, variant: "destructive" });
+          }
+        }}
+        onPriorityChange={async (item, newPriority) => {
+          try {
+            const url = item.tipo === "chamado"
+              ? `/api/workspace/chamados/${item.id}`
+              : `/api/workspace/tarefas/${item.id}`;
+            const res = await fetchWithAuth(url, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prioridade: newPriority }),
+            });
+            if (!res.ok) throw new Error("Erro ao atualizar prioridade");
+            setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, prioridade: newPriority } : i));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Erro desconhecido";
+            toast({ title: "Erro ao atualizar prioridade", description: msg, variant: "destructive" });
+          }
+        }}
+      />
     </div>
   );
 }

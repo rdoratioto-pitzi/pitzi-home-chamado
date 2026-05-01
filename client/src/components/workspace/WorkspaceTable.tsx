@@ -7,6 +7,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Edit, Trash2, ChevronRight } from "lucide-react";
+import {
+  statusOptionsForKind,
+  priorityOptionsForKind,
+  type ItemKind,
+} from "@/lib/workspace-status";
 
 export interface ChamadoItem {
   id: string;
@@ -50,8 +55,24 @@ export interface UnifiedItem {
 }
 
 type WorkspaceTableProps =
-  | { variant?: "chamados"; items: ChamadoItem[]; loading?: boolean; onRowClick?: (item: ChamadoItem) => void; onDelete?: (item: ChamadoItem) => void }
-  | { variant: "todos"; items: UnifiedItem[]; loading?: boolean; onRowClick?: (item: UnifiedItem) => void; onDelete?: (item: ChamadoItem) => void };
+  | {
+      variant?: "chamados";
+      items: ChamadoItem[];
+      loading?: boolean;
+      onRowClick?: (item: ChamadoItem) => void;
+      onDelete?: (item: ChamadoItem) => void;
+      onStatusChange?: (item: ChamadoItem, newStatus: string) => void;
+      onPriorityChange?: (item: ChamadoItem, newPriority: string) => void;
+    }
+  | {
+      variant: "todos";
+      items: UnifiedItem[];
+      loading?: boolean;
+      onRowClick?: (item: UnifiedItem) => void;
+      onDelete?: (item: ChamadoItem) => void;
+      onStatusChange?: (item: UnifiedItem, newStatus: string) => void;
+      onPriorityChange?: (item: UnifiedItem, newPriority: string) => void;
+    };
 
 const statusDotColors: Record<string, { bg: string }> = {
   in_progress: { bg: "#00c853" },
@@ -284,6 +305,8 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
   const variant = props.variant ?? "chamados";
   const onRowClick = "onRowClick" in props ? props.onRowClick : undefined;
   const onDelete = "onDelete" in props ? props.onDelete : undefined;
+  const onStatusChange = "onStatusChange" in props ? props.onStatusChange : undefined;
+  const onPriorityChange = "onPriorityChange" in props ? props.onPriorityChange : undefined;
 
   const col3Header = variant === "todos" ? "Tipo / Contexto" : "Categoria / Tipo";
   const headers = ["Código", "Título", col3Header, "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""];
@@ -357,6 +380,8 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
                         key={item.id}
                         item={item as UnifiedItem}
                         onRowClick={onRowClick as ((item: UnifiedItem) => void) | undefined}
+                        onStatusChange={onStatusChange as ((item: UnifiedItem, s: string) => void) | undefined}
+                        onPriorityChange={onPriorityChange as ((item: UnifiedItem, p: string) => void) | undefined}
                       />
                     ) : (
                       <ChamadoItemRow
@@ -364,6 +389,8 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
                         item={item as ChamadoItem}
                         onRowClick={onRowClick as ((item: ChamadoItem) => void) | undefined}
                         onDelete={onDelete}
+                        onStatusChange={onStatusChange as ((item: ChamadoItem, s: string) => void) | undefined}
+                        onPriorityChange={onPriorityChange as ((item: ChamadoItem, p: string) => void) | undefined}
                       />
                     ),
                   )}
@@ -405,7 +432,75 @@ function HeaderRow({ headers }: { headers: string[] }) {
   );
 }
 
-function ChamadoItemRow({ item, onRowClick, onDelete }: { item: ChamadoItem; onRowClick?: (item: ChamadoItem) => void; onDelete?: (item: ChamadoItem) => void }) {
+function InlineSelectChip({
+  value,
+  options,
+  onChange,
+  className,
+  emptyLabel,
+}: {
+  value: string;
+  options: readonly { value: string; label: string }[];
+  onChange?: (next: string) => void;
+  className?: string;
+  emptyLabel?: string;
+}) {
+  const [editing, setEditing] = useState(false);
+  const label = options.find((o) => o.value === value)?.label ?? value ?? emptyLabel ?? "—";
+
+  if (!onChange) {
+    return (
+      <span className={className}>
+        {label}
+      </span>
+    );
+  }
+
+  if (editing) {
+    return (
+      <select
+        autoFocus
+        defaultValue={value}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          e.stopPropagation();
+          const v = e.target.value;
+          if (v && v !== value) onChange(v);
+          setEditing(false);
+        }}
+        onBlur={() => setEditing(false)}
+        className="text-xs rounded px-1 py-0 outline-none"
+        style={{
+          background: "rgba(255,255,255,0.06)",
+          border: "1px solid rgba(0,200,83,0.3)",
+          color: "rgba(255,255,255,0.85)",
+        }}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+      className={`${className ?? ""} hover:bg-white/5 rounded px-1 -mx-1 cursor-pointer text-left`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function ChamadoItemRow({ item, onRowClick, onDelete, onStatusChange, onPriorityChange }: {
+  item: ChamadoItem;
+  onRowClick?: (item: ChamadoItem) => void;
+  onDelete?: (item: ChamadoItem) => void;
+  onStatusChange?: (item: ChamadoItem, s: string) => void;
+  onPriorityChange?: (item: ChamadoItem, p: string) => void;
+}) {
   const typeColor = typeColors[item.tipo?.toLowerCase()] || "bg-slate-500/10 text-slate-400";
   const prioColor = priorityColors[item.prioridade] || priorityColors.medium;
 
@@ -439,12 +534,24 @@ function ChamadoItemRow({ item, onRowClick, onDelete }: { item: ChamadoItem; onR
         </Badge>
       </div>
       <ResponsavelCell initials={item.responsavelInitials} name={item.responsavel} />
-      <span className="text-xs" style={{ color: "var(--l2)" }}>
-        {statusLabels[item.status] || item.status}
-      </span>
-      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
-        {priorityLabels[item.prioridade] || item.prioridade}
-      </Badge>
+      <InlineSelectChip
+        value={item.status}
+        options={statusOptionsForKind("chamado")}
+        onChange={onStatusChange ? (next) => onStatusChange(item, next) : undefined}
+        className="text-xs"
+      />
+      {onPriorityChange ? (
+        <InlineSelectChip
+          value={item.prioridade}
+          options={priorityOptionsForKind("chamado")}
+          onChange={(next) => onPriorityChange(item, next)}
+          className={`text-[10px] px-1.5 py-0 rounded border ${prioColor}`}
+        />
+      ) : (
+        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
+          {priorityLabels[item.prioridade] || item.prioridade}
+        </Badge>
+      )}
       <span className="ws-col-sla text-xs text-muted-foreground">
         {item.sla ? `${item.sla}h` : "—"}
       </span>
@@ -457,7 +564,13 @@ function ChamadoItemRow({ item, onRowClick, onDelete }: { item: ChamadoItem; onR
   );
 }
 
-function UnifiedItemRow({ item, onRowClick }: { item: UnifiedItem; onRowClick?: (item: UnifiedItem) => void }) {
+function UnifiedItemRow({ item, onRowClick, onStatusChange, onPriorityChange }: {
+  item: UnifiedItem;
+  onRowClick?: (item: UnifiedItem) => void;
+  onStatusChange?: (item: UnifiedItem, s: string) => void;
+  onPriorityChange?: (item: UnifiedItem, p: string) => void;
+}) {
+  const kind: ItemKind = item.tipo === "chamado" ? "chamado" : "tarefa";
   const badgeColor = typeColors[item.badgeVariant] || "bg-slate-500/10 text-slate-400";
   const prioColor = priorityColors[item.prioridade] || priorityColors.media;
 
@@ -496,12 +609,24 @@ function UnifiedItemRow({ item, onRowClick }: { item: UnifiedItem; onRowClick?: 
         </Badge>
       </div>
       <ResponsavelCell initials={item.responsavelInitials} name={item.responsavel} />
-      <span className="text-xs" style={{ color: "var(--l2)" }}>
-        {statusLabels[item.status] || item.status}
-      </span>
-      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
-        {priorityLabels[item.prioridade] || item.prioridade}
-      </Badge>
+      <InlineSelectChip
+        value={item.status}
+        options={statusOptionsForKind(kind)}
+        onChange={onStatusChange ? (next) => onStatusChange(item, next) : undefined}
+        className="text-xs"
+      />
+      {onPriorityChange ? (
+        <InlineSelectChip
+          value={item.prioridade}
+          options={priorityOptionsForKind(kind)}
+          onChange={(next) => onPriorityChange(item, next)}
+          className={`text-[10px] px-1.5 py-0 rounded border ${prioColor}`}
+        />
+      ) : (
+        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
+          {priorityLabels[item.prioridade] || item.prioridade}
+        </Badge>
+      )}
       <span className="ws-col-sla text-xs text-muted-foreground">
         {item.sla ? `${item.sla}h` : "—"}
       </span>
