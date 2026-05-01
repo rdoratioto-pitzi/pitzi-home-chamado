@@ -851,7 +851,9 @@ export function ProjetosView() {
   const [projetoFilter, setProjetoFilter] = useState("all");
   const [filtroKpi, setFiltroKpi] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("lista");
-  const [statusFilter, setStatusFilter] = useState("all");
+  // statusFilter agora filtra status do PROJETO (não da tarefa), default "ativo"
+  // — CEO prefere ver só projetos ativos por padrão.
+  const [statusFilter, setStatusFilter] = useState<string>("ativo");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
   const [selectedTarefa, setSelectedTarefa] = useState<UnifiedItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -977,50 +979,46 @@ export function ProjetosView() {
     return true;
   }
 
+  // statusFilter agora aplica ao status do PROJETO (normalizado p/ legacy).
+  const matchProjetoStatus = (p: ProjetoComTarefas) =>
+    statusFilter === "all" || normalizeStatusForForm(p.status) === statusFilter;
+
   const filteredProjetos = projetos
     .filter((p) => projetoFilter === "all" || p.id === projetoFilter)
+    .filter(matchProjetoStatus)
     .map((p) => {
       if (!searchQuery) {
-        // Apply KPI filter, status filter, and responsavel filter even without search query
         const kpiFiltered = p.tarefas.filter((t) => {
           const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
-          const matchStatus = statusFilter === "all" || t.status === statusFilter;
           const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-          return matchKpi && matchStatus && matchResp;
+          return matchKpi && matchResp;
         });
-        const needsFilter = (filtroKpi && filtroKpi !== "Proj. Ativos") || statusFilter !== "all" || responsavelFilter !== "all";
+        const needsFilter = (filtroKpi && filtroKpi !== "Proj. Ativos") || responsavelFilter !== "all";
         return needsFilter ? { ...p, tarefas: kpiFiltered } : p;
       }
       const q = searchQuery.toLowerCase();
-      // Search projects by name/code too
       const projetoMatch =
         p.nome.toLowerCase().includes(q) ||
         p.codigo.toLowerCase().includes(q);
-      const tarefasFiltradas = p.tarefas.filter(
-        (t) => {
-          const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
-          const matchStatus = statusFilter === "all" || t.status === statusFilter;
-          const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-          return (
-            matchKpi &&
-            matchStatus &&
-            matchResp &&
-            (t.codigo.toLowerCase().includes(q) ||
-              t.titulo.toLowerCase().includes(q) ||
-              t.responsavel.toLowerCase().includes(q))
-          );
-        },
-      );
-      // Show project if name matches or has matching tarefas
+      const tarefasFiltradas = p.tarefas.filter((t) => {
+        const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
+        const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
+        return (
+          matchKpi &&
+          matchResp &&
+          (t.codigo.toLowerCase().includes(q) ||
+            t.titulo.toLowerCase().includes(q) ||
+            t.responsavel.toLowerCase().includes(q))
+        );
+      });
       if (!projetoMatch && tarefasFiltradas.length === 0) return null;
       return {
         ...p,
         tarefas: projetoMatch
           ? p.tarefas.filter((t) => {
               const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
-              const matchStatus = statusFilter === "all" || t.status === statusFilter;
               const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-              return matchKpi && matchStatus && matchResp;
+              return matchKpi && matchResp;
             })
           : tarefasFiltradas,
       };
@@ -1126,18 +1124,19 @@ export function ProjetosView() {
           </Select>
         )}
 
-        {/* Status filter — hidden in Em Tratativa */}
+        {/* Status do Projeto — default Ativo, hidden em Em Tratativa */}
         {!emTratativa && (
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-8 w-[140px] text-xs">
-              <SelectValue placeholder="Todos Status" />
+            <SelectTrigger className="h-8 w-[160px] text-xs">
+              <SelectValue placeholder="Status do Projeto" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos Status</SelectItem>
-              <SelectItem value="a-fazer">A Fazer</SelectItem>
-              <SelectItem value="em-andamento">Em Andamento</SelectItem>
-              <SelectItem value="bloqueado">Bloqueado</SelectItem>
+              <SelectItem value="all">Todos os Status</SelectItem>
+              <SelectItem value="backlog">Backlog</SelectItem>
+              <SelectItem value="ativo">Ativo</SelectItem>
+              <SelectItem value="pausado">Pausado</SelectItem>
               <SelectItem value="concluido">Concluído</SelectItem>
+              <SelectItem value="inativo">Inativo</SelectItem>
             </SelectContent>
           </Select>
         )}
