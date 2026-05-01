@@ -35,6 +35,45 @@ function slackEnv(envBindings: { SLACK_BOT_TOKEN?: string; SLACK_INTEGRATION_ENA
 
 const STATUS_FECHADO = new Set(["resolved", "closed"]);
 
+/**
+ * Converte input do payload (que pode ser "", " ", null, undefined, ou string ISO/yyyy-MM-dd)
+ * em Date válido OU null. Evita `new Date("")` que produz Invalid Date e quebra o
+ * `mapToDriverValue` do Drizzle (RangeError: Invalid time value em toISOString).
+ */
+function toDateOrNull(v: unknown): Date | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v !== "string" && !(v instanceof Date) && typeof v !== "number") return null;
+  const s = typeof v === "string" ? v.trim() : v;
+  if (s === "") return null;
+  const d = s instanceof Date ? s : new Date(s as string | number);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Mapa de migração lazy: status legado (criados pelo modal /projetos antigo ou
+ * pelo default do schema) → status canônico do workspace. Quando user edita um
+ * projeto antigo, o backend normaliza on-the-fly e persiste no formato novo.
+ */
+const STATUS_LEGACY_MAP: Record<string, string> = {
+  active: "ativo",
+  sprint_active: "ativo",
+  planning: "backlog",
+  on_hold: "pausado",
+  completed: "concluido",
+  archived: "inativo",
+};
+
+function normalizeProjectStatus(s: unknown): string | undefined {
+  if (s === null || s === undefined) return undefined;
+  const str = String(s);
+  const mapped = STATUS_LEGACY_MAP[str];
+  if (mapped) {
+    console.log("[normalize-status] migrated", { from: str, to: mapped });
+    return mapped;
+  }
+  return str;
+}
+
 interface Anexo { name: string; url: string }
 
 function mimeToName(mime: string, idx: number): string {
@@ -385,7 +424,7 @@ workspace.post("/api/workspace/tarefas", async (c) => {
         columnId,
         priority: prioridade || "normal",
         assigneeId: responsavelId || null,
-        dueDate: dataEntrega ? new Date(dataEntrega) : null,
+        dueDate: toDateOrNull(dataEntrega),
         status: "todo",
         progress: 0,
       })
@@ -489,8 +528,8 @@ workspace.post("/api/workspace/projetos", async (c) => {
         status: "backlog",
         priority: prioridade || "media",
         ownerId: responsavelId || userId,
-        startDate: dataInicio ? new Date(dataInicio) : null,
-        endDate: dataFim ? new Date(dataFim) : null,
+        startDate: toDateOrNull(dataInicio),
+        endDate: toDateOrNull(dataFim),
         color: "#00c853",
         category: categoria || null,
         visibility: finalVisibility,
@@ -886,7 +925,7 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
     if (status !== undefined) updateData.status = ptBrToKanban[status] || status;
     if (prioridade !== undefined) updateData.priority = prioridade;
     if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
-    if (dataEntrega !== undefined) updateData.dueDate = dataEntrega ? new Date(dataEntrega) : null;
+    if (dataEntrega !== undefined) updateData.dueDate = toDateOrNull(dataEntrega);
     if (progresso !== undefined) updateData.progress = progresso;
     if (titulo !== undefined) updateData.title = titulo.trim();
     if (descricao !== undefined) updateData.objectives = descricao;
@@ -943,14 +982,18 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
 
 // ─── PATCH projetos ───────────────────────────────────────────────────────────
 workspace.patch("/api/workspace/projetos/:id", async (c) => {
+  const id = c.req.param("id");
+  let stage = "init";
   try {
     const db = c.get("db");
-    const id = c.req.param("id");
+    stage = "parse-body";
     const body = await c.req.json();
-    const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } = body;
+    const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } = body;
+    const status = normalizeProjectStatus(body.status);
 
+    stage = "validate-status";
     const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
-    if (status && !validStatuses.includes(status)) {
+    if (status !== undefined && !validStatuses.includes(status)) {
       return c.json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` }, 400);
     }
 
@@ -961,19 +1004,21 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     }
 
     const storage = getStorage(db);
+    stage = "load-existing";
     const existing = await storage.getProject(id);
     if (!existing) {
       return c.json({ error: "Projeto não encontrado" }, 404);
     }
 
+    stage = "build-updateData";
     const updateData: Record<string, any> = {};
     if (nome !== undefined) updateData.name = nome.trim();
     if (descricao !== undefined) updateData.description = descricao;
     if (status !== undefined) updateData.status = status;
     if (prioridade !== undefined) updateData.priority = prioridade;
     if (responsavelId !== undefined) updateData.ownerId = responsavelId;
-    if (dataInicio !== undefined) updateData.startDate = dataInicio ? new Date(dataInicio) : null;
-    if (dataFim !== undefined) updateData.endDate = dataFim ? new Date(dataFim) : null;
+    if (dataInicio !== undefined) updateData.startDate = toDateOrNull(dataInicio);
+    if (dataFim !== undefined) updateData.endDate = toDateOrNull(dataFim);
     if (categoria !== undefined) updateData.category = categoria;
     if (cor !== undefined) updateData.color = cor;
     if (progresso !== undefined) updateData.progress = Math.max(0, Math.min(100, progresso));
@@ -985,6 +1030,8 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
 
     let updated = existing;
     if (Object.keys(updateData).length > 0) {
+      stage = "db.update";
+      console.log("[PATCH /api/workspace/projetos/:id] db.update", { id, fields: Object.keys(updateData) });
       const [u] = await db
         .update(projects)
         .set(updateData)
@@ -997,27 +1044,42 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     // Upsert de project_members (espelha worker/src/routes/projects.ts)
     const effectiveVisibility = (visibility as Visibility | undefined) ?? (existing.visibility as Visibility);
     if (effectiveVisibility === "shared" && Array.isArray(memberIds)) {
+      stage = "members.shared.load";
       const currentMembers = await storage.getProjectMembers(id);
       const currentMemberIds = new Set(currentMembers.map((m) => m.userId));
       const newMemberIds = new Set(memberIds as string[]);
 
       for (const uid of memberIds as string[]) {
         if (!currentMemberIds.has(uid)) {
+          stage = `members.add(${uid})`;
           try {
             await storage.addProjectMember({ projectId: id, userId: uid, role: "member" });
-          } catch (_e) { /* ignora */ }
+          } catch (e: any) {
+            console.error("[PATCH /api/workspace/projetos/:id] addProjectMember falhou (ignorado)", { id, uid, msg: e?.message, stack: e?.stack });
+          }
         }
       }
       for (const member of currentMembers) {
         if (!newMemberIds.has(member.userId)) {
-          await storage.removeProjectMember(member.id);
+          stage = `members.remove(${member.id})`;
+          try {
+            await storage.removeProjectMember(member.id);
+          } catch (e: any) {
+            console.error("[PATCH /api/workspace/projetos/:id] removeProjectMember falhou (ignorado)", { id, memberId: member.id, msg: e?.message, stack: e?.stack });
+          }
         }
       }
     } else if (effectiveVisibility !== "shared") {
       // Limpa membros se virou private/public
+      stage = "members.cleanup.load";
       const currentMembers = await storage.getProjectMembers(id);
       for (const member of currentMembers) {
-        await storage.removeProjectMember(member.id);
+        stage = `members.cleanup(${member.id})`;
+        try {
+          await storage.removeProjectMember(member.id);
+        } catch (e: any) {
+          console.error("[PATCH /api/workspace/projetos/:id] cleanup removeProjectMember falhou (ignorado)", { id, memberId: member.id, msg: e?.message, stack: e?.stack });
+        }
       }
     }
 
@@ -1030,7 +1092,15 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
       visibility: updated.visibility,
     });
   } catch (error: any) {
-    return c.json({ error: error.message }, error.status || 500);
+    console.error("[PATCH /api/workspace/projetos/:id] FALHOU", {
+      id,
+      stage,
+      msg: error?.message,
+      name: error?.name,
+      code: error?.code,
+      stack: error?.stack,
+    });
+    return c.json({ error: error.message, stage }, error.status || 500);
   }
 });
 
