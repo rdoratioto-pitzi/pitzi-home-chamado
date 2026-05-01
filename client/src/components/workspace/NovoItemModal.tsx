@@ -26,6 +26,7 @@ interface Attachment {
 interface UserOption {
   id: string;
   name: string;
+  status?: string;
 }
 
 interface ProjetoOption {
@@ -890,6 +891,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                           style={{ border: "1px solid rgba(255,255,255,0.1)" }}
                         >
                           {users
+                            .filter((u) => u.status === "active")
                             .filter((u) => !memberIdsProjeto.includes(u.id))
                             .filter((u) =>
                               u.name.toLowerCase().includes(memberSearchProjeto.toLowerCase()),
