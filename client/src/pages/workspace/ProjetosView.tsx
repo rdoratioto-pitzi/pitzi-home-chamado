@@ -1011,7 +1011,8 @@ export function ProjetosView() {
         const needsFilter =
           (filtroKpi && filtroKpi !== "Proj. Ativos") ||
           responsavelFilter !== "all" ||
-          tarefaStatusFilter !== "all";
+          tarefaStatusFilter !== "all" ||
+          codigoQueryDebounced !== "";
         return needsFilter ? { ...p, tarefas: kpiFiltered } : p;
       }
       const q = searchQuery.toLowerCase();
