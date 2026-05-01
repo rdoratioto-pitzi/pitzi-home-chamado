@@ -215,44 +215,32 @@ export function ChamadosView() {
 
       {/* Table */}
       {viewMode === "lista" && (
-        <>
-          <WorkspaceTable
-            items={filteredItems}
-            loading={loading}
-            onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
-            onDelete={async (item) => {
-              if (!confirm(`Excluir chamado ${item.codigo}?`)) return;
-              try {
-                const res = await fetchWithAuth(`/api/tickets/${item.id}`, { method: "DELETE" });
-                if (!res.ok) {
-                  const err = await res.json().catch(() => ({ error: "Erro ao excluir" }));
-                  throw new Error(err.error || "Erro ao excluir");
-                }
-                setItems((prev) => prev.filter((i) => i.id !== item.id));
-                toast({ title: `Chamado ${item.codigo} excluído` });
-              } catch (err: unknown) {
-                const msg = err instanceof Error ? err.message : "Erro desconhecido";
-                toast({ title: "Erro ao excluir", description: msg, variant: "destructive" });
+        <WorkspaceTable
+          items={filteredItems}
+          loading={loading}
+          onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
+          onDelete={async (item) => {
+            if (!confirm(`Excluir chamado ${item.codigo}?`)) return;
+            try {
+              const res = await fetchWithAuth(`/api/tickets/${item.id}`, { method: "DELETE" });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: "Erro ao excluir" }));
+                throw new Error(err.error || "Erro ao excluir");
               }
-            }}
-          />
-          <ItemDetailDrawer
-            open={drawerOpen}
-            item={selectedItem}
-            onClose={() => setDrawerOpen(false)}
-            onUpdate={(updated) => {
-              // Em ChamadosView, o drawer só lida com chamados; cast seguro.
-              const ch = updated as ChamadoItem;
-              setItems((prev) => prev.map((i) => (i.id === ch.id ? ch : i)));
-              setSelectedItem(ch);
-            }}
-          />
-        </>
+              setItems((prev) => prev.filter((i) => i.id !== item.id));
+              toast({ title: `Chamado ${item.codigo} excluído` });
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : "Erro desconhecido";
+              toast({ title: "Erro ao excluir", description: msg, variant: "destructive" });
+            }
+          }}
+        />
       )}
       {viewMode === "kanban" && !loading && (
         <KanbanView
           items={filteredItems}
           variant="chamados"
+          onItemClick={(item) => { setSelectedItem(item as ChamadoItem); setDrawerOpen(true); }}
           onStatusChange={async (itemId, newStatus) => {
             try {
               const res = await fetchWithAuth(`/api/workspace/chamados/${itemId}`, {
@@ -266,6 +254,18 @@ export function ChamadosView() {
             } catch {
               toast({ title: "Erro ao mover chamado", variant: "destructive" });
             }
+          }}
+        />
+      )}
+      {(viewMode === "lista" || viewMode === "kanban") && (
+        <ItemDetailDrawer
+          open={drawerOpen}
+          item={selectedItem}
+          onClose={() => setDrawerOpen(false)}
+          onUpdate={(updated) => {
+            const ch = updated as ChamadoItem;
+            setItems((prev) => prev.map((i) => (i.id === ch.id ? ch : i)));
+            setSelectedItem(ch);
           }}
         />
       )}
