@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Send, Paperclip, ExternalLink, Download, Maximize2, FileText, FileSpreadsheet, FileImage, File, FileArchive } from "lucide-react";
+import { X, Send, Paperclip, ExternalLink, Download, Maximize2, FileText, FileSpreadsheet, FileImage, File, FileArchive, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +34,7 @@ interface ItemDetailDrawerProps {
   item: ChamadoItem | UnifiedItem | null;
   onClose: () => void;
   onUpdate?: (updatedItem: ChamadoItem | UnifiedItem) => void;
+  onDelete?: (deletedId: string) => void;
 }
 
 interface TarefaDetailExtras {
@@ -126,7 +137,7 @@ function getFileIcon(name: string) {
   return { Icon: File, color: "rgba(255,255,255,0.5)" };
 }
 
-export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDrawerProps) {
+export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: ItemDetailDrawerProps) {
   const [, setLocation] = useLocation();
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [novoComentario, setNovoComentario] = useState("");
@@ -135,6 +146,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
   const [descricaoDraft, setDescricaoDraft] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subtasksLoading, setSubtasksLoading] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<Array<{id: string; name: string}>>([]);
   const [availableProjetos, setAvailableProjetos] = useState<ProjetoOption[]>([]);
   const [tarefaExtras, setTarefaExtras] = useState<TarefaDetailExtras>({ projetoId: null, responsavelId: null });
@@ -1039,8 +1052,126 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
               </>
             )}
           </div>
+
+          {/* Footer — sticky bottom */}
+          {item && (
+            <div
+              style={{
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                padding: "12px 16px",
+                borderTop: "1px solid rgba(255,255,255,0.06)",
+                background: "hsl(var(--background))",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteOpen(true)}
+                disabled={deleting}
+                className="text-xs px-3 py-1.5 rounded transition-colors flex items-center gap-1.5"
+                style={{
+                  background: "transparent",
+                  color: "#ff5050",
+                  border: "1px solid rgba(255,80,80,0.25)",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,80,80,0.08)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Excluir
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-xs px-3 py-1.5 rounded transition-colors"
+                  style={{
+                    background: "transparent",
+                    color: "rgba(255,255,255,0.55)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="text-xs px-3 py-1.5 rounded transition-colors font-medium"
+                  style={{
+                    background: "rgba(0,200,83,0.15)",
+                    color: "#00c853",
+                    border: "1px solid rgba(0,200,83,0.3)",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,200,83,0.22)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(0,200,83,0.15)")}
+                >
+                  Concluído
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Confirm delete */}
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Excluir {isChamado ? "chamado" : "tarefa"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {item ? (
+                <>
+                  <span className="font-medium">{item.codigo}</span> — {item.titulo}
+                  <br />
+                  Esta ação não pode ser desfeita.
+                </>
+              ) : (
+                "Esta ação não pode ser desfeita."
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleting}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!item) return;
+                setDeleting(true);
+                try {
+                  const url = isChamado
+                    ? `/api/tickets/${item.id}`
+                    : `/api/workspace/tarefas/${item.id}`;
+                  const r = await fetchWithAuth(url, { method: "DELETE" });
+                  if (!r.ok) {
+                    const err = await r.json().catch(() => ({ error: "Erro ao excluir" }));
+                    throw new Error(err.error || "Erro ao excluir");
+                  }
+                  toast({ title: `${isChamado ? "Chamado" : "Tarefa"} ${item.codigo} excluído` });
+                  setConfirmDeleteOpen(false);
+                  onDelete?.(item.id);
+                  onClose();
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : "Erro desconhecido";
+                  toast({ title: "Erro ao excluir", description: msg, variant: "destructive" });
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              {deleting ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
