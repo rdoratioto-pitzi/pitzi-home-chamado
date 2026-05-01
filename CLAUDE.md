@@ -89,6 +89,30 @@ NUNCA fazer apenas `git push` e considerar o deploy concluído.
 O Cloudflare Pages e o Worker NÃO fazem deploy automático a partir do git.
 O deploy SEMPRE requer execução manual dos comandos abaixo.
 
+### Build por ambiente — `--mode` é obrigatório para dev
+
+`scripts/build.ts` aceita `--mode=<production|staging|development>` e propaga
+pro Vite, que carrega `client/.env.<mode>`. O default é `production`, então
+`npm run build` (e `bash scripts/deploy.sh`) continua apontando pra
+`https://homeapi.renovsmart.com.br`.
+
+Para gerar bundle apontando pra API de dev (`homeapi-dev.renovsmart.com.br`),
+use:
+
+```bash
+npm run build:dev   # equivalente a: tsx scripts/build.ts --mode=staging
+```
+
+Sem isso, o bundle sai apontando pra produção e o login em
+`home-dev.renovsmart.com.br` quebra com erro de CORS. Um eventual
+`scripts/deploy-dev.sh` deve usar `npm run build:dev` em vez de `npm run build`.
+
+Validação rápida do bundle gerado:
+
+```bash
+grep -oE "homeapi[a-z-]*\.renovsmart\.com\.br" dist/public/assets/index-*.js | sort -u
+```
+
 ### Script de deploy completo (salvo em `scripts/deploy.sh`):
 ```bash
 #!/bin/bash
