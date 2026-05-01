@@ -1100,7 +1100,10 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                 </button>
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={() => {
+                    toast({ title: `${isChamado ? "Chamado" : "Tarefa"} salvo com sucesso` });
+                    onClose();
+                  }}
                   className="text-xs px-3 py-1.5 rounded transition-colors font-medium"
                   style={{
                     background: "rgba(0,200,83,0.15)",
@@ -1110,7 +1113,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                   onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,200,83,0.22)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(0,200,83,0.15)")}
                 >
-                  Concluído
+                  Salvar
                 </button>
               </div>
             </div>
