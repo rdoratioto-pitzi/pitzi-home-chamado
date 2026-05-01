@@ -265,7 +265,7 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
         </span>
         <span style={{ color: "hsl(var(--muted-foreground) / 0.4)" }}>·</span>
         <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-teal-500/10 text-teal-400 border-teal-700">
-          atividade
+          Tarefa
         </Badge>
       </div>
 
@@ -848,6 +848,8 @@ export function ProjetosView() {
   });
   const [projetos, setProjetos] = useState<ProjetoComTarefas[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [codigoQuery, setCodigoQuery] = useState("");
+  const [codigoQueryDebounced, setCodigoQueryDebounced] = useState("");
   const [projetoFilter, setProjetoFilter] = useState("all");
   const [filtroKpi, setFiltroKpi] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("lista");
@@ -941,7 +943,7 @@ export function ProjetosView() {
       toast({ title: "Atividade excluída com sucesso" });
       refreshData();
     } catch {
-      toast({ title: "Erro ao excluir atividade", variant: "destructive" });
+      toast({ title: "Erro ao excluir tarefa", variant: "destructive" });
     }
   };
 
@@ -981,11 +983,20 @@ export function ProjetosView() {
     return true;
   }
 
+  // Debounce 250ms pra busca por código
+  useEffect(() => {
+    const t = setTimeout(() => setCodigoQueryDebounced(codigoQuery.trim().toLowerCase()), 250);
+    return () => clearTimeout(t);
+  }, [codigoQuery]);
+
   const matchProjetoStatus = (p: ProjetoComTarefas) =>
     statusFilter === "all" || normalizeStatusForForm(p.status) === statusFilter;
 
   const matchTarefaStatus = (t: TarefaItem) =>
     tarefaStatusFilter === "all" || (t.status || "a-fazer") === tarefaStatusFilter;
+
+  const matchCodigo = (t: TarefaItem) =>
+    !codigoQueryDebounced || t.codigo.toLowerCase().includes(codigoQueryDebounced);
 
   const filteredProjetos = projetos
     .filter((p) => projetoFilter === "all" || p.id === projetoFilter)
@@ -995,7 +1006,7 @@ export function ProjetosView() {
         const kpiFiltered = p.tarefas.filter((t) => {
           const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
           const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-          return matchKpi && matchResp && matchTarefaStatus(t);
+          return matchKpi && matchResp && matchTarefaStatus(t) && matchCodigo(t);
         });
         const needsFilter =
           (filtroKpi && filtroKpi !== "Proj. Ativos") ||
@@ -1014,6 +1025,7 @@ export function ProjetosView() {
           matchKpi &&
           matchResp &&
           matchTarefaStatus(t) &&
+          matchCodigo(t) &&
           (t.codigo.toLowerCase().includes(q) ||
             t.titulo.toLowerCase().includes(q) ||
             t.responsavel.toLowerCase().includes(q))
@@ -1026,7 +1038,7 @@ export function ProjetosView() {
           ? p.tarefas.filter((t) => {
               const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
               const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-              return matchKpi && matchResp && matchTarefaStatus(t);
+              return matchKpi && matchResp && matchTarefaStatus(t) && matchCodigo(t);
             })
           : tarefasFiltradas,
       };
@@ -1090,6 +1102,26 @@ export function ProjetosView() {
 
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap">
+        {/* Busca por código */}
+        <div className="relative w-[180px] flex-shrink-0">
+          <Input
+            placeholder="Código (REN-...)"
+            value={codigoQuery}
+            onChange={(e) => setCodigoQuery(e.target.value)}
+            className="h-8 text-xs pr-7"
+          />
+          {codigoQuery && (
+            <button
+              type="button"
+              onClick={() => setCodigoQuery("")}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted"
+              title="Limpar"
+            >
+              <X className="h-3 w-3 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+
         {/* Em Tratativa toggle */}
         <button
           onClick={() => setEmTratativa((v) => !v)}
@@ -1108,7 +1140,7 @@ export function ProjetosView() {
         <div className="relative flex-1 min-w-[200px] max-w-[300px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar atividades..."
+            placeholder="Buscar tarefas..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8 h-8 text-sm"
@@ -1135,21 +1167,23 @@ export function ProjetosView() {
         {/* Status do Projeto — default Ativo, hidden em Em Tratativa */}
         {!emTratativa && (
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-8 w-[180px] text-xs">
+            <SelectTrigger className="h-8 w-[200px] text-xs">
               <span className="truncate">
-                {statusFilter === "all"
-                  ? "Status do Projeto: Todos"
-                  : statusFilter === "backlog"
-                    ? "Backlog"
-                    : statusFilter === "ativo"
-                      ? "Ativo"
-                      : statusFilter === "pausado"
-                        ? "Pausado"
-                        : statusFilter === "concluido"
-                          ? "Concluído"
-                          : statusFilter === "inativo"
-                            ? "Inativo"
-                            : statusFilter}
+                {`Status do Projeto: ${
+                  statusFilter === "all"
+                    ? "Todos"
+                    : statusFilter === "backlog"
+                      ? "Backlog"
+                      : statusFilter === "ativo"
+                        ? "Ativo"
+                        : statusFilter === "pausado"
+                          ? "Pausado"
+                          : statusFilter === "concluido"
+                            ? "Concluído"
+                            : statusFilter === "inativo"
+                              ? "Inativo"
+                              : statusFilter
+                }`}
               </span>
             </SelectTrigger>
             <SelectContent>
@@ -1228,7 +1262,7 @@ export function ProjetosView() {
             <SkeletonRows />
           ) : sortedFlatTarefas.length === 0 ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-              {emTratativa ? "Nenhuma atividade em tratativa" : "Nenhuma atividade encontrada"}
+              {emTratativa ? "Nenhuma tarefa em tratativa" : "Nenhuma tarefa encontrada"}
             </div>
           ) : (
             sortedFlatTarefas.map((tarefa) => (
