@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil, ChevronRight, MoreHorizontal, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown, User as UserIcon, Users, Globe, UserPlus, X } from "lucide-react";
+import { Search, List, Trello, BarChart3, Calendar, LayoutDashboard, Pencil, MoreHorizontal, Edit, Trash2, ArrowUpDown, ArrowUp, ArrowDown, User as UserIcon, Users, Globe, UserPlus, X } from "lucide-react";
 import { KpiStrip } from "@/components/workspace/KpiStrip";
 import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import type { UnifiedItem } from "@/components/workspace/WorkspaceTable";
@@ -169,151 +169,14 @@ const priorityColors: Record<string, string> = {
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-function ProjectGroupHeader({
-  projeto,
-  collapsed,
-  onToggle,
-  onEdit,
-}: {
-  projeto: ProjetoComTarefas;
-  collapsed: boolean;
-  onToggle: () => void;
-  onEdit?: () => void;
-}) {
-  const cor = projeto.cor || "#00c853";
-  const prog = projeto.progresso ?? 0;
-  const tarefaCount = projeto.tarefas.length;
 
-  return (
-    <div
-      className="flex items-center gap-2 px-4 py-2 group cursor-pointer select-none bg-muted/20"
-      onClick={onToggle}
-    >
-      <ChevronRight
-        size={14}
-        className="transition-transform duration-200 flex-shrink-0 text-muted-foreground"
-        style={{
-          transform: collapsed ? "rotate(0deg)" : "rotate(90deg)",
-        }}
-      />
-      <span
-        style={{
-          width: 7,
-          height: 7,
-          borderRadius: "50%",
-          background: cor,
-          display: "inline-block",
-          flexShrink: 0,
-        }}
-      />
-      <span
-        className="text-muted-foreground"
-        style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          textTransform: "uppercase",
-          fontSize: "10px",
-          letterSpacing: "0.05em",
-        }}
-      >
-        {projeto.nome}
-      </span>
-      <Badge
-        variant="outline"
-        className="text-[10px] px-1.5 py-0 border"
-        style={{
-          background: `${cor}15`,
-          color: cor,
-          borderColor: `${cor}40`,
-        }}
-      >
-        {prog}%
-      </Badge>
-      <span
-        className="text-muted-foreground/70"
-        style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "10px",
-        }}
-      >
-        {projeto.codigo}
-      </span>
-      {collapsed && tarefaCount > 0 && (
-        <span
-          className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground"
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-          }}
-        >
-          {tarefaCount} {tarefaCount === 1 ? "atividade" : "atividades"}
-        </span>
-      )}
-      {onEdit && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-muted"
-          title="Editar projeto"
-        >
-          <Pencil size={12} className="text-muted-foreground" />
-        </button>
-      )}
-    </div>
-  );
-}
-
-function HeaderRow() {
-  const headers = [
-    "Código",
-    "Título",
-    "Categoria / Tipo",
-    "Responsável",
-    "Status",
-    "Prioridade",
-    "Progresso",
-    "Data Início",
-    "Data Fim",
-    "",
-  ];
-  return (
-    <div
-      className="grid items-center px-4 py-2 gap-2 border-b border-border/40"
-      style={{
-        gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-      }}
-    >
-      {headers.map((h, i) => (
-        <span
-          key={i}
-          className="text-muted-foreground/70"
-          style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            textTransform: "uppercase",
-            fontSize: "9px",
-            letterSpacing: "0.05em",
-          }}
-        >
-          {h}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function EmptyTarefasRow() {
-  return (
-    <div className="flex items-center px-4 py-3 border-b border-border/30">
-      <span className="text-xs italic text-muted-foreground" style={{ paddingLeft: 18 }}>
-        Nenhuma atividade neste projeto
-      </span>
-    </div>
-  );
-}
-
-const FLAT_GRID = "96px 1fr 175px 100px 115px 110px 62px 88px 30px";
+const FLAT_GRID = "96px 1fr 175px 130px 100px 115px 110px 62px 88px 30px";
 
 const FLAT_HEADERS: { label: string; field: SortField | null }[] = [
   { label: "Código", field: "codigo" },
   { label: "Título", field: "titulo" },
   { label: "Projeto", field: "projeto" },
+  { label: "Categoria / Tipo", field: null },
   { label: "Responsável", field: "responsavel" },
   { label: "Status", field: "status" },
   { label: "Prioridade", field: "prioridade" },
@@ -388,11 +251,22 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
       </span>
 
       {/* Projeto */}
-      <div className="flex items-center gap-1.5 min-w-0 truncate">
+      <div className="flex items-center gap-1.5 min-w-0 truncate" title={tarefa.projetoNome}>
         <span className="inline-block flex-shrink-0" style={{ width: 7, height: 7, borderRadius: "50%", background: tarefa.projetoCor }} />
         <span className="text-xs truncate" style={{ color: tarefa.projetoCor, opacity: 0.85 }}>
-          {tarefa.projetoNome}
+          {tarefa.projetoNome || "—"}
         </span>
+      </div>
+
+      {/* Categoria / Tipo */}
+      <div className="flex items-center gap-1.5 min-w-0 truncate">
+        <span className="text-xs truncate" style={{ color: "hsl(var(--muted-foreground))" }}>
+          {tarefa.sprint || "—"}
+        </span>
+        <span style={{ color: "hsl(var(--muted-foreground) / 0.4)" }}>·</span>
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-teal-500/10 text-teal-400 border-teal-700">
+          atividade
+        </Badge>
       </div>
 
       {/* Responsável */}
@@ -461,135 +335,6 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
   );
 }
 
-function TarefaRow({ tarefa, projetoCor, onClick, onEdit, onDelete }: { tarefa: TarefaItem; projetoCor: string; onClick?: () => void; onEdit?: () => void; onDelete?: () => void }) {
-  const status = tarefa.status || "a-fazer";
-  const dotColor = statusDotColors[status] || "hsl(var(--muted-foreground) / 0.45)";
-  const prioridade = tarefa.prioridade || "media";
-  const prioColor = priorityColors[prioridade] || priorityColors.media;
-  const prog = tarefa.progresso ?? 0;
-
-  const dataInicio = tarefa.criadoEm
-    ? new Date(tarefa.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-    : "—";
-
-  return (
-    <div
-      className="group grid items-center px-4 py-2.5 gap-2 transition-colors cursor-pointer border-b border-border/30 hover:bg-muted/40"
-      onClick={onClick}
-      style={{
-        gridTemplateColumns: "96px 1fr 175px 100px 115px 110px 62px 88px 88px 30px",
-        borderBottom: "1px solid hsl(var(--border) / 0.5)",
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(var(--muted))")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-    >
-      {/* Código */}
-      <div className="flex items-center gap-2 min-w-0">
-        <span
-          className="inline-block flex-shrink-0"
-          style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor }}
-        />
-        <span
-          className="text-xs text-muted-foreground truncate"
-          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-        >
-          {tarefa.codigo}
-        </span>
-      </div>
-
-      {/* Título */}
-      <span className="text-sm truncate text-foreground">
-        {tarefa.titulo}
-      </span>
-
-      {/* Categoria / Tipo */}
-      <div className="flex items-center gap-1.5 min-w-0 truncate">
-        <span className="text-xs truncate" style={{ color: projetoCor, opacity: 0.7 }}>
-          {tarefa.sprint || "—"}
-        </span>
-        <span className="text-muted-foreground/40">·</span>
-        <Badge variant="outline" className="text-[10px] px-1.5 py-0 border bg-slate-500/10 text-slate-400">
-          atividade
-        </Badge>
-      </div>
-
-      {/* Responsável */}
-      <div className="flex items-center gap-1.5 min-w-0">
-        <div
-          className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold h-[22px] w-[22px] bg-primary/15 text-primary"
-        >
-          {tarefa.responsavelInitials}
-        </div>
-        {tarefa.responsavel && tarefa.responsavel !== "Não atribuído" && (
-          <span className="text-xs truncate text-muted-foreground">
-            {tarefa.responsavel}
-          </span>
-        )}
-      </div>
-
-      {/* Status */}
-      <span className="text-xs text-muted-foreground">
-        {statusLabels[status] || status}
-      </span>
-
-      {/* Prioridade */}
-      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${prioColor}`}>
-        {priorityLabels[prioridade] || prioridade}
-      </Badge>
-
-      {/* Progresso */}
-      <div className="flex items-center gap-1">
-        <div style={{ width: 56, height: 4, borderRadius: 2, background: "hsl(var(--muted))" }}>
-          <div
-            style={{
-              width: `${Math.min(prog, 100)}%`,
-              height: "100%",
-              borderRadius: 2,
-              background: projetoCor,
-            }}
-          />
-        </div>
-        <span
-          className="text-[10px] text-muted-foreground"
-          style={{ fontFamily: "'JetBrains Mono', monospace" }}
-        >
-          {prog}%
-        </span>
-      </div>
-
-      {/* Data Início */}
-      <span className="text-xs text-muted-foreground">{dataInicio}</span>
-
-      {/* Data Fim */}
-      <span className="text-xs text-muted-foreground">
-        {tarefa.dataEntrega
-          ? new Date(tarefa.dataEntrega).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
-          : "—"}
-      </span>
-
-      {/* Actions */}
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="p-1 rounded hover:bg-muted">
-              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(); }}>
-              <Edit className="h-3.5 w-3.5 mr-2" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-red-400" onClick={(e) => { e.stopPropagation(); onDelete?.(); }}>
-              <Trash2 className="h-3.5 w-3.5 mr-2" />
-              Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
-  );
-}
 
 function SkeletonRows() {
   return (
@@ -1104,7 +849,6 @@ export function ProjetosView() {
   const [editProjeto, setEditProjeto] = useState<ProjetoComTarefas | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [emTratativa, setEmTratativa] = useState(false);
   const [sortField, setSortField] = useState<SortField>("projeto");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -1119,61 +863,6 @@ export function ProjetosView() {
   };
 
   const EM_TRATATIVA_STATUSES = ["a-fazer", "em-andamento", "bloqueado"];
-
-  const sortedFlatTarefas = useMemo<TarefaFlat[]>(() => {
-    if (!emTratativa) return [];
-    let list: TarefaFlat[] = projetos.flatMap((p) =>
-      p.tarefas
-        .filter((t) => EM_TRATATIVA_STATUSES.includes(t.status || ""))
-        .map((t) => ({ ...t, projetoNome: p.nome, projetoCor: p.cor || "#00c853" }))
-    );
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (t) =>
-          t.titulo.toLowerCase().includes(q) ||
-          t.codigo.toLowerCase().includes(q) ||
-          t.responsavel.toLowerCase().includes(q) ||
-          t.projetoNome.toLowerCase().includes(q)
-      );
-    }
-    if (responsavelFilter !== "all") {
-      list = list.filter((t) => t.responsavel === responsavelFilter);
-    }
-    return [...list].sort((a, b) => {
-      if (sortField === "prioridade") {
-        const order: Record<string, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
-        const diff = (order[a.prioridade || ""] ?? 4) - (order[b.prioridade || ""] ?? 4);
-        return sortDir === "asc" ? diff : -diff;
-      }
-      if (sortField === "progresso") {
-        const diff = (a.progresso ?? 0) - (b.progresso ?? 0);
-        return sortDir === "asc" ? diff : -diff;
-      }
-      const map: Record<SortField, string> = {
-        codigo: a.codigo,
-        titulo: a.titulo,
-        projeto: a.projetoNome,
-        responsavel: a.responsavel,
-        status: a.status || "",
-        dataFim: a.dataEntrega || "",
-        prioridade: "",
-        progresso: "",
-      };
-      const mapB: Record<SortField, string> = {
-        codigo: b.codigo,
-        titulo: b.titulo,
-        projeto: b.projetoNome,
-        responsavel: b.responsavel,
-        status: b.status || "",
-        dataFim: b.dataEntrega || "",
-        prioridade: "",
-        progresso: "",
-      };
-      const cmp = map[sortField].localeCompare(mapB[sortField], "pt-BR");
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-  }, [emTratativa, projetos, searchQuery, responsavelFilter, sortField, sortDir]);
 
   const handleSaveEdit = async (formData: ProjectEditFormData) => {
     if (!editProjeto) return;
@@ -1329,6 +1018,50 @@ export function ProjetosView() {
     })
     .filter((p): p is ProjetoComTarefas => p !== null);
 
+  // Flat: sempre flatten, derivado de filteredProjetos pra herdar TODOS os filtros
+  // (projeto, status, KPI, responsavel, search). emTratativa restringe pra status
+  // em treatment.
+  const sortedFlatTarefas: TarefaFlat[] = (() => {
+    const list: TarefaFlat[] = filteredProjetos.flatMap((p) =>
+      p.tarefas
+        .filter((t) => !emTratativa || EM_TRATATIVA_STATUSES.includes(t.status || ""))
+        .map((t) => ({ ...t, projetoNome: p.nome, projetoCor: p.cor || "#00c853" })),
+    );
+    return [...list].sort((a, b) => {
+      if (sortField === "prioridade") {
+        const order: Record<string, number> = { critica: 0, alta: 1, media: 2, baixa: 3 };
+        const diff = (order[a.prioridade || ""] ?? 4) - (order[b.prioridade || ""] ?? 4);
+        return sortDir === "asc" ? diff : -diff;
+      }
+      if (sortField === "progresso") {
+        const diff = (a.progresso ?? 0) - (b.progresso ?? 0);
+        return sortDir === "asc" ? diff : -diff;
+      }
+      const map: Record<SortField, string> = {
+        codigo: a.codigo,
+        titulo: a.titulo,
+        projeto: a.projetoNome,
+        responsavel: a.responsavel,
+        status: a.status || "",
+        dataFim: a.dataEntrega || "",
+        prioridade: "",
+        progresso: "",
+      };
+      const mapB: Record<SortField, string> = {
+        codigo: b.codigo,
+        titulo: b.titulo,
+        projeto: b.projetoNome,
+        responsavel: b.responsavel,
+        status: b.status || "",
+        dataFim: b.dataEntrega || "",
+        prioridade: "",
+        progresso: "",
+      };
+      const cmp = map[sortField].localeCompare(mapB[sortField], "pt-BR");
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  })();
+
   return (
     <div className="flex flex-col gap-4">
       {/* KPI Strip */}
@@ -1429,15 +1162,15 @@ export function ProjetosView() {
         </div>
       </div>
 
-      {/* Content by view mode */}
-      {emTratativa && (
+      {/* Content: lista flat (sem agrupamento por projeto) */}
+      {viewMode === "lista" && (
         <div className="w-full">
           <FlatHeaderRow sortField={sortField} sortDir={sortDir} onSort={handleSort} />
           {loading ? (
             <SkeletonRows />
           ) : sortedFlatTarefas.length === 0 ? (
             <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-              Nenhuma atividade em tratativa
+              {emTratativa ? "Nenhuma atividade em tratativa" : "Nenhuma atividade encontrada"}
             </div>
           ) : (
             sortedFlatTarefas.map((tarefa) => (
@@ -1455,71 +1188,6 @@ export function ProjetosView() {
                 onDelete={() => handleDeleteTarefa(tarefa.id)}
               />
             ))
-          )}
-        </div>
-      )}
-      {!emTratativa && viewMode === "lista" && (
-        <div className="w-full">
-          <HeaderRow />
-          {loading ? (
-            <SkeletonRows />
-          ) : filteredProjetos.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-              Nenhum projeto encontrado
-            </div>
-          ) : (
-            <>
-              {filteredProjetos.map((projeto) => {
-                const isCollapsed = collapsedProjects.has(projeto.id);
-                return (
-                  <div key={projeto.id}>
-                    <ProjectGroupHeader
-                      projeto={projeto}
-                      collapsed={isCollapsed}
-                      onToggle={() => {
-                        setCollapsedProjects((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(projeto.id)) {
-                            next.delete(projeto.id);
-                          } else {
-                            next.add(projeto.id);
-                          }
-                          return next;
-                        });
-                      }}
-                      onEdit={() => {
-                        setEditProjeto(projeto);
-                        setEditOpen(true);
-                      }}
-                    />
-                    {!isCollapsed && (
-                      <>
-                        {projeto.tarefas.length === 0 ? (
-                          <EmptyTarefasRow />
-                        ) : (
-                          projeto.tarefas.map((tarefa) => (
-                            <TarefaRow
-                              key={tarefa.id}
-                              tarefa={tarefa}
-                              projetoCor={projeto.cor || "#00c853"}
-                              onClick={() => {
-                                setSelectedTarefa(toUnifiedItem(tarefa, projeto.nome));
-                                setDrawerOpen(true);
-                              }}
-                              onEdit={() => {
-                                setSelectedTarefa(toUnifiedItem(tarefa, projeto.nome));
-                                setDrawerOpen(true);
-                              }}
-                              onDelete={() => handleDeleteTarefa(tarefa.id)}
-                            />
-                          ))
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
-            </>
           )}
         </div>
       )}
