@@ -1,6 +1,6 @@
 // worker/src/routes/workspace.ts
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import {
@@ -151,7 +151,7 @@ workspace.get("/api/workspace/counts", async (c) => {
       isAdmin
         ? storage.getTickets()
         : storage.getTickets({ requesterId: userId, assigneeId: userId }),
-      db.select().from(kanbanCards),
+      db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
     ]);
 
     const chamados = allTickets.filter(
@@ -606,7 +606,7 @@ workspace.get("/api/workspace/todos", async (c) => {
         isAdmin
           ? storage.getTickets()
           : storage.getTickets({ requesterId: userId, assigneeId: userId }),
-        db.select().from(kanbanCards),
+        db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
         db.select().from(projects),
         storage.getUsers(),
         storage.getSlaRules(),
@@ -731,7 +731,7 @@ workspace.get("/api/workspace/projetos", async (c) => {
 
     const [allProjects, cards, allUsers, allMembers] = await Promise.all([
       db.select().from(projects),
-      db.select().from(kanbanCards),
+      db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
       db.select().from(users),
       db.select().from(projectMembers),
     ]);
@@ -1187,6 +1187,119 @@ workspace.get("/api/workspace/tarefas/:id", async (c) => {
         cor: projeto.color || "#00c853",
       } : null,
     });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── GET subtarefas ───────────────────────────────────────────────────────────
+workspace.get("/api/workspace/tarefas/:id/subtarefas", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const db = c.get("db");
+    const rows = await db
+      .select()
+      .from(kanbanCards)
+      .where(eq(kanbanCards.parentCardId, id))
+      .orderBy(kanbanCards.order, kanbanCards.createdAt);
+    return c.json({
+      subtarefas: rows.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        done: r.status === "done",
+      })),
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── POST subtarefa ───────────────────────────────────────────────────────────
+workspace.post("/api/workspace/tarefas/:id/subtarefas", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const { title } = await c.req.json();
+    const t = (title || "").trim();
+    if (!t) return c.json({ error: "Título obrigatório" }, 400);
+    const db = c.get("db");
+
+    const [parent] = await db
+      .select()
+      .from(kanbanCards)
+      .where(eq(kanbanCards.id, id))
+      .limit(1);
+    if (!parent) return c.json({ error: "Tarefa pai não encontrada" }, 404);
+
+    const existing = await db
+      .select({ id: kanbanCards.id })
+      .from(kanbanCards)
+      .where(eq(kanbanCards.parentCardId, parent.id));
+    const code = `${parent.code || parent.id.slice(0, 6)}·S${existing.length + 1}`;
+
+    const [created] = await db
+      .insert(kanbanCards)
+      .values({
+        code,
+        projectId: parent.projectId,
+        columnId: parent.columnId,
+        parentCardId: parent.id,
+        title: t,
+        status: "todo",
+        priority: "normal",
+      })
+      .returning();
+    return c.json({
+      id: created.id,
+      title: created.title,
+      done: created.status === "done",
+    }, 201);
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── PATCH subtarefa ──────────────────────────────────────────────────────────
+workspace.patch("/api/workspace/subtarefas/:subtaskId", async (c) => {
+  try {
+    const { subtaskId } = c.req.param() as { subtaskId: string };
+    const { done, title } = await c.req.json();
+    const db = c.get("db");
+
+    const updateData: Record<string, any> = {};
+    if (done !== undefined) updateData.status = done ? "done" : "todo";
+    if (title !== undefined) updateData.title = String(title).trim();
+    if (Object.keys(updateData).length === 0) {
+      return c.json({ error: "Nenhum campo para atualizar" }, 400);
+    }
+
+    const [updated] = await db
+      .update(kanbanCards)
+      .set(updateData)
+      .where(eq(kanbanCards.id, subtaskId))
+      .returning();
+    if (!updated) return c.json({ error: "Subtarefa não encontrada" }, 404);
+
+    return c.json({
+      id: updated.id,
+      title: updated.title,
+      done: updated.status === "done",
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── DELETE subtarefa ─────────────────────────────────────────────────────────
+workspace.delete("/api/workspace/subtarefas/:subtaskId", async (c) => {
+  try {
+    const { subtaskId } = c.req.param() as { subtaskId: string };
+    const db = c.get("db");
+    const [deleted] = await db
+      .delete(kanbanCards)
+      .where(eq(kanbanCards.id, subtaskId))
+      .returning({ id: kanbanCards.id });
+    if (!deleted) return c.json({ error: "Subtarefa não encontrada" }, 404);
+    return c.json({ ok: true });
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
   }

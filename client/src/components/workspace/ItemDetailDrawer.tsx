@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ChamadoItem, UnifiedItem } from "./WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { RichContent } from "@/components/rich-content";
+import { SubtaskList, type Subtask } from "@/components/shared/SubtaskList";
 import { useToast } from "@/hooks/use-toast";
 import {
   statusOptionsForKind,
@@ -132,6 +133,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
   const [enviandoComentario, setEnviandoComentario] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
   const [descricaoDraft, setDescricaoDraft] = useState<string>("");
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [subtasksLoading, setSubtasksLoading] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<Array<{id: string; name: string}>>([]);
   const [availableProjetos, setAvailableProjetos] = useState<ProjetoOption[]>([]);
   const [tarefaExtras, setTarefaExtras] = useState<TarefaDetailExtras>({ projetoId: null, responsavelId: null });
@@ -163,6 +166,54 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
       .then((data: { comentarios: Comentario[] }) => setComentarios(data.comentarios || []))
       .catch(() => setComentarios([]));
   }, [item?.id, open, isChamado]);
+
+  // Subtarefas: só para tarefas.
+  useEffect(() => {
+    if (!item || !open || isChamado) { setSubtasks([]); return; }
+    setSubtasksLoading(true);
+    fetchWithAuth(`/api/workspace/tarefas/${item.id}/subtarefas`)
+      .then((r) => r.json())
+      .then((data: { subtarefas: Subtask[] }) => setSubtasks(data.subtarefas || []))
+      .catch(() => setSubtasks([]))
+      .finally(() => setSubtasksLoading(false));
+  }, [item?.id, open, isChamado]);
+
+  async function createSubtask(title: string) {
+    if (!item) return;
+    const r = await fetchWithAuth(`/api/workspace/tarefas/${item.id}/subtarefas`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title }),
+    });
+    if (!r.ok) {
+      toast({ title: "Erro ao criar subtarefa", variant: "destructive" });
+      return;
+    }
+    const novo: Subtask = await r.json();
+    setSubtasks((prev) => [...prev, novo]);
+  }
+
+  async function toggleSubtask(id: string, done: boolean) {
+    const r = await fetchWithAuth(`/api/workspace/subtarefas/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ done }),
+    });
+    if (!r.ok) {
+      toast({ title: "Erro ao atualizar subtarefa", variant: "destructive" });
+      return;
+    }
+    setSubtasks((prev) => prev.map((s) => (s.id === id ? { ...s, done } : s)));
+  }
+
+  async function deleteSubtask(id: string) {
+    const r = await fetchWithAuth(`/api/workspace/subtarefas/${id}`, { method: "DELETE" });
+    if (!r.ok) {
+      toast({ title: "Erro ao excluir subtarefa", variant: "destructive" });
+      return;
+    }
+    setSubtasks((prev) => prev.filter((s) => s.id !== id));
+  }
 
   // Lista de usuários para o select de Responsável (chamados e tarefas).
   useEffect(() => {
@@ -817,6 +868,26 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     </p>
                   )}
                 </div>
+
+                {/* SUBTAREFAS — só tarefas */}
+                {!isChamado && (
+                  <div
+                    style={{
+                      marginBottom: 24,
+                      paddingTop: 20,
+                      borderTop: "1px solid rgba(255,255,255,0.05)",
+                    }}
+                  >
+                    <div style={SECTION_LABEL_STYLE}>Subtarefas</div>
+                    <SubtaskList
+                      subtasks={subtasks}
+                      onCreate={createSubtask}
+                      onToggle={toggleSubtask}
+                      onDelete={deleteSubtask}
+                      loading={subtasksLoading}
+                    />
+                  </div>
+                )}
 
                 {/* ANEXOS */}
                 {(() => {
