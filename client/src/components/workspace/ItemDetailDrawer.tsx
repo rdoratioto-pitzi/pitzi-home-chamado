@@ -131,6 +131,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
   const [novoComentario, setNovoComentario] = useState("");
   const [enviandoComentario, setEnviandoComentario] = useState(false);
   const [editingField, setEditingField] = useState<string | null>(null);
+  const [descricaoDraft, setDescricaoDraft] = useState<string>("");
   const [availableUsers, setAvailableUsers] = useState<Array<{id: string; name: string}>>([]);
   const [availableProjetos, setAvailableProjetos] = useState<ProjetoOption[]>([]);
   const [tarefaExtras, setTarefaExtras] = useState<TarefaDetailExtras>({ projetoId: null, responsavelId: null });
@@ -356,7 +357,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
               flexShrink: 0,
             }}
           >
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               {item && (
                 <>
                   <span
@@ -370,12 +371,55 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     {item.codigo}
                   </span>
                   <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
-                  <span
-                    className="truncate text-sm"
-                    style={{ color: "rgba(255,255,255,0.85)" }}
-                  >
-                    {item.titulo}
-                  </span>
+                  {editingField === "titulo" ? (
+                    <input
+                      autoFocus
+                      defaultValue={item.titulo}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v && v !== item.titulo) {
+                          handlePatch("titulo", v);
+                        } else {
+                          setEditingField(null);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          const v = (e.target as HTMLInputElement).value.trim();
+                          if (v && v !== item.titulo) {
+                            handlePatch("titulo", v);
+                          } else {
+                            setEditingField(null);
+                          }
+                        } else if (e.key === "Escape") {
+                          setEditingField(null);
+                        }
+                      }}
+                      className="flex-1 text-sm rounded px-2 py-0.5 outline-none min-w-0"
+                      style={{
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(0,200,83,0.3)",
+                        color: "rgba(255,255,255,0.95)",
+                      }}
+                    />
+                  ) : (
+                    <span
+                      className="truncate text-sm cursor-pointer hover:bg-white/5 rounded px-1 -mx-1 flex-1 min-w-0"
+                      style={{ color: "rgba(255,255,255,0.85)" }}
+                      onClick={() => setEditingField("titulo")}
+                      title="Clique para editar"
+                    >
+                      {item.titulo}
+                    </span>
+                  )}
+                  {isPatching && editingField === "titulo" && (
+                    <span
+                      className="text-[10px] flex-shrink-0"
+                      style={{ color: "rgba(255,255,255,0.4)" }}
+                    >
+                      salvando...
+                    </span>
+                  )}
                 </>
               )}
             </div>
@@ -682,8 +726,80 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate }: ItemDetailDr
                     borderTop: "1px solid rgba(255,255,255,0.05)",
                   }}
                 >
-                  <div style={SECTION_LABEL_STYLE}>Descrição</div>
-                  {descricao ? (
+                  <div style={{ ...SECTION_LABEL_STYLE, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>Descrição</span>
+                    {editingField !== "descricao" && (
+                      <button
+                        onClick={() => {
+                          setDescricaoDraft(descricao || "");
+                          setEditingField("descricao");
+                        }}
+                        className="text-[10px] px-1.5 py-0.5 rounded transition-colors"
+                        style={{
+                          color: "rgba(255,255,255,0.4)",
+                          background: "transparent",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          textTransform: "none",
+                          letterSpacing: "0",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                          e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.color = "rgba(255,255,255,0.4)";
+                        }}
+                      >
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {editingField === "descricao" ? (
+                    <div className="flex flex-col gap-2">
+                      <textarea
+                        autoFocus
+                        value={descricaoDraft}
+                        onChange={(e) => setDescricaoDraft(e.target.value)}
+                        rows={6}
+                        className="w-full text-sm p-2 rounded outline-none resize-y"
+                        style={{
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid rgba(0,200,83,0.3)",
+                          color: "rgba(255,255,255,0.85)",
+                          minHeight: 100,
+                          lineHeight: 1.5,
+                        }}
+                        placeholder="Descreva..."
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => { setEditingField(null); setDescricaoDraft(""); }}
+                          disabled={isPatching}
+                          className="text-xs px-2.5 py-1 rounded"
+                          style={{
+                            background: "transparent",
+                            color: "rgba(255,255,255,0.5)",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => handlePatch("descricao", descricaoDraft)}
+                          disabled={isPatching}
+                          className="text-xs px-2.5 py-1 rounded"
+                          style={{
+                            background: "rgba(0,200,83,0.15)",
+                            color: "#00c853",
+                            border: "1px solid rgba(0,200,83,0.3)",
+                          }}
+                        >
+                          {isPatching ? "Salvando..." : "Salvar"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : descricao ? (
                     <RichContent
                       content={descricao}
                       className="text-sm [&_*]:!text-[rgba(255,255,255,0.55)] !leading-relaxed"
