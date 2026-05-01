@@ -79,6 +79,9 @@ function getItemTipoBadge(item: ChamadoItem | UnifiedItem): { label: string; col
 function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedItem; draggable?: boolean; onClick?: () => void }) {
   const badge = getItemTipoBadge(item);
   const date = getItemDate(item);
+  // Nome do projeto: só pra tarefa em variant=todos (UnifiedItem com tipo="tarefa").
+  const projetoNome =
+    "tipo" in item && (item as UnifiedItem).tipo === "tarefa" ? (item as UnifiedItem).contexto : null;
 
   const statusColors: Record<string, string> = {
     in_progress: "#00c853",
@@ -141,6 +144,21 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
           </Badge>
         )}
       </div>
+
+      {/* Projeto (só pra tarefa) */}
+      {projetoNome && (
+        <p
+          className="truncate"
+          title={projetoNome}
+          style={{
+            fontSize: 10,
+            color: "rgba(255,255,255,0.45)",
+            marginBottom: 4,
+          }}
+        >
+          {projetoNome}
+        </p>
+      )}
 
       {/* Title */}
       <p

@@ -457,7 +457,7 @@ function ProjectsKanbanView({
                     opacity: draggingId === t.id ? 0.6 : 1,
                   }}
                 >
-                  <div className="flex items-center gap-1.5 mb-1.5">
+                  <div className="flex items-center gap-1.5 mb-1">
                     <span
                       style={{
                         fontFamily: "'JetBrains Mono', monospace",
@@ -469,6 +469,15 @@ function ProjectsKanbanView({
                       {t.codigo}
                     </span>
                   </div>
+                  {t.projetoNome && (
+                    <p
+                      className="text-[10px] truncate mb-1"
+                      title={t.projetoNome}
+                      style={{ color: "hsl(var(--muted-foreground))" }}
+                    >
+                      {t.projetoNome}
+                    </p>
+                  )}
                   <p className="text-xs mb-2 text-foreground">
                     {t.titulo}
                   </p>
