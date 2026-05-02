@@ -8,6 +8,7 @@
 import { format } from "date-fns-tz";
 import { generateICSContent } from "./ics";
 import type { Ticket, User, TicketComment, Task, KanbanCard, Project } from "../../../shared/schema";
+import { getApplicationLabel } from "../../../shared/applications";
 import type { IStorage, EmailNotificationType } from "../../../server/storage";
 import {
   emailTemplate,
@@ -262,7 +263,7 @@ export async function sendTicketCreatedEmail(
         ${infoTable([
           { label: "Categoria", value: ticket.category },
           { label: "Tipo", value: ticket.type },
-          { label: "Local", value: ticket.location },
+          { label: "Aplicação", value: getApplicationLabel(ticket.applicationKey) },
           { label: "Prioridade", value: priorityBadge(ticket.priority) },
           { label: "Solicitante", value: requester.name },
           ...(assignee ? [{ label: "Responsavel", value: assignee.name }] : []),
@@ -319,7 +320,7 @@ export async function sendTicketAssignedEmail(
         ${infoTable([
           { label: "Categoria", value: ticket.category },
           { label: "Tipo", value: ticket.type },
-          { label: "Local", value: ticket.location },
+          { label: "Aplicação", value: getApplicationLabel(ticket.applicationKey) },
           { label: "Prioridade", value: priorityBadge(ticket.priority) },
           { label: "Status", value: statusBadge(ticket.status) },
         ])}
