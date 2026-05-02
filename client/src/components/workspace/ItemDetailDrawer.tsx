@@ -28,6 +28,8 @@ import {
   priorityClassOf,
   type ItemKind,
 } from "@/lib/workspace-status";
+import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
+import { getApplicationLabel } from "@shared/applications";
 
 interface ItemDetailDrawerProps {
   open: boolean;
@@ -40,6 +42,7 @@ interface ItemDetailDrawerProps {
 interface TarefaDetailExtras {
   projetoId: string | null;
   responsavelId: string | null;
+  applicationKey: string | null;
 }
 
 interface ProjetoOption {
@@ -150,7 +153,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
   const [deleting, setDeleting] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<Array<{id: string; name: string}>>([]);
   const [availableProjetos, setAvailableProjetos] = useState<ProjetoOption[]>([]);
-  const [tarefaExtras, setTarefaExtras] = useState<TarefaDetailExtras>({ projetoId: null, responsavelId: null });
+  const [tarefaExtras, setTarefaExtras] = useState<TarefaDetailExtras>({ projetoId: null, responsavelId: null, applicationKey: null });
   const [isPatching, setIsPatching] = useState(false);
   const { toast } = useToast();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -237,22 +240,24 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
       .catch(() => {});
   }, [open]);
 
-  // Para tarefa: busca projetoId/responsavelId atuais (não vêm em UnifiedItem)
-  // e a lista de projetos disponíveis para o select de Projeto.
+  // Para tarefa: busca projetoId/responsavelId/applicationKey atuais do server
+  // (defesa em profundidade — fonte de verdade vem do GET, não do prop, que pode
+  // chegar com applicationKey ausente quando o item é construído por mappers).
   useEffect(() => {
     if (!open || !item || isChamado) {
-      setTarefaExtras({ projetoId: null, responsavelId: null });
+      setTarefaExtras({ projetoId: null, responsavelId: null, applicationKey: null });
       return;
     }
     fetchWithAuth(`/api/workspace/tarefas/${item.id}`)
       .then((r) => r.json())
-      .then((data: { projeto?: { id: string } | null; responsavelId?: string | null }) => {
+      .then((data: { projeto?: { id: string } | null; responsavelId?: string | null; applicationKey?: string | null }) => {
         setTarefaExtras({
           projetoId: data.projeto?.id ?? null,
           responsavelId: data.responsavelId ?? null,
+          applicationKey: data.applicationKey ?? null,
         });
       })
-      .catch(() => setTarefaExtras({ projetoId: null, responsavelId: null }));
+      .catch(() => setTarefaExtras({ projetoId: null, responsavelId: null, applicationKey: null }));
   }, [item?.id, open, isChamado]);
 
   useEffect(() => {
@@ -280,6 +285,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
     dataEntrega: string | null;
     progresso: number | null;
     criadoEm: string | null;
+    applicationKey?: string | null;
   }): UnifiedItem {
     return {
       ...prev,
@@ -294,6 +300,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
       dataEntrega: resp.dataEntrega,
       progresso: resp.progresso,
       criadoEm: resp.criadoEm,
+      applicationKey: resp.applicationKey ?? prev.applicationKey ?? null,
     };
   }
 
@@ -319,6 +326,9 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
         onUpdate?.(merged);
         if (field === "responsavelId") {
           setTarefaExtras((prev) => ({ ...prev, responsavelId: value === "" ? null : (value as string) }));
+        }
+        if (field === "applicationKey") {
+          setTarefaExtras((prev) => ({ ...prev, applicationKey: (value as string | null) ?? null }));
         }
       }
       setEditingField(null);
@@ -643,6 +653,43 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                         </span>
                       </div>
                     )}
+
+                    {/* Aplicação — inline editável.
+                        Para tarefa, usa tarefaExtras.applicationKey como fonte de verdade
+                        (hidratado do GET /tarefas/:id), com fallback ao prop. */}
+                    {(() => {
+                      const appKey = isChamado
+                        ? (item as ChamadoItem).applicationKey ?? null
+                        : (tarefaExtras.applicationKey ?? (item as UnifiedItem).applicationKey ?? null);
+                      return (
+                        <div className="flex items-center gap-3">
+                          <span style={ROW_LABEL_STYLE}>Aplicação</span>
+                          {editingField === "applicationKey" ? (
+                            <div className="min-w-[200px]">
+                              <ApplicationSelect
+                                value={appKey}
+                                onChange={(v) => handlePatch("applicationKey", v)}
+                                size="sm"
+                                required={isChamado}
+                              />
+                            </div>
+                          ) : (
+                            <span
+                              className="text-xs font-medium"
+                              onClick={() => setEditingField("applicationKey")}
+                              style={{
+                                color: appKey
+                                  ? "rgba(255,255,255,0.65)"
+                                  : "rgba(255,180,0,0.85)",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {getApplicationLabel(appKey)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Responsável */}
                     <div className="flex items-center gap-3">
