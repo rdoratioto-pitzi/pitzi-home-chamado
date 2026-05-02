@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import { requireAuth, getSessionUser } from "../middleware/auth";
+import { extractMentions } from "../lib/sanitize-rich-text";
 import { projects, projectMembers, kanbanCards, kanbanColumns, kanbanComments, users, workspaceComentarios } from "@shared/schema";
 import type { Ticket, User, SlaRule, InsertTicket } from "@shared/schema";
 import { isValidApplicationKey } from "@shared/applications";
@@ -1442,12 +1443,14 @@ export function registerWorkspaceRoutes(router: Router) {
         return res.status(400).json({ error: "Texto obrigatório" });
       }
 
+      const sanitizedTexto = texto.trim();
       const [comentario] = await db
         .insert(kanbanComments)
         .values({
           cardId: String(id),
           userId,
-          content: texto.trim(),
+          content: sanitizedTexto,
+          mentions: extractMentions(sanitizedTexto),
         })
         .returning();
 
@@ -1518,12 +1521,15 @@ export function registerWorkspaceRoutes(router: Router) {
         return res.status(400).json({ error: "Texto obrigatório" });
       }
 
+      const sanitizedTexto = texto.trim();
+      const mencionados = extractMentions(sanitizedTexto).map((m) => m.userId);
       const [comentario] = await db
         .insert(workspaceComentarios)
         .values({
           chamadoId: id,
           autorId: userId,
-          texto: texto.trim(),
+          texto: sanitizedTexto,
+          mencionados,
         })
         .returning();
 
