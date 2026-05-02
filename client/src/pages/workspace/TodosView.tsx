@@ -20,6 +20,7 @@ import { KpiStrip, type WorkspaceKpis } from "@/components/workspace/KpiStrip";
 import { WorkspaceTable, type UnifiedItem } from "@/components/workspace/WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 
 type TipoFilter = "todos" | "chamados" | "tarefas" | "projetos";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
@@ -75,6 +76,7 @@ export function TodosView() {
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>("todos");
   const [statusFilter, setStatusFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
+  const [applicationFilter, setApplicationFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("lista");
 
   useEffect(() => {
@@ -131,6 +133,7 @@ export function TodosView() {
 
     if (statusFilter !== "all" && item.status !== statusFilter) return false;
     if (responsavelFilter !== "all" && item.responsavel !== responsavelFilter) return false;
+    if (applicationFilter && item.applicationKey !== applicationFilter) return false;
 
     return true;
   });
@@ -196,6 +199,18 @@ export function TodosView() {
           searchPlaceholder="Buscar colaborador..."
           className="w-[150px]"
         />
+
+        {/* Aplicação filter */}
+        <div className="w-[180px]">
+          <ApplicationSelect
+            value={applicationFilter}
+            onChange={setApplicationFilter}
+            size="sm"
+            showAllOption
+            allOptionLabel="Aplicação: Todas"
+            placeholder="Aplicação"
+          />
+        </div>
 
         {/* View mode toggle */}
         <div

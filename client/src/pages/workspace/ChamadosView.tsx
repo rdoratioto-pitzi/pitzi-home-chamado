@@ -22,6 +22,7 @@ import { WorkspaceTable, type ChamadoItem } from "@/components/workspace/Workspa
 import { KanbanView } from "@/components/workspace/KanbanView";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 
 type Periodo = "este-ano" | "mes-vigente" | "mes-anterior" | "em-tratativa";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
@@ -63,6 +64,7 @@ export function ChamadosView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
+  const [applicationFilter, setApplicationFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("lista");
   const [selectedItem, setSelectedItem] = useState<ChamadoItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -122,6 +124,7 @@ export function ChamadosView() {
     }
     if (statusFilter !== "all" && item.status !== statusFilter) return false;
     if (responsavelFilter !== "all" && item.responsavel !== responsavelFilter) return false;
+    if (applicationFilter && item.applicationKey !== applicationFilter) return false;
     return true;
   });
 
@@ -193,6 +196,18 @@ export function ChamadosView() {
           searchPlaceholder="Buscar colaborador..."
           className="w-[150px]"
         />
+
+        {/* Aplicação filter */}
+        <div className="w-[180px]">
+          <ApplicationSelect
+            value={applicationFilter}
+            onChange={setApplicationFilter}
+            size="sm"
+            showAllOption
+            allOptionLabel="Aplicação: Todas"
+            placeholder="Aplicação"
+          />
+        </div>
 
         {/* View mode toggle */}
         <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "var(--sep)" }}>

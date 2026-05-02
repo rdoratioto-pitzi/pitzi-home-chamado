@@ -12,6 +12,7 @@ import {
   insertKanbanLabelSchema,
   insertKanbanCardDependencySchema,
 } from "../../../shared/schema";
+import { isValidApplicationKey } from "../../../shared/applications";
 
 import {
   sendProjectMemberAddedEmail,
@@ -79,6 +80,9 @@ projects.post("/api/projects", async (c) => {
   const storage = getStorage(c.get("db"));
   const body = await c.req.json();
   const { memberIds, ...projectData } = body;
+  if (!isValidApplicationKey(projectData.applicationKey)) {
+    return c.json({ error: "Aplicação é obrigatória e deve ser válida" }, 400);
+  }
   const validated = insertProjectSchema.parse(projectData);
   const project = await storage.createProject(validated);
 
@@ -116,6 +120,13 @@ projects.patch("/api/projects/:id", async (c) => {
   }
   const body = await c.req.json();
   const { memberIds, ...projectData } = body;
+  if (
+    projectData.applicationKey !== undefined &&
+    projectData.applicationKey !== null &&
+    !isValidApplicationKey(projectData.applicationKey)
+  ) {
+    return c.json({ error: "Aplicação inválida" }, 400);
+  }
   const partialSchema = insertProjectSchema.partial();
   const validated = partialSchema.parse(projectData);
   const project = await storage.updateProject(id, validated);

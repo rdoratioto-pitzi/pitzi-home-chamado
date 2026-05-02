@@ -84,7 +84,7 @@ export const tickets = pgTable("tickets", {
   attachments: text("attachments"), // JSON array of attachment URLs
   category: text("category").notNull(),
   type: text("type").notNull().default("bug"), // bug, melhoria, negocio
-  location: text("location").notNull().default("outros"), // RS, RG, Dash, One, Home, Omie, Outros
+  applicationKey: text("application_key"), // FK lógica para shared/applications.ts (substitui o antigo `location`)
   priority: text("priority").notNull().default("medium"),
   impact: text("impact").notNull().default("medio"), // baixo, medio, alto, critico
   status: text("status").notNull().default("open"), // open, in_progress, blocked, resolved, closed
@@ -110,8 +110,8 @@ export const tickets = pgTable("tickets", {
 export const insertTicketSchema = createInsertSchema(tickets).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTicket = z.infer<typeof insertTicketSchema>;
 export type Ticket = typeof tickets.$inferSelect;
-export type TicketListing = Pick<Ticket, 
-  "id" | "code" | "title" | "category" | "type" | "location" | "priority" | "status" | 
+export type TicketListing = Pick<Ticket,
+  "id" | "code" | "title" | "category" | "type" | "applicationKey" | "priority" | "status" |
   "requesterId" | "assigneeId" | "createdAt" | "dueDate" | "dataAbertura" | "dataResolucao"
 > & { requesterName: string | null; assigneeName: string | null };
 
@@ -166,6 +166,7 @@ export const projects = pgTable("projects", {
   progress: integer("progress").default(0),
   color: varchar("color", { length: 7 }).default("#00c853"),
   category: varchar("category", { length: 80 }),
+  applicationKey: text("application_key"), // FK lógica para shared/applications.ts
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -235,6 +236,7 @@ export const kanbanCards = pgTable("kanban_cards", {
   progress: integer("progress").default(0),
   checklist: text("checklist"),
   labelIds: text("label_ids"),
+  applicationKey: text("application_key"), // FK lógica para shared/applications.ts (herda do projeto pai por default)
   status: text("status").notNull().default("todo"), // 'todo' | 'doing' | 'done'
   createdAt: timestamp("created_at").defaultNow(),
 });
