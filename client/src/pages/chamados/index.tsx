@@ -129,6 +129,7 @@ const getTypeColor = (type: string): string => {
 
 import { format, addHours, isWeekend, isBefore, addDays, getHours, setHours, setMinutes, setSeconds, addBusinessDays, isAfter, subHours } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import { getApplicationLabel } from "@shared/applications";
 
 const TIMEZONE = "America/Sao_Paulo";
 const WORK_START_HOUR = 8;
@@ -540,7 +541,7 @@ export default function ChamadosPage() {
         "Título": truncateText(ticket.title),
         "Categoria": ticket.category,
         "Tipo": ticket.type || "Bug",
-        "Local": ticket.location || "",
+        "Aplicação": getApplicationLabel(ticket.applicationKey),
         "Prioridade": priorityLabels[ticket.priority],
         "Status": statusLabels[ticket.status],
         "Solicitante": ticket.requesterName || "",

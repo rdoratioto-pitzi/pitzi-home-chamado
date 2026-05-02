@@ -9,6 +9,7 @@ import {
   insertTicketResponsavelSchema,
   insertTicketCommentSchema,
 } from "../../../shared/schema";
+import { isValidApplicationKey } from "../../../shared/applications";
 import {
   sendTicketCreatedEmail,
   sendTicketAssignedEmail,
@@ -189,6 +190,10 @@ tickets.post("/api/tickets", async (c) => {
     data.requesterId = user.userId;
   }
 
+  if (!isValidApplicationKey(data.applicationKey)) {
+    return c.json({ error: "Aplicação é obrigatória e deve ser válida" }, 400);
+  }
+
   const validated = insertTicketSchema.parse(data);
 
   // Auto-assignment
@@ -252,11 +257,17 @@ tickets.patch("/api/tickets/:id", async (c) => {
   const body = await c.req.json();
   let updateData: any = { ...body };
 
+  if (updateData.applicationKey !== undefined && updateData.applicationKey !== null) {
+    if (!isValidApplicationKey(updateData.applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
+    }
+  }
+
   // Non-admin field restriction
   if (user.role !== "admin") {
     const allowedFields = [
       "status", "title", "description", "attachments",
-      "location", "impact", "dueDate",
+      "applicationKey", "impact", "dueDate",
     ];
     const filteredData: any = {};
     allowedFields.forEach((field) => {

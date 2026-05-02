@@ -27,6 +27,8 @@ import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import type { UnifiedItem } from "@/components/workspace/WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
+import { getApplicationLabel } from "@shared/applications";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -96,6 +98,7 @@ interface TarefaItem {
   sprint: string | null;
   progresso: number | null;
   criadoEm: string | null;
+  applicationKey?: string | null;
   anexos?: Array<{ name: string; url: string }>;
 }
 
@@ -113,6 +116,7 @@ interface ProjetoComTarefas {
   progresso: number | null;
   cor: string | null;
   categoria: string | null;
+  applicationKey?: string | null;
   visibility?: "private" | "shared" | "public" | null;
   memberIds?: string[];
   criadoEm: string | null;
@@ -170,13 +174,14 @@ const priorityColors: Record<string, string> = {
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 
-const FLAT_GRID = "96px 1fr 175px 130px 100px 115px 110px 62px 88px 30px";
+const FLAT_GRID = "96px 1fr 175px 130px 130px 100px 115px 110px 62px 88px 30px";
 
 const FLAT_HEADERS: { label: string; field: SortField | null }[] = [
   { label: "Código", field: "codigo" },
   { label: "Título", field: "titulo" },
   { label: "Projeto", field: "projeto" },
   { label: "Categoria / Tipo", field: null },
+  { label: "Aplicação", field: null },
   { label: "Responsável", field: "responsavel" },
   { label: "Status", field: "status" },
   { label: "Prioridade", field: "prioridade" },
@@ -268,6 +273,15 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
           Tarefa
         </Badge>
       </div>
+
+      {/* Aplicação */}
+      <span
+        className="text-xs truncate"
+        title={getApplicationLabel(tarefa.applicationKey)}
+        style={{ color: tarefa.applicationKey ? "hsl(var(--foreground) / 0.75)" : "hsl(var(--muted-foreground) / 0.45)" }}
+      >
+        {getApplicationLabel(tarefa.applicationKey)}
+      </span>
 
       {/* Responsável */}
       <div className="flex items-center gap-1.5 min-w-0">
@@ -530,6 +544,7 @@ interface ProjectEditFormData {
   status: string;
   prioridade: string;
   categoria: string;
+  applicationKey: string | null;
   responsavelId?: string;
   dataInicio: string | null;
   dataFim: string | null;
@@ -566,6 +581,8 @@ function ProjectEditDialog({
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [memberSearchInput, setMemberSearchInput] = useState("");
   const [users, setUsers] = useState<Array<{ id: string; name: string; email?: string; status?: string }>>([]);
+  const [applicationKey, setApplicationKey] = useState<string | null>(null);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
     if (projeto) {
@@ -574,6 +591,8 @@ function ProjectEditDialog({
       setStatus(normalizeStatusForForm(projeto.status));
       setPrioridade(projeto.prioridade || "media");
       setCategoria(projeto.categoria || "");
+      setApplicationKey(projeto.applicationKey ?? null);
+      setSubmitAttempted(false);
       setCor(projeto.cor || "#00c853");
       setProgresso(projeto.progresso ?? 0);
       setDataInicio(toDateInputValue(projeto.dataInicio));
@@ -672,6 +691,25 @@ function ProjectEditDialog({
               <Label className="text-xs">Categoria</Label>
               <Input value={categoria} onChange={(e) => setCategoria(e.target.value)} className="mt-1" />
             </div>
+          </div>
+          <div>
+            <Label className="text-xs">Aplicação *</Label>
+            <div className="mt-1">
+              <ApplicationSelect
+                value={applicationKey}
+                onChange={setApplicationKey}
+                required
+                hasError={submitAttempted && !applicationKey}
+              />
+            </div>
+            {submitAttempted && !applicationKey && (
+              <p className="text-[11px] text-red-500 mt-1">Aplicação é obrigatória</p>
+            )}
+            {!submitAttempted && projeto && !projeto.applicationKey && !applicationKey && (
+              <p className="text-[11px] text-amber-500 mt-1">
+                Aplicação não definida — selecione antes de salvar
+              </p>
+            )}
           </div>
           <div>
             <Label className="text-xs">Visibilidade</Label>
@@ -789,17 +827,22 @@ function ProjectEditDialog({
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button
-            onClick={() => onSave({
-              nome, descricao, status, prioridade, categoria,
-              responsavelId: responsavelId && responsavelId !== "keep" ? responsavelId : undefined,
-              // Defesa em profundidade — string vazia vira null antes de sair do client
-              // (backend já trata via toDateOrNull, mas evita ambiguidade do payload).
-              dataInicio: dataInicio || null,
-              dataFim: dataFim || null,
-              cor, progresso,
-              visibility,
-              memberIds: visibility === "shared" ? memberIds : [],
-            })}
+            onClick={() => {
+              setSubmitAttempted(true);
+              if (!applicationKey) return;
+              onSave({
+                nome, descricao, status, prioridade, categoria,
+                applicationKey,
+                responsavelId: responsavelId && responsavelId !== "keep" ? responsavelId : undefined,
+                // Defesa em profundidade — string vazia vira null antes de sair do client
+                // (backend já trata via toDateOrNull, mas evita ambiguidade do payload).
+                dataInicio: dataInicio || null,
+                dataFim: dataFim || null,
+                cor, progresso,
+                visibility,
+                memberIds: visibility === "shared" ? memberIds : [],
+              });
+            }}
             disabled={saving || !nome.trim()}
           >
             {saving ? "Salvando..." : "Salvar"}
@@ -832,6 +875,7 @@ function toUnifiedItem(tarefa: TarefaItem, projetoNome: string): UnifiedItem {
     sprint: tarefa.sprint,
     dataEntrega: tarefa.dataEntrega,
     anexos: tarefa.anexos || [],
+    applicationKey: tarefa.applicationKey ?? null,
   };
 }
 
@@ -859,6 +903,7 @@ export function ProjetosView() {
   const [statusFilter, setStatusFilter] = useState<string>("ativo");
   const [tarefaStatusFilter, setTarefaStatusFilter] = useState<string>("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
+  const [applicationFilter, setApplicationFilter] = useState<string | null>(null);
   const [selectedTarefa, setSelectedTarefa] = useState<UnifiedItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editProjeto, setEditProjeto] = useState<ProjetoComTarefas | null>(null);
@@ -992,6 +1037,12 @@ export function ProjetosView() {
   const matchProjetoStatus = (p: ProjetoComTarefas) =>
     statusFilter === "all" || normalizeStatusForForm(p.status) === statusFilter;
 
+  const matchProjetoApplication = (p: ProjetoComTarefas) =>
+    !applicationFilter || p.applicationKey === applicationFilter;
+
+  const matchTarefaApplication = (t: TarefaItem) =>
+    !applicationFilter || (t as TarefaItem & { applicationKey?: string | null }).applicationKey === applicationFilter;
+
   const matchTarefaStatus = (t: TarefaItem) =>
     tarefaStatusFilter === "all" || (t.status || "a-fazer") === tarefaStatusFilter;
 
@@ -1001,18 +1052,20 @@ export function ProjetosView() {
   const filteredProjetos = projetos
     .filter((p) => projetoFilter === "all" || p.id === projetoFilter)
     .filter(matchProjetoStatus)
+    .filter(matchProjetoApplication)
     .map((p) => {
       if (!searchQuery) {
         const kpiFiltered = p.tarefas.filter((t) => {
           const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
           const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-          return matchKpi && matchResp && matchTarefaStatus(t) && matchCodigo(t);
+          return matchKpi && matchResp && matchTarefaStatus(t) && matchCodigo(t) && matchTarefaApplication(t);
         });
         const needsFilter =
           (filtroKpi && filtroKpi !== "Proj. Ativos") ||
           responsavelFilter !== "all" ||
           tarefaStatusFilter !== "all" ||
-          codigoQueryDebounced !== "";
+          codigoQueryDebounced !== "" ||
+          applicationFilter !== null;
         return needsFilter ? { ...p, tarefas: kpiFiltered } : p;
       }
       const q = searchQuery.toLowerCase();
@@ -1027,6 +1080,7 @@ export function ProjetosView() {
           matchResp &&
           matchTarefaStatus(t) &&
           matchCodigo(t) &&
+          matchTarefaApplication(t) &&
           (t.codigo.toLowerCase().includes(q) ||
             t.titulo.toLowerCase().includes(q) ||
             t.responsavel.toLowerCase().includes(q))
@@ -1039,7 +1093,7 @@ export function ProjetosView() {
           ? p.tarefas.filter((t) => {
               const matchKpi = applyKpiFilterToTarefa(t, filtroKpi);
               const matchResp = responsavelFilter === "all" || t.responsavel === responsavelFilter;
-              return matchKpi && matchResp && matchTarefaStatus(t) && matchCodigo(t);
+              return matchKpi && matchResp && matchTarefaStatus(t) && matchCodigo(t) && matchTarefaApplication(t);
             })
           : tarefasFiltradas,
       };
@@ -1150,7 +1204,14 @@ export function ProjetosView() {
 
         {/* Projeto filter — hidden in Em Tratativa */}
         {!emTratativa && (
-          <Select value={projetoFilter} onValueChange={setProjetoFilter}>
+          <Select
+            value={projetoFilter}
+            onValueChange={setProjetoFilter}
+            onOpenChange={(isOpen) => {
+              // Garante que recém-criados apareçam no dropdown sem aguardar remount.
+              if (isOpen) refreshData();
+            }}
+          >
             <SelectTrigger className="h-8 w-[200px] text-xs">
               <SelectValue placeholder="Projeto" />
             </SelectTrigger>
@@ -1163,6 +1224,20 @@ export function ProjetosView() {
               ))}
             </SelectContent>
           </Select>
+        )}
+
+        {/* Aplicação filter */}
+        {!emTratativa && (
+          <div className="w-[200px]">
+            <ApplicationSelect
+              value={applicationFilter}
+              onChange={setApplicationFilter}
+              size="sm"
+              showAllOption
+              allOptionLabel="Aplicação: Todas"
+              placeholder={`Aplicação: ${getApplicationLabel(applicationFilter)}`}
+            />
+          </div>
         )}
 
         {/* Status do Projeto — default Ativo, hidden em Em Tratativa */}
@@ -1326,6 +1401,7 @@ export function ProjetosView() {
                         responsavelInitials: u.responsavelInitials,
                         dataEntrega: u.dataEntrega ?? null,
                         progresso: u.progresso ?? 0,
+                        applicationKey: u.applicationKey ?? t.applicationKey ?? null,
                       }
                     : t,
                 ),

@@ -9,6 +9,7 @@ import {
   insertKanbanLabelSchema,
   insertKanbanCardDependencySchema,
 } from "@shared/schema";
+import { isValidApplicationKey } from "@shared/applications";
 import { getSessionUser, requireAuth } from "../middleware/auth";
 import {
   sendMentionNotificationEmail,
@@ -77,6 +78,9 @@ export function registerProjectRoutes(router: Router) {
   router.post("/api/projects", requireAuth, async (req, res) => {
     try {
       const { memberIds, ...projectData } = req.body;
+      if (!isValidApplicationKey(projectData.applicationKey)) {
+        return res.status(400).json({ error: "Aplicação é obrigatória e deve ser válida" });
+      }
       const validated = insertProjectSchema.parse(projectData);
       const project = await storage.createProject(validated);
 
@@ -122,6 +126,13 @@ export function registerProjectRoutes(router: Router) {
         return res.status(403).json({ error: "Access denied" });
       }
       const { memberIds, ...projectData } = req.body;
+      if (
+        projectData.applicationKey !== undefined &&
+        projectData.applicationKey !== null &&
+        !isValidApplicationKey(projectData.applicationKey)
+      ) {
+        return res.status(400).json({ error: "Aplicação inválida" });
+      }
       const partialSchema = insertProjectSchema.partial();
       const validated = partialSchema.parse(projectData);
       const project = await storage.updateProject(getId(req), validated);

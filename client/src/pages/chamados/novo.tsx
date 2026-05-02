@@ -35,6 +35,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { HelpCircle, CheckCircle2, ArrowLeft, Plus, Eye, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
+import { isValidApplicationKey } from "@shared/applications";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -43,7 +45,9 @@ const formSchema = z.object({
     .max(5000, "Descrição deve ter no máximo 5.000 caracteres"),
   category: z.string().min(1, "Selecione uma categoria"),
   type: z.string().min(1, "Selecione um tipo"),
-  location: z.string().min(1, "Selecione um local"),
+  applicationKey: z.string().refine(isValidApplicationKey, {
+    message: "Selecione uma aplicação válida",
+  }),
   priority: z.string().min(1, "Selecione uma prioridade"),
   impact: z.string().min(1, "Selecione o impacto"),
   assigneeId: z.string().optional(),
@@ -69,16 +73,6 @@ const defaultTypes: FieldItem[] = [
   { value: "bug", label: "Bug" },
   { value: "melhoria", label: "Melhoria" },
   { value: "negocio", label: "Negócio" },
-];
-
-const defaultLocations: FieldItem[] = [
-  { value: "RS", label: "RS" },
-  { value: "RG", label: "RG" },
-  { value: "Dash", label: "Dash" },
-  { value: "One", label: "One" },
-  { value: "Home", label: "Home" },
-  { value: "Omie", label: "Omie" },
-  { value: "Outros", label: "Outros" },
 ];
 
 export default function NovoChamadoPage() {
@@ -110,16 +104,6 @@ export default function NovoChamadoPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: locationsSetting } = useQuery<Setting>({
-    queryKey: ["/api/settings", "ticket_locations"],
-    queryFn: async () => {
-      const res = await fetch("/api/settings/ticket_locations");
-      if (!res.ok) return null;
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
   // Helper to parse settings with fallback to defaults
   const parseSettingWithFallback = (settingValue: string | null | undefined, defaults: FieldItem[]): FieldItem[] => {
     if (!settingValue) return defaults;
@@ -135,7 +119,6 @@ export default function NovoChamadoPage() {
 
   const categories = parseSettingWithFallback(categoriesSetting?.value, defaultCategories);
   const types = parseSettingWithFallback(typesSetting?.value, defaultTypes);
-  const locations = parseSettingWithFallback(locationsSetting?.value, defaultLocations);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -144,7 +127,7 @@ export default function NovoChamadoPage() {
       description: "",
       category: "",
       type: "",
-      location: "",
+      applicationKey: "",
       priority: "medium",
       impact: "medio",
       assigneeId: undefined,
@@ -389,36 +372,29 @@ export default function NovoChamadoPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="location"
+                    name="applicationKey"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center gap-1">
-                          Local <span className="text-destructive">*</span>
+                          Aplicação <span className="text-destructive">*</span>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-[250px]">
+                            <TooltipContent className="max-w-[280px]">
                               <p className="text-xs">
-                                <strong>Local</strong> indica o sistema ou ambiente onde o problema ocorreu.
+                                <strong>Aplicação</strong> indica a qual produto/sistema Renov o chamado se refere.
                               </p>
                             </TooltipContent>
                           </Tooltip>
                         </FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-ticket-location">
-                              <SelectValue placeholder="Selecione" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {locations.map((loc) => (
-                              <SelectItem key={loc.value} value={loc.value}>
-                                {loc.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <ApplicationSelect
+                            value={field.value || null}
+                            onChange={(v) => field.onChange(v ?? "")}
+                            required
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
