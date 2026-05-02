@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import type { ChamadoItem, UnifiedItem } from "./WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { RichContent } from "@/components/rich-content";
+import { RichTextarea } from "@/components/rich-textarea";
+import { useMentionableUsers } from "@/hooks/use-mentionable-users";
 import { SubtaskList, type Subtask } from "@/components/shared/SubtaskList";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -156,6 +158,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
   const [tarefaExtras, setTarefaExtras] = useState<TarefaDetailExtras>({ projetoId: null, responsavelId: null, applicationKey: null });
   const [isPatching, setIsPatching] = useState(false);
   const { toast } = useToast();
+  const mentionableUsers = useMentionableUsers();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -872,20 +875,12 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                   </div>
                   {editingField === "descricao" ? (
                     <div className="flex flex-col gap-2">
-                      <textarea
-                        autoFocus
+                      <RichTextarea
                         value={descricaoDraft}
-                        onChange={(e) => setDescricaoDraft(e.target.value)}
-                        rows={6}
-                        className="w-full text-sm p-2 rounded outline-none resize-y"
-                        style={{
-                          background: "rgba(255,255,255,0.04)",
-                          border: "1px solid rgba(0,200,83,0.3)",
-                          color: "rgba(255,255,255,0.85)",
-                          minHeight: 100,
-                          lineHeight: 1.5,
-                        }}
+                        onChange={setDescricaoDraft}
                         placeholder="Descreva..."
+                        hideAttachments
+                        data-testid="item-detail-descricao-edit"
                       />
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -1051,9 +1046,10 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs" style={{ color: "rgba(255,255,255,0.55)", lineHeight: "1.5" }}>
-                                {c.texto}
-                              </p>
+                              <RichContent
+                                content={c.texto}
+                                className="text-xs [&_*]:!text-[rgba(255,255,255,0.55)] !leading-relaxed"
+                              />
                             </div>
                           </div>
                         ))
@@ -1061,30 +1057,22 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     </div>
 
                     {/* New comment input */}
-                    <div className="flex gap-2 mt-2">
-                      <textarea
-                        ref={textareaRef}
-                        value={novoComentario}
-                        onChange={(e) => setNovoComentario(e.target.value)}
-                        placeholder="Adicionar comentário..."
-                        rows={2}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                            e.preventDefault();
-                            handleEnviarComentario();
-                          }
-                        }}
-                        className="flex-1 text-xs p-2 rounded resize-none outline-none"
-                        style={{
-                          background: "rgba(255,255,255,0.04)",
-                          border: "1px solid rgba(255,255,255,0.1)",
-                          color: "rgba(255,255,255,0.7)",
-                        }}
-                      />
+                    <div className="flex gap-2 mt-2 items-end">
+                      <div className="flex-1 min-w-0">
+                        <RichTextarea
+                          value={novoComentario}
+                          onChange={setNovoComentario}
+                          placeholder="Adicionar comentário... (use @ para mencionar)"
+                          enableMentions
+                          mentionableUsers={mentionableUsers}
+                          hideAttachments
+                          data-testid="item-detail-novo-comentario"
+                        />
+                      </div>
                       <button
                         onClick={handleEnviarComentario}
                         disabled={enviandoComentario || !novoComentario.trim()}
-                        className="flex-shrink-0 p-2 rounded transition-colors self-end"
+                        className="flex-shrink-0 p-2 rounded transition-colors"
                         style={{
                           background: novoComentario.trim() ? "rgba(0,200,83,0.15)" : "rgba(255,255,255,0.04)",
                           border: "1px solid rgba(0,200,83,0.2)",

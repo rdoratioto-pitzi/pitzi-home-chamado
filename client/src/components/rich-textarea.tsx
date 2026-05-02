@@ -1,6 +1,53 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
+import 'quill-mention/autoregister';
+import 'quill-mention/dist/quill.mention.css';
+import { Quill } from 'react-quill-new';
+
+// quill-mention v6 só insere "@" no DOM. Estendemos MentionBlot.create
+// para também injetar o nome do usuário (data.displayName) como text node.
+// Sem isso, a pill renderiza vazia.
+let mentionBlotPatched = false;
+function patchMentionBlot() {
+  if (mentionBlotPatched) return;
+  try {
+    const Mention: any = (Quill as any).import('blots/mention');
+    if (!Mention || typeof Mention.create !== 'function') return;
+    const originalCreate = Mention.create.bind(Mention);
+    Mention.create = function (data: any) {
+      const node = originalCreate(data);
+      if (node instanceof HTMLElement && data && typeof data.displayName === 'string' && data.displayName.length > 0) {
+        // Evita duplicar caso o blot já contenha o nome
+        if (!node.textContent || !node.textContent.includes(data.displayName)) {
+          node.appendChild(document.createTextNode(data.displayName));
+        }
+      }
+      return node;
+    };
+    mentionBlotPatched = true;
+  } catch {
+    // Mention blot ainda não registrado — tentamos de novo no primeiro render
+  }
+}
+patchMentionBlot();
+
+// Pré-processa HTML entrando no Quill para garantir que mentions salvas
+// (vindas do backend) tenham o nome injetado dentro do span.
+const MENTION_RE = /<span\b([^>]*\bclass="[^"]*\bmention\b[^"]*"[^>]*)>([\s\S]*?)<\/span>/gi;
+function ensureMentionNames(html: string): string {
+  if (!html || !html.includes('mention')) return html || '';
+  return html.replace(MENTION_RE, (match, attrs: string, inner: string) => {
+    const m = attrs.match(/data-display-name="([^"]+)"/i);
+    if (!m) return match;
+    const displayName = m[1];
+    if (inner.includes(displayName)) return match;
+    if (/<span[^>]*\bql-mention-denotation-char\b[^>]*>[^<]*<\/span>/i.test(inner)) {
+      return `<span ${attrs}>${inner}${displayName}</span>`;
+    }
+    return `<span ${attrs}><span class="ql-mention-denotation-char">@</span>${displayName}</span>`;
+  });
+}
 import { Button } from "@/components/ui/button";
 import { 
   X, Loader2, Maximize2, Video, FileText, Paperclip, FileSpreadsheet, File, Download,
@@ -15,6 +62,12 @@ import {
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { cn } from "@/lib/utils";
 
+export interface MentionableUser {
+  id: string;
+  name: string;
+  email?: string;
+}
+
 interface RichTextareaProps {
   value: string;
   onChange: (value: string) => void;
@@ -28,6 +81,12 @@ interface RichTextareaProps {
   disabled?: boolean;
   className?: string;
   "data-testid"?: string;
+  /** Habilita autocomplete de @menção (default false). */
+  enableMentions?: boolean;
+  /** Lista de usuários para autocomplete (obrigatório quando enableMentions=true). */
+  mentionableUsers?: MentionableUser[];
+  /** Esconde o botão Anexar (útil em campo de comentário). */
+  hideAttachments?: boolean;
 }
 
 function getFileTypeFromDataUrl(url: string): "image" | "video" | "pdf" | "excel" | "document" | "other" {
@@ -90,7 +149,26 @@ export function RichTextarea({
   disabled = false,
   className: externalClassName,
   "data-testid": dataTestId,
+  enableMentions = false,
+  mentionableUsers,
+  hideAttachments = false,
 }: RichTextareaProps) {
+  // Mantém ref atualizada com a lista mais recente sem recriar o módulo Quill
+  const mentionableUsersRef = useRef<MentionableUser[]>(mentionableUsers ?? []);
+  useEffect(() => {
+    mentionableUsersRef.current = mentionableUsers ?? [];
+  }, [mentionableUsers]);
+
+  // Garante que o monkey-patch do MentionBlot está aplicado (Mention é
+  // registrado pelo autoregister antes desse efeito rodar)
+  useEffect(() => {
+    patchMentionBlot();
+  }, []);
+
+  const valueWithMentionNames = useMemo(
+    () => (enableMentions ? ensureMentionNames(value || '') : value || ''),
+    [value, enableMentions],
+  );
   // Support both new (attachments) and legacy (images) props
   const attachments: { name: string; url: string }[] = (attachmentsProp ?? (imagesProp || []).map((url, i) => ({ name: `Arquivo_${i + 1}`, url }))).filter(a => a != null && a.url);
   const handleAttachmentsChange = useCallback((newAttachments: { name: string; url: string }[]) => {
@@ -107,59 +185,109 @@ export function RichTextarea({
   const quillRef = useRef<ReactQuill>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const modules = useMemo(() => ({
-    toolbar: {
-      container: [
-        [{ 'header': [1, 2, false] }],
-        ['bold', 'italic', 'strike', 'code'],
-        [{ 'list': 'ordered' }, { 'list': 'bullet' }],  // Ordem correta: ordered (1.) primeiro, bullet (•) depois
-        ['blockquote'],
-        ['link'],
-        ['clean']
-      ]
-    },
-    keyboard: {
-      bindings: {
-        tab: {
-          key: 9,
-          handler: function (this: any, range: any, context: any) {
-            const quill = this.quill;
-            quill.history.cutoff();
-            quill.history.push('user', 'api');
-            if (context.format.list) {
-              quill.format('indent', '+1', 'user');
-            } else {
-              quill.insertText(range.index, '  ');
-            }
-            quill.history.cutoff();
-            quill.history.push('user', 'api');
-          }
-        },
-        'shift-tab': {
-          key: 9,
-          shiftKey: true,
-          handler: function (this: any, range: any, context: any) {
-            const quill = this.quill;
-            quill.history.cutoff();
-            quill.history.push('user', 'api');
-            if (context.format.list) {
-              quill.format('indent', '-1', 'user');
-            }
-            quill.history.cutoff();
-            quill.history.push('user', 'api');
-          }
+  const modules = useMemo(() => {
+    const base: Record<string, any> = {
+      toolbar: {
+        container: [
+          [{ 'header': [1, 2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+          ['blockquote', 'code-block', 'code'],
+          ['link'],
+          ['undo', 'redo'],
+          ['clean'],
+        ],
+        handlers: {
+          undo: function (this: any) { this.quill.history.undo(); },
+          redo: function (this: any) { this.quill.history.redo(); },
         },
       },
-    },
-  }), []);
+      history: {
+        delay: 1000,
+        maxStack: 100,
+        userOnly: true,
+      },
+      keyboard: {
+        bindings: {
+          tab: {
+            key: 9,
+            handler: function (this: any, range: any, context: any) {
+              const quill = this.quill;
+              quill.history.cutoff();
+              quill.history.push('user', 'api');
+              if (context.format.list) {
+                quill.format('indent', '+1', 'user');
+              } else {
+                quill.insertText(range.index, '  ');
+              }
+              quill.history.cutoff();
+              quill.history.push('user', 'api');
+            }
+          },
+          'shift-tab': {
+            key: 9,
+            shiftKey: true,
+            handler: function (this: any, range: any, context: any) {
+              const quill = this.quill;
+              quill.history.cutoff();
+              quill.history.push('user', 'api');
+              if (context.format.list) {
+                quill.format('indent', '-1', 'user');
+              }
+              quill.history.cutoff();
+              quill.history.push('user', 'api');
+            }
+          },
+        },
+      },
+    };
 
-  const formats = [
-    'header',
-    'bold', 'italic', 'strike', 'code',
-    'list', 'blockquote',
-    'link',
-    'indent',
-  ];
+    if (enableMentions) {
+      base.mention = {
+        allowedChars: /^[A-Za-z0-9_\-.\sÀ-ÿ]*$/,
+        mentionDenotationChars: ['@'],
+        spaceAfterInsert: true,
+        dataAttributes: ['userId', 'displayName', 'denotationChar', 'index'],
+        source: function (
+          searchTerm: string,
+          renderList: (matches: any[], term: string) => void,
+        ) {
+          const term = (searchTerm || '').toLowerCase();
+          const users = mentionableUsersRef.current || [];
+          const matches = users
+            .filter((u) => {
+              if (!term) return true;
+              return (
+                u.name.toLowerCase().includes(term) ||
+                (u.email ?? '').toLowerCase().includes(term)
+              );
+            })
+            .slice(0, 8)
+            .map((u) => ({
+              userId: u.id,
+              displayName: u.name,
+              value: u.name,
+              id: u.id,
+            }));
+          renderList(matches, searchTerm);
+        },
+      };
+    }
+
+    return base;
+  }, [enableMentions]);
+
+  const formats = useMemo(() => {
+    const base = [
+      'header',
+      'bold', 'italic', 'underline', 'strike', 'code',
+      'list', 'blockquote', 'code-block',
+      'link',
+      'indent',
+    ];
+    if (enableMentions) base.push('mention');
+    return base;
+  }, [enableMentions]);
 
   const uploadFile = useCallback(async (file: File): Promise<string | null> => {
     const maxSize = 50 * 1024 * 1024;
@@ -297,7 +425,7 @@ export function RichTextarea({
           <ReactQuill
             ref={quillRef}
             theme="snow"
-            value={value || ''}
+            value={valueWithMentionNames}
             onChange={handleQuillChange}
             onFocus={handleQuillFocus}
             onBlur={handleQuillBlur}
@@ -324,28 +452,30 @@ export function RichTextarea({
       
       <div className="flex items-center justify-between flex-wrap gap-1">
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled || isUploading}
-            data-testid={dataTestId ? `${dataTestId}-upload-btn-alt` : undefined}
-          >
-            {isUploading ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-1" />
-            ) : (
-              <Paperclip className="h-4 w-4" />
-            )}
-            <span className="ml-1">Anexar</span>
-          </Button>
+          {!hideAttachments && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled || isUploading}
+              data-testid={dataTestId ? `${dataTestId}-upload-btn-alt` : undefined}
+            >
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Paperclip className="h-4 w-4" />
+              )}
+              <span className="ml-1">Anexar</span>
+            </Button>
+          )}
         </div>
         <span className={cn("text-[10px] text-muted-foreground", "ml-auto")}>
           {(value || '').length}
         </span>
       </div>
 
-      {attachments.length > 0 && (
+      {!hideAttachments && attachments.length > 0 && (
         <div className="space-y-2 mt-2">
           {attachments.map((att, index) => {
             const fileType = getFileTypeFromDataUrl(att.url);

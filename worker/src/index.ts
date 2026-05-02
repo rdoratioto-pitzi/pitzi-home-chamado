@@ -4,6 +4,7 @@ import { createDb, type Database } from "./lib/db";
 import { createCorsMiddleware } from "./middleware/cors";
 import { authMiddleware } from "./middleware/auth";
 import { errorHandler } from "./middleware/error-handler";
+import { sanitizeRichText } from "./lib/sanitize-rich-text";
 import { auth } from "./routes/auth";
 import { settings } from "./routes/settings";
 import { notifications } from "./routes/notifications";
@@ -102,6 +103,32 @@ app.use("*", createCorsMiddleware());
 app.use("*", async (c, next) => {
   const db = createDb(c.env.DATABASE_URL);
   c.set("db", db);
+  await next();
+});
+
+// Sanitização de campos rich-text em bodies JSON (POST/PATCH/PUT)
+const RICH_TEXT_FIELDS = ["descricao", "description", "content", "comentario", "message", "texto"] as const;
+app.use("*", async (c, next) => {
+  const method = c.req.method;
+  if (method === "POST" || method === "PATCH" || method === "PUT") {
+    const ctype = c.req.header("content-type") || "";
+    if (ctype.includes("application/json")) {
+      try {
+        const body: any = await c.req.json();
+        if (body && typeof body === "object" && !Array.isArray(body)) {
+          for (const key of RICH_TEXT_FIELDS) {
+            if (typeof body[key] === "string" && body[key].length > 0) {
+              body[key] = sanitizeRichText(body[key]);
+            }
+          }
+        }
+        // Override c.req.json para retornar o body sanitizado nas chamadas dos handlers
+        (c.req as any).json = async () => body;
+      } catch {
+        // body vazio / não-JSON / json inválido — segue sem mexer
+      }
+    }
+  }
   await next();
 });
 

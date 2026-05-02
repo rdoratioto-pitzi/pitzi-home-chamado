@@ -5,6 +5,7 @@ import { sql, eq, or, and } from "drizzle-orm";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import { requireAdmin } from "../middleware/auth";
+import { extractMentions } from "../lib/sanitize-rich-text";
 import {
   insertTaskTagSchema,
   insertTaskTagMemberSchema,
@@ -890,7 +891,7 @@ tasksRouter.post("/api/tasks/:id/comments", async (c) => {
   const body = await c.req.json();
 
   try {
-    const data = { ...body, taskId: id, authorId: userId };
+    const data = { ...body, taskId: id, authorId: userId, mentions: extractMentions(body?.content) };
     const validated = insertTaskCommentSchema.parse(data);
     const comment = await storage.createTaskComment(validated);
 
@@ -943,7 +944,10 @@ tasksRouter.patch("/api/task-comments/:id", async (c) => {
   const body = await c.req.json();
 
   try {
-    const comment = await storage.updateTaskComment(id, { content: body.content });
+    const comment = await storage.updateTaskComment(id, {
+      content: body.content,
+      mentions: extractMentions(body.content),
+    });
     if (!comment) return c.json({ error: "Comment not found" }, 404);
     return c.json(comment);
   } catch (error) {

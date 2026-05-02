@@ -96,6 +96,7 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   const filteredUsers = activeUsers
     .filter(u => u.name.toLowerCase().includes(mentionFilter.toLowerCase()))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  const mentionableUsersList = activeUsers.map((u) => ({ id: u.id, name: u.name, email: u.email }));
 
   const handleCommentChange = (value: string) => {
     setNewComment(value);
@@ -596,6 +597,8 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                               images={commentImages}
                               onImagesChange={setCommentImages}
                               className="min-h-[80px]"
+                              enableMentions
+                              mentionableUsers={mentionableUsersList}
                             />
                             {showMentions && filteredUsers.length > 0 && (
                               <div className="absolute bottom-full left-0 w-64 bg-popover border rounded-md shadow-md z-50 mb-1 max-h-48 overflow-y-auto">

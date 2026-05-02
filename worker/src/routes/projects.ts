@@ -13,6 +13,7 @@ import {
   insertKanbanCardDependencySchema,
 } from "../../../shared/schema";
 import { isValidApplicationKey } from "../../../shared/applications";
+import { extractMentions } from "../lib/sanitize-rich-text";
 
 import {
   sendProjectMemberAddedEmail,
@@ -462,6 +463,7 @@ projects.post("/api/cards/:id/comments", async (c) => {
     ...body,
     cardId: id,
     userId: userId,
+    mentions: extractMentions(body?.content),
   });
   const comment = await storage.createKanbanComment(validated);
 
