@@ -26,6 +26,26 @@ npm run check      # TypeScript type check
 pkill -f tsx && pkill -f vite && npm run dev
 ```
 
+### Aplicar SQL nos bancos Neon (dev/prod)
+
+Quando `db:push` quebra (drift FK, sequences Omie) ou se precisa de
+ALTERs ad-hoc, use os scripts que carregam connection string do
+Bitwarden vault e rodam via `psql`:
+
+```bash
+npm run db:apply:dev "SELECT count(*) FROM tickets;"          # SQL inline
+npm run db:apply:dev -- -f migrations/20260502-mentions.sql   # arquivo
+npm run db:apply:prod "..."                                   # exige "APLICAR EM PROD"
+```
+
+Pré-requisitos:
+- Bitwarden CLI instalado (`bw`) — já em uso na Renov
+- `bw unlock` + `export BW_SESSION=...` antes de rodar
+- Items no vault: `neon-dev-database-url` e `neon-prod-database-url`
+  (password = connection string Neon completa, com `sslmode=require`)
+
+Override do nome do item (raro): `BW_ITEM_DEV=outro-nome npm run db:apply:dev ...`.
+
 ## 🔴 Git Workflow — REGRAS OBRIGATÓRIAS
 
 ### Branch — SEMPRE a partir de develop
