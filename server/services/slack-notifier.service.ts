@@ -212,7 +212,7 @@ export async function notifyChamadoCriado(
       ? await getUserById(deps.db, chamado.requesterId)
       : null;
 
-    const { text, blocks } = buildChamadoCriadoBlocks({ chamado, autor });
+    const { text, blocks } = buildChamadoCriadoBlocks({ chamado, autor, baseUrl: deps.env.APP_URL });
     const sent = await sendChannelMessage(deps.env, { channel, text, blocks });
     if (!sent) return;
 
@@ -278,8 +278,10 @@ export async function notifyChamadoAtribuido(
     const slackId = await resolveSlackIdForUser(deps, responsavel);
     if (slackId) {
       const dm = buildDmAtribuicaoChamado({
+        chamadoId: chamado.id,
         chamadoCode: chamado.code,
         titulo: chamado.title,
+        baseUrl: deps.env.APP_URL,
       });
       await sendDirectMessage(deps.env, {
         slackUserId: slackId,
@@ -369,7 +371,7 @@ export async function notifyProjetoCriado(
       ? await getUserById(deps.db, projeto.ownerId)
       : null;
 
-    const { text, blocks } = buildProjetoCriadoBlocks({ projeto, owner });
+    const { text, blocks } = buildProjetoCriadoBlocks({ projeto, owner, baseUrl: deps.env.APP_URL });
     const sent = await sendChannelMessage(deps.env, { channel, text, blocks });
     if (!sent) return;
 
@@ -424,6 +426,7 @@ export async function notifyAtividadeCriada(
       atividade: card,
       projeto,
       responsavel,
+      baseUrl: deps.env.APP_URL,
     });
 
     await sendThreadReply(deps.env, {
@@ -441,9 +444,11 @@ export async function notifyAtividadeCriada(
       const slackId = await resolveSlackIdForUser(deps, responsavel);
       if (slackId) {
         const dm = buildDmAtividadeUrgente({
+          atividadeId: card.id,
           atividadeCode: card.code,
           titulo: card.title,
-          projetoCode: projeto.code,
+          projetoId: projeto.id,
+          baseUrl: deps.env.APP_URL,
         });
         await sendDirectMessage(deps.env, {
           slackUserId: slackId,

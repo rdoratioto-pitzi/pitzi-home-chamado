@@ -26,6 +26,7 @@ function slackEnv() {
     SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN,
     SLACK_INTEGRATION_ENABLED: process.env.SLACK_INTEGRATION_ENABLED,
     SLACK_CHANNEL_DEVS: process.env.SLACK_CHANNEL_DEVS,
+    APP_URL: process.env.APP_URL,
   };
 }
 
