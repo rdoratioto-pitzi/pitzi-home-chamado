@@ -779,3 +779,114 @@ html:not(.dark) main {
 :root:not(.dark) [data-dark-preview] {
   /* Intentionally dark — this is a preview of dark theme logo */
 }
+
+/* ============== Quill rich-text — undo/redo + mention badge ============== */
+.ql-snow.ql-toolbar button.ql-undo,
+.ql-snow.ql-toolbar button.ql-redo {
+  width: 28px;
+  position: relative;
+}
+.ql-snow.ql-toolbar button.ql-undo::before {
+  content: "↶";
+  font-size: 16px;
+  line-height: 1;
+}
+.ql-snow.ql-toolbar button.ql-redo::before {
+  content: "↷";
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Mention badge — Verde Bandeira Renov.
+   quill-mention v6 só insere o "@" no DOM; o nome do usuário fica em
+   data-display-name. Renderizamos o nome via CSS ::after.
+   Usamos !important pra vencer o CSS default do plugin (quill.mention.css
+   define width:65px e background azul-claro). */
+.rich-text-content .mention,
+.ql-editor .mention {
+  background: rgba(0, 161, 55, 0.15) !important;
+  color: #00A137 !important;
+  padding: 2px 8px !important;
+  border-radius: 999px !important;
+  font-weight: 500;
+  font-size: 0.95em;
+  border: 1px solid rgba(0, 161, 55, 0.4);
+  display: inline-block;
+  line-height: 1.3;
+  text-decoration: none;
+  white-space: nowrap;
+  width: auto !important;
+  height: auto !important;
+  margin-right: 2px !important;
+}
+/* O nome do usuário é injetado como text node no DOM (via JS):
+   - Editor: monkey-patch em MentionBlot.create (rich-textarea.tsx)
+   - Display: regex em RichContent (rich-content.tsx)
+   Isso é mais robusto que pseudo-elementos em embeds contenteditable. */
+.rich-text-content .mention .ql-mention-denotation-char,
+.ql-editor .mention .ql-mention-denotation-char {
+  color: inherit;
+  margin: 0 1px 0 0 !important;
+  opacity: 0.85;
+}
+.ql-editor .mention {
+  user-select: all; /* atomic — Backspace remove o token inteiro */
+}
+
+/* Dropdown de autocomplete do quill-mention — tema dark Renov */
+.ql-mention-list-container {
+  background: #111113 !important;
+  border: 1px solid rgba(0, 161, 55, 0.3) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+  color: #fff !important;
+  font-family: 'Montserrat', sans-serif;
+  z-index: 9999 !important;
+  overflow: hidden;
+}
+.ql-mention-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+.ql-mention-list-item {
+  color: rgba(255, 255, 255, 0.85) !important;
+  padding: 8px 12px !important;
+  cursor: pointer;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+  background: transparent !important;
+}
+.ql-mention-list-item.selected,
+.ql-mention-list-item:hover {
+  background: rgba(0, 161, 55, 0.15) !important;
+  color: #fff !important;
+}
+
+/* Render do code-block via Quill — fundo escuro consistente com tema */
+.rich-text-content pre,
+.ql-editor pre {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.rich-text-content code:not(pre code),
+.ql-editor code:not(pre code) {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92em;
+}
+.rich-text-content blockquote,
+.ql-editor blockquote {
+  border-left: 3px solid #00A137;
+  padding-left: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 8px 0;
+}
