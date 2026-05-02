@@ -11,6 +11,8 @@
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
+    "db:apply:dev": "./scripts/db-apply-dev.sh",
+    "db:apply:prod": "./scripts/db-apply-prod.sh",
     "renov-dev": "tsx cli/renov-dev.ts",
     "build:client": "cd client && vite build",
     "pages:dev": "wrangler pages dev dist/public --port 8788",
