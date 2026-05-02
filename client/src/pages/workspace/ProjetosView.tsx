@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -645,7 +646,9 @@ function ProjectEditDialog({
           </div>
           <div>
             <Label className="text-xs">Descrição</Label>
-            <Textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} className="mt-1" rows={3} />
+            <div className="mt-1">
+              <RichTextarea value={descricao} onChange={setDescricao} hideAttachments data-testid="projeto-edit-descricao" />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
