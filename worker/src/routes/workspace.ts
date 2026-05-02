@@ -13,6 +13,7 @@ import {
   workspaceComentarios,
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
+import { isValidApplicationKey } from "../../../shared/applications";
 import {
   notifyChamadoCriado,
   notifyChamadoAtribuido,
@@ -271,6 +272,7 @@ workspace.get("/api/workspace/chamados", async (c) => {
         abertura: t.dataAbertura || t.createdAt,
         solicitante: requester?.name || null,
         anexos: parseAnexos(t.attachments),
+        applicationKey: (t as any).applicationKey ?? null,
       };
     });
 
@@ -296,11 +298,15 @@ workspace.get("/api/workspace/chamados", async (c) => {
 workspace.post("/api/workspace/chamados", async (c) => {
   try {
     const { userId } = c.get("user");
-    const body = await c.req.json<{ titulo?: string; descricao?: string; categoria?: string; tipo?: string; prioridade?: string }>();
-    const { titulo, descricao, categoria, tipo, prioridade } = body;
+    const body = await c.req.json<{ titulo?: string; descricao?: string; categoria?: string; tipo?: string; prioridade?: string; applicationKey?: string }>();
+    const { titulo, descricao, categoria, tipo, prioridade, applicationKey } = body;
 
     if (!titulo?.trim()) {
       return c.json({ error: "Título obrigatório" }, 400);
+    }
+
+    if (!isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação é obrigatória e deve ser válida" }, 400);
     }
 
     const prioridadeMap: Record<string, string> = { baixa: "low", media: "medium", alta: "high", critica: "critical" };
@@ -313,7 +319,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
       description: descricao || "",
       category: categoria || "geral",
       type: tipo || "bug",
-      location: "outros",
+      applicationKey,
       priority: mappedPriority,
       impact: "medio",
       status: "open",
@@ -352,6 +358,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
         responsavelInitials: initials,
         status: ticket.status,
         prioridade: ticket.priority,
+        applicationKey: (ticket as any).applicationKey ?? null,
         sla: sla.slaHoras,
         statusSla: sla.status,
         criadoEm: (ticket.dataAbertura || ticket.createdAt || "").toString(),
@@ -375,14 +382,19 @@ workspace.post("/api/workspace/tarefas", async (c) => {
       prioridade?: string;
       responsavelId?: string;
       dataEntrega?: string;
+      applicationKey?: string | null;
     }>();
-    const { titulo, descricao, projetoId, prioridade, responsavelId, dataEntrega } = body;
+    const { titulo, descricao, projetoId, prioridade, responsavelId, dataEntrega, applicationKey } = body;
 
     if (!titulo?.trim()) {
       return c.json({ error: "Título obrigatório" }, 400);
     }
     if (!projetoId) {
       return c.json({ error: "Projeto obrigatório para criar tarefa" }, 400);
+    }
+
+    if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
     }
 
     const [projeto] = await db
@@ -393,6 +405,10 @@ workspace.post("/api/workspace/tarefas", async (c) => {
     if (!projeto) {
       return c.json({ error: "Projeto não encontrado" }, 404);
     }
+
+    // Herança: se applicationKey não foi passada, usa a do projeto pai
+    const finalApplicationKey: string | null =
+      applicationKey !== undefined ? (applicationKey ?? null) : (projeto.applicationKey ?? null);
 
     // Find or create first column for the project
     let columns = await db
@@ -427,6 +443,7 @@ workspace.post("/api/workspace/tarefas", async (c) => {
         dueDate: toDateOrNull(dataEntrega),
         status: "todo",
         progress: 0,
+        applicationKey: finalApplicationKey,
       })
       .returning();
 
@@ -461,6 +478,7 @@ workspace.post("/api/workspace/tarefas", async (c) => {
         responsavelInitials: respInitials,
         status: kanbanStatusToPtBr[card.status] || "a-fazer",
         prioridade: card.priority || "normal",
+        applicationKey: (card as any).applicationKey ?? null,
         sla: null,
         statusSla: null,
         criadoEm: (card.createdAt || "").toString(),
@@ -481,6 +499,7 @@ workspace.post("/api/workspace/projetos", async (c) => {
     const body = await c.req.json<{
       nome?: string;
       descricao?: string;
+      status?: string;
       prioridade?: string;
       responsavelId?: string;
       dataInicio?: string;
@@ -488,10 +507,12 @@ workspace.post("/api/workspace/projetos", async (c) => {
       categoria?: string;
       visibility?: string;
       memberIds?: string[];
+      applicationKey?: string;
     }>();
     const {
       nome,
       descricao,
+      status,
       prioridade,
       responsavelId,
       dataInicio,
@@ -499,11 +520,23 @@ workspace.post("/api/workspace/projetos", async (c) => {
       categoria,
       visibility,
       memberIds,
+      applicationKey,
     } = body;
 
     if (!nome?.trim()) {
       return c.json({ error: "Nome obrigatório" }, 400);
     }
+
+    if (!isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação é obrigatória e deve ser válida" }, 400);
+    }
+
+    const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
+    const normalizedStatus = normalizeProjectStatus(status);
+    if (normalizedStatus !== undefined && !validStatuses.includes(normalizedStatus)) {
+      return c.json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` }, 400);
+    }
+    const finalStatus = normalizedStatus ?? "backlog";
 
     const validVisibilities = ["private", "shared", "public"] as const;
     type Visibility = typeof validVisibilities[number];
@@ -525,7 +558,7 @@ workspace.post("/api/workspace/projetos", async (c) => {
         code,
         name: nome.trim(),
         description: descricao || null,
-        status: "backlog",
+        status: finalStatus,
         priority: prioridade || "media",
         ownerId: responsavelId || userId,
         startDate: toDateOrNull(dataInicio),
@@ -534,6 +567,7 @@ workspace.post("/api/workspace/projetos", async (c) => {
         category: categoria || null,
         visibility: finalVisibility,
         progress: 0,
+        applicationKey,
       })
       .returning();
 
@@ -577,11 +611,18 @@ workspace.post("/api/workspace/projetos", async (c) => {
         id: projeto.id,
         codigo: projeto.code,
         nome: projeto.name,
+        descricao: projeto.description,
         status: projeto.status,
         prioridade: projeto.priority,
         responsavel: respNome,
         responsavelInitials: respInitials,
+        responsavelId: projeto.ownerId,
         cor: projeto.color,
+        categoria: projeto.category,
+        dataInicio: projeto.startDate ? String(projeto.startDate) : null,
+        dataFim: projeto.endDate ? String(projeto.endDate) : null,
+        progresso: projeto.progress ?? 0,
+        applicationKey: projeto.applicationKey ?? null,
         visibility: projeto.visibility,
         criadoEm: (projeto.createdAt || "").toString(),
       },
@@ -649,6 +690,7 @@ workspace.get("/api/workspace/todos", async (c) => {
         responsavelInitials: getInitials(name),
         status: t.status,
         prioridade: t.priority,
+        applicationKey: (t as any).applicationKey ?? null,
         sla: sla.slaHoras,
         statusSla: sla.status,
         criadoEm: (t.dataAbertura || t.createdAt || "").toString(),
@@ -672,6 +714,7 @@ workspace.get("/api/workspace/todos", async (c) => {
         responsavelInitials: getInitials(name),
         status: kanbanStatusToPtBr[c.status] || c.status,
         prioridade: c.priority || "normal",
+        applicationKey: (c as any).applicationKey ?? null,
         sla: null as number | null,
         statusSla: null as "dentro_prazo" | "em_atraso" | null,
         criadoEm: (c.createdAt || "").toString(),
@@ -769,6 +812,7 @@ workspace.get("/api/workspace/projetos", async (c) => {
         progresso: p.progress,
         cor: p.color,
         categoria: p.category,
+        applicationKey: p.applicationKey,
         visibility: p.visibility,
         memberIds: membersByProject.get(p.id) ?? [],
         criadoEm: p.createdAt ? String(p.createdAt) : null,
@@ -789,6 +833,7 @@ workspace.get("/api/workspace/projetos", async (c) => {
             status: kanbanStatusToPtBr[c.status] || c.status,
             prioridade: c.priority,
             responsavelId: c.assigneeId,
+            applicationKey: c.applicationKey,
             dataEntrega: c.dueDate ? String(c.dueDate) : null,
             progresso: c.progress,
             criadoEm: c.createdAt ? String(c.createdAt) : null,
@@ -826,9 +871,13 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
     const { userId: actorId } = c.get("user");
-    const { status, prioridade, responsavelId, titulo, descricao } = await c.req.json();
+    const { status, prioridade, responsavelId, titulo, descricao, applicationKey } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
+
+    if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
+    }
 
     const prioridadeMap: Record<string, string> = {
       baixa: "low", media: "medium", alta: "high", critica: "critical",
@@ -846,6 +895,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
     if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
     if (titulo !== undefined) updateData.title = titulo.trim();
     if (descricao !== undefined) updateData.description = descricao;
+    if (applicationKey !== undefined) updateData.applicationKey = applicationKey;
 
     if (Object.keys(updateData).length === 0) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
@@ -892,6 +942,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
       responsavelInitials: initials,
       status: ticket.status,
       prioridade: priorityRevMap[ticket.priority] || ticket.priority,
+      applicationKey: (ticket as any).applicationKey ?? null,
       sla: sla.slaHoras,
       statusSla: sla.status,
       abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
@@ -906,9 +957,13 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
 workspace.patch("/api/workspace/tarefas/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
-    const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao, projetoId } = await c.req.json();
+    const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao, projetoId, applicationKey } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
+
+    if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
+    }
 
     const ptBrToKanban: Record<string, string> = {
       "a-fazer": "todo", "em-andamento": "doing", concluido: "done", bloqueado: "blocked",
@@ -929,6 +984,8 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
     if (progresso !== undefined) updateData.progress = progresso;
     if (titulo !== undefined) updateData.title = titulo.trim();
     if (descricao !== undefined) updateData.objectives = descricao;
+    // applicationKey: se vier explícito, aplica; mudança de projetoId NÃO sobrescreve.
+    if (applicationKey !== undefined) updateData.applicationKey = applicationKey;
 
     // Mover tarefa para outro projeto: precisa reatribuir columnId,
     // pois a coluna atual pertence ao projeto antigo.
@@ -1001,6 +1058,7 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
       dataEntrega: card.dueDate ? String(card.dueDate) : null,
       progresso: card.progress,
       criadoEm: card.createdAt ? String(card.createdAt) : null,
+      applicationKey: (card as any).applicationKey ?? null,
     });
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
@@ -1015,8 +1073,12 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     const db = c.get("db");
     stage = "parse-body";
     const body = await c.req.json();
-    const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } = body;
+    const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds, applicationKey } = body;
     const status = normalizeProjectStatus(body.status);
+
+    if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
+    }
 
     stage = "validate-status";
     const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
@@ -1050,6 +1112,7 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     if (cor !== undefined) updateData.color = cor;
     if (progresso !== undefined) updateData.progress = Math.max(0, Math.min(100, progresso));
     if (visibility !== undefined) updateData.visibility = visibility;
+    if (applicationKey !== undefined) updateData.applicationKey = applicationKey;
 
     if (Object.keys(updateData).length === 0 && memberIds === undefined) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
@@ -1114,8 +1177,16 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
       id: updated.id,
       codigo: updated.code,
       nome: updated.name,
+      descricao: updated.description,
       status: updated.status,
       prioridade: updated.priority,
+      responsavelId: updated.ownerId,
+      cor: updated.color,
+      categoria: updated.category,
+      dataInicio: updated.startDate ? String(updated.startDate) : null,
+      dataFim: updated.endDate ? String(updated.endDate) : null,
+      progresso: updated.progress ?? 0,
+      applicationKey: updated.applicationKey ?? null,
       visibility: updated.visibility,
     });
   } catch (error: any) {

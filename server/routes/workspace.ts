@@ -4,6 +4,7 @@ import { db } from "../db";
 import { requireAuth, getSessionUser } from "../middleware/auth";
 import { projects, projectMembers, kanbanCards, kanbanColumns, kanbanComments, users, workspaceComentarios } from "@shared/schema";
 import type { Ticket, User, SlaRule, InsertTicket } from "@shared/schema";
+import { isValidApplicationKey } from "@shared/applications";
 import { eq, and, isNull } from "drizzle-orm";
 import {
   notifyChamadoCriado,
@@ -251,6 +252,7 @@ export function registerWorkspaceRoutes(router: Router) {
           abertura: t.dataAbertura || t.createdAt,
           solicitante: requester?.name || null,
           anexos: parseAnexos((t as any).attachments),
+          applicationKey: (t as any).applicationKey ?? null,
         };
       });
 
@@ -268,17 +270,22 @@ export function registerWorkspaceRoutes(router: Router) {
   router.post("/api/workspace/chamados", requireAuth, async (req, res) => {
     try {
       const { userId } = getSessionUser(req);
-      const { titulo, descricao, categoria, tipo, prioridade, attachments } = req.body as {
+      const { titulo, descricao, categoria, tipo, prioridade, attachments, applicationKey } = req.body as {
         titulo?: string;
         descricao?: string;
         categoria?: string;
         tipo?: string;
         prioridade?: string;
         attachments?: string;
+        applicationKey?: string;
       };
 
       if (!titulo?.trim()) {
         return res.status(400).json({ error: "Título obrigatório" });
+      }
+
+      if (!isValidApplicationKey(applicationKey)) {
+        return res.status(400).json({ error: "Aplicação é obrigatória e deve ser válida" });
       }
 
       const prioridadeMap: Record<string, string> = {
@@ -294,7 +301,7 @@ export function registerWorkspaceRoutes(router: Router) {
         description: descricao || "",
         category: categoria || "geral",
         type: tipo || "bug",
-        location: "outros",
+        applicationKey,
         priority: mappedPriority,
         impact: "medio",
         status: "open",
@@ -330,10 +337,12 @@ export function registerWorkspaceRoutes(router: Router) {
         titulo: ticket.title,
         descricao: ticket.description || "",
         categoria: ticket.category,
+        tipo_chamado: ticket.type,
         responsavel: name,
         responsavelInitials: initials,
         status: ticket.status,
         prioridade: ticket.priority,
+        applicationKey: (ticket as any).applicationKey ?? null,
         sla: sla.slaHoras,
         statusSla: sla.status,
         criadoEm: (ticket.dataAbertura || ticket.createdAt || "").toString(),
@@ -348,7 +357,7 @@ export function registerWorkspaceRoutes(router: Router) {
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
 
-      const { titulo, descricao, projetoId, prioridade, responsavelId, dataEntrega } =
+      const { titulo, descricao, projetoId, prioridade, responsavelId, dataEntrega, applicationKey } =
         req.body as {
           titulo?: string;
           descricao?: string;
@@ -356,6 +365,7 @@ export function registerWorkspaceRoutes(router: Router) {
           prioridade?: string;
           responsavelId?: string;
           dataEntrega?: string;
+          applicationKey?: string | null;
         };
 
       if (!titulo?.trim()) {
@@ -363,6 +373,10 @@ export function registerWorkspaceRoutes(router: Router) {
       }
       if (!projetoId) {
         return res.status(400).json({ error: "Projeto obrigatório para criar tarefa" });
+      }
+
+      if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+        return res.status(400).json({ error: "Aplicação inválida" });
       }
 
       // Find project
@@ -374,6 +388,10 @@ export function registerWorkspaceRoutes(router: Router) {
       if (!projeto) {
         return res.status(404).json({ error: "Projeto não encontrado" });
       }
+
+      // Herança: se applicationKey não foi passada, usa a do projeto pai
+      const finalApplicationKey: string | null =
+        applicationKey !== undefined ? (applicationKey ?? null) : (projeto.applicationKey ?? null);
 
       // Find or create first column for the project
       let columns = await db
@@ -409,6 +427,7 @@ export function registerWorkspaceRoutes(router: Router) {
           dueDate: toDateOrNull(dataEntrega),
           status: "todo",
           progress: 0,
+          applicationKey: finalApplicationKey,
         })
         .returning();
 
@@ -439,6 +458,7 @@ export function registerWorkspaceRoutes(router: Router) {
         responsavelInitials: respInitials,
         status: kanbanStatusToPtBr[card.status] || "a-fazer",
         prioridade: card.priority || "normal",
+        applicationKey: (card as any).applicationKey ?? null,
         sla: null,
         statusSla: null,
         criadoEm: (card.createdAt || "").toString(),
@@ -454,10 +474,11 @@ export function registerWorkspaceRoutes(router: Router) {
       if (!db) return res.status(500).json({ error: "Database not available" });
 
       const { userId } = getSessionUser(req);
-      const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, visibility, memberIds } =
+      const { nome, descricao, status, prioridade, responsavelId, dataInicio, dataFim, categoria, visibility, memberIds, applicationKey } =
         req.body as {
           nome?: string;
           descricao?: string;
+          status?: string;
           prioridade?: string;
           responsavelId?: string;
           dataInicio?: string;
@@ -465,11 +486,23 @@ export function registerWorkspaceRoutes(router: Router) {
           categoria?: string;
           visibility?: string;
           memberIds?: string[];
+          applicationKey?: string;
         };
 
       if (!nome?.trim()) {
         return res.status(400).json({ error: "Nome obrigatório" });
       }
+
+      if (!isValidApplicationKey(applicationKey)) {
+        return res.status(400).json({ error: "Aplicação é obrigatória e deve ser válida" });
+      }
+
+      const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
+      const normalizedStatus = normalizeProjectStatus(status);
+      if (normalizedStatus !== undefined && !validStatuses.includes(normalizedStatus)) {
+        return res.status(400).json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` });
+      }
+      const finalStatus = normalizedStatus ?? "backlog";
 
       const validVisibilities = ["private", "shared", "public"] as const;
       type Visibility = typeof validVisibilities[number];
@@ -494,7 +527,7 @@ export function registerWorkspaceRoutes(router: Router) {
           code,
           name: nome.trim(),
           description: descricao || null,
-          status: "backlog",
+          status: finalStatus,
           priority: prioridade || "media",
           ownerId: responsavelId || userId,
           startDate: toDateOrNull(dataInicio),
@@ -503,6 +536,7 @@ export function registerWorkspaceRoutes(router: Router) {
           category: categoria || null,
           visibility: finalVisibility,
           progress: 0,
+          applicationKey,
         })
         .returning();
 
@@ -540,11 +574,18 @@ export function registerWorkspaceRoutes(router: Router) {
         id: projeto.id,
         codigo: projeto.code,
         nome: projeto.name,
+        descricao: projeto.description,
         status: projeto.status,
         prioridade: projeto.priority,
         responsavel: respNome,
         responsavelInitials: respInitials,
+        responsavelId: projeto.ownerId,
         cor: projeto.color,
+        categoria: projeto.category,
+        dataInicio: projeto.startDate ? String(projeto.startDate) : null,
+        dataFim: projeto.endDate ? String(projeto.endDate) : null,
+        progresso: projeto.progress ?? 0,
+        applicationKey: projeto.applicationKey ?? null,
         visibility: projeto.visibility,
         criadoEm: (projeto.createdAt || "").toString(),
       });
@@ -561,7 +602,7 @@ export function registerWorkspaceRoutes(router: Router) {
       if (!db) return res.status(500).json({ error: "Database not available" });
 
       stage = "parse-body";
-      const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } =
+      const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds, applicationKey } =
         req.body as {
           nome?: string;
           descricao?: string;
@@ -575,8 +616,13 @@ export function registerWorkspaceRoutes(router: Router) {
           progresso?: number;
           visibility?: string;
           memberIds?: string[];
+          applicationKey?: string | null;
         };
       const status = normalizeProjectStatus((req.body as any).status);
+
+      if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+        return res.status(400).json({ error: "Aplicação inválida" });
+      }
 
       stage = "validate-status";
       const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
@@ -610,6 +656,7 @@ export function registerWorkspaceRoutes(router: Router) {
       if (cor !== undefined) updateData.color = cor;
       if (progresso !== undefined) updateData.progress = Math.max(0, Math.min(100, progresso));
       if (visibility !== undefined) updateData.visibility = visibility;
+      if (applicationKey !== undefined) updateData.applicationKey = applicationKey;
 
       if (Object.keys(updateData).length === 0 && memberIds === undefined) {
         return res.status(400).json({ error: "Nenhum campo para atualizar" });
@@ -674,8 +721,16 @@ export function registerWorkspaceRoutes(router: Router) {
         id: updated.id,
         codigo: updated.code,
         nome: updated.name,
+        descricao: updated.description,
         status: updated.status,
         prioridade: updated.priority,
+        responsavelId: updated.ownerId,
+        cor: updated.color,
+        categoria: updated.category,
+        dataInicio: updated.startDate ? String(updated.startDate) : null,
+        dataFim: updated.endDate ? String(updated.endDate) : null,
+        progresso: updated.progress ?? 0,
+        applicationKey: updated.applicationKey ?? null,
         visibility: updated.visibility,
       });
     } catch (error: any) {
@@ -748,6 +803,7 @@ export function registerWorkspaceRoutes(router: Router) {
           responsavelInitials: getInitials(name),
           status: t.status,
           prioridade: t.priority,
+          applicationKey: (t as any).applicationKey ?? null,
           sla: sla.slaHoras,
           statusSla: sla.status,
           criadoEm: (t.dataAbertura || t.createdAt || "").toString(),
@@ -772,6 +828,7 @@ export function registerWorkspaceRoutes(router: Router) {
           responsavelInitials: getInitials(name),
           status: kanbanStatusToPtBr[c.status] || c.status,
           prioridade: c.priority || "normal",
+          applicationKey: (c as any).applicationKey ?? null,
           sla: null as number | null,
           statusSla: null as "dentro_prazo" | "em_atraso" | null,
           criadoEm: (c.createdAt || "").toString(),
@@ -862,6 +919,7 @@ export function registerWorkspaceRoutes(router: Router) {
           progresso: p.progress,
           cor: p.color,
           categoria: p.category,
+          applicationKey: p.applicationKey,
           visibility: p.visibility,
           memberIds: membersByProject.get(p.id) ?? [],
           criadoEm: p.createdAt ? String(p.createdAt) : null,
@@ -885,6 +943,7 @@ export function registerWorkspaceRoutes(router: Router) {
               status: kanbanStatusToPtBr[c.status] || c.status,
               prioridade: c.priority,
               responsavelId: c.assigneeId,
+              applicationKey: c.applicationKey,
               dataEntrega: c.dueDate ? String(c.dueDate) : null,
               progresso: c.progress,
               criadoEm: c.createdAt ? String(c.createdAt) : null,
@@ -925,13 +984,18 @@ export function registerWorkspaceRoutes(router: Router) {
     try {
       const { id } = req.params;
       const { userId: actorId } = getSessionUser(req);
-      const { status, prioridade, responsavelId, titulo, descricao } = req.body as {
+      const { status, prioridade, responsavelId, titulo, descricao, applicationKey } = req.body as {
         status?: string;
         prioridade?: string;
         responsavelId?: string;
         titulo?: string;
         descricao?: string;
+        applicationKey?: string | null;
       };
+
+      if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+        return res.status(400).json({ error: "Aplicação inválida" });
+      }
 
       const prioridadeMap: Record<string, string> = {
         baixa: "low",
@@ -955,6 +1019,7 @@ export function registerWorkspaceRoutes(router: Router) {
       if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
       if (titulo !== undefined) updateData.title = titulo.trim();
       if (descricao !== undefined) updateData.description = descricao;
+      if (applicationKey !== undefined) updateData.applicationKey = applicationKey;
 
       if (Object.keys(updateData).length === 0) {
         return res.status(400).json({ error: "Nenhum campo para atualizar" });
@@ -1003,6 +1068,7 @@ export function registerWorkspaceRoutes(router: Router) {
         responsavelInitials: initials,
         status: ticket.status,
         prioridade: priorityRevMap[ticket.priority] || ticket.priority,
+        applicationKey: (ticket as any).applicationKey ?? null,
         sla: sla.slaHoras,
         statusSla: sla.status,
         abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
@@ -1057,6 +1123,7 @@ export function registerWorkspaceRoutes(router: Router) {
         dataInicio: card.startDate ? String(card.startDate) : null,
         progresso: card.progress ?? 0,
         criadoEm: card.createdAt ? String(card.createdAt) : null,
+        applicationKey: (card as any).applicationKey ?? null,
         anexos,
         projeto: projeto ? {
           id: projeto.id,
@@ -1075,7 +1142,7 @@ export function registerWorkspaceRoutes(router: Router) {
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
       const { id } = req.params;
-      const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao, projetoId } = req.body as {
+      const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao, projetoId, applicationKey } = req.body as {
         status?: string;
         prioridade?: string;
         responsavelId?: string;
@@ -1084,7 +1151,12 @@ export function registerWorkspaceRoutes(router: Router) {
         titulo?: string;
         descricao?: string;
         projetoId?: string;
+        applicationKey?: string | null;
       };
+
+      if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+        return res.status(400).json({ error: "Aplicação inválida" });
+      }
 
       const ptBrToKanban: Record<string, string> = {
         "a-fazer": "todo",
@@ -1108,6 +1180,8 @@ export function registerWorkspaceRoutes(router: Router) {
       if (progresso !== undefined) updateData.progress = progresso;
       if (titulo !== undefined) updateData.title = titulo.trim();
       if (descricao !== undefined) updateData.objectives = descricao;
+      // applicationKey: se vier explícito, aplica; mudança de projetoId NÃO sobrescreve (respeita escolha manual)
+      if (applicationKey !== undefined) updateData.applicationKey = applicationKey;
 
       // Mover tarefa para outro projeto: precisa reatribuir columnId,
       // pois a coluna atual pertence ao projeto antigo.
@@ -1180,6 +1254,7 @@ export function registerWorkspaceRoutes(router: Router) {
         dataEntrega: card.dueDate ? String(card.dueDate) : null,
         progresso: card.progress,
         criadoEm: card.createdAt ? String(card.createdAt) : null,
+        applicationKey: (card as any).applicationKey ?? null,
       });
     } catch (error: any) {
       return res.status(error.status || 500).json({ error: error.message });

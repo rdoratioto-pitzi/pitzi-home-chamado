@@ -80,7 +80,7 @@ export function registerExternalRoutes(router: Router) {
           title: tickets.title,
           category: tickets.category,
           type: tickets.type,
-          location: tickets.location,
+          applicationKey: tickets.applicationKey,
           priority: tickets.priority,
           impact: tickets.impact,
           status: tickets.status,
