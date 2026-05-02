@@ -7,6 +7,7 @@ import {
   insertTicketCommentSchema,
 } from "@shared/schema";
 import { isValidApplicationKey } from "@shared/applications";
+import { extractMentions } from "../lib/sanitize-rich-text";
 import { requireAuth, requireAdmin, getSessionUser } from "../middleware/auth";
 import {
   sendTicketCreatedEmail,
@@ -247,6 +248,7 @@ export function registerTicketRoutes(router: Router) {
         ...req.body,
         ticketId: getId(req),
         userId: userId,
+        mentions: extractMentions(req.body?.content),
       });
       const comment = await storage.createTicketComment(validated);
 

@@ -10,6 +10,7 @@ import {
   insertKanbanCardDependencySchema,
 } from "@shared/schema";
 import { isValidApplicationKey } from "@shared/applications";
+import { extractMentions } from "../lib/sanitize-rich-text";
 import { getSessionUser, requireAuth } from "../middleware/auth";
 import {
   sendMentionNotificationEmail,
@@ -514,6 +515,7 @@ export function registerProjectRoutes(router: Router) {
         ...req.body,
         cardId: getId(req),
         userId: userId,
+        mentions: extractMentions(req.body?.content),
       });
       const comment = await storage.createKanbanComment(validated);
 
