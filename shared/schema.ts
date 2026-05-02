@@ -139,6 +139,7 @@ export const ticketComments = pgTable("ticket_comments", {
   userId: varchar("user_id").notNull(),
   content: text("content").notNull(),
   attachments: text("attachments"), // JSON array of attachment URLs
+  mentions: jsonb("mentions").notNull().default(sql`'[]'::jsonb`), // [{userId, displayName}]
   isInternal: boolean("is_internal").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -291,6 +292,7 @@ export const kanbanComments = pgTable("kanban_comments", {
   cardId: varchar("card_id").notNull(),
   userId: varchar("user_id").notNull(),
   content: text("content").notNull(),
+  mentions: jsonb("mentions").notNull().default(sql`'[]'::jsonb`), // [{userId, displayName}]
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -557,6 +559,7 @@ export const taskComments = pgTable("task_comments", {
   taskId: varchar("task_id").notNull(),
   authorId: varchar("author_id").notNull(),
   content: text("content").notNull(),
+  mentions: jsonb("mentions").notNull().default(sql`'[]'::jsonb`), // [{userId, displayName}]
   parentCommentId: varchar("parent_comment_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

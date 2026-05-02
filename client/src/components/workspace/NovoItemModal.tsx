@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   Select,
   SelectContent,
@@ -563,12 +564,12 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
           />
 
           {/* Description */}
-          <Textarea
+          <RichTextarea
             value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
+            onChange={setDescricao}
             placeholder={DESC_PLACEHOLDER[type]}
-            className="border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[90px] text-sm shadow-none"
-            style={{ color: "rgba(255,255,255,0.55)" }}
+            hideAttachments
+            data-testid="novo-item-descricao"
           />
 
           {/* AI hint — chamado only */}

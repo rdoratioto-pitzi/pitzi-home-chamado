@@ -10,6 +10,7 @@ import {
   insertTicketCommentSchema,
 } from "../../../shared/schema";
 import { isValidApplicationKey } from "../../../shared/applications";
+import { extractMentions } from "../lib/sanitize-rich-text";
 import {
   sendTicketCreatedEmail,
   sendTicketAssignedEmail,
@@ -412,6 +413,7 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
     ...body,
     ticketId: id,
     userId: user.userId,
+    mentions: extractMentions(body?.content),
   });
   const comment = await storage.createTicketComment(validated);
 

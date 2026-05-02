@@ -271,6 +271,22 @@ app.use(
 
 app.use(express.urlencoded({ limit: "50mb", extended: false }));
 
+import { sanitizeRichText } from "./lib/sanitize-rich-text";
+
+const RICH_TEXT_FIELDS = ["descricao", "description", "content", "comentario", "message", "texto"] as const;
+
+app.use((req, _res, next) => {
+  if ((req.method === "POST" || req.method === "PATCH" || req.method === "PUT") && req.body && typeof req.body === "object" && !Array.isArray(req.body)) {
+    for (const key of RICH_TEXT_FIELDS) {
+      const v = (req.body as any)[key];
+      if (typeof v === "string" && v.length > 0) {
+        (req.body as any)[key] = sanitizeRichText(v);
+      }
+    }
+  }
+  next();
+});
+
 /**
  * --------------------------------------------------
  * SESSION + AUTH

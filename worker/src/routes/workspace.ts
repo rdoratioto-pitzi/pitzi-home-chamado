@@ -14,6 +14,7 @@ import {
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
 import { isValidApplicationKey } from "../../../shared/applications";
+import { extractMentions } from "../lib/sanitize-rich-text";
 import {
   notifyChamadoCriado,
   notifyChamadoAtribuido,
@@ -1450,12 +1451,14 @@ workspace.post("/api/workspace/tarefas/:id/comentarios", async (c) => {
       return c.json({ error: "Texto obrigatório" }, 400);
     }
 
+    const sanitizedTexto = texto.trim();
     const [comentario] = await db
       .insert(kanbanComments)
       .values({
         cardId: id,
         userId,
-        content: texto.trim(),
+        content: sanitizedTexto,
+        mentions: extractMentions(sanitizedTexto),
       })
       .returning();
 
@@ -1527,12 +1530,15 @@ workspace.post("/api/workspace/chamados/:id/comentarios", async (c) => {
       return c.json({ error: "Texto obrigatório" }, 400);
     }
 
+    const sanitizedTexto = texto.trim();
+    const mencionados = extractMentions(sanitizedTexto).map((m) => m.userId);
     const [comentario] = await db
       .insert(workspaceComentarios)
       .values({
         chamadoId: id,
         autorId: userId,
-        texto: texto.trim(),
+        texto: sanitizedTexto,
+        mencionados,
       })
       .returning();
 

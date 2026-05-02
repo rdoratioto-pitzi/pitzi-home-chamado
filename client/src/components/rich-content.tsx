@@ -12,6 +12,41 @@ interface RichContentProps {
   className?: string;
 }
 
+const HTML_TAG_RE = /<\/?[a-zA-Z][\s\S]*?>/;
+
+// quill-mention v6 só insere o "@" no DOM; o nome do usuário fica em
+// data-display-name. Para o display fora do editor, injetamos o nome
+// diretamente no innerHTML para não depender de pseudo-element.
+function injectMentionNames(html: string): string {
+  return html.replace(
+    /<span\b([^>]*\bclass="[^"]*\bmention\b[^"]*"[^>]*)>([\s\S]*?)<\/span>/gi,
+    (match, attrs: string, inner: string) => {
+      const m = attrs.match(/data-display-name="([^"]+)"/i);
+      if (!m) return match;
+      const displayName = m[1];
+      // Já tem o nome dentro? Não duplica.
+      if (inner.includes(displayName)) return match;
+      // Insere o nome após o denotation char "@", ou no final se não houver.
+      if (/<span[^>]*\bql-mention-denotation-char\b[^>]*>[^<]*<\/span>/i.test(inner)) {
+        return `<span ${attrs}>${inner}${displayName}</span>`;
+      }
+      return `<span ${attrs}><span class="ql-mention-denotation-char">@</span>${displayName}</span>`;
+    },
+  );
+}
+
+function normalizeContent(raw: string): string {
+  if (!raw) return "";
+  if (!HTML_TAG_RE.test(raw)) {
+    const escaped = raw
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    return `<p>${escaped.replace(/\n/g, "<br/>")}</p>`;
+  }
+  return injectMentionNames(raw);
+}
+
 export function RichContent({ content, className }: RichContentProps) {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -25,15 +60,18 @@ export function RichContent({ content, className }: RichContentProps) {
     }
   };
 
+  const html = normalizeContent(content || "");
+
   return (
     <>
       <div
         className={cn(
-          "prose prose-sm dark:prose-invert max-w-none",
+          "rich-text-content prose prose-sm dark:prose-invert max-w-none",
           className
         )}
         style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
-        dangerouslySetInnerHTML={{ __html: content || "" }}
+        // eslint-disable-next-line react/no-danger -- backend sanitiza HTML via isomorphic-dompurify antes de persistir
+        dangerouslySetInnerHTML={{ __html: html }}
         onClick={handleClick}
       />
 
