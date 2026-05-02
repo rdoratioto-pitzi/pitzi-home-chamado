@@ -187,6 +187,10 @@ export default function TaskDetailPage() {
     queryKey: ["/api/users"],
   });
 
+  const tarefaMentionableUsers = users
+    .filter((u) => u.status === "active")
+    .map((u) => ({ id: u.id, name: u.name, email: u.email }));
+
   useEffect(() => {
     if (task) {
       setEditedTask(task);
@@ -1116,59 +1120,17 @@ export default function TaskDetailPage() {
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">AD</AvatarFallback>
               </Avatar>
               <div className="flex-1 relative">
-                <Textarea
-                  value={newComment}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setNewComment(value);
-                    
-                    const cursorPos = e.target.selectionStart;
-                    const textBeforeCursor = value.slice(0, cursorPos);
-                    const atMatch = textBeforeCursor.match(/@(\w*)$/);
-                    
-                    if (atMatch) {
-                      setMentionQuery(atMatch[1].toLowerCase());
-                      setMentionPosition(cursorPos - atMatch[0].length);
-                      setShowMentionSuggestions(true);
-                    } else {
-                      setShowMentionSuggestions(false);
-                    }
-                  }}
-                  placeholder="Adicione um comentário... Use @nome para mencionar alguém"
-                  rows={2}
-                  className="resize-none mb-2"
-                  data-testid="input-new-comment"
-                />
-                {showMentionSuggestions && (
-                  <div className="absolute z-20 left-0 right-0 mt-1 bg-background border rounded-md shadow-lg max-h-32 overflow-y-auto">
-                    {users
-                      .filter(u => u.status === "active" && (u.name.toLowerCase().includes(mentionQuery) || u.email.toLowerCase().includes(mentionQuery)))
-                      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
-                      .slice(0, 5)
-                      .map(user => (
-                        <button
-                          key={user.id}
-                          type="button"
-                          className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-2 text-sm"
-                          onClick={() => {
-                            const before = newComment.slice(0, mentionPosition);
-                            const after = newComment.slice(mentionPosition + mentionQuery.length + 1);
-                            setNewComment(`${before}@${user.name} ${after}`);
-                            setShowMentionSuggestions(false);
-                          }}
-                        >
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs">{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <span>{user.name}</span>
-                          <span className="text-muted-foreground text-xs">({user.email})</span>
-                        </button>
-                      ))}
-                    {users.filter(u => u.status === "active" && u.name.toLowerCase().includes(mentionQuery)).length === 0 && (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">Nenhum usuário encontrado</div>
-                    )}
-                  </div>
-                )}
+                <div className="mb-2">
+                  <RichTextarea
+                    value={newComment}
+                    onChange={setNewComment}
+                    placeholder="Adicione um comentário... (use @ para mencionar)"
+                    enableMentions
+                    mentionableUsers={tarefaMentionableUsers}
+                    hideAttachments
+                    data-testid="input-new-comment"
+                  />
+                </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" className="h-8 w-8" disabled>

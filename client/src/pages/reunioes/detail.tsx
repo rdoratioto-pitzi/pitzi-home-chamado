@@ -57,6 +57,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
+import { useMentionableUsers } from "@/hooks/use-mentionable-users";
 import type { Task, TaskComment, TaskCommentWithUser, TaskArea, User as UserType } from "@shared/schema";
 
 // Função para remover tags HTML e retornar texto puro
@@ -99,6 +100,7 @@ export default function MeetingDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const mentionableUsersForReuniao = useMentionableUsers();
   const [isEditing, setIsEditing] = useState(false);
   const [commentImages, setCommentImages] = useState<string[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -981,11 +983,13 @@ export default function MeetingDetailPage() {
           {!replyingTo && (
             <div className="flex flex-col gap-2 border-t border-border pt-4">
               <RichTextarea
-                placeholder="Adicione um comentário..."
+                placeholder="Adicione um comentário... (use @ para mencionar)"
                 value={newComment}
                 onChange={setNewComment}
                 images={commentImages}
                 onImagesChange={setCommentImages}
+                enableMentions
+                mentionableUsers={mentionableUsersForReuniao}
                 data-testid="input-new-comment"
               />
               <Button 

@@ -29,6 +29,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { RichTextarea } from "@/components/rich-textarea";
 import { RichContent } from "@/components/rich-content";
+import { useMentionableUsers } from "@/hooks/use-mentionable-users";
 import { UserSelect } from "@/components/ui/user-select";
 import {
   Tooltip,
@@ -193,6 +194,8 @@ export default function TicketDetailPage() {
     queryKey: ["/api/users"],
     enabled: isEditing,
   });
+
+  const mentionableUsersForComment = useMentionableUsers();
 
   // Fetch comments
   const { data: comments = [] } = useQuery<TicketCommentWithUser[]>({
@@ -866,11 +869,14 @@ export default function TicketDetailPage() {
               <Separator />
               
               <div className="space-y-3">
-                <Textarea
-                  placeholder="Adicione um comentário..."
+                <RichTextarea
+                  placeholder="Adicione um comentário... (use @ para mencionar)"
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  rows={3}
+                  onChange={setComment}
+                  hideAttachments
+                  enableMentions
+                  mentionableUsers={mentionableUsersForComment}
+                  data-testid="chamado-novo-comentario"
                 />
                 <Button 
                   onClick={handleAddComment} 
