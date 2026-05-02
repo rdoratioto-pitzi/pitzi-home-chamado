@@ -26,11 +26,17 @@ import {
 } from "../../../server/services/slack-notifier.service";
 
 /** Extrai env Slack do binding do Worker. */
-function slackEnv(envBindings: { SLACK_BOT_TOKEN?: string; SLACK_INTEGRATION_ENABLED?: string; SLACK_CHANNEL_DEVS?: string }) {
+function slackEnv(envBindings: {
+  SLACK_BOT_TOKEN?: string;
+  SLACK_INTEGRATION_ENABLED?: string;
+  SLACK_CHANNEL_DEVS?: string;
+  APP_URL?: string;
+}) {
   return {
     SLACK_BOT_TOKEN: envBindings.SLACK_BOT_TOKEN,
     SLACK_INTEGRATION_ENABLED: envBindings.SLACK_INTEGRATION_ENABLED,
     SLACK_CHANNEL_DEVS: envBindings.SLACK_CHANNEL_DEVS,
+    APP_URL: envBindings.APP_URL,
   };
 }
 
