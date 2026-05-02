@@ -12,14 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
-  Plus, 
-  Trash2, 
-  Edit, 
-  Save, 
+import {
+  Plus,
+  Trash2,
+  Edit,
+  Save,
   X,
   Tag,
-  MapPin,
   FolderOpen,
   Clock
 } from "lucide-react";
@@ -498,16 +497,6 @@ export function FieldsSettings() {
     { value: "negocio", label: "Negócio" },
   ];
 
-  const defaultLocations = [
-    { value: "RS", label: "RS" },
-    { value: "RG", label: "RG" },
-    { value: "Dash", label: "Dash" },
-    { value: "One", label: "One" },
-    { value: "Home", label: "Home" },
-    { value: "Omie", label: "Omie" },
-    { value: "Outros", label: "Outros" },
-  ];
-
   return (
     <div className="space-y-6">
       <div>
@@ -526,10 +515,6 @@ export function FieldsSettings() {
           <TabsTrigger value="types" data-testid="tab-field-types">
             <Tag className="h-4 w-4 mr-2" />
             Tipos
-          </TabsTrigger>
-          <TabsTrigger value="locations" data-testid="tab-field-locations">
-            <MapPin className="h-4 w-4 mr-2" />
-            Locais
           </TabsTrigger>
           <TabsTrigger value="sla" data-testid="tab-field-sla">
             <Clock className="h-4 w-4 mr-2" />
@@ -555,17 +540,6 @@ export function FieldsSettings() {
             description="Defina os tipos de chamados (Bug, Melhoria, Negócio, etc.)"
             icon={Tag}
             defaultItems={defaultTypes}
-            showLabel={false}
-          />
-        </TabsContent>
-
-        <TabsContent value="locations">
-          <FieldManager 
-            settingKey="ticket_locations"
-            title="Locais"
-            description="Defina os locais/sistemas onde os chamados podem ocorrer"
-            icon={MapPin}
-            defaultItems={defaultLocations}
             showLabel={false}
           />
         </TabsContent>
