@@ -283,6 +283,7 @@ export function AppSidebar() {
           projetos: true,
           tarefas: true,
           okrs: true,
+          metas: true,
           fluxogramas: true,
           diagramas: true,
           logistica: true,
