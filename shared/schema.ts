@@ -1803,3 +1803,39 @@ export type InsertSlackThreadMapping = z.infer<typeof insertSlackThreadMappingSc
 export type SlackThreadMapping = typeof slackThreadMapping.$inferSelect;
 export type SlackEntityType = "chamado" | "projeto";
 
+// ============== HERMES SLACK THREADS (Fase 3) ==============
+// Mapeia 1 chamado <-> 1 thread Slack do Hermes <-> decisão humana (aprovado/ajustar/cancelado).
+// Distinto de slackThreadMapping (uso geral): essa tabela carrega o estado da
+// approval gate do Hermes — quando o humano clica em um botão na thread, o
+// resultado é gravado aqui.
+export const hermesSlackThreads = pgTable(
+  "hermes_slack_threads",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    chamadoId: varchar("chamado_id")
+      .notNull()
+      .unique()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    threadTs: text("thread_ts").notNull(),
+    channelId: text("channel_id").notNull(),
+    decision: text("decision"), // 'aprovado' | 'ajustar' | 'cancelado' | null
+    decisionByUserId: text("decision_by_user_id"),
+    decisionAt: timestamp("decision_at"),
+    ajusteFeedback: text("ajuste_feedback"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    chamadoIdx: index("hermes_slack_threads_chamado_idx").on(table.chamadoId),
+  }),
+);
+
+export const insertHermesSlackThreadSchema = createInsertSchema(hermesSlackThreads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertHermesSlackThread = z.infer<typeof insertHermesSlackThreadSchema>;
+export type HermesSlackThread = typeof hermesSlackThreads.$inferSelect;
+export type HermesDecision = "aprovado" | "ajustar" | "cancelado";
+
