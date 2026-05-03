@@ -17,6 +17,7 @@ import {
   notifyAtividadeConcluida,
   type SlackDb,
 } from "../services/slack-notifier.service";
+import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 
 /**
  * Slack notifier env (Express runtime). Apenas as variáveis necessárias —
@@ -316,6 +317,25 @@ export function registerWorkspaceRoutes(router: Router) {
       if (db) {
         fireSlack(() => notifyChamadoCriado({ db: db as SlackDb, env: slackEnv() }, ticket.id));
       }
+
+      // Hermes trigger — fire-and-forget, NUNCA bloqueia resposta nem propaga erro.
+      storage
+        .getUser(userId)
+        .then((requester) =>
+          fireHermes(
+            {
+              HERMES_ROUTINE_URL: process.env.HERMES_ROUTINE_URL,
+              HERMES_ROUTINE_TOKEN: process.env.HERMES_ROUTINE_TOKEN,
+              APP_URL: process.env.APP_URL,
+              NODE_ENV: process.env.NODE_ENV,
+            },
+            ticket,
+            requester ? { name: requester.name } : null,
+          ),
+        )
+        .catch((err: unknown) => {
+          console.error("[hermes-trigger] erro inesperado fora do service:", err);
+        });
 
       const [allUsers, slaRules] = await Promise.all([
         storage.getUsers(),
