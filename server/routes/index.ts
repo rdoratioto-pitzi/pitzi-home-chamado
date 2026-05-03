@@ -29,6 +29,7 @@ import { registerComercialKpisRoutes } from "./comercial-kpis";
 import { registerExternalRoutes } from "./external.js";
 import { registerPricingDashboardRoutes } from "./pricing-dashboard";
 import { registerServiceAccountRoutes } from "./service-accounts";
+import { registerHermesRoutes } from "./hermes";
 
 export function registerModularRoutes(app: Router) {
   const router = Router();
@@ -63,6 +64,7 @@ export function registerModularRoutes(app: Router) {
   registerExternalRoutes(router);
   registerPricingDashboardRoutes(router);
   registerServiceAccountRoutes(router);
+  registerHermesRoutes(router);
 
   app.use(router);
 }
