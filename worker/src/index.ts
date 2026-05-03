@@ -34,6 +34,7 @@ import { triagem } from "./routes/triagem";
 import { avaliacoes } from "./routes/avaliacoes";
 import { comercialKpisRoutes } from "./routes/comercial-kpis";
 import { external } from "./routes/external";
+import { serviceAccounts } from "./routes/service-accounts";
 
 type Bindings = {
   DATABASE_URL: string;
@@ -186,5 +187,6 @@ app.route("/", triagem);
 app.route("/", avaliacoes);
 app.route("/", comercialKpisRoutes);
 app.route("/", external);
+app.route("/", serviceAccounts);
 
 export default app;
