@@ -19,7 +19,6 @@ import {
   sendMentionNotificationEmail,
   sendCSATReceivedEmail,
 } from "../lib/email";
-import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 
 const tickets = new Hono<AppEnv>();
 
@@ -235,21 +234,6 @@ tickets.post("/api/tickets", async (c) => {
       })
       .catch(console.error);
   }
-
-  // Hermes trigger — fire-and-forget via waitUntil para não atrasar resposta.
-  // NUNCA propaga erro para o cliente.
-  const hermesPromise = fireHermes(
-    {
-      HERMES_ROUTINE_URL: env.HERMES_ROUTINE_URL,
-      HERMES_ROUTINE_TOKEN: env.HERMES_ROUTINE_TOKEN,
-      APP_URL: env.APP_URL,
-    },
-    ticket,
-    requester ? { name: requester.name } : null,
-  ).catch((err: unknown) => {
-    console.error("[hermes-trigger] erro inesperado fora do service:", err);
-  });
-  c.executionCtx.waitUntil(hermesPromise);
 
   return c.json(ticket, 201);
 });

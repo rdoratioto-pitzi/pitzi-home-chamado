@@ -25,6 +25,7 @@ import {
   notifyAtividadeConcluida,
   type SlackDb,
 } from "../../../server/services/slack-notifier.service";
+import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 
 /** Extrai env Slack do binding do Worker. */
 function slackEnv(envBindings: {
@@ -338,6 +339,25 @@ workspace.post("/api/workspace/chamados", async (c) => {
     fireSlack(c, () =>
       notifyChamadoCriado({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id),
     );
+
+    // Hermes trigger — fire-and-forget via waitUntil, NUNCA propaga erro.
+    const hermesPromise = storage
+      .getUser(userId)
+      .then((requester) =>
+        fireHermes(
+          {
+            HERMES_ROUTINE_URL: c.env.HERMES_ROUTINE_URL,
+            HERMES_ROUTINE_TOKEN: c.env.HERMES_ROUTINE_TOKEN,
+            APP_URL: c.env.APP_URL,
+          },
+          ticket,
+          requester ? { name: requester.name } : null,
+        ),
+      )
+      .catch((err: unknown) => {
+        console.error("[hermes-trigger] erro inesperado fora do service:", err);
+      });
+    c.executionCtx.waitUntil(hermesPromise);
 
     const [allUsers, slaRules] = await Promise.all([
       storage.getUsers(),
