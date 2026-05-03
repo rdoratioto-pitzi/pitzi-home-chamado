@@ -16,7 +16,7 @@ POST /api/admin/service-accounts/:id/generate-token
   ```json
   {
     "userId": "uuid-do-hermes",
-    "email": "hermes@renov.com",
+    "email": "hermes@renovsmart.com.br",
     "token": "<plaintext-base64url-de-48-bytes>",
     "expiresAt": "2027-05-03T00:00:00.000Z"
   }

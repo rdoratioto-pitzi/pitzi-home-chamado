@@ -15,7 +15,7 @@
        │                                    └──────────────┘
        ▼
 ┌──────────────┐
-│ Neon Postgres│  ← tabela users tem registro hermes@renov.com
+│ Neon Postgres│  ← tabela users tem registro hermes@renovsmart.com.br
 └──────────────┘
 ```
 
@@ -45,11 +45,11 @@
   responsável e — em ações sensíveis — pedir aprovação humana antes do
   `executor-v1` acionar a API.
 
-### Service account `hermes@renov.com`
+### Service account `hermes@renovsmart.com.br`
 
 - Linha na tabela `users` do banco Home.
 - Campos relevantes:
-  - `email = hermes@renov.com`
+  - `email = hermes@renovsmart.com.br`
   - `name = Hermes (Agente)`
   - `is_admin = true` — necessário para postar comentários em qualquer
     chamado e para ler todos os tickets do tenant
