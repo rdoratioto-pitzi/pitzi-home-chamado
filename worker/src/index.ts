@@ -74,6 +74,10 @@ type Bindings = {
   VENUS_API_KEY: string;
   DEV_TOOLS_TOKEN: string;
   APP_VERSION: string;
+  // Hermes (Fase 2 — webhook outbound). Opcionais — service desabilita
+  // silenciosamente se ausentes.
+  HERMES_ROUTINE_URL?: string;
+  HERMES_ROUTINE_TOKEN?: string;
 };
 
 export type AuthUser = {
