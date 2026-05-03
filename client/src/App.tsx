@@ -201,12 +201,12 @@ function Router() {
         </ProtectedRoute>
       </Route>
       <Route path="/metas">
-        <ProtectedRoute requiredPermission="okrs">
+        <ProtectedRoute requiredPermission="metas">
           <MetasVisaoGeralPage />
         </ProtectedRoute>
       </Route>
       <Route path="/metas/gestao">
-        <ProtectedRoute requiredPermission="okrs">
+        <ProtectedRoute requiredPermission="metas">
           <MetasGestaoPage />
         </ProtectedRoute>
       </Route>
