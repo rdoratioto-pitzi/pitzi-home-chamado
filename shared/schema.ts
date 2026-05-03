@@ -36,6 +36,10 @@ export const users = pgTable("users", {
   modulePermissions: text("module_permissions"), // JSON: { chamados: true, projetos: false, ... }
   // Slack integration — preenchido on-demand a partir do email corporativo (@pitzi.com.br)
   slackUserId: varchar("slack_user_id"),
+  // Service account Bearer token — usado por agentes (ex.: Hermes).
+  // Guardamos apenas SHA-256 do token; o plaintext só sai uma vez na rota de geração.
+  apiTokenHash: text("api_token_hash"),
+  apiTokenExpiresAt: timestamp("api_token_expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
