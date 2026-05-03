@@ -105,6 +105,16 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return next();
   }
 
+  // Hermes Fase 3 — endpoints autenticados via Bearer token (service account)
+  // ou via Slack signature. Validação ocorre dentro da própria rota.
+  if (
+    req.method === "POST" &&
+    (req.path === "/api/integrations/hermes/thread-registered" ||
+      req.path === "/api/integrations/slack/interactions")
+  ) {
+    return next();
+  }
+
   if (!req.session?.userId) {
     return res.status(401).json({ error: "Não autenticado" });
   }
