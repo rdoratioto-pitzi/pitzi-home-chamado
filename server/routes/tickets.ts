@@ -17,7 +17,6 @@ import {
   sendMentionNotificationEmail,
   sendCSATReceivedEmail,
 } from "../email-service";
-import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 
 export function registerTicketRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
@@ -100,20 +99,6 @@ export function registerTicketRoutes(router: Router) {
           linkUrl: `/chamados?ticket=${ticket.id}`,
         }).catch(console.error);
       }
-
-      // Hermes trigger — fire-and-forget, NUNCA bloqueia resposta nem propaga erro.
-      fireHermes(
-        {
-          HERMES_ROUTINE_URL: process.env.HERMES_ROUTINE_URL,
-          HERMES_ROUTINE_TOKEN: process.env.HERMES_ROUTINE_TOKEN,
-          APP_URL: process.env.APP_URL,
-          NODE_ENV: process.env.NODE_ENV,
-        },
-        ticket,
-        requester ? { name: requester.name } : null,
-      ).catch((err: unknown) => {
-        console.error("[hermes-trigger] erro inesperado fora do service:", err);
-      });
 
       res.status(201).json(ticket);
     } catch (error) {
