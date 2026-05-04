@@ -22,6 +22,7 @@ import { WorkspaceTable, type ChamadoItem } from "@/components/workspace/Workspa
 import { KanbanView } from "@/components/workspace/KanbanView";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 
 type Periodo = "este-ano" | "mes-vigente" | "mes-anterior" | "em-tratativa";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
@@ -63,6 +64,7 @@ export function ChamadosView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
+  const [applicationFilter, setApplicationFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("lista");
   const [selectedItem, setSelectedItem] = useState<ChamadoItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -122,6 +124,7 @@ export function ChamadosView() {
     }
     if (statusFilter !== "all" && item.status !== statusFilter) return false;
     if (responsavelFilter !== "all" && item.responsavel !== responsavelFilter) return false;
+    if (applicationFilter && item.applicationKey !== applicationFilter) return false;
     return true;
   });
 
@@ -194,6 +197,18 @@ export function ChamadosView() {
           className="w-[150px]"
         />
 
+        {/* Aplicação filter */}
+        <div className="w-[180px]">
+          <ApplicationSelect
+            value={applicationFilter}
+            onChange={setApplicationFilter}
+            size="sm"
+            showAllOption
+            allOptionLabel="Aplicação: Todas"
+            placeholder="Aplicação"
+          />
+        </div>
+
         {/* View mode toggle */}
         <div className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto" style={{ borderColor: "var(--sep)" }}>
           {(Object.keys(viewIcons) as ViewMode[]).map((mode) => (
@@ -215,42 +230,62 @@ export function ChamadosView() {
 
       {/* Table */}
       {viewMode === "lista" && (
-        <>
-          <WorkspaceTable
-            items={filteredItems}
-            loading={loading}
-            onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
-            onDelete={async (item) => {
-              if (!confirm(`Excluir chamado ${item.codigo}?`)) return;
-              try {
-                const res = await fetchWithAuth(`/api/tickets/${item.id}`, { method: "DELETE" });
-                if (!res.ok) {
-                  const err = await res.json().catch(() => ({ error: "Erro ao excluir" }));
-                  throw new Error(err.error || "Erro ao excluir");
-                }
-                setItems((prev) => prev.filter((i) => i.id !== item.id));
-                toast({ title: `Chamado ${item.codigo} excluído` });
-              } catch (err: unknown) {
-                const msg = err instanceof Error ? err.message : "Erro desconhecido";
-                toast({ title: "Erro ao excluir", description: msg, variant: "destructive" });
+        <WorkspaceTable
+          items={filteredItems}
+          loading={loading}
+          onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
+          onStatusChange={async (item, newStatus) => {
+            try {
+              const res = await fetchWithAuth(`/api/workspace/chamados/${item.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+              });
+              if (!res.ok) throw new Error("Erro ao atualizar status");
+              const updated: ChamadoItem = await res.json();
+              setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "Erro desconhecido";
+              toast({ title: "Erro ao atualizar status", description: msg, variant: "destructive" });
+            }
+          }}
+          onPriorityChange={async (item, newPriority) => {
+            try {
+              const res = await fetchWithAuth(`/api/workspace/chamados/${item.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prioridade: newPriority }),
+              });
+              if (!res.ok) throw new Error("Erro ao atualizar prioridade");
+              const updated: ChamadoItem = await res.json();
+              setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "Erro desconhecido";
+              toast({ title: "Erro ao atualizar prioridade", description: msg, variant: "destructive" });
+            }
+          }}
+          onDelete={async (item) => {
+            if (!confirm(`Excluir chamado ${item.codigo}?`)) return;
+            try {
+              const res = await fetchWithAuth(`/api/tickets/${item.id}`, { method: "DELETE" });
+              if (!res.ok) {
+                const err = await res.json().catch(() => ({ error: "Erro ao excluir" }));
+                throw new Error(err.error || "Erro ao excluir");
               }
-            }}
-          />
-          <ItemDetailDrawer
-            open={drawerOpen}
-            item={selectedItem}
-            onClose={() => setDrawerOpen(false)}
-            onUpdate={(updated) => {
-              setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i));
-              setSelectedItem(updated);
-            }}
-          />
-        </>
+              setItems((prev) => prev.filter((i) => i.id !== item.id));
+              toast({ title: `Chamado ${item.codigo} excluído` });
+            } catch (err: unknown) {
+              const msg = err instanceof Error ? err.message : "Erro desconhecido";
+              toast({ title: "Erro ao excluir", description: msg, variant: "destructive" });
+            }
+          }}
+        />
       )}
       {viewMode === "kanban" && !loading && (
         <KanbanView
           items={filteredItems}
           variant="chamados"
+          onItemClick={(item) => { setSelectedItem(item as ChamadoItem); setDrawerOpen(true); }}
           onStatusChange={async (itemId, newStatus) => {
             try {
               const res = await fetchWithAuth(`/api/workspace/chamados/${itemId}`, {
@@ -264,6 +299,21 @@ export function ChamadosView() {
             } catch {
               toast({ title: "Erro ao mover chamado", variant: "destructive" });
             }
+          }}
+        />
+      )}
+      {(viewMode === "lista" || viewMode === "kanban") && (
+        <ItemDetailDrawer
+          open={drawerOpen}
+          item={selectedItem}
+          onClose={() => setDrawerOpen(false)}
+          onUpdate={(updated) => {
+            const ch = updated as ChamadoItem;
+            setItems((prev) => prev.map((i) => (i.id === ch.id ? ch : i)));
+            setSelectedItem(ch);
+          }}
+          onDelete={(id) => {
+            setItems((prev) => prev.filter((i) => i.id !== id));
           }}
         />
       )}

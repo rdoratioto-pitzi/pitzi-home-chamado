@@ -30,11 +30,31 @@ const allowlist = [
   "zod-validation-error",
 ];
 
+function parseMode(argv: string[]): string {
+  const flag = argv.find((arg) => arg.startsWith("--mode="));
+  if (flag) {
+    return flag.slice("--mode=".length);
+  }
+  const idx = argv.indexOf("--mode");
+  if (idx !== -1 && argv[idx + 1]) {
+    return argv[idx + 1];
+  }
+  return "production";
+}
+
 async function buildAll() {
+  const mode = parseMode(process.argv.slice(2));
+  const allowedModes = new Set(["production", "staging", "development"]);
+  if (!allowedModes.has(mode)) {
+    throw new Error(
+      `invalid --mode "${mode}". Use one of: ${[...allowedModes].join(", ")}`,
+    );
+  }
+
   await rm("dist", { recursive: true, force: true });
 
-  console.log("building client...");
-  await viteBuild();
+  console.log(`building client (mode=${mode})...`);
+  await viteBuild({ mode });
 
   console.log("building server...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));

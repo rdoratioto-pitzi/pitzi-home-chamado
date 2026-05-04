@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextarea } from "@/components/rich-textarea";
 import {
   Select,
   SelectContent,
@@ -15,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { UserSelect } from "@/components/ui/user-select";
+import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 
 export type ItemType = "chamado" | "tarefa" | "projeto";
 
@@ -34,6 +36,7 @@ interface ProjetoOption {
   codigo: string;
   nome: string;
   cor: string;
+  applicationKey?: string | null;
 }
 
 interface NovoItemModalProps {
@@ -169,6 +172,17 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
   const [categoriaChamado, setCategoriaChamado] = useState("");
   const [tipoChamado, setTipoChamado] = useState("");
   const [prioridadeChamado, setPrioridadeChamado] = useState("media");
+  const [applicationKeyChamado, setApplicationKeyChamado] = useState<string | null>(null);
+
+  // Tarefa applicationKey (opcional, herda do projeto pai)
+  const [applicationKeyTarefa, setApplicationKeyTarefa] = useState<string | null>(null);
+  const [applicationKeyTarefaTouched, setApplicationKeyTarefaTouched] = useState(false);
+
+  // Projeto applicationKey (obrigatório)
+  const [applicationKeyProjeto, setApplicationKeyProjeto] = useState<string | null>(null);
+
+  // Marca quando submit foi tentado pra mostrar erro visual
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   // Projeto chip state
   const [statusProjeto, setStatusProjeto] = useState("backlog");
@@ -198,6 +212,11 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setCategoriaChamado("");
     setTipoChamado("");
     setPrioridadeChamado("media");
+    setApplicationKeyChamado(null);
+    setApplicationKeyTarefa(null);
+    setApplicationKeyTarefaTouched(false);
+    setApplicationKeyProjeto(null);
+    setSubmitAttempted(false);
     setStatusTarefa("a-fazer");
     setProjetoId("");
     setPrioridade("");
@@ -230,6 +249,19 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
       .then((data: { projetos: ProjetoOption[] }) => setProjetos(data.projetos || []))
       .catch(() => {});
   }, [open]);
+
+  // Herança: ao selecionar projeto na aba Tarefa, auto-preenche applicationKey
+  // (a menos que o usuário já tenha escolhido manualmente).
+  useEffect(() => {
+    if (type !== "tarefa") return;
+    if (applicationKeyTarefaTouched) return;
+    if (!projetoId) {
+      setApplicationKeyTarefa(null);
+      return;
+    }
+    const projeto = projetos.find((p) => p.id === projetoId);
+    setApplicationKeyTarefa(projeto?.applicationKey ?? null);
+  }, [projetoId, projetos, type, applicationKeyTarefaTouched]);
 
   // Paste handler
   useEffect(() => {
@@ -295,6 +327,11 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setCategoriaChamado("");
     setTipoChamado("");
     setPrioridadeChamado("media");
+    setApplicationKeyChamado(null);
+    setApplicationKeyTarefa(null);
+    setApplicationKeyTarefaTouched(false);
+    setApplicationKeyProjeto(null);
+    setSubmitAttempted(false);
     setStatusTarefa("a-fazer");
     setProjetoId("");
     setPrioridade("");
@@ -316,6 +353,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
   }
 
   async function handleSubmit() {
+    setSubmitAttempted(true);
     if (!titulo.trim()) {
       toast({ title: "Informe o título", variant: "destructive" });
       return;
@@ -326,6 +364,14 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     }
     if (type === "chamado" && !tipoChamado) {
       toast({ title: "Selecione o tipo", variant: "destructive" });
+      return;
+    }
+    if (type === "chamado" && !applicationKeyChamado) {
+      toast({ title: "Selecione a aplicação", variant: "destructive" });
+      return;
+    }
+    if (type === "projeto" && !applicationKeyProjeto) {
+      toast({ title: "Selecione a aplicação", variant: "destructive" });
       return;
     }
     setSubmitting(true);
@@ -342,6 +388,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             categoria: categoriaChamado,
             tipo: tipoChamado,
             prioridade: prioridadeChamado || undefined,
+            applicationKey: applicationKeyChamado,
             attachments: attachments.length > 0 ? JSON.stringify(attachments) : undefined,
           }),
         });
@@ -357,6 +404,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             responsavelId: responsavelId || undefined,
             dataEntrega: dataEntrega || undefined,
             sprint: sprint || undefined,
+            // Se usuário tocou no campo, manda explicitamente; senão deixa o backend herdar do projeto
+            ...(applicationKeyTarefaTouched ? { applicationKey: applicationKeyTarefa } : {}),
           }),
         });
       } else {
@@ -366,12 +415,14 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
           body: JSON.stringify({
             nome: titulo.trim(),
             descricao,
+            status: statusProjeto || undefined,
             prioridade: prioridadeProjeto || undefined,
             responsavelId: responsavelProjeto || undefined,
             dataInicio: dataInicio || undefined,
             dataFim: dataFim || undefined,
             categoria: categoriaProjeto || undefined,
             visibility: visibilityProjeto,
+            applicationKey: applicationKeyProjeto,
             memberIds: visibilityProjeto === "shared" ? memberIdsProjeto : [],
           }),
         });
@@ -513,12 +564,12 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
           />
 
           {/* Description */}
-          <Textarea
+          <RichTextarea
             value={descricao}
-            onChange={(e) => setDescricao(e.target.value)}
+            onChange={setDescricao}
             placeholder={DESC_PLACEHOLDER[type]}
-            className="border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 resize-none min-h-[90px] text-sm shadow-none"
-            style={{ color: "rgba(255,255,255,0.55)" }}
+            hideAttachments
+            data-testid="novo-item-descricao"
           />
 
           {/* AI hint — chamado only */}
@@ -569,6 +620,16 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                 placeholder="Prioridade"
                 options={PRIORIDADE_OPTIONS}
               />
+              <div className="min-w-[180px]">
+                <ApplicationSelect
+                  value={applicationKeyChamado}
+                  onChange={setApplicationKeyChamado}
+                  required
+                  size="sm"
+                  placeholder="Aplicação *"
+                  hasError={submitAttempted && !applicationKeyChamado}
+                />
+              </div>
             </div>
           )}
 
@@ -678,6 +739,17 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                   width: "70px",
                 }}
               />
+              <div className="min-w-[180px]">
+                <ApplicationSelect
+                  value={applicationKeyTarefa}
+                  onChange={(v) => {
+                    setApplicationKeyTarefa(v);
+                    setApplicationKeyTarefaTouched(true);
+                  }}
+                  size="sm"
+                  placeholder="Aplicação"
+                />
+              </div>
             </div>
           )}
 
@@ -720,11 +792,77 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                   width: "90px",
                 }}
               />
+              <div
+                className="flex items-center h-7 px-2 rounded-full text-xs"
+                style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+              >
+                <span
+                  className="mr-1 whitespace-nowrap"
+                  style={{ color: budget ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.3)", fontSize: "10px" }}
+                >
+                  R$
+                </span>
+                <input
+                  type="number"
+                  value={budget}
+                  onChange={(e) => setBudget(e.target.value)}
+                  min="0"
+                  step="100"
+                  placeholder="Budget"
+                  className="bg-transparent outline-none text-xs"
+                  style={{ color: "rgba(255,255,255,0.7)", width: "70px" }}
+                />
+              </div>
+              <div className="min-w-[180px]">
+                <ApplicationSelect
+                  value={applicationKeyProjeto}
+                  onChange={setApplicationKeyProjeto}
+                  required
+                  size="sm"
+                  placeholder="Aplicação *"
+                  hasError={submitAttempted && !applicationKeyProjeto}
+                />
+              </div>
+              {/* Visibilidade — 3 botões compactos chip-style */}
+              <div
+                className="flex items-center h-7 rounded-full overflow-hidden"
+                style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+                title={
+                  visibilityProjeto === "private"
+                    ? "Apenas o responsável pode ver este projeto."
+                    : visibilityProjeto === "shared"
+                      ? "O responsável e os membros selecionados podem ver este projeto."
+                      : "Todos os usuários podem ver este projeto."
+                }
+              >
+                {(["private", "shared", "public"] as const).map((v) => {
+                  const isActive = visibilityProjeto === v;
+                  const Icon = v === "private" ? UserIcon : v === "shared" ? Users : Globe;
+                  const label = v === "private" ? "Privada" : v === "shared" ? "Comp." : "Pública";
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setVisibilityProjeto(v)}
+                      className="flex items-center gap-1 px-2 h-full text-xs transition-colors"
+                      style={{
+                        background: isActive ? "rgba(0,200,83,0.08)" : "transparent",
+                        color: isActive ? "#00c853" : "rgba(255,255,255,0.5)",
+                      }}
+                    >
+                      <Icon className="h-3 w-3" />
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {/* Collapsible — tarefa and projeto */}
-          {type !== "chamado" && (
+          {/* Collapsible — tarefa (Estimativa/Etapa) e projeto (Membros quando shared).
+              Categoria, Budget e Visibilidade do projeto agora vivem na linha principal
+              de chips para manter consistência visual com tabs Chamado/Tarefa. */}
+          {type === "tarefa" && (
             <div>
               <button
                 onClick={() => setExtraOpen((v) => !v)}
@@ -739,201 +877,115 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
               </button>
               {extraOpen && (
                 <div className="grid grid-cols-2 gap-3 pt-2">
-                  {type === "tarefa" && (
-                    <>
-                      <div>
-                        <label
-                          className="text-xs mb-1 block"
-                          style={{ color: "rgba(255,255,255,0.35)" }}
-                        >
-                          Estimativa (h)
-                        </label>
-                        <input
-                          type="number"
-                          value={estimativa}
-                          onChange={(e) => setEstimativa(e.target.value)}
-                          min="0"
-                          step="0.5"
-                          className="w-full h-8 px-3 text-sm rounded outline-none"
-                          style={{
-                            background: "rgba(255,255,255,0.04)",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                            color: "rgba(255,255,255,0.7)",
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label
-                          className="text-xs mb-1 block"
-                          style={{ color: "rgba(255,255,255,0.35)" }}
-                        >
-                          Etapa
-                        </label>
-                        <input
-                          type="text"
-                          value={etapa}
-                          onChange={(e) => setEtapa(e.target.value)}
-                          placeholder="Ex: Design, Dev, QA..."
-                          className="w-full h-8 px-3 text-sm rounded outline-none"
-                          style={{
-                            background: "rgba(255,255,255,0.04)",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                            color: "rgba(255,255,255,0.7)",
-                          }}
-                        />
-                      </div>
-                    </>
-                  )}
-                  {type === "projeto" && (
-                    <>
-                      <div>
-                        <label
-                          className="text-xs mb-1 block"
-                          style={{ color: "rgba(255,255,255,0.35)" }}
-                        >
-                          Categoria
-                        </label>
-                        <input
-                          type="text"
-                          value={categoriaProjeto}
-                          onChange={(e) => setCategoriaProjeto(e.target.value)}
-                          className="w-full h-8 px-3 text-sm rounded outline-none"
-                          style={{
-                            background: "rgba(255,255,255,0.04)",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                            color: "rgba(255,255,255,0.7)",
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label
-                          className="text-xs mb-1 block"
-                          style={{ color: "rgba(255,255,255,0.35)" }}
-                        >
-                          Budget R$ (opcional)
-                        </label>
-                        <input
-                          type="number"
-                          value={budget}
-                          onChange={(e) => setBudget(e.target.value)}
-                          min="0"
-                          step="100"
-                          className="w-full h-8 px-3 text-sm rounded outline-none"
-                          style={{
-                            background: "rgba(255,255,255,0.04)",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                            color: "rgba(255,255,255,0.7)",
-                          }}
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-              {/*
-                Visibilidade do projeto fica em "Campos adicionais" (full-width)
-                porque a linha principal de chips já está densa (status, prioridade,
-                responsável, datas, categoria) — adicionar outro chip quebraria o layout.
-              */}
-              {extraOpen && type === "projeto" && (
-                <div className="pt-3 mt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                  <label className="text-xs mb-1 block" style={{ color: "rgba(255,255,255,0.35)" }}>
-                    Visibilidade
-                  </label>
-                  <Select
-                    value={visibilityProjeto}
-                    onValueChange={(v) => setVisibilityProjeto(v as "private" | "shared" | "public")}
-                  >
-                    <SelectTrigger
-                      className="w-full h-8 px-3 text-sm outline-none"
+                  <div>
+                    <label
+                      className="text-xs mb-1 block"
+                      style={{ color: "rgba(255,255,255,0.35)" }}
+                    >
+                      Estimativa (h)
+                    </label>
+                    <input
+                      type="number"
+                      value={estimativa}
+                      onChange={(e) => setEstimativa(e.target.value)}
+                      min="0"
+                      step="0.5"
+                      className="w-full h-8 px-3 text-sm rounded outline-none"
                       style={{
                         background: "rgba(255,255,255,0.04)",
                         border: "1px solid rgba(255,255,255,0.1)",
                         color: "rgba(255,255,255,0.7)",
                       }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-xs mb-1 block"
+                      style={{ color: "rgba(255,255,255,0.35)" }}
                     >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="private">
-                        <div className="flex items-center gap-2"><UserIcon className="h-4 w-4" /> Privada</div>
-                      </SelectItem>
-                      <SelectItem value="shared">
-                        <div className="flex items-center gap-2"><Users className="h-4 w-4" /> Compartilhada</div>
-                      </SelectItem>
-                      <SelectItem value="public">
-                        <div className="flex items-center gap-2"><Globe className="h-4 w-4" /> Pública</div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[11px] mt-1" style={{ color: "rgba(255,255,255,0.35)" }}>
-                    {visibilityProjeto === "private"
-                      ? "Apenas o responsável pode ver este projeto."
-                      : visibilityProjeto === "shared"
-                      ? "O responsável e os membros selecionados podem ver este projeto."
-                      : "Todos os usuários podem ver este projeto."}
-                  </p>
-
-                  {visibilityProjeto === "shared" && (
-                    <div className="mt-3 space-y-2">
-                      <div className="relative">
-                        <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Buscar usuário para adicionar..."
-                          value={memberSearchProjeto}
-                          onChange={(e) => setMemberSearchProjeto(e.target.value)}
-                          className="pl-9 h-8 text-sm"
-                        />
-                      </div>
-                      {memberSearchProjeto && (
-                        <div
-                          className="rounded-md max-h-32 overflow-y-auto"
-                          style={{ border: "1px solid rgba(255,255,255,0.1)" }}
-                        >
-                          {users
-                            .filter((u) => u.status === "active")
-                            .filter((u) => !memberIdsProjeto.includes(u.id))
-                            .filter((u) =>
-                              u.name.toLowerCase().includes(memberSearchProjeto.toLowerCase()),
-                            )
-                            .slice(0, 5)
-                            .map((u) => (
-                              <button
-                                key={u.id}
-                                type="button"
-                                className="w-full text-left px-3 py-2 text-sm hover-elevate"
-                                onClick={() => {
-                                  setMemberIdsProjeto((prev) => [...prev, u.id]);
-                                  setMemberSearchProjeto("");
-                                }}
-                              >
-                                {u.name}
-                              </button>
-                            ))}
-                        </div>
-                      )}
-                      {memberIdsProjeto.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {memberIdsProjeto.map((uid) => {
-                            const u = users.find((x) => x.id === uid);
-                            return (
-                              <Badge key={uid} variant="secondary" className="gap-1">
-                                {u?.name || uid}
-                                <button
-                                  type="button"
-                                  onClick={() => setMemberIdsProjeto((prev) => prev.filter((id) => id !== uid))}
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                      Etapa
+                    </label>
+                    <input
+                      type="text"
+                      value={etapa}
+                      onChange={(e) => setEtapa(e.target.value)}
+                      placeholder="Ex: Design, Dev, QA..."
+                      className="w-full h-8 px-3 text-sm rounded outline-none"
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        color: "rgba(255,255,255,0.7)",
+                      }}
+                    />
+                  </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Membros — só aparece quando projeto+shared. Sem collapsible: a seleção
+              de membros precisa estar visível assim que o usuário escolhe "Comp.". */}
+          {type === "projeto" && visibilityProjeto === "shared" && (
+            <div className="pt-3 mt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+              <label className="text-xs mb-2 block" style={{ color: "rgba(255,255,255,0.35)" }}>
+                Membros do projeto
+              </label>
+              <div className="space-y-2">
+                <div className="relative">
+                  <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar usuário para adicionar..."
+                    value={memberSearchProjeto}
+                    onChange={(e) => setMemberSearchProjeto(e.target.value)}
+                    className="pl-9 h-8 text-sm"
+                  />
+                </div>
+                {memberSearchProjeto && (
+                  <div
+                    className="rounded-md max-h-32 overflow-y-auto"
+                    style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+                  >
+                    {users
+                      .filter((u) => u.status === "active")
+                      .filter((u) => !memberIdsProjeto.includes(u.id))
+                      .filter((u) =>
+                        u.name.toLowerCase().includes(memberSearchProjeto.toLowerCase()),
+                      )
+                      .slice(0, 5)
+                      .map((u) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover-elevate"
+                          onClick={() => {
+                            setMemberIdsProjeto((prev) => [...prev, u.id]);
+                            setMemberSearchProjeto("");
+                          }}
+                        >
+                          {u.name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+                {memberIdsProjeto.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {memberIdsProjeto.map((uid) => {
+                      const u = users.find((x) => x.id === uid);
+                      return (
+                        <Badge key={uid} variant="secondary" className="gap-1">
+                          {u?.name || uid}
+                          <button
+                            type="button"
+                            onClick={() => setMemberIdsProjeto((prev) => prev.filter((id) => id !== uid))}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

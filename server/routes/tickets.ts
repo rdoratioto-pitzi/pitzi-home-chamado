@@ -6,6 +6,8 @@ import {
   insertTicketResponsavelSchema,
   insertTicketCommentSchema,
 } from "@shared/schema";
+import { isValidApplicationKey } from "@shared/applications";
+import { extractMentions } from "../lib/sanitize-rich-text";
 import { requireAuth, requireAdmin, getSessionUser } from "../middleware/auth";
 import {
   sendTicketCreatedEmail,
@@ -58,6 +60,10 @@ export function registerTicketRoutes(router: Router) {
 
       if (!isAdmin || !data.requesterId) {
         data.requesterId = userId;
+      }
+
+      if (!isValidApplicationKey(data.applicationKey)) {
+        return res.status(400).json({ error: "Aplicação é obrigatória e deve ser válida" });
       }
 
       const validated = insertTicketSchema.parse(data);
@@ -114,8 +120,14 @@ export function registerTicketRoutes(router: Router) {
 
       let updateData: any = { ...req.body };
 
+      if (updateData.applicationKey !== undefined && updateData.applicationKey !== null) {
+        if (!isValidApplicationKey(updateData.applicationKey)) {
+          return res.status(400).json({ error: "Aplicação inválida" });
+        }
+      }
+
       if (!isAdmin) {
-        const allowedFields = ["status", "title", "description", "attachments", "location", "impact", "dueDate"];
+        const allowedFields = ["status", "title", "description", "attachments", "applicationKey", "impact", "dueDate"];
         const filteredData: any = {};
         allowedFields.forEach(field => {
           if (updateData[field] !== undefined) {
@@ -236,6 +248,7 @@ export function registerTicketRoutes(router: Router) {
         ...req.body,
         ticketId: getId(req),
         userId: userId,
+        mentions: extractMentions(req.body?.content),
       });
       const comment = await storage.createTicketComment(validated);
 

@@ -26,6 +26,26 @@ npm run check      # TypeScript type check
 pkill -f tsx && pkill -f vite && npm run dev
 ```
 
+### Aplicar SQL nos bancos Neon (dev/prod)
+
+Quando `db:push` quebra (drift FK, sequences Omie) ou se precisa de
+ALTERs ad-hoc, use os scripts que carregam connection string do
+Bitwarden vault e rodam via `psql`:
+
+```bash
+npm run db:apply:dev "SELECT count(*) FROM tickets;"          # SQL inline
+npm run db:apply:dev -- -f migrations/20260502-mentions.sql   # arquivo
+npm run db:apply:prod "..."                                   # exige "APLICAR EM PROD"
+```
+
+Pré-requisitos:
+- Bitwarden CLI instalado (`bw`) — já em uso na Renov
+- `bw unlock` + `export BW_SESSION=...` antes de rodar
+- Items no vault: `neon-dev-database-url` e `neon-prod-database-url`
+  (password = connection string Neon completa, com `sslmode=require`)
+
+Override do nome do item (raro): `BW_ITEM_DEV=outro-nome npm run db:apply:dev ...`.
+
 ## 🔴 Git Workflow — REGRAS OBRIGATÓRIAS
 
 ### Branch — SEMPRE a partir de develop
@@ -88,6 +108,30 @@ Reviewer obrigatório: **Marcelo (CTO)** — sem aprovação dele, não fazer me
 NUNCA fazer apenas `git push` e considerar o deploy concluído.
 O Cloudflare Pages e o Worker NÃO fazem deploy automático a partir do git.
 O deploy SEMPRE requer execução manual dos comandos abaixo.
+
+### Build por ambiente — `--mode` é obrigatório para dev
+
+`scripts/build.ts` aceita `--mode=<production|staging|development>` e propaga
+pro Vite, que carrega `client/.env.<mode>`. O default é `production`, então
+`npm run build` (e `bash scripts/deploy.sh`) continua apontando pra
+`https://homeapi.renovsmart.com.br`.
+
+Para gerar bundle apontando pra API de dev (`homeapi-dev.renovsmart.com.br`),
+use:
+
+```bash
+npm run build:dev   # equivalente a: tsx scripts/build.ts --mode=staging
+```
+
+Sem isso, o bundle sai apontando pra produção e o login em
+`home-dev.renovsmart.com.br` quebra com erro de CORS. Um eventual
+`scripts/deploy-dev.sh` deve usar `npm run build:dev` em vez de `npm run build`.
+
+Validação rápida do bundle gerado:
+
+```bash
+grep -oE "homeapi[a-z-]*\.renovsmart\.com\.br" dist/public/assets/index-*.js | sort -u
+```
 
 ### Script de deploy completo (salvo em `scripts/deploy.sh`):
 ```bash

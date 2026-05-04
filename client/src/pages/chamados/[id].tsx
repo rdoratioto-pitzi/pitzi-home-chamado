@@ -29,6 +29,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { RichTextarea } from "@/components/rich-textarea";
 import { RichContent } from "@/components/rich-content";
+import { useMentionableUsers } from "@/hooks/use-mentionable-users";
 import { UserSelect } from "@/components/ui/user-select";
 import {
   Tooltip,
@@ -50,6 +51,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
+import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
+import { getApplicationLabel } from "@shared/applications";
 
 const statusColors: Record<string, string> = {
   open: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
@@ -149,22 +152,12 @@ const defaultTypes: FieldItem[] = [
   { value: "negocio", label: "Negócio" },
 ];
 
-const defaultLocations: FieldItem[] = [
-  { value: "RS", label: "RS" },
-  { value: "RG", label: "RG" },
-  { value: "Dash", label: "Dash" },
-  { value: "One", label: "One" },
-  { value: "Home", label: "Home" },
-  { value: "Omie", label: "Omie" },
-  { value: "Outros", label: "Outros" },
-];
-
 const editFormSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
   description: z.string().max(5000, "Descrição deve ter no máximo 5.000 caracteres"),
   category: z.string().min(1, "Selecione uma categoria"),
   type: z.string().min(1, "Selecione um tipo"),
-  location: z.string().min(1, "Selecione um local"),
+  applicationKey: z.string().min(1, "Selecione a aplicação"),
   priority: z.string().min(1, "Selecione uma prioridade"),
   impact: z.string().min(1, "Selecione o impacto"),
   assigneeId: z.string().optional(),
@@ -202,6 +195,8 @@ export default function TicketDetailPage() {
     enabled: isEditing,
   });
 
+  const mentionableUsersForComment = useMentionableUsers();
+
   // Fetch comments
   const { data: comments = [] } = useQuery<TicketCommentWithUser[]>({
     queryKey: ["/api/tickets", id, "comments"],
@@ -227,16 +222,6 @@ export default function TicketDetailPage() {
     queryKey: ["/api/settings", "ticket_types"],
     queryFn: async () => {
       const res = await fetch("/api/settings/ticket_types");
-      if (!res.ok) return null;
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const { data: locationsSetting } = useQuery<Setting>({
-    queryKey: ["/api/settings", "ticket_locations"],
-    queryFn: async () => {
-      const res = await fetch("/api/settings/ticket_locations");
       if (!res.ok) return null;
       return res.json();
     },
@@ -273,7 +258,6 @@ export default function TicketDetailPage() {
 
   const categories = parseSettingWithFallback(categoriesSetting?.value, defaultCategories);
   const types = parseSettingWithFallback(typesSetting?.value, defaultTypes);
-  const locations = parseSettingWithFallback(locationsSetting?.value, defaultLocations);
 
   const editForm = useForm<EditFormData>({
     resolver: zodResolver(editFormSchema),
@@ -282,7 +266,7 @@ export default function TicketDetailPage() {
       description: "",
       category: "",
       type: "",
-      location: "",
+      applicationKey: "",
       priority: "medium",
       impact: "medio",
       assigneeId: "",
@@ -298,7 +282,7 @@ export default function TicketDetailPage() {
         description: ticket.description || "",
         category: ticket.category,
         type: ticket.type || "",
-        location: ticket.location || "",
+        applicationKey: ticket.applicationKey || "",
         priority: ticket.priority,
         impact: ticket.impact || "medio",
         assigneeId: ticket.assigneeId || "",
@@ -553,22 +537,17 @@ export default function TicketDetailPage() {
                       />
                       <FormField
                         control={editForm.control}
-                        name="location"
+                        name="applicationKey"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Local</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {locations.map(loc => (
-                                  <SelectItem key={loc.value} value={loc.value}>{loc.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <FormLabel>Aplicação</FormLabel>
+                            <FormControl>
+                              <ApplicationSelect
+                                value={field.value || null}
+                                onChange={(v) => field.onChange(v ?? "")}
+                                required
+                              />
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -702,7 +681,7 @@ export default function TicketDetailPage() {
                   <div className="flex flex-wrap gap-2 mb-4">
                     <Badge variant="outline">{categories.find(c => c.value === ticket.category)?.label || ticket.category}</Badge>
                     <Badge variant="outline">{typeLabels[ticket.type as keyof typeof typeLabels] || ticket.type}</Badge>
-                    <Badge variant="outline">{locations.find(l => l.value === ticket.location)?.label || ticket.location}</Badge>
+                    <Badge variant="outline">{getApplicationLabel(ticket.applicationKey)}</Badge>
                     <Badge variant="outline">{priorityLabels[ticket.priority as keyof typeof priorityLabels]}</Badge>
                   </div>
                   <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -890,11 +869,14 @@ export default function TicketDetailPage() {
               <Separator />
               
               <div className="space-y-3">
-                <Textarea
-                  placeholder="Adicione um comentário..."
+                <RichTextarea
+                  placeholder="Adicione um comentário... (use @ para mencionar)"
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  rows={3}
+                  onChange={setComment}
+                  hideAttachments
+                  enableMentions
+                  mentionableUsers={mentionableUsersForComment}
+                  data-testid="chamado-novo-comentario"
                 />
                 <Button 
                   onClick={handleAddComment} 

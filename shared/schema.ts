@@ -36,6 +36,10 @@ export const users = pgTable("users", {
   modulePermissions: text("module_permissions"), // JSON: { chamados: true, projetos: false, ... }
   // Slack integration — preenchido on-demand a partir do email corporativo (@pitzi.com.br)
   slackUserId: varchar("slack_user_id"),
+  // Service account Bearer token — usado por agentes (ex.: Hermes).
+  // Guardamos apenas SHA-256 do token; o plaintext só sai uma vez na rota de geração.
+  apiTokenHash: text("api_token_hash"),
+  apiTokenExpiresAt: timestamp("api_token_expires_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -84,7 +88,7 @@ export const tickets = pgTable("tickets", {
   attachments: text("attachments"), // JSON array of attachment URLs
   category: text("category").notNull(),
   type: text("type").notNull().default("bug"), // bug, melhoria, negocio
-  location: text("location").notNull().default("outros"), // RS, RG, Dash, One, Home, Omie, Outros
+  applicationKey: text("application_key"), // FK lógica para shared/applications.ts (substitui o antigo `location`)
   priority: text("priority").notNull().default("medium"),
   impact: text("impact").notNull().default("medio"), // baixo, medio, alto, critico
   status: text("status").notNull().default("open"), // open, in_progress, blocked, resolved, closed
@@ -110,8 +114,8 @@ export const tickets = pgTable("tickets", {
 export const insertTicketSchema = createInsertSchema(tickets).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTicket = z.infer<typeof insertTicketSchema>;
 export type Ticket = typeof tickets.$inferSelect;
-export type TicketListing = Pick<Ticket, 
-  "id" | "code" | "title" | "category" | "type" | "location" | "priority" | "status" | 
+export type TicketListing = Pick<Ticket,
+  "id" | "code" | "title" | "category" | "type" | "applicationKey" | "priority" | "status" |
   "requesterId" | "assigneeId" | "createdAt" | "dueDate" | "dataAbertura" | "dataResolucao"
 > & { requesterName: string | null; assigneeName: string | null };
 
@@ -139,6 +143,7 @@ export const ticketComments = pgTable("ticket_comments", {
   userId: varchar("user_id").notNull(),
   content: text("content").notNull(),
   attachments: text("attachments"), // JSON array of attachment URLs
+  mentions: jsonb("mentions").notNull().default(sql`'[]'::jsonb`), // [{userId, displayName}]
   isInternal: boolean("is_internal").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -166,6 +171,7 @@ export const projects = pgTable("projects", {
   progress: integer("progress").default(0),
   color: varchar("color", { length: 7 }).default("#00c853"),
   category: varchar("category", { length: 80 }),
+  applicationKey: text("application_key"), // FK lógica para shared/applications.ts
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -235,6 +241,7 @@ export const kanbanCards = pgTable("kanban_cards", {
   progress: integer("progress").default(0),
   checklist: text("checklist"),
   labelIds: text("label_ids"),
+  applicationKey: text("application_key"), // FK lógica para shared/applications.ts (herda do projeto pai por default)
   status: text("status").notNull().default("todo"), // 'todo' | 'doing' | 'done'
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -289,6 +296,7 @@ export const kanbanComments = pgTable("kanban_comments", {
   cardId: varchar("card_id").notNull(),
   userId: varchar("user_id").notNull(),
   content: text("content").notNull(),
+  mentions: jsonb("mentions").notNull().default(sql`'[]'::jsonb`), // [{userId, displayName}]
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -555,6 +563,7 @@ export const taskComments = pgTable("task_comments", {
   taskId: varchar("task_id").notNull(),
   authorId: varchar("author_id").notNull(),
   content: text("content").notNull(),
+  mentions: jsonb("mentions").notNull().default(sql`'[]'::jsonb`), // [{userId, displayName}]
   parentCommentId: varchar("parent_comment_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1793,4 +1802,48 @@ export const insertSlackThreadMappingSchema = createInsertSchema(slackThreadMapp
 export type InsertSlackThreadMapping = z.infer<typeof insertSlackThreadMappingSchema>;
 export type SlackThreadMapping = typeof slackThreadMapping.$inferSelect;
 export type SlackEntityType = "chamado" | "projeto";
+
+// ============== HERMES SLACK THREADS (Fase 3) ==============
+// Mapeia 1 chamado <-> 1 thread Slack do Hermes <-> decisão humana (aprovado/ajustar/cancelado).
+// Distinto de slackThreadMapping (uso geral): essa tabela carrega o estado da
+// approval gate do Hermes — quando o humano clica em um botão na thread, o
+// resultado é gravado aqui.
+export const hermesSlackThreads = pgTable(
+  "hermes_slack_threads",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    chamadoId: varchar("chamado_id")
+      .notNull()
+      .unique()
+      .references(() => tickets.id, { onDelete: "cascade" }),
+    threadTs: text("thread_ts").notNull(),
+    channelId: text("channel_id").notNull(),
+    decision: text("decision"), // 'aprovado' | 'ajustar' | 'cancelado' | null
+    decisionByUserId: text("decision_by_user_id"),
+    decisionAt: timestamp("decision_at"),
+    ajusteFeedback: text("ajuste_feedback"),
+    // Fase 4 — rastreamento da Routine "Hermes Executor" pós-aprovação
+    executionStatus: text("execution_status"), // 'pending' | 'running' | 'success' | 'failed' | null
+    executionStartedAt: timestamp("execution_started_at"),
+    executionCompletedAt: timestamp("execution_completed_at"),
+    executionPrUrl: text("execution_pr_url"),
+    executionPrNumber: integer("execution_pr_number"),
+    executionError: text("execution_error"),
+    executionPlan: text("execution_plan"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    chamadoIdx: index("hermes_slack_threads_chamado_idx").on(table.chamadoId),
+  }),
+);
+
+export const insertHermesSlackThreadSchema = createInsertSchema(hermesSlackThreads).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertHermesSlackThread = z.infer<typeof insertHermesSlackThreadSchema>;
+export type HermesSlackThread = typeof hermesSlackThreads.$inferSelect;
+export type HermesDecision = "aprovado" | "ajustar" | "cancelado";
 

@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { toZonedTime, fromZonedTime, format } from "date-fns-tz";
 import type { Ticket, User, TicketComment, Task, KanbanCard, Project } from "@shared/schema";
+import { getApplicationLabel } from "@shared/applications";
 import { storage, type EmailNotificationType } from "./storage";
 import {
   emailTemplate,
@@ -211,7 +212,7 @@ export async function sendTicketCreatedEmail(
         ${infoTable([
           { label: "Categoria", value: ticket.category },
           { label: "Tipo", value: ticket.type },
-          { label: "Local", value: ticket.location },
+          { label: "Aplicação", value: getApplicationLabel(ticket.applicationKey) },
           { label: "Prioridade", value: priorityBadge(ticket.priority) },
           { label: "Solicitante", value: requester.name },
           ...(assignee ? [{ label: "Responsável", value: assignee.name }] : []),
@@ -270,7 +271,7 @@ export async function sendTicketAssignedEmail(
         ${infoTable([
           { label: "Categoria", value: ticket.category },
           { label: "Tipo", value: ticket.type },
-          { label: "Local", value: ticket.location },
+          { label: "Aplicação", value: getApplicationLabel(ticket.applicationKey) },
           { label: "Prioridade", value: priorityBadge(ticket.priority) },
           { label: "Status", value: statusBadge(ticket.status) },
         ])}
