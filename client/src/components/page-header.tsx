@@ -56,8 +56,8 @@ export function PageHeader({ title, description, breadcrumbs, actions }: PageHea
         <div className="flex items-center gap-3 shrink-0">
           {actions}
           {actions && <div className="h-8 w-px bg-border/40" />}
-          <NotificationBell />
           <ThemeToggle />
+          <NotificationBell />
           <UserProfileMenu />
         </div>
       </div>
