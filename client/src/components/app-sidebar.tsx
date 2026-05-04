@@ -311,6 +311,7 @@ export function AppSidebar() {
       projetos: false,
       tarefas: false,
       okrs: false,
+      metas: false,
       fluxogramas: false,
       diagramas: false,
       logistica: false,
