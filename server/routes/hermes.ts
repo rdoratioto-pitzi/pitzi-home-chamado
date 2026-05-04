@@ -18,6 +18,7 @@ import { createHash, createHmac, timingSafeEqual } from "crypto";
 import { eq } from "drizzle-orm";
 import { db as maybeDb } from "../db";
 import { users, tickets, hermesSlackThreads } from "@shared/schema";
+import { fireExecutor } from "../services/hermes-executor-trigger.service";
 
 // db é tipado como nullable em server/db.ts pra suportar DEV sem Postgres,
 // mas em runtime o serviço só sobe com DATABASE_URL setada — non-null aqui é
@@ -174,7 +175,23 @@ const threadRegisteredSchema = z.object({
   chamado_id: z.string().uuid(),
   thread_ts: z.string().min(1),
   channel_id: z.string().min(1),
+  // Fase 5 — opcional: a Routine Triagem v7 envia o /prompt-renov gerado pra
+  // que a Fase 4 possa disparar o Executor sem depender de re-fetch.
+  execution_plan: z.string().min(1).optional(),
 });
+
+const executionUpdateSchema = z
+  .object({
+    chamado_id: z.string().uuid(),
+    status: z.enum(["success", "failed"]),
+    pr_url: z.string().url().optional(),
+    pr_number: z.number().int().optional(),
+    error: z.string().optional(),
+  })
+  .refine(
+    (data) => data.status !== "failed" || (data.error && data.error.length > 0),
+    { message: "error é obrigatório quando status='failed'", path: ["error"] },
+  );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Rotas
@@ -195,7 +212,7 @@ export function registerHermesRoutes(router: Router) {
           .status(400)
           .json({ error: "Validation failed", details: parsed.error.errors });
       }
-      const { chamado_id, thread_ts, channel_id } = parsed.data;
+      const { chamado_id, thread_ts, channel_id, execution_plan } = parsed.data;
 
       const [ticket] = await db
         .select({ id: tickets.id })
@@ -216,7 +233,12 @@ export function registerHermesRoutes(router: Router) {
       if (existing) {
         const [updated] = await db
           .update(hermesSlackThreads)
-          .set({ threadTs: thread_ts, channelId: channel_id, updatedAt: now })
+          .set({
+            threadTs: thread_ts,
+            channelId: channel_id,
+            updatedAt: now,
+            ...(execution_plan ? { executionPlan: execution_plan } : {}),
+          })
           .where(eq(hermesSlackThreads.chamadoId, chamado_id))
           .returning();
         row = updated;
@@ -227,6 +249,7 @@ export function registerHermesRoutes(router: Router) {
             chamadoId: chamado_id,
             threadTs: thread_ts,
             channelId: channel_id,
+            ...(execution_plan ? { executionPlan: execution_plan } : {}),
           })
           .returning();
         row = inserted;
@@ -244,6 +267,61 @@ export function registerHermesRoutes(router: Router) {
       });
     } catch (error) {
       console.error("[hermes-thread-registered] erro:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // ── POST /api/integrations/hermes/execution-update ─────────────────────
+  // Fase 4 — a Routine Hermes Executor reporta status (success|failed) ao final.
+  router.post("/api/integrations/hermes/execution-update", async (req, res) => {
+    try {
+      const user = await authenticateServiceAccount(req.headers.authorization);
+      if (!user) {
+        return res.status(401).json({ error: "Bearer token inválido ou ausente" });
+      }
+
+      const parsed = executionUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res
+          .status(400)
+          .json({ error: "Validation failed", details: parsed.error.errors });
+      }
+      const { chamado_id, status, pr_url, pr_number, error } = parsed.data;
+
+      const [mapping] = await db
+        .select()
+        .from(hermesSlackThreads)
+        .where(eq(hermesSlackThreads.chamadoId, chamado_id));
+      if (!mapping) {
+        return res.status(404).json({ error: "Mapping não encontrado" });
+      }
+
+      const now = new Date();
+      const [updated] = await db
+        .update(hermesSlackThreads)
+        .set({
+          executionStatus: status,
+          executionCompletedAt: now,
+          ...(pr_url ? { executionPrUrl: pr_url } : {}),
+          ...(pr_number !== undefined ? { executionPrNumber: pr_number } : {}),
+          ...(error ? { executionError: error } : {}),
+          updatedAt: now,
+        })
+        .where(eq(hermesSlackThreads.chamadoId, chamado_id))
+        .returning();
+
+      console.log(
+        `[hermes-execution-update] chamado=${chamado_id} status=${status} pr=${pr_url ?? "—"} actor=${user.email}`,
+      );
+
+      return res.status(200).json({
+        ok: true,
+        chamado_id,
+        execution_status: updated?.executionStatus,
+        execution_completed_at: updated?.executionCompletedAt,
+      });
+    } catch (error) {
+      console.error("[hermes-execution-update] erro:", error);
       return res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -373,6 +451,46 @@ async function handleSlackInteraction(
           ? `✅ Aprovado por <@${userId}>. Hermes irá executar nos próximos passos.`
           : `❌ Cancelado por <@${userId}>. Atendimento encerrado.`;
       await postSlackThreadReply(botToken, channelId, threadTs, text);
+    }
+
+    // Fase 4 — disparar Routine Executor quando aprovado
+    if (decision === "aprovado") {
+      const executionPlan = mapping.executionPlan ?? "";
+      if (!executionPlan || executionPlan.trim().length === 0) {
+        console.warn(
+          `[hermes-executor-trigger] chamado=${chamadoId}: execution_plan ausente — fallback manual`,
+        );
+        if (botToken) {
+          await postSlackThreadReply(
+            botToken,
+            channelId,
+            threadTs,
+            "⚠️ Plano não encontrado para execução automática. Marcelo, intervenção manual necessária.",
+          );
+        }
+      } else {
+        const ambiente: "dev" | "prod" =
+          (process.env.APP_URL || "").includes("home-dev") ||
+          (process.env.APP_URL || "").includes("localhost") ||
+          process.env.NODE_ENV === "development"
+            ? "dev"
+            : "prod";
+
+        await fireExecutor(
+          {
+            HERMES_EXECUTOR_URL: process.env.HERMES_EXECUTOR_URL,
+            HERMES_EXECUTOR_TOKEN: process.env.HERMES_EXECUTOR_TOKEN,
+          },
+          {
+            chamado_id: chamadoId,
+            thread_ts: threadTs,
+            channel_id: channelId,
+            execution_plan: executionPlan,
+            approved_by: userId,
+            ambiente,
+          },
+        );
+      }
     }
     return;
   }

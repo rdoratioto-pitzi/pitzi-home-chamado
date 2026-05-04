@@ -14,6 +14,7 @@ import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { users, tickets, hermesSlackThreads } from "../../../shared/schema";
 import type { AppEnv } from "../index";
+import { fireExecutor } from "../services/hermes-executor-trigger.service";
 
 const HEX_TABLE = "0123456789abcdef";
 
@@ -177,7 +178,21 @@ const threadRegisteredSchema = z.object({
   chamado_id: z.string().uuid(),
   thread_ts: z.string().min(1),
   channel_id: z.string().min(1),
+  execution_plan: z.string().min(1).optional(),
 });
+
+const executionUpdateSchema = z
+  .object({
+    chamado_id: z.string().uuid(),
+    status: z.enum(["success", "failed"]),
+    pr_url: z.string().url().optional(),
+    pr_number: z.number().int().optional(),
+    error: z.string().optional(),
+  })
+  .refine(
+    (data) => data.status !== "failed" || (data.error && data.error.length > 0),
+    { message: "error é obrigatório quando status='failed'", path: ["error"] },
+  );
 
 export const hermes = new Hono<AppEnv>();
 
@@ -197,7 +212,7 @@ hermes.post("/api/integrations/hermes/thread-registered", async (c) => {
         400,
       );
     }
-    const { chamado_id, thread_ts, channel_id } = parsed.data;
+    const { chamado_id, thread_ts, channel_id, execution_plan } = parsed.data;
 
     const [ticket] = await db
       .select({ id: tickets.id })
@@ -216,7 +231,12 @@ hermes.post("/api/integrations/hermes/thread-registered", async (c) => {
     if (existing) {
       const [updated] = await db
         .update(hermesSlackThreads)
-        .set({ threadTs: thread_ts, channelId: channel_id, updatedAt: new Date() })
+        .set({
+          threadTs: thread_ts,
+          channelId: channel_id,
+          updatedAt: new Date(),
+          ...(execution_plan ? { executionPlan: execution_plan } : {}),
+        })
         .where(eq(hermesSlackThreads.chamadoId, chamado_id))
         .returning();
       row = updated;
@@ -227,6 +247,7 @@ hermes.post("/api/integrations/hermes/thread-registered", async (c) => {
           chamadoId: chamado_id,
           threadTs: thread_ts,
           channelId: channel_id,
+          ...(execution_plan ? { executionPlan: execution_plan } : {}),
         })
         .returning();
       row = inserted;
@@ -247,6 +268,65 @@ hermes.post("/api/integrations/hermes/thread-registered", async (c) => {
     );
   } catch (error) {
     console.error("[hermes-thread-registered] erro:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+hermes.post("/api/integrations/hermes/execution-update", async (c) => {
+  try {
+    const db = c.get("db");
+    const user = await authenticateServiceAccount(db, c.req.header("authorization"));
+    if (!user) {
+      return c.json({ error: "Bearer token inválido ou ausente" }, 401);
+    }
+
+    const body = await c.req.json().catch(() => null);
+    const parsed = executionUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        { error: "Validation failed", details: parsed.error.errors },
+        400,
+      );
+    }
+    const { chamado_id, status, pr_url, pr_number, error } = parsed.data;
+
+    const [mapping] = await db
+      .select()
+      .from(hermesSlackThreads)
+      .where(eq(hermesSlackThreads.chamadoId, chamado_id));
+    if (!mapping) {
+      return c.json({ error: "Mapping não encontrado" }, 404);
+    }
+
+    const now = new Date();
+    const [updated] = await db
+      .update(hermesSlackThreads)
+      .set({
+        executionStatus: status,
+        executionCompletedAt: now,
+        ...(pr_url ? { executionPrUrl: pr_url } : {}),
+        ...(pr_number !== undefined ? { executionPrNumber: pr_number } : {}),
+        ...(error ? { executionError: error } : {}),
+        updatedAt: now,
+      })
+      .where(eq(hermesSlackThreads.chamadoId, chamado_id))
+      .returning();
+
+    console.log(
+      `[hermes-execution-update] chamado=${chamado_id} status=${status} pr=${pr_url ?? "—"} actor=${user.email}`,
+    );
+
+    return c.json(
+      {
+        ok: true,
+        chamado_id,
+        execution_status: updated?.executionStatus,
+        execution_completed_at: updated?.executionCompletedAt,
+      },
+      200,
+    );
+  } catch (err) {
+    console.error("[hermes-execution-update] erro:", err);
     return c.json({ error: "Internal server error" }, 500);
   }
 });
@@ -287,7 +367,12 @@ hermes.post("/api/integrations/slack/interactions", async (c) => {
 
   // Worker: usar c.executionCtx?.waitUntil pra processar async sem reter o response.
   const db = c.get("db");
-  const work = handleSlackInteraction(db, payload, botToken).catch((err) => {
+  const executorEnv = {
+    HERMES_EXECUTOR_URL: c.env.HERMES_EXECUTOR_URL,
+    HERMES_EXECUTOR_TOKEN: c.env.HERMES_EXECUTOR_TOKEN,
+    APP_URL: (c.env as { APP_URL?: string }).APP_URL,
+  };
+  const work = handleSlackInteraction(db, payload, botToken, executorEnv).catch((err) => {
     console.error("[hermes-interactions] erro async:", err);
   });
   try {
@@ -302,6 +387,11 @@ async function handleSlackInteraction(
   db: AppEnv["Variables"]["db"],
   payload: any,
   botToken: string | undefined,
+  executorEnv: {
+    HERMES_EXECUTOR_URL?: string;
+    HERMES_EXECUTOR_TOKEN?: string;
+    APP_URL?: string;
+  },
 ): Promise<void> {
   const userId: string = payload?.user?.id || "desconhecido";
 
@@ -371,6 +461,46 @@ async function handleSlackInteraction(
           ? `✅ Aprovado por <@${userId}>. Hermes irá executar nos próximos passos.`
           : `❌ Cancelado por <@${userId}>. Atendimento encerrado.`;
       await postSlackThreadReply(botToken, channelId, threadTs, text);
+    }
+
+    // Fase 4 — disparar Routine Executor quando aprovado
+    if (decision === "aprovado") {
+      const executionPlan = mapping.executionPlan ?? "";
+      if (!executionPlan || executionPlan.trim().length === 0) {
+        console.warn(
+          `[hermes-executor-trigger] chamado=${chamadoId}: execution_plan ausente — fallback manual`,
+        );
+        if (botToken) {
+          await postSlackThreadReply(
+            botToken,
+            channelId,
+            threadTs,
+            "⚠️ Plano não encontrado para execução automática. Marcelo, intervenção manual necessária.",
+          );
+        }
+      } else {
+        const appUrl = executorEnv.APP_URL || "";
+        const ambiente: "dev" | "prod" =
+          appUrl.includes("home-dev") || appUrl.includes("localhost")
+            ? "dev"
+            : "prod";
+
+        await fireExecutor(
+          db,
+          {
+            HERMES_EXECUTOR_URL: executorEnv.HERMES_EXECUTOR_URL,
+            HERMES_EXECUTOR_TOKEN: executorEnv.HERMES_EXECUTOR_TOKEN,
+          },
+          {
+            chamado_id: chamadoId,
+            thread_ts: threadTs,
+            channel_id: channelId,
+            execution_plan: executionPlan,
+            approved_by: userId,
+            ambiente,
+          },
+        );
+      }
     }
     return;
   }

@@ -28,6 +28,7 @@ const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "POST", path: "/api/git-analytics/github-webhook" },
   // Phase 3 — Hermes endpoints (autenticação custom validada in-route)
   { method: "POST", path: "/api/integrations/hermes/thread-registered" }, // Bearer token
+  { method: "POST", path: "/api/integrations/hermes/execution-update" }, // Bearer token (Fase 4)
   { method: "POST", path: "/api/integrations/slack/interactions" }, // Slack signature
   // Phase 3 — Upload routes (PUT is self-authenticated via HMAC token)
   { method: "PUT", path: /^\/api\/uploads\/put\// },
