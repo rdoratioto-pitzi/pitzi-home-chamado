@@ -1822,6 +1822,14 @@ export const hermesSlackThreads = pgTable(
     decisionByUserId: text("decision_by_user_id"),
     decisionAt: timestamp("decision_at"),
     ajusteFeedback: text("ajuste_feedback"),
+    // Fase 4 — rastreamento da Routine "Hermes Executor" pós-aprovação
+    executionStatus: text("execution_status"), // 'pending' | 'running' | 'success' | 'failed' | null
+    executionStartedAt: timestamp("execution_started_at"),
+    executionCompletedAt: timestamp("execution_completed_at"),
+    executionPrUrl: text("execution_pr_url"),
+    executionPrNumber: integer("execution_pr_number"),
+    executionError: text("execution_error"),
+    executionPlan: text("execution_plan"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

@@ -79,6 +79,10 @@ type Bindings = {
   // silenciosamente se ausentes.
   HERMES_ROUTINE_URL?: string;
   HERMES_ROUTINE_TOKEN?: string;
+  // Hermes (Fase 4 — Executor pós-aprovação). Opcionais — service desabilita
+  // silenciosamente se ausentes.
+  HERMES_EXECUTOR_URL?: string;
+  HERMES_EXECUTOR_TOKEN?: string;
 };
 
 export type AuthUser = {
