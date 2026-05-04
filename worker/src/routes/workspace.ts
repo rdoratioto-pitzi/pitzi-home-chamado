@@ -1,6 +1,6 @@
 // worker/src/routes/workspace.ts
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import {
@@ -13,6 +13,8 @@ import {
   workspaceComentarios,
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
+import { isValidApplicationKey } from "../../../shared/applications";
+import { extractMentions } from "../lib/sanitize-rich-text";
 import {
   notifyChamadoCriado,
   notifyChamadoAtribuido,
@@ -23,13 +25,20 @@ import {
   notifyAtividadeConcluida,
   type SlackDb,
 } from "../../../server/services/slack-notifier.service";
+import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 
 /** Extrai env Slack do binding do Worker. */
-function slackEnv(envBindings: { SLACK_BOT_TOKEN?: string; SLACK_INTEGRATION_ENABLED?: string; SLACK_CHANNEL_DEVS?: string }) {
+function slackEnv(envBindings: {
+  SLACK_BOT_TOKEN?: string;
+  SLACK_INTEGRATION_ENABLED?: string;
+  SLACK_CHANNEL_DEVS?: string;
+  APP_URL?: string;
+}) {
   return {
     SLACK_BOT_TOKEN: envBindings.SLACK_BOT_TOKEN,
     SLACK_INTEGRATION_ENABLED: envBindings.SLACK_INTEGRATION_ENABLED,
     SLACK_CHANNEL_DEVS: envBindings.SLACK_CHANNEL_DEVS,
+    APP_URL: envBindings.APP_URL,
   };
 }
 
@@ -151,7 +160,7 @@ workspace.get("/api/workspace/counts", async (c) => {
       isAdmin
         ? storage.getTickets()
         : storage.getTickets({ requesterId: userId, assigneeId: userId }),
-      db.select().from(kanbanCards),
+      db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
     ]);
 
     const chamados = allTickets.filter(
@@ -271,6 +280,7 @@ workspace.get("/api/workspace/chamados", async (c) => {
         abertura: t.dataAbertura || t.createdAt,
         solicitante: requester?.name || null,
         anexos: parseAnexos(t.attachments),
+        applicationKey: (t as any).applicationKey ?? null,
       };
     });
 
@@ -296,11 +306,15 @@ workspace.get("/api/workspace/chamados", async (c) => {
 workspace.post("/api/workspace/chamados", async (c) => {
   try {
     const { userId } = c.get("user");
-    const body = await c.req.json<{ titulo?: string; descricao?: string; categoria?: string; tipo?: string; prioridade?: string }>();
-    const { titulo, descricao, categoria, tipo, prioridade } = body;
+    const body = await c.req.json<{ titulo?: string; descricao?: string; categoria?: string; tipo?: string; prioridade?: string; applicationKey?: string }>();
+    const { titulo, descricao, categoria, tipo, prioridade, applicationKey } = body;
 
     if (!titulo?.trim()) {
       return c.json({ error: "Título obrigatório" }, 400);
+    }
+
+    if (!isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação é obrigatória e deve ser válida" }, 400);
     }
 
     const prioridadeMap: Record<string, string> = { baixa: "low", media: "medium", alta: "high", critica: "critical" };
@@ -313,7 +327,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
       description: descricao || "",
       category: categoria || "geral",
       type: tipo || "bug",
-      location: "outros",
+      applicationKey,
       priority: mappedPriority,
       impact: "medio",
       status: "open",
@@ -325,6 +339,25 @@ workspace.post("/api/workspace/chamados", async (c) => {
     fireSlack(c, () =>
       notifyChamadoCriado({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id),
     );
+
+    // Hermes trigger — fire-and-forget via waitUntil, NUNCA propaga erro.
+    const hermesPromise = storage
+      .getUser(userId)
+      .then((requester) =>
+        fireHermes(
+          {
+            HERMES_ROUTINE_URL: c.env.HERMES_ROUTINE_URL,
+            HERMES_ROUTINE_TOKEN: c.env.HERMES_ROUTINE_TOKEN,
+            APP_URL: c.env.APP_URL,
+          },
+          ticket,
+          requester ? { name: requester.name } : null,
+        ),
+      )
+      .catch((err: unknown) => {
+        console.error("[hermes-trigger] erro inesperado fora do service:", err);
+      });
+    c.executionCtx.waitUntil(hermesPromise);
 
     const [allUsers, slaRules] = await Promise.all([
       storage.getUsers(),
@@ -352,6 +385,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
         responsavelInitials: initials,
         status: ticket.status,
         prioridade: ticket.priority,
+        applicationKey: (ticket as any).applicationKey ?? null,
         sla: sla.slaHoras,
         statusSla: sla.status,
         criadoEm: (ticket.dataAbertura || ticket.createdAt || "").toString(),
@@ -375,14 +409,19 @@ workspace.post("/api/workspace/tarefas", async (c) => {
       prioridade?: string;
       responsavelId?: string;
       dataEntrega?: string;
+      applicationKey?: string | null;
     }>();
-    const { titulo, descricao, projetoId, prioridade, responsavelId, dataEntrega } = body;
+    const { titulo, descricao, projetoId, prioridade, responsavelId, dataEntrega, applicationKey } = body;
 
     if (!titulo?.trim()) {
       return c.json({ error: "Título obrigatório" }, 400);
     }
     if (!projetoId) {
       return c.json({ error: "Projeto obrigatório para criar tarefa" }, 400);
+    }
+
+    if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
     }
 
     const [projeto] = await db
@@ -393,6 +432,10 @@ workspace.post("/api/workspace/tarefas", async (c) => {
     if (!projeto) {
       return c.json({ error: "Projeto não encontrado" }, 404);
     }
+
+    // Herança: se applicationKey não foi passada, usa a do projeto pai
+    const finalApplicationKey: string | null =
+      applicationKey !== undefined ? (applicationKey ?? null) : (projeto.applicationKey ?? null);
 
     // Find or create first column for the project
     let columns = await db
@@ -427,6 +470,7 @@ workspace.post("/api/workspace/tarefas", async (c) => {
         dueDate: toDateOrNull(dataEntrega),
         status: "todo",
         progress: 0,
+        applicationKey: finalApplicationKey,
       })
       .returning();
 
@@ -455,12 +499,13 @@ workspace.post("/api/workspace/tarefas", async (c) => {
         titulo: card.title,
         contexto: projeto.name,
         corContexto: projeto.color || null,
-        badgeLabel: "TAREFA",
+        badgeLabel: "Tarefa",
         badgeVariant: "tarefa",
         responsavel: respNome,
         responsavelInitials: respInitials,
         status: kanbanStatusToPtBr[card.status] || "a-fazer",
         prioridade: card.priority || "normal",
+        applicationKey: (card as any).applicationKey ?? null,
         sla: null,
         statusSla: null,
         criadoEm: (card.createdAt || "").toString(),
@@ -481,6 +526,7 @@ workspace.post("/api/workspace/projetos", async (c) => {
     const body = await c.req.json<{
       nome?: string;
       descricao?: string;
+      status?: string;
       prioridade?: string;
       responsavelId?: string;
       dataInicio?: string;
@@ -488,10 +534,12 @@ workspace.post("/api/workspace/projetos", async (c) => {
       categoria?: string;
       visibility?: string;
       memberIds?: string[];
+      applicationKey?: string;
     }>();
     const {
       nome,
       descricao,
+      status,
       prioridade,
       responsavelId,
       dataInicio,
@@ -499,11 +547,23 @@ workspace.post("/api/workspace/projetos", async (c) => {
       categoria,
       visibility,
       memberIds,
+      applicationKey,
     } = body;
 
     if (!nome?.trim()) {
       return c.json({ error: "Nome obrigatório" }, 400);
     }
+
+    if (!isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação é obrigatória e deve ser válida" }, 400);
+    }
+
+    const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
+    const normalizedStatus = normalizeProjectStatus(status);
+    if (normalizedStatus !== undefined && !validStatuses.includes(normalizedStatus)) {
+      return c.json({ error: `Status inválido. Valores aceitos: ${validStatuses.join(", ")}` }, 400);
+    }
+    const finalStatus = normalizedStatus ?? "backlog";
 
     const validVisibilities = ["private", "shared", "public"] as const;
     type Visibility = typeof validVisibilities[number];
@@ -525,7 +585,7 @@ workspace.post("/api/workspace/projetos", async (c) => {
         code,
         name: nome.trim(),
         description: descricao || null,
-        status: "backlog",
+        status: finalStatus,
         priority: prioridade || "media",
         ownerId: responsavelId || userId,
         startDate: toDateOrNull(dataInicio),
@@ -534,6 +594,7 @@ workspace.post("/api/workspace/projetos", async (c) => {
         category: categoria || null,
         visibility: finalVisibility,
         progress: 0,
+        applicationKey,
       })
       .returning();
 
@@ -577,11 +638,18 @@ workspace.post("/api/workspace/projetos", async (c) => {
         id: projeto.id,
         codigo: projeto.code,
         nome: projeto.name,
+        descricao: projeto.description,
         status: projeto.status,
         prioridade: projeto.priority,
         responsavel: respNome,
         responsavelInitials: respInitials,
+        responsavelId: projeto.ownerId,
         cor: projeto.color,
+        categoria: projeto.category,
+        dataInicio: projeto.startDate ? String(projeto.startDate) : null,
+        dataFim: projeto.endDate ? String(projeto.endDate) : null,
+        progresso: projeto.progress ?? 0,
+        applicationKey: projeto.applicationKey ?? null,
         visibility: projeto.visibility,
         criadoEm: (projeto.createdAt || "").toString(),
       },
@@ -606,7 +674,7 @@ workspace.get("/api/workspace/todos", async (c) => {
         isAdmin
           ? storage.getTickets()
           : storage.getTickets({ requesterId: userId, assigneeId: userId }),
-        db.select().from(kanbanCards),
+        db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
         db.select().from(projects),
         storage.getUsers(),
         storage.getSlaRules(),
@@ -649,6 +717,7 @@ workspace.get("/api/workspace/todos", async (c) => {
         responsavelInitials: getInitials(name),
         status: t.status,
         prioridade: t.priority,
+        applicationKey: (t as any).applicationKey ?? null,
         sla: sla.slaHoras,
         statusSla: sla.status,
         criadoEm: (t.dataAbertura || t.createdAt || "").toString(),
@@ -666,12 +735,13 @@ workspace.get("/api/workspace/todos", async (c) => {
         titulo: c.title,
         contexto: proj?.nome || "Sem projeto",
         corContexto: proj?.cor || null,
-        badgeLabel: "TAREFA",
+        badgeLabel: "Tarefa",
         badgeVariant: "tarefa",
         responsavel: name,
         responsavelInitials: getInitials(name),
         status: kanbanStatusToPtBr[c.status] || c.status,
         prioridade: c.priority || "normal",
+        applicationKey: (c as any).applicationKey ?? null,
         sla: null as number | null,
         statusSla: null as "dentro_prazo" | "em_atraso" | null,
         criadoEm: (c.createdAt || "").toString(),
@@ -731,7 +801,7 @@ workspace.get("/api/workspace/projetos", async (c) => {
 
     const [allProjects, cards, allUsers, allMembers] = await Promise.all([
       db.select().from(projects),
-      db.select().from(kanbanCards),
+      db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
       db.select().from(users),
       db.select().from(projectMembers),
     ]);
@@ -769,6 +839,7 @@ workspace.get("/api/workspace/projetos", async (c) => {
         progresso: p.progress,
         cor: p.color,
         categoria: p.category,
+        applicationKey: p.applicationKey,
         visibility: p.visibility,
         memberIds: membersByProject.get(p.id) ?? [],
         criadoEm: p.createdAt ? String(p.createdAt) : null,
@@ -789,6 +860,7 @@ workspace.get("/api/workspace/projetos", async (c) => {
             status: kanbanStatusToPtBr[c.status] || c.status,
             prioridade: c.priority,
             responsavelId: c.assigneeId,
+            applicationKey: c.applicationKey,
             dataEntrega: c.dueDate ? String(c.dueDate) : null,
             progresso: c.progress,
             criadoEm: c.createdAt ? String(c.createdAt) : null,
@@ -826,9 +898,13 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
     const { userId: actorId } = c.get("user");
-    const { status, prioridade, responsavelId, titulo, descricao } = await c.req.json();
+    const { status, prioridade, responsavelId, titulo, descricao, applicationKey } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
+
+    if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
+    }
 
     const prioridadeMap: Record<string, string> = {
       baixa: "low", media: "medium", alta: "high", critica: "critical",
@@ -846,6 +922,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
     if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
     if (titulo !== undefined) updateData.title = titulo.trim();
     if (descricao !== undefined) updateData.description = descricao;
+    if (applicationKey !== undefined) updateData.applicationKey = applicationKey;
 
     if (Object.keys(updateData).length === 0) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
@@ -892,6 +969,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
       responsavelInitials: initials,
       status: ticket.status,
       prioridade: priorityRevMap[ticket.priority] || ticket.priority,
+      applicationKey: (ticket as any).applicationKey ?? null,
       sla: sla.slaHoras,
       statusSla: sla.status,
       abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
@@ -906,9 +984,13 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
 workspace.patch("/api/workspace/tarefas/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
-    const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao } = await c.req.json();
+    const { status, prioridade, responsavelId, dataEntrega, progresso, titulo, descricao, projetoId, applicationKey } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
+
+    if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
+    }
 
     const ptBrToKanban: Record<string, string> = {
       "a-fazer": "todo", "em-andamento": "doing", concluido: "done", bloqueado: "blocked",
@@ -929,6 +1011,35 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
     if (progresso !== undefined) updateData.progress = progresso;
     if (titulo !== undefined) updateData.title = titulo.trim();
     if (descricao !== undefined) updateData.objectives = descricao;
+    // applicationKey: se vier explícito, aplica; mudança de projetoId NÃO sobrescreve.
+    if (applicationKey !== undefined) updateData.applicationKey = applicationKey;
+
+    // Mover tarefa para outro projeto: precisa reatribuir columnId,
+    // pois a coluna atual pertence ao projeto antigo.
+    if (projetoId !== undefined && projetoId !== prevCard?.projectId) {
+      const [targetProject] = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(eq(projects.id, projetoId))
+        .limit(1);
+      if (!targetProject) {
+        return c.json({ error: "Projeto destino não encontrado" }, 404);
+      }
+      let [targetCol] = await db
+        .select({ id: kanbanColumns.id })
+        .from(kanbanColumns)
+        .where(eq(kanbanColumns.projectId, projetoId))
+        .orderBy(kanbanColumns.order)
+        .limit(1);
+      if (!targetCol) {
+        [targetCol] = await db
+          .insert(kanbanColumns)
+          .values({ projectId: projetoId, name: "A Fazer", order: 0 })
+          .returning({ id: kanbanColumns.id });
+      }
+      updateData.projectId = projetoId;
+      updateData.columnId = targetCol.id;
+    }
 
     if (Object.keys(updateData).length === 0) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
@@ -974,6 +1085,7 @@ workspace.patch("/api/workspace/tarefas/:id", async (c) => {
       dataEntrega: card.dueDate ? String(card.dueDate) : null,
       progresso: card.progress,
       criadoEm: card.createdAt ? String(card.createdAt) : null,
+      applicationKey: (card as any).applicationKey ?? null,
     });
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
@@ -988,8 +1100,12 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     const db = c.get("db");
     stage = "parse-body";
     const body = await c.req.json();
-    const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds } = body;
+    const { nome, descricao, prioridade, responsavelId, dataInicio, dataFim, categoria, cor, progresso, visibility, memberIds, applicationKey } = body;
     const status = normalizeProjectStatus(body.status);
+
+    if (applicationKey !== undefined && applicationKey !== null && !isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
+    }
 
     stage = "validate-status";
     const validStatuses = ["backlog", "ativo", "pausado", "concluido", "inativo"];
@@ -1023,6 +1139,7 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
     if (cor !== undefined) updateData.color = cor;
     if (progresso !== undefined) updateData.progress = Math.max(0, Math.min(100, progresso));
     if (visibility !== undefined) updateData.visibility = visibility;
+    if (applicationKey !== undefined) updateData.applicationKey = applicationKey;
 
     if (Object.keys(updateData).length === 0 && memberIds === undefined) {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
@@ -1087,8 +1204,16 @@ workspace.patch("/api/workspace/projetos/:id", async (c) => {
       id: updated.id,
       codigo: updated.code,
       nome: updated.name,
+      descricao: updated.description,
       status: updated.status,
       prioridade: updated.priority,
+      responsavelId: updated.ownerId,
+      cor: updated.color,
+      categoria: updated.category,
+      dataInicio: updated.startDate ? String(updated.startDate) : null,
+      dataFim: updated.endDate ? String(updated.endDate) : null,
+      progresso: updated.progress ?? 0,
+      applicationKey: updated.applicationKey ?? null,
       visibility: updated.visibility,
     });
   } catch (error: any) {
@@ -1165,6 +1290,119 @@ workspace.get("/api/workspace/tarefas/:id", async (c) => {
   }
 });
 
+// ─── GET subtarefas ───────────────────────────────────────────────────────────
+workspace.get("/api/workspace/tarefas/:id/subtarefas", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const db = c.get("db");
+    const rows = await db
+      .select()
+      .from(kanbanCards)
+      .where(eq(kanbanCards.parentCardId, id))
+      .orderBy(kanbanCards.order, kanbanCards.createdAt);
+    return c.json({
+      subtarefas: rows.map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        done: r.status === "done",
+      })),
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── POST subtarefa ───────────────────────────────────────────────────────────
+workspace.post("/api/workspace/tarefas/:id/subtarefas", async (c) => {
+  try {
+    const { id } = c.req.param() as { id: string };
+    const { title } = await c.req.json();
+    const t = (title || "").trim();
+    if (!t) return c.json({ error: "Título obrigatório" }, 400);
+    const db = c.get("db");
+
+    const [parent] = await db
+      .select()
+      .from(kanbanCards)
+      .where(eq(kanbanCards.id, id))
+      .limit(1);
+    if (!parent) return c.json({ error: "Tarefa pai não encontrada" }, 404);
+
+    const existing = await db
+      .select({ id: kanbanCards.id })
+      .from(kanbanCards)
+      .where(eq(kanbanCards.parentCardId, parent.id));
+    const code = `${parent.code || parent.id.slice(0, 6)}·S${existing.length + 1}`;
+
+    const [created] = await db
+      .insert(kanbanCards)
+      .values({
+        code,
+        projectId: parent.projectId,
+        columnId: parent.columnId,
+        parentCardId: parent.id,
+        title: t,
+        status: "todo",
+        priority: "normal",
+      })
+      .returning();
+    return c.json({
+      id: created.id,
+      title: created.title,
+      done: created.status === "done",
+    }, 201);
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── PATCH subtarefa ──────────────────────────────────────────────────────────
+workspace.patch("/api/workspace/subtarefas/:subtaskId", async (c) => {
+  try {
+    const { subtaskId } = c.req.param() as { subtaskId: string };
+    const { done, title } = await c.req.json();
+    const db = c.get("db");
+
+    const updateData: Record<string, any> = {};
+    if (done !== undefined) updateData.status = done ? "done" : "todo";
+    if (title !== undefined) updateData.title = String(title).trim();
+    if (Object.keys(updateData).length === 0) {
+      return c.json({ error: "Nenhum campo para atualizar" }, 400);
+    }
+
+    const [updated] = await db
+      .update(kanbanCards)
+      .set(updateData)
+      .where(eq(kanbanCards.id, subtaskId))
+      .returning();
+    if (!updated) return c.json({ error: "Subtarefa não encontrada" }, 404);
+
+    return c.json({
+      id: updated.id,
+      title: updated.title,
+      done: updated.status === "done",
+    });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
+// ─── DELETE subtarefa ─────────────────────────────────────────────────────────
+workspace.delete("/api/workspace/subtarefas/:subtaskId", async (c) => {
+  try {
+    const { subtaskId } = c.req.param() as { subtaskId: string };
+    const db = c.get("db");
+    const [deleted] = await db
+      .delete(kanbanCards)
+      .where(eq(kanbanCards.id, subtaskId))
+      .returning({ id: kanbanCards.id });
+    if (!deleted) return c.json({ error: "Subtarefa não encontrada" }, 404);
+    return c.json({ ok: true });
+  } catch (error: any) {
+    return c.json({ error: error.message }, error.status || 500);
+  }
+});
+
 // ─── DELETE tarefa ────────────────────────────────────────────────────────────
 workspace.delete("/api/workspace/tarefas/:id", async (c) => {
   try {
@@ -1233,12 +1471,14 @@ workspace.post("/api/workspace/tarefas/:id/comentarios", async (c) => {
       return c.json({ error: "Texto obrigatório" }, 400);
     }
 
+    const sanitizedTexto = texto.trim();
     const [comentario] = await db
       .insert(kanbanComments)
       .values({
         cardId: id,
         userId,
-        content: texto.trim(),
+        content: sanitizedTexto,
+        mentions: extractMentions(sanitizedTexto),
       })
       .returning();
 
@@ -1310,12 +1550,15 @@ workspace.post("/api/workspace/chamados/:id/comentarios", async (c) => {
       return c.json({ error: "Texto obrigatório" }, 400);
     }
 
+    const sanitizedTexto = texto.trim();
+    const mencionados = extractMentions(sanitizedTexto).map((m) => m.userId);
     const [comentario] = await db
       .insert(workspaceComentarios)
       .values({
         chamadoId: id,
         autorId: userId,
-        texto: texto.trim(),
+        texto: sanitizedTexto,
+        mencionados,
       })
       .returning();
 

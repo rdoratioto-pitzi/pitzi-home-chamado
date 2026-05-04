@@ -633,9 +633,11 @@ export default function MetasVisaoGeralPage() {
               {checkinMeta.description && (
                 <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
                   <h4 className="text-[12px] font-bold text-primary uppercase tracking-wider mb-1">Descrição</h4>
-                  <p className="text-[13px] text-muted-foreground whitespace-pre-wrap">
-                    {checkinMeta.description}
-                  </p>
+                  <div
+                    className="text-[13px] text-muted-foreground prose prose-sm max-w-none break-words overflow-hidden"
+                    style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+                    dangerouslySetInnerHTML={{ __html: checkinMeta.description }}
+                  />
                 </div>
               )}
 

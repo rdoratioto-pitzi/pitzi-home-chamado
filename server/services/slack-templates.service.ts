@@ -18,35 +18,60 @@ import type { SlackBlock } from "./slack.service";
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const APP_BASE_URL = "https://home.renovsmart.com.br";
+/**
+ * Fallback defensivo para `baseUrl`. Em runtime sempre deve vir um valor
+ * concreto via `env.APP_URL`; este default só protege contra config faltando.
+ */
+const APP_BASE_URL_FALLBACK = "https://home.renovsmart.com.br";
 
 export type EntityType = "chamado" | "projeto" | "atividade";
 
 /**
- * Constrói URL canônica para uma entidade no Renov Home.
- * O caller pode passar uma `baseUrl` customizada (dev/staging) — default produção.
+ * Constrói URL canônica para uma entidade no Renov Home. Os paths refletem
+ * as rotas reais do frontend (`client/src/App.tsx`):
+ *  - chamado   → /chamados/<uuid>           (`pages/chamados/[id].tsx`)
+ *  - projeto   → /projetos/<uuid>           (`pages/projetos/kanban.tsx`)
+ *  - atividade → /projetos/<uuid>?card=<id> (kanban abre o card via query —
+ *                forward-compat: hoje o `card=` é ignorado, mas links antigos
+ *                continuarão válidos quando a abertura por query for ativada)
+ *
+ * IMPORTANTE: o argumento de identificação é o **UUID** da entidade (ticket.id,
+ * project.id, kanbanCard.id). NÃO usar `code` (CHA-XXXX) — a rota não resolve.
  */
 export function buildEntityUrl(
   entityType: EntityType,
-  code: string,
-  parentProjectCode?: string,
-  baseUrl: string = APP_BASE_URL,
+  id: string,
+  parentProjectId?: string,
+  baseUrl: string = APP_BASE_URL_FALLBACK,
 ): string {
   const base = baseUrl.replace(/\/$/, "");
   switch (entityType) {
     case "chamado":
-      return `${base}/workspace/chamados?code=${encodeURIComponent(code)}`;
+      return `${base}/chamados/${encodeURIComponent(id)}`;
     case "projeto":
-      return `${base}/workspace/projetos/${encodeURIComponent(code)}`;
+      return `${base}/projetos/${encodeURIComponent(id)}`;
     case "atividade": {
-      // Atividade vive dentro de um projeto. Se temos o code do projeto pai,
-      // usamos rota aninhada; senão linkamos a busca por code.
-      if (parentProjectCode) {
-        return `${base}/workspace/projetos/${encodeURIComponent(parentProjectCode)}?card=${encodeURIComponent(code)}`;
+      if (parentProjectId) {
+        return `${base}/projetos/${encodeURIComponent(parentProjectId)}?card=${encodeURIComponent(id)}`;
       }
-      return `${base}/workspace?card=${encodeURIComponent(code)}`;
+      // Sem projeto pai conhecido, cai numa rota inerte mas no domínio correto.
+      return `${base}/projetos`;
     }
   }
+}
+
+/**
+ * Retorna `"[DEV] "` quando o `baseUrl` aponta para ambiente dev/local —
+ * usado para prefixar títulos de mensagens Slack e diferenciar visualmente
+ * notificações de teste das de produção (canal único compartilhado).
+ */
+export function buildEnvPrefix(baseUrl: string | undefined): string {
+  if (!baseUrl) return "";
+  const lower = baseUrl.toLowerCase();
+  if (lower.includes("home-dev") || lower.includes("localhost") || lower.includes("127.0.0.1")) {
+    return "[DEV] ";
+  }
+  return "";
 }
 
 /**
@@ -104,8 +129,9 @@ function truncate(text: string, max = 200): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type ChamadoCriadoInput = {
-  chamado: Pick<Ticket, "code" | "title" | "category" | "type" | "priority">;
+  chamado: Pick<Ticket, "id" | "code" | "title" | "category" | "type" | "priority">;
   autor: Pick<User, "name"> | null;
+  baseUrl?: string;
 };
 
 /** Mensagem-mãe quando um novo chamado é aberto. */
@@ -113,19 +139,20 @@ export function buildChamadoCriadoBlocks(input: ChamadoCriadoInput): {
   text: string;
   blocks: SlackBlock[];
 } {
-  const { chamado, autor } = input;
-  const url = buildEntityUrl("chamado", chamado.code);
+  const { chamado, autor, baseUrl } = input;
+  const url = buildEntityUrl("chamado", chamado.id, undefined, baseUrl);
   const emoji = emojiPorPrioridade(chamado.priority);
   const autorNome = autor?.name || "Usuário desconhecido";
+  const envPrefix = buildEnvPrefix(baseUrl);
 
-  const text = `🎫 Novo chamado ${chamado.code}: ${chamado.title}`;
+  const text = `${envPrefix}🎫 Novo chamado ${chamado.code}: ${chamado.title}`;
 
   const blocks: SlackBlock[] = [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `🎫 *Novo chamado: <${url}|${chamado.code}>*\n*${escapeMrkdwn(truncate(chamado.title, 150))}*`,
+        text: `${envPrefix}🎫 *Novo chamado: <${url}|${chamado.code}>*\n*${escapeMrkdwn(truncate(chamado.title, 150))}*`,
       },
     },
     {
@@ -158,8 +185,9 @@ export function buildChamadoCriadoBlocks(input: ChamadoCriadoInput): {
 }
 
 export type ProjetoCriadoInput = {
-  projeto: Pick<Project, "code" | "name" | "visibility" | "priority">;
+  projeto: Pick<Project, "id" | "code" | "name" | "visibility" | "priority">;
   owner: Pick<User, "name"> | null;
+  baseUrl?: string;
 };
 
 /** Mensagem-mãe quando um novo projeto é criado (apenas se shared/public). */
@@ -167,19 +195,20 @@ export function buildProjetoCriadoBlocks(input: ProjetoCriadoInput): {
   text: string;
   blocks: SlackBlock[];
 } {
-  const { projeto, owner } = input;
-  const url = buildEntityUrl("projeto", projeto.code);
+  const { projeto, owner, baseUrl } = input;
+  const url = buildEntityUrl("projeto", projeto.id, undefined, baseUrl);
   const emoji = emojiPorPrioridade(projeto.priority);
   const ownerNome = owner?.name || "Sem owner";
+  const envPrefix = buildEnvPrefix(baseUrl);
 
-  const text = `📋 Novo projeto ${projeto.code}: ${projeto.name}`;
+  const text = `${envPrefix}📋 Novo projeto ${projeto.code}: ${projeto.name}`;
 
   const blocks: SlackBlock[] = [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `📋 *Novo projeto: <${url}|${projeto.code}>*\n*${escapeMrkdwn(truncate(projeto.name, 150))}*`,
+        text: `${envPrefix}📋 *Novo projeto: <${url}|${projeto.code}>*\n*${escapeMrkdwn(truncate(projeto.name, 150))}*`,
       },
     },
     {
@@ -212,9 +241,10 @@ export function buildProjetoCriadoBlocks(input: ProjetoCriadoInput): {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type AtividadeCriadaInput = {
-  atividade: Pick<KanbanCard, "code" | "title" | "priority">;
-  projeto: Pick<Project, "code">;
+  atividade: Pick<KanbanCard, "id" | "code" | "title" | "priority">;
+  projeto: Pick<Project, "id" | "code">;
   responsavel: Pick<User, "name"> | null;
+  baseUrl?: string;
 };
 
 /** Reply na thread do projeto pai quando uma nova atividade é criada. */
@@ -222,11 +252,12 @@ export function buildAtividadeCriadaBlocks(input: AtividadeCriadaInput): {
   text: string;
   blocks: SlackBlock[];
 } {
-  const { atividade, projeto, responsavel } = input;
-  const url = buildEntityUrl("atividade", atividade.code, projeto.code);
+  const { atividade, projeto, responsavel, baseUrl } = input;
+  const url = buildEntityUrl("atividade", atividade.id, projeto.id, baseUrl);
   const emoji = emojiPorPrioridade(atividade.priority);
   const respNome = responsavel?.name || "Não atribuído";
 
+  // Reply herda contexto da mensagem-mãe (já prefixada quando dev) — sem [DEV] aqui.
   const text = `➕ Nova atividade ${atividade.code}: ${atividade.title}`;
 
   const blocks: SlackBlock[] = [
@@ -291,17 +322,20 @@ export function buildAlertaCriticoText(chamadoCode: string): string {
 
 /** DM enviada ao responsável quando atribuído a um chamado. */
 export function buildDmAtribuicaoChamado(input: {
+  chamadoId: string;
   chamadoCode: string;
   titulo: string;
+  baseUrl?: string;
 }): { text: string; blocks: SlackBlock[] } {
-  const url = buildEntityUrl("chamado", input.chamadoCode);
-  const text = `Você foi atribuído ao chamado ${input.chamadoCode}`;
+  const url = buildEntityUrl("chamado", input.chamadoId, undefined, input.baseUrl);
+  const envPrefix = buildEnvPrefix(input.baseUrl);
+  const text = `${envPrefix}Você foi atribuído ao chamado ${input.chamadoCode}`;
   const blocks: SlackBlock[] = [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `🙋 Você foi atribuído ao chamado *<${url}|${input.chamadoCode}>*\n${escapeMrkdwn(truncate(input.titulo, 200))}`,
+        text: `${envPrefix}🙋 Você foi atribuído ao chamado *<${url}|${input.chamadoCode}>*\n${escapeMrkdwn(truncate(input.titulo, 200))}`,
       },
     },
     {
@@ -321,18 +355,21 @@ export function buildDmAtribuicaoChamado(input: {
 
 /** DM enviada ao responsável de atividade urgente/muito-urgente. */
 export function buildDmAtividadeUrgente(input: {
+  atividadeId: string;
   atividadeCode: string;
   titulo: string;
-  projetoCode: string;
+  projetoId: string;
+  baseUrl?: string;
 }): { text: string; blocks: SlackBlock[] } {
-  const url = buildEntityUrl("atividade", input.atividadeCode, input.projetoCode);
-  const text = `Atividade urgente atribuída: ${input.atividadeCode}`;
+  const url = buildEntityUrl("atividade", input.atividadeId, input.projetoId, input.baseUrl);
+  const envPrefix = buildEnvPrefix(input.baseUrl);
+  const text = `${envPrefix}Atividade urgente atribuída: ${input.atividadeCode}`;
   const blocks: SlackBlock[] = [
     {
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `🔥 Atividade urgente: *<${url}|${input.atividadeCode}>*\n${escapeMrkdwn(truncate(input.titulo, 200))}`,
+        text: `${envPrefix}🔥 Atividade urgente: *<${url}|${input.atividadeCode}>*\n${escapeMrkdwn(truncate(input.titulo, 200))}`,
       },
     },
   ];

@@ -20,6 +20,7 @@ import {
 import { z } from "zod";
 import { sql, eq, or, and, type SQL } from "drizzle-orm";
 import { tasks, type Task } from "@shared/schema";
+import { extractMentions } from "../lib/sanitize-rich-text";
 import { getSessionUser, requireAuth, requireAdmin } from "../middleware/auth";
 
 type SessionUser = {
@@ -796,7 +797,7 @@ export function registerTaskRoutes(router: Router) {
   router.post("/api/tasks/:id/comments", requireAuth, async (req, res) => {
     try {
       const { userId } = getSessionUser(req);
-      const data = { ...req.body, taskId: getId(req), authorId: userId };
+      const data = { ...req.body, taskId: getId(req), authorId: userId, mentions: extractMentions(req.body?.content) };
       const validated = insertTaskCommentSchema.parse(data);
       const comment = await storage.createTaskComment(validated);
 
@@ -846,7 +847,11 @@ export function registerTaskRoutes(router: Router) {
 
   router.patch("/api/task-comments/:id", requireAuth, async (req, res) => {
     try {
-      const comment = await storage.updateTaskComment(getId(req), { content: req.body.content });
+      const content = req.body.content;
+      const comment = await storage.updateTaskComment(getId(req), {
+        content,
+        mentions: extractMentions(content),
+      });
       if (!comment) return res.status(404).json({ error: "Comment not found" });
       res.json(comment);
     } catch (error) {

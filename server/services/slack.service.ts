@@ -20,6 +20,13 @@ export type SlackEnv = {
   SLACK_INTEGRATION_ENABLED?: string;
   SLACK_CHANNEL_DEVS?: string;
   // SLACK_SIGNING_SECRET é usado apenas na Fase 2 (eventos inbound).
+
+  // URL base da aplicação (frontend), usada pelos templates para montar
+  // links nas notificações. Origem por runtime:
+  //  - Express:  process.env.APP_URL
+  //  - Worker:   c.env.APP_URL (wrangler.toml [vars] / [env.dev.vars])
+  // Quando ausente, os templates caem num fallback de produção.
+  APP_URL?: string;
 };
 
 export type SlackBlock = KnownBlock | Block;

@@ -20,6 +20,7 @@ import { KpiStrip, type WorkspaceKpis } from "@/components/workspace/KpiStrip";
 import { WorkspaceTable, type UnifiedItem } from "@/components/workspace/WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 
 type TipoFilter = "todos" | "chamados" | "tarefas" | "projetos";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
@@ -75,6 +76,7 @@ export function TodosView() {
   const [tipoFilter, setTipoFilter] = useState<TipoFilter>("todos");
   const [statusFilter, setStatusFilter] = useState("all");
   const [responsavelFilter, setResponsavelFilter] = useState("all");
+  const [applicationFilter, setApplicationFilter] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("lista");
 
   useEffect(() => {
@@ -131,6 +133,7 @@ export function TodosView() {
 
     if (statusFilter !== "all" && item.status !== statusFilter) return false;
     if (responsavelFilter !== "all" && item.responsavel !== responsavelFilter) return false;
+    if (applicationFilter && item.applicationKey !== applicationFilter) return false;
 
     return true;
   });
@@ -197,6 +200,18 @@ export function TodosView() {
           className="w-[150px]"
         />
 
+        {/* Aplicação filter */}
+        <div className="w-[180px]">
+          <ApplicationSelect
+            value={applicationFilter}
+            onChange={setApplicationFilter}
+            size="sm"
+            showAllOption
+            allOptionLabel="Aplicação: Todas"
+            placeholder="Aplicação"
+          />
+        </div>
+
         {/* View mode toggle */}
         <div
           className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto"
@@ -220,7 +235,45 @@ export function TodosView() {
       </div>
 
       {/* Table */}
-      <WorkspaceTable variant="todos" items={filteredItems} loading={loading} />
+      <WorkspaceTable
+        variant="todos"
+        items={filteredItems}
+        loading={loading}
+        onStatusChange={async (item, newStatus) => {
+          try {
+            const url = item.tipo === "chamado"
+              ? `/api/workspace/chamados/${item.id}`
+              : `/api/workspace/tarefas/${item.id}`;
+            const res = await fetchWithAuth(url, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status: newStatus }),
+            });
+            if (!res.ok) throw new Error("Erro ao atualizar status");
+            setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, status: newStatus } : i));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Erro desconhecido";
+            toast({ title: "Erro ao atualizar status", description: msg, variant: "destructive" });
+          }
+        }}
+        onPriorityChange={async (item, newPriority) => {
+          try {
+            const url = item.tipo === "chamado"
+              ? `/api/workspace/chamados/${item.id}`
+              : `/api/workspace/tarefas/${item.id}`;
+            const res = await fetchWithAuth(url, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ prioridade: newPriority }),
+            });
+            if (!res.ok) throw new Error("Erro ao atualizar prioridade");
+            setItems((prev) => prev.map((i) => i.id === item.id ? { ...i, prioridade: newPriority } : i));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Erro desconhecido";
+            toast({ title: "Erro ao atualizar prioridade", description: msg, variant: "destructive" });
+          }
+        }}
+      />
     </div>
   );
 }
