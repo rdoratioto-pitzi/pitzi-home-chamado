@@ -68,3 +68,4 @@ agents/logs/
 .claude/skills/gstack/node_modules/
 .mcp.json
 server/config/openrouter-keys.ts
+.replit
