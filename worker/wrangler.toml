@@ -18,7 +18,7 @@ bucket_name = "renov-home-attachments"
 
 [vars]
 APP_URL = "https://home.renovsmart.com.br"
-CORS_ORIGIN = "https://home.renovsmart.com.br,https://renov-home.pages.dev"
+CORS_ORIGIN = "https://home.renovsmart.com.br,https://renov-home.pages.dev,https://rdoratioto-pitzi.github.io"
 API_URL = "https://homeapi.renovsmart.com.br"
 SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
 SENDPULSE_FROM_NAME = "Renov Home"
