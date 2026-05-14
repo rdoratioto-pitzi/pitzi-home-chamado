@@ -77,32 +77,32 @@ const leftPanelVariants = {
 };
 
 // Decorative recycling arrows for green panel
-function RecycleIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+function PhonePatternIcon({ className, style, size = 60, rotate = 0 }: {
+  className?: string;
+  style?: React.CSSProperties;
+  size?: number;
+  rotate?: number;
+}) {
   return (
     <svg
       className={className}
       style={style}
-      viewBox="0 0 120 120"
+      width={size}
+      height={Math.round(size * 1.5)}
+      viewBox="0 0 60 90"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Arrow 1 — top */}
-      <path
-        d="M60 14L74 32H66V50L46 30L66 10V28L60 14Z"
-        fill="white"
-      />
-      {/* Arrow 2 — bottom-right */}
-      <path
-        d="M60 14L74 32H66V50L46 30L66 10V28L60 14Z"
-        fill="white"
-        transform="rotate(120 60 60)"
-      />
-      {/* Arrow 3 — bottom-left */}
-      <path
-        d="M60 14L74 32H66V50L46 30L66 10V28L60 14Z"
-        fill="white"
-        transform="rotate(240 60 60)"
-      />
+      <g transform={`rotate(${rotate}, 30, 45)`}>
+        <rect x="4" y="2" width="52" height="86" rx="12" stroke="white" strokeWidth="3.5"/>
+        <circle cx="30" cy="18" r="6" stroke="white" strokeWidth="3"/>
+        <circle cx="18" cy="68" r="4.5" fill="white"/>
+        <circle cx="30" cy="68" r="4.5" fill="white"/>
+        <circle cx="42" cy="68" r="4.5" fill="white"/>
+        <circle cx="18" cy="80" r="4.5" fill="white"/>
+        <circle cx="30" cy="80" r="4.5" fill="white"/>
+        <circle cx="42" cy="80" r="4.5" fill="white"/>
+      </g>
     </svg>
   );
 }
@@ -269,65 +269,40 @@ export default function LoginPage() {
         initial="hidden"
         animate="visible"
         className="hidden md:flex relative flex-col items-center justify-center overflow-hidden"
-        style={{ width: "50%", minHeight: "100vh", background: "#068130" }}
+        style={{ width: "50%", minHeight: "100vh", background: "#3B42DE" }}
       >
-        {/* Decorative recycling icons */}
-        <RecycleIcon
-          className="absolute w-32 h-32 pointer-events-none"
-          style={{ top: "10%", left: "8%", opacity: 0.12 }}
-        />
-        <RecycleIcon
-          className="absolute w-20 h-20 pointer-events-none"
-          style={{ top: "22%", right: "9%", opacity: 0.09 }}
-        />
-        <RecycleIcon
-          className="absolute w-28 h-28 pointer-events-none"
-          style={{ bottom: "14%", left: "14%", opacity: 0.12 }}
-        />
-        <RecycleIcon
-          className="absolute w-16 h-16 pointer-events-none"
-          style={{ bottom: "32%", right: "7%", opacity: 0.07 }}
-        />
+        {/* Phone pattern background */}
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "4%",    left: "6%",   opacity: 0.10 }} size={54} rotate={-18} />
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "2%",    left: "28%",  opacity: 0.08 }} size={46} rotate={25}  />
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "8%",    left: "54%",  opacity: 0.11 }} size={50} rotate={-10} />
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "3%",    right: "8%",  opacity: 0.09 }} size={48} rotate={20}  />
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "38%",   left: "2%",   opacity: 0.08 }} size={52} rotate={30}  />
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "42%",   right: "4%",  opacity: 0.10 }} size={56} rotate={-22} />
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ bottom: "22%",left: "8%",   opacity: 0.10 }} size={50} rotate={-15} />
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ bottom: "20%",left: "30%",  opacity: 0.07 }} size={44} rotate={20}  />
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ bottom: "8%", right: "12%", opacity: 0.09 }} size={52} rotate={15}  />
+        <PhonePatternIcon className="absolute pointer-events-none" style={{ bottom: "5%", left: "55%",  opacity: 0.08 }} size={48} rotate={-25} />
 
-        {/* Content */}
-        <div className="relative z-10 flex flex-col items-center text-center px-12">
+        {/* Center logo */}
+        <div className="relative z-10 flex items-center justify-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.85, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
-            className="mb-8"
           >
-            <RenovLogo variant="white" size="xl" className="mx-auto" />
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut", delay: 0.4 }}
-            className="space-y-2"
-          >
-            <p
-              className="text-white"
-              style={{
-                fontFamily: "Montserrat, sans-serif",
-                fontSize: "16px",
-                fontWeight: 400,
-                opacity: 0.9,
-              }}
-            >
-              Gestão Inteligente de Chamados.
-            </p>
-            <p
-              className="text-white"
-              style={{
-                fontFamily: "Montserrat, sans-serif",
-                fontSize: "14px",
-                fontWeight: 300,
-                opacity: 0.6,
-              }}
-            >
-              Plataforma Interna Pitzi
-            </p>
+            <svg viewBox="0 0 280 90" width="280" height="90" xmlns="http://www.w3.org/2000/svg">
+              <g transform="translate(42, 45) rotate(-12) translate(-27, -40)">
+                <rect x="2" y="2" width="50" height="76" rx="11" fill="none" stroke="white" strokeWidth="4"/>
+                <circle cx="27" cy="16" r="5.5" stroke="white" strokeWidth="3" fill="none"/>
+                <circle cx="15" cy="58" r="4" fill="white"/>
+                <circle cx="27" cy="58" r="4" fill="white"/>
+                <circle cx="39" cy="58" r="4" fill="white"/>
+                <circle cx="15" cy="69" r="4" fill="white"/>
+                <circle cx="27" cy="69" r="4" fill="white"/>
+                <circle cx="39" cy="69" r="4" fill="white"/>
+              </g>
+              <text x="88" y="62" fontFamily="Montserrat, sans-serif" fontWeight="800" fontSize="56" fill="white" letterSpacing="-2">pitzi</text>
+            </svg>
           </motion.div>
         </div>
       </motion.div>
@@ -347,7 +322,7 @@ export default function LoginPage() {
           <motion.div variants={itemVariants} className="flex justify-center mb-8 md:hidden">
             <div
               className="inline-flex items-center justify-center rounded-2xl px-6 py-3"
-              style={{ background: "#068130" }}
+              style={{ background: "#3B42DE" }}
             >
               <RenovLogo variant="white" size="md" />
             </div>
