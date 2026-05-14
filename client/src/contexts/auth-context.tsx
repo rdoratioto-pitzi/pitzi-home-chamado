@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import type { CurrentUser } from "@/lib/permissions";
+import { getStoredToken, clearStoredToken } from "@/lib/queryClient";
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -24,8 +25,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function checkSession() {
       try {
+        const token = getStoredToken();
         const res = await fetch(`${API_BASE}/api/auth/me`, {
           credentials: "include",
+          headers: token ? { "Authorization": `Bearer ${token}` } : {},
         });
         if (res.ok) {
           const data = await res.json();
@@ -63,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore — always clear local state
     }
+    clearStoredToken();
     setUser(null);
     // Broadcast to other tabs
     try {

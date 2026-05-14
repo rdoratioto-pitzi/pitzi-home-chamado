@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
-import { fetchWithAuth, API_BASE } from "@/lib/queryClient";
+import { fetchWithAuth, API_BASE, setStoredToken } from "@/lib/queryClient";
 import { Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
 import { VersionBadge } from "@/components/version-badge";
 
@@ -157,6 +157,9 @@ export default function LoginPage() {
       const result = await response.json();
 
       if (result.success) {
+        if (result.accessToken) {
+          setStoredToken(result.accessToken);
+        }
         setLoginSuccess(true);
         auth.login(result.user);
         setTimeout(() => {
