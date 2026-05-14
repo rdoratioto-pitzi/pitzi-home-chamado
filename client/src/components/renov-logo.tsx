@@ -105,25 +105,36 @@ export function PitziLogo({ variant = "auto", size = "md", className = "" }: Pit
 
   // Nível 3: SVG inline (zero dependência externa)
   const textColor = resolvedVariant === "dark" || resolvedVariant === "white" ? "#FFFFFF" : "#0A0A0A";
+  const accentColor = resolvedVariant === "dark" || resolvedVariant === "white" ? "#FFFFFF" : "#3B42DE";
 
   return (
     <svg
-      viewBox="0 0 200 56"
+      viewBox="0 0 280 90"
       width={width}
       height={height}
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
+      <g transform="translate(42, 45) rotate(-12) translate(-27, -40)">
+        <rect x="2" y="2" width="50" height="76" rx="11" fill="none" stroke={accentColor} strokeWidth="4"/>
+        <circle cx="27" cy="16" r="5.5" stroke={accentColor} strokeWidth="3" fill="none"/>
+        <circle cx="15" cy="58" r="4" fill={accentColor}/>
+        <circle cx="27" cy="58" r="4" fill={accentColor}/>
+        <circle cx="39" cy="58" r="4" fill={accentColor}/>
+        <circle cx="15" cy="69" r="4" fill={accentColor}/>
+        <circle cx="27" cy="69" r="4" fill={accentColor}/>
+        <circle cx="39" cy="69" r="4" fill={accentColor}/>
+      </g>
       <text
-        x="4"
-        y="42"
+        x="88"
+        y="62"
         fontFamily="Montserrat, Arial, sans-serif"
         fontWeight="800"
-        fontSize="44"
+        fontSize="56"
         fill={textColor}
         letterSpacing="-2"
       >
-        Pitzi
+        pitzi
       </text>
     </svg>
   );
