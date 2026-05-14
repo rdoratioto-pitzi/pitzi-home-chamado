@@ -78,14 +78,14 @@ type WorkspaceTableProps =
     };
 
 const statusDotColors: Record<string, { bg: string }> = {
-  in_progress: { bg: "#00c853" },
+  in_progress: { bg: "#5B62EC" },
   resolved: { bg: "#4ade80" },
   closed: { bg: "#4ade80" },
   open: { bg: "#f59e0b" },
   blocked: { bg: "#ef4444" },
   // tarefa statuses
   "a-fazer": { bg: "#f59e0b" },
-  "em-andamento": { bg: "#00c853" },
+  "em-andamento": { bg: "#5B62EC" },
   concluido: { bg: "#4ade80" },
   cancelado: { bg: "#ef4444" },
 };
@@ -237,7 +237,7 @@ function GroupHeader({
         className="text-xs px-1.5 py-0.5 rounded-full"
         style={{
           background: "var(--bg4)",
-          color: "#00c853",
+          color: "#5B62EC",
           fontSize: "10px",
         }}
       >
@@ -486,7 +486,7 @@ function InlineSelectChip({
         className="text-xs rounded px-1 py-0 outline-none"
         style={{
           background: "rgba(255,255,255,0.06)",
-          border: "1px solid rgba(0,200,83,0.3)",
+          border: "1px solid rgba(59,66,222,0.3)",
           color: "rgba(255,255,255,0.85)",
         }}
       >
@@ -706,8 +706,8 @@ function ResponsavelCell({ initials, name }: { initials: string; name: string })
         style={{
           width: 22,
           height: 22,
-          background: "rgba(0,200,83,0.15)",
-          color: "#00c853",
+          background: "rgba(59,66,222,0.15)",
+          color: "#5B62EC",
         }}
       >
         {initials}
@@ -728,7 +728,7 @@ function SlaStatusCell({ statusSla, className }: { statusSla: "dentro_prazo" | "
       style={{
         color:
           statusSla === "dentro_prazo"
-            ? "#00c853"
+            ? "#5B62EC"
             : statusSla === "em_atraso"
               ? "#ff5050"
               : "var(--l4)",

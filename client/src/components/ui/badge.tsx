@@ -30,7 +30,7 @@ export interface BadgeProps
     VariantProps<typeof badgeVariants> {}
 
 const semanticStyles: Record<string, React.CSSProperties> = {
-  success: { background: "rgba(0,161,55,0.10)", color: "#00A137" },
+  success: { background: "rgba(59,66,222,0.10)", color: "#3B42DE" },
   warning: { background: "rgba(192,122,0,0.10)", color: "#C07A00" },
   destructive: { background: "rgba(197,48,48,0.10)", color: "#C53030" },
   info: { background: "rgba(60,120,216,0.10)", color: "#3C78D8" },

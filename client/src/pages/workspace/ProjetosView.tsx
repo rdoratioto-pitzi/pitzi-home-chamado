@@ -150,7 +150,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusDotColors: Record<string, string> = {
-  "em-andamento": "#00c853",
+  "em-andamento": "#5B62EC",
   "em-revisao": "#2196f3",
   "concluido": "#4ade80",
   "a-fazer": "#f59e0b",
@@ -288,7 +288,7 @@ function TarefaFlatRow({ tarefa, onClick, onEdit, onDelete }: { tarefa: TarefaFl
       <div className="flex items-center gap-1.5 min-w-0">
         <div
           className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
-          style={{ width: 22, height: 22, background: "rgba(0,200,83,0.15)", color: "#00c853" }}
+          style={{ width: 22, height: 22, background: "rgba(59,66,222,0.15)", color: "#5B62EC" }}
         >
           {tarefa.responsavelInitials}
         </div>
@@ -394,13 +394,13 @@ function ProjectsKanbanView({
 
   const columns = [
     { key: "a-fazer", label: "A Fazer", color: "#f59e0b" },
-    { key: "em-andamento", label: "Em Andamento", color: "#00c853" },
+    { key: "em-andamento", label: "Em Andamento", color: "#5B62EC" },
     { key: "bloqueado", label: "Bloqueado", color: "#ef4444" },
     { key: "concluido", label: "Concluído", color: "#4ade80" },
   ];
 
   const allTarefas = projetos.flatMap((p) =>
-    p.tarefas.map((t) => ({ ...t, projetoCor: p.cor || "#00c853", projetoNome: p.nome }))
+    p.tarefas.map((t) => ({ ...t, projetoCor: p.cor || "#5B62EC", projetoNome: p.nome }))
   );
 
   const handleDrop = async (targetStatus: string) => {
@@ -456,7 +456,7 @@ function ProjectsKanbanView({
             {/* Cards */}
             <div
               className="flex flex-col gap-2 rounded-lg p-1 min-h-[60px] transition-colors"
-              style={{ background: isOver ? "rgba(0,200,83,0.08)" : "transparent", border: isOver ? "1px dashed rgba(0,200,83,0.3)" : "1px dashed transparent" }}
+              style={{ background: isOver ? "rgba(0,200,83,0.08)" : "transparent", border: isOver ? "1px dashed rgba(59,66,222,0.3)" : "1px dashed transparent" }}
             >
               {columnTarefas.map((t) => (
                 <div
@@ -576,7 +576,7 @@ function ProjectEditDialog({
   const [responsavelId, setResponsavelId] = useState("keep");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
-  const [cor, setCor] = useState("#00c853");
+  const [cor, setCor] = useState("#5B62EC");
   const [progresso, setProgresso] = useState(0);
   const [visibility, setVisibility] = useState<"private" | "shared" | "public">("private");
   const [memberIds, setMemberIds] = useState<string[]>([]);
@@ -594,7 +594,7 @@ function ProjectEditDialog({
       setCategoria(projeto.categoria || "");
       setApplicationKey(projeto.applicationKey ?? null);
       setSubmitAttempted(false);
-      setCor(projeto.cor || "#00c853");
+      setCor(projeto.cor || "#5B62EC");
       setProgresso(projeto.progresso ?? 0);
       setDataInicio(toDateInputValue(projeto.dataInicio));
       setDataFim(toDateInputValue(projeto.dataFim));
@@ -822,7 +822,7 @@ function ProjectEditDialog({
                 step={5}
                 value={progresso}
                 onChange={(e) => setProgresso(Number(e.target.value))}
-                className="w-full mt-2 accent-[#00c853]"
+                className="w-full mt-2 accent-[#5B62EC]"
               />
             </div>
           </div>
@@ -1110,7 +1110,7 @@ export function ProjetosView() {
     const list: TarefaFlat[] = filteredProjetos.flatMap((p) =>
       p.tarefas
         .filter((t) => !emTratativa || EM_TRATATIVA_STATUSES.includes(t.status || ""))
-        .map((t) => ({ ...t, projetoNome: p.nome, projetoCor: p.cor || "#00c853" })),
+        .map((t) => ({ ...t, projetoNome: p.nome, projetoCor: p.cor || "#5B62EC" })),
     );
     return [...list].sort((a, b) => {
       if (sortField === "prioridade") {
@@ -1186,8 +1186,8 @@ export function ProjetosView() {
           className="h-8 px-3 text-xs rounded-md border transition-colors flex-shrink-0"
           style={{
             background: emTratativa ? "rgba(0,200,83,0.12)" : "transparent",
-            borderColor: emTratativa ? "#00c853" : "hsl(var(--border))",
-            color: emTratativa ? "#00c853" : "hsl(var(--muted-foreground))",
+            borderColor: emTratativa ? "#5B62EC" : "hsl(var(--border))",
+            color: emTratativa ? "#5B62EC" : "hsl(var(--muted-foreground))",
             fontWeight: emTratativa ? 600 : 400,
           }}
         >

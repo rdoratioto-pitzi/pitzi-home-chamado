@@ -76,7 +76,7 @@ function KpiItem({ label, value, color }: { label: string; value: number; color?
 }
 
 function ProjetoCard({ projeto }: { projeto: ProjetoItem }) {
-  const cor = projeto.cor || "#00c853";
+  const cor = projeto.cor || "#5B62EC";
   const prog = projeto.progresso ?? 0;
   const status = projeto.status || "backlog";
 
@@ -198,7 +198,7 @@ export function VisaoEstrategica({ open, projetos, kpis, onClose }: VisaoEstrate
         style={{
           maxWidth: 1100,
           background: "#111811",
-          border: "1px solid rgba(0,200,83,0.15)",
+          border: "1px solid rgba(59,66,222,0.15)",
           borderRadius: 14,
           margin: "0 24px",
         }}
@@ -226,7 +226,7 @@ export function VisaoEstrategica({ open, projetos, kpis, onClose }: VisaoEstrate
               key={k.key}
               label={k.label}
               value={kpis[k.key]}
-              color={k.key === "concluidas" ? "#00c853" : undefined}
+              color={k.key === "concluidas" ? "#5B62EC" : undefined}
             />
           ))}
         </div>

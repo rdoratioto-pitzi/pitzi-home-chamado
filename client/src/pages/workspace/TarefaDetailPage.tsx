@@ -477,7 +477,7 @@ export default function TarefaDetailPage() {
                       onChange={(e) =>
                         setEditProgresso(Number(e.target.value))
                       }
-                      className="w-full mt-2 accent-[#00c853]"
+                      className="w-full mt-2 accent-[#5B62EC]"
                     />
                   </div>
                   <div className="space-y-2 pt-4 border-t">

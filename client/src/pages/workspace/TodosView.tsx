@@ -223,8 +223,8 @@ export function TodosView() {
               onClick={() => setViewMode(mode)}
               className="p-1.5 transition-colors"
               style={{
-                background: viewMode === mode ? "rgba(0,200,83,0.15)" : "transparent",
-                color: viewMode === mode ? "#00c853" : "rgba(255,255,255,0.3)",
+                background: viewMode === mode ? "rgba(59,66,222,0.15)" : "transparent",
+                color: viewMode === mode ? "#5B62EC" : "rgba(255,255,255,0.3)",
               }}
               title={mode.charAt(0).toUpperCase() + mode.slice(1)}
             >

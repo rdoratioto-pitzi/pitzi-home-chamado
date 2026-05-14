@@ -72,7 +72,7 @@ export function SubtaskList({
                 width: `${pct}%`,
                 height: "100%",
                 borderRadius: 2,
-                background: "#00c853",
+                background: "#3B42DE",
                 transition: "width 200ms ease",
               }}
             />
@@ -99,7 +99,7 @@ export function SubtaskList({
               onClick={() => handleToggle(s)}
               disabled={!!busyId}
               className="flex-shrink-0"
-              style={{ color: s.done ? "#00c853" : "rgba(255,255,255,0.4)" }}
+              style={{ color: s.done ? "#5B62EC" : "rgba(255,255,255,0.4)" }}
               aria-label={s.done ? "Marcar como pendente" : "Concluir subtarefa"}
             >
               {s.done ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4" />}
@@ -157,7 +157,7 @@ export function SubtaskList({
           style={{
             background: draft.trim() ? "rgba(0,200,83,0.15)" : "rgba(255,255,255,0.04)",
             border: "1px solid rgba(0,200,83,0.2)",
-            color: draft.trim() ? "#00c853" : "rgba(255,255,255,0.2)",
+            color: draft.trim() ? "#5B62EC" : "rgba(255,255,255,0.2)",
           }}
           aria-label="Adicionar subtarefa"
         >

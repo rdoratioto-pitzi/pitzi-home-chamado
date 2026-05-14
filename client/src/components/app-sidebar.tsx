@@ -421,7 +421,7 @@ export function AppSidebar() {
                       <LayoutGrid className="h-[20px] w-[20px]" />
                       <span className="text-[12px]">Workspace</span>
                       {workspaceCount !== null && (
-                        <span className="ml-auto mr-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#00c853]/15 px-1.5 text-[10px] font-semibold text-[#00c853]">
+                        <span className="ml-auto mr-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#3B42DE]/15 px-1.5 text-[10px] font-semibold text-[#5B62EC]">
                           {workspaceCount}
                         </span>
                       )}

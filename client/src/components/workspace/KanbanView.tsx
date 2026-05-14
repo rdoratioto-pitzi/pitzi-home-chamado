@@ -25,7 +25,7 @@ const COLUMNS: KanbanColumn[] = [
   {
     key: "em_andamento",
     label: "Em Andamento",
-    dotColor: "#00c853",
+    dotColor: "#5B62EC",
     statuses: ["in_progress", "em-andamento"],
   },
   {
@@ -84,8 +84,8 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
     "tipo" in item && (item as UnifiedItem).tipo === "tarefa" ? (item as UnifiedItem).contexto : null;
 
   const statusColors: Record<string, string> = {
-    in_progress: "#00c853",
-    "em-andamento": "#00c853",
+    in_progress: "#5B62EC",
+    "em-andamento": "#5B62EC",
     open: "#f59e0b",
     "a-fazer": "#f59e0b",
     blocked: "#ef4444",
@@ -206,8 +206,8 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
                 width: 20,
                 height: 20,
                 borderRadius: "50%",
-                background: "rgba(0,200,83,0.15)",
-                color: "#00c853",
+                background: "rgba(59,66,222,0.15)",
+                color: "#5B62EC",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",

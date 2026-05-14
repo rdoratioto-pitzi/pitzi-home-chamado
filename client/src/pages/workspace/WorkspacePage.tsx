@@ -24,7 +24,7 @@ function TopbarActions({ activeTab, onVisaoEstrategica, onNewItem }: TopbarActio
     return (
       <Button
         size="sm"
-        className="bg-[#00a137] hover:bg-[#00a137]/90 text-white"
+        className="bg-[#3B42DE] hover:bg-[#3B42DE]/90 text-white"
         onClick={() => onNewItem("chamado")}
       >
         <Plus className="h-4 w-4 mr-1" />
@@ -39,7 +39,7 @@ function TopbarActions({ activeTab, onVisaoEstrategica, onNewItem }: TopbarActio
         <Button
           size="sm"
           variant="outline"
-          className="border-[#00c853] text-[#00c853] hover:bg-[#00c853]/10"
+          className="border-[#5B62EC] text-[#5B62EC] hover:bg-[#5B62EC]/10"
           onClick={() => onNewItem("tarefa")}
         >
           <Plus className="h-4 w-4 mr-1" />
@@ -47,7 +47,7 @@ function TopbarActions({ activeTab, onVisaoEstrategica, onNewItem }: TopbarActio
         </Button>
         <Button
           size="sm"
-          className="bg-[#00a137] hover:bg-[#00a137]/90 text-white"
+          className="bg-[#3B42DE] hover:bg-[#3B42DE]/90 text-white"
           onClick={() => onNewItem("projeto")}
         >
           <Plus className="h-4 w-4 mr-1" />
@@ -68,7 +68,7 @@ function TopbarActions({ activeTab, onVisaoEstrategica, onNewItem }: TopbarActio
       <Button
         size="sm"
         variant="outline"
-        className="border-[#00c853] text-[#00c853] hover:bg-[#00c853]/10"
+        className="border-[#5B62EC] text-[#5B62EC] hover:bg-[#5B62EC]/10"
         onClick={() => onNewItem("chamado")}
       >
         <Plus className="h-4 w-4 mr-1" />
@@ -80,7 +80,7 @@ function TopbarActions({ activeTab, onVisaoEstrategica, onNewItem }: TopbarActio
       </Button>
       <Button
         size="sm"
-        className="bg-[#00a137] hover:bg-[#00a137]/90 text-white"
+        className="bg-[#3B42DE] hover:bg-[#3B42DE]/90 text-white"
         onClick={() => onNewItem("projeto")}
       >
         <Plus className="h-4 w-4 mr-1" />

@@ -479,7 +479,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                       className="flex-1 text-sm rounded px-2 py-0.5 outline-none min-w-0"
                       style={{
                         background: "rgba(255,255,255,0.06)",
-                        border: "1px solid rgba(0,200,83,0.3)",
+                        border: "1px solid rgba(59,66,222,0.3)",
                         color: "rgba(255,255,255,0.95)",
                       }}
                     />
@@ -548,7 +548,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           onChange={(e) => { handlePatch("status", e.target.value); }}
                           onBlur={() => setEditingField(null)}
                           className="text-xs rounded px-2 py-0.5 outline-none"
-                          style={{ background: "#1a201a", border: "1px solid rgba(0,200,83,0.3)", color: "#00c853" }}
+                          style={{ background: "#0f1124", border: "1px solid rgba(59,66,222,0.3)", color: "#5B62EC" }}
                         >
                           {statusOptionsForKind(kind).map((o) => (
                             <option key={o.value} value={o.value}>{o.label}</option>
@@ -580,7 +580,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           onChange={(e) => { handlePatch("prioridade", e.target.value); }}
                           onBlur={() => setEditingField(null)}
                           className="text-xs rounded px-2 py-0.5 outline-none"
-                          style={{ background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                          style={{ background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
                         >
                           {priorityOptionsForKind(kind).map((o) => (
                             <option key={o.value} value={o.value}>{o.label}</option>
@@ -629,7 +629,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                             onChange={(e) => { if (e.target.value) handlePatch("projetoId", e.target.value); }}
                             onBlur={() => setEditingField(null)}
                             className="text-xs rounded px-2 py-0.5 outline-none"
-                            style={{ background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                            style={{ background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
                           >
                             {availableProjetos.map((p) => (
                               <option key={p.id} value={p.id}>{p.nome}</option>
@@ -704,7 +704,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           onChange={(e) => { if (e.target.value) handlePatch("responsavelId", e.target.value); }}
                           onBlur={() => setEditingField(null)}
                           className="text-xs rounded px-2 py-0.5 outline-none"
-                          style={{ background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                          style={{ background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
                         >
                           {isChamado && <option value="">Manter atual</option>}
                           {availableUsers.map((u) => (
@@ -719,7 +719,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                         >
                           <div
                             className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold"
-                            style={{ width: 22, height: 22, background: "rgba(0,200,83,0.15)", color: "#00c853" }}
+                            style={{ width: 22, height: 22, background: "rgba(59,66,222,0.15)", color: "#5B62EC" }}
                           >
                             {item!.responsavelInitials}
                           </div>
@@ -760,7 +760,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                             onChange={(e) => { handlePatch("dataEntrega", e.target.value || null); }}
                             onBlur={() => setEditingField(null)}
                             className="text-xs rounded px-2 py-0.5 outline-none"
-                            style={{ background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                            style={{ background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
                           />
                         ) : (
                           <span
@@ -798,7 +798,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                               }
                             }}
                             className="text-xs rounded px-2 py-0.5 outline-none"
-                            style={{ width: 64, background: "#1a201a", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                            style={{ width: 64, background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
                           />
                         ) : (
                           <div
@@ -812,7 +812,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                                   width: `${Math.min((item as UnifiedItem).progresso ?? 0, 100)}%`,
                                   height: "100%",
                                   borderRadius: 3,
-                                  background: "#00c853",
+                                  background: "#5B62EC",
                                 }}
                               />
                             </div>
@@ -900,9 +900,9 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           disabled={isPatching}
                           className="text-xs px-2.5 py-1 rounded"
                           style={{
-                            background: "rgba(0,200,83,0.15)",
-                            color: "#00c853",
-                            border: "1px solid rgba(0,200,83,0.3)",
+                            background: "rgba(59,66,222,0.15)",
+                            color: "#5B62EC",
+                            border: "1px solid rgba(59,66,222,0.3)",
                           }}
                         >
                           {isPatching ? "Salvando..." : "Salvar"}
@@ -1031,7 +1031,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           <div key={c.id} className="flex gap-2">
                             <div
                               className="flex items-center justify-center flex-shrink-0 rounded-full text-[10px] font-semibold mt-0.5"
-                              style={{ width: 24, height: 24, background: "rgba(0,200,83,0.15)", color: "#00c853" }}
+                              style={{ width: 24, height: 24, background: "rgba(59,66,222,0.15)", color: "#5B62EC" }}
                             >
                               {c.autorInitials}
                             </div>
@@ -1074,9 +1074,9 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                         disabled={enviandoComentario || !novoComentario.trim()}
                         className="flex-shrink-0 p-2 rounded transition-colors"
                         style={{
-                          background: novoComentario.trim() ? "rgba(0,200,83,0.15)" : "rgba(255,255,255,0.04)",
+                          background: novoComentario.trim() ? "rgba(59,66,222,0.15)" : "rgba(255,255,255,0.04)",
                           border: "1px solid rgba(0,200,83,0.2)",
-                          color: novoComentario.trim() ? "#00c853" : "rgba(255,255,255,0.2)",
+                          color: novoComentario.trim() ? "#5B62EC" : "rgba(255,255,255,0.2)",
                         }}
                       >
                         <Send className="h-4 w-4" />
@@ -1141,12 +1141,12 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                   }}
                   className="text-xs px-3 py-1.5 rounded transition-colors font-medium"
                   style={{
-                    background: "rgba(0,200,83,0.15)",
-                    color: "#00c853",
-                    border: "1px solid rgba(0,200,83,0.3)",
+                    background: "rgba(59,66,222,0.15)",
+                    color: "#5B62EC",
+                    border: "1px solid rgba(59,66,222,0.3)",
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,200,83,0.22)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(0,200,83,0.15)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(59,66,222,0.15)")}
                 >
                   Salvar
                 </button>

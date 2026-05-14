@@ -86,7 +86,7 @@ function ChipSelect({ value, onValueChange, placeholder, options, greenStyle }: 
             ? {
                 background: "rgba(0,200,83,0.06)",
                 borderColor: "rgba(0,200,83,0.25)",
-                color: "#00c853",
+                color: "#5B62EC",
               }
             : {
                 background: "transparent",
@@ -505,7 +505,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                   ? {
                       background: "rgba(0,200,83,0.08)",
                       borderColor: "rgba(0,200,83,0.28)",
-                      color: "#00c853",
+                      color: "#5B62EC",
                     }
                   : {
                       background: "transparent",
@@ -529,8 +529,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
               style={{
                 fontFamily: "'JetBrains Mono', monospace",
                 fontSize: "11px",
-                color: "#00c853",
-                border: "1px solid rgba(0,200,83,0.3)",
+                color: "#5B62EC",
+                border: "1px solid rgba(59,66,222,0.3)",
                 padding: "1px 6px",
                 borderRadius: "4px",
               }}
@@ -578,8 +578,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
               className="flex items-start gap-2 text-xs px-3 py-2 rounded"
               style={{
                 background: "rgba(0,200,83,0.05)",
-                border: "1px solid rgba(0,200,83,0.15)",
-                color: "#00c853",
+                border: "1px solid rgba(59,66,222,0.15)",
+                color: "#5B62EC",
               }}
             >
               <span>⏱</span>
@@ -698,7 +698,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                   style={{
                     background: "rgba(0,200,83,0.06)",
                     borderColor: "rgba(0,200,83,0.25)",
-                    color: "#00c853",
+                    color: "#5B62EC",
                   }}
                 >
                   <SelectValue placeholder="Projeto" />
@@ -847,7 +847,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                       className="flex items-center gap-1 px-2 h-full text-xs transition-colors"
                       style={{
                         background: isActive ? "rgba(0,200,83,0.08)" : "transparent",
-                        color: isActive ? "#00c853" : "rgba(255,255,255,0.5)",
+                        color: isActive ? "#5B62EC" : "rgba(255,255,255,0.5)",
                       }}
                     >
                       <Icon className="h-3 w-3" />
@@ -1011,7 +1011,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             onClick={handleSubmit}
             disabled={submitting}
             size="sm"
-            className="bg-[#00a137] hover:bg-[#00a137]/90 text-white"
+            className="bg-[#3B42DE] hover:bg-[#3B42DE]/90 text-white"
           >
             {submitting ? "Criando..." : submitLabel}
           </Button>
