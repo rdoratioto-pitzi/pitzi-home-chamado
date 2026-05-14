@@ -29,13 +29,30 @@ async function tryRefreshToken(): Promise<boolean> {
   }
 }
 
+// Verifica com /api/auth/me antes de redirecionar para /login.
+// Isso evita que um 401 transitório (race condition, cookie cross-origin
+// não enviado na primeira requisição, etc.) derrube usuários autenticados.
 function handleUnauthorized() {
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const loginPath = base + "/login";
   if (window.location.pathname === loginPath || window.location.pathname.endsWith("/login")) return;
   if (_handlingUnauthorized) return;
   _handlingUnauthorized = true;
-  window.location.href = loginPath;
+
+  fetch(`${API_BASE}/api/auth/me`, { credentials: "include" })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (data?.user) {
+        // Sessão ainda válida — 401 foi transitório, não redirecionar
+        _handlingUnauthorized = false;
+      } else {
+        window.location.href = loginPath;
+      }
+    })
+    .catch(() => {
+      // Falha de rede — não redirecionar (pode ser temporário)
+      _handlingUnauthorized = false;
+    });
 }
 
 async function throwIfResNotOk(res: Response) {
