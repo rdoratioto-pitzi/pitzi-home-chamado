@@ -6,15 +6,12 @@ import { readFileSync } from "fs";
 const pkg = JSON.parse(readFileSync(path.resolve(import.meta.dirname, "package.json"), "utf-8"));
 
 export default defineConfig({
-  plugins: [
-    react(),
-    {
-      name: 'inject-build-timestamp',
-      transformIndexHtml(html) {
-        return html.replace('</head>', `<!-- build:${Date.now()} --></head>`);
-      },
+  plugins: [react(), {
+    name: 'inject-build-timestamp',
+    transformIndexHtml(html) {
+      return html.replace('</head>', `<!-- build:${Date.now()} --></head>`);
     },
-  ],
+  }],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
