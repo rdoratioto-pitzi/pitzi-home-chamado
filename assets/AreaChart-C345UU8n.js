@@ -1,0 +1,1 @@
+import{g as a,X as r,Y as s,f as i}from"./generateCategoricalChart-B2PRCUtT.js";import{A as x}from"./Area-BNCsNygg.js";var o=a({chartName:"AreaChart",GraphicalChild:x,axisComponents:[{axisType:"xAxis",AxisComp:r},{axisType:"yAxis",AxisComp:s}],formatAxisMap:i});export{o as A};
