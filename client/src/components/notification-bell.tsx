@@ -13,7 +13,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getQueryFn } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import type { Notification } from "@shared/schema";
 import {
@@ -71,8 +71,10 @@ export function NotificationBell() {
   });
 
   // Contador de não lidas: sem polling — atualiza apenas ao abrir o popover.
+  // on401: "returnNull" evita que falha de autenticação dispare logout imediato.
   const { data: unreadData, refetch: refetchUnreadCount } = useQuery<{ count: number }>({
     queryKey: ["/api/notifications/unread/count"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
     enabled: !!user?.id,
     staleTime: Infinity,
   });
