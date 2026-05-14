@@ -15,6 +15,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
   </head>
   <body>
+    <script>
+      // Restore path after 404.html SPA redirect (GitHub Pages only)
+      var redirect = sessionStorage.getItem('__spa_redirect');
+      if (redirect) {
+        sessionStorage.removeItem('__spa_redirect');
+        var base = window.location.pathname.replace(/\/$/, '');
+        window.history.replaceState(null, '', base + redirect);
+      }
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

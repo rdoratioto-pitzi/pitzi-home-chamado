@@ -30,10 +30,12 @@ async function tryRefreshToken(): Promise<boolean> {
 }
 
 function handleUnauthorized() {
-  if (window.location.pathname === "/login") return;
+  const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+  const loginPath = base + "/login";
+  if (window.location.pathname === loginPath || window.location.pathname.endsWith("/login")) return;
   if (_handlingUnauthorized) return;
   _handlingUnauthorized = true;
-  window.location.href = "/login";
+  window.location.href = loginPath;
 }
 
 async function throwIfResNotOk(res: Response) {
