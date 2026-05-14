@@ -72,6 +72,7 @@ const MODULES = [
 ] as const;
 
 const PERFIS_ACESSO = [
+  { value: "usuario_normal", label: "Usuário Normal" },
   { value: "assistente", label: "Assistente" },
   { value: "analista", label: "Analista" },
   { value: "gestor", label: "Gestor" },
