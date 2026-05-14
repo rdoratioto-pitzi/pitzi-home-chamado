@@ -1,0 +1,1 @@
+import{e as r}from"./index-BzsAlLlJ.js";function s(){return r({queryKey:["meta-areas"],queryFn:async()=>{const e=await fetch("/api/meta-areas");if(!e.ok)throw new Error("Erro ao carregar áreas");return e.json()},staleTime:300*1e3})}export{s as u};
