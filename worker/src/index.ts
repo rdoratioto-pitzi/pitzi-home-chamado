@@ -83,6 +83,8 @@ type Bindings = {
   // silenciosamente se ausentes.
   HERMES_EXECUTOR_URL?: string;
   HERMES_EXECUTOR_TOKEN?: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
 };
 
 export type AuthUser = {

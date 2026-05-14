@@ -11,7 +11,7 @@ import {
   clearAuthCookies,
   getRefreshTokenFromCookie,
 } from "../lib/jwt";
-import { setCookie } from "hono/cookie";
+import { setCookie, getCookie, deleteCookie } from "hono/cookie";
 import type { AppEnv, AuthUser } from "../index";
 import { sendPasswordResetEmail } from "../lib/email";
 
@@ -232,6 +232,134 @@ auth.post("/api/auth/forgot-password", async (c) => {
   );
 
   return c.json({ success: true, message: successMsg });
+});
+
+// ─── GET /api/auth/google — inicia fluxo OAuth ─────────────────
+auth.get("/api/auth/google", (c) => {
+  const state = crypto.randomUUID();
+
+  const params = new URLSearchParams({
+    client_id: c.env.GOOGLE_CLIENT_ID,
+    redirect_uri: `${c.env.API_URL}/api/auth/google/callback`,
+    response_type: "code",
+    scope: "email profile",
+    hd: "pitzi.com.br",
+    state,
+    access_type: "online",
+    prompt: "select_account",
+  });
+
+  setCookie(c, "oauth_state", state, {
+    httpOnly: true,
+    secure: c.env.APP_URL.startsWith("https://"),
+    sameSite: "Lax" as const,
+    maxAge: 10 * 60,
+    path: "/",
+  });
+
+  return c.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+// ─── GET /api/auth/google/callback ─────────────────────────────
+auth.get("/api/auth/google/callback", async (c) => {
+  const { code, state, error } = c.req.query();
+  const appUrl = c.env.APP_URL;
+
+  if (error) {
+    return c.redirect(`${appUrl}/login?error=google_denied`);
+  }
+
+  const savedState = getCookie(c, "oauth_state");
+  deleteCookie(c, "oauth_state", { path: "/" });
+
+  if (!state || !savedState || state !== savedState) {
+    return c.redirect(`${appUrl}/login?error=invalid_state`);
+  }
+
+  // Troca code por tokens
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: c.env.GOOGLE_CLIENT_ID,
+      client_secret: c.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: `${c.env.API_URL}/api/auth/google/callback`,
+      grant_type: "authorization_code",
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    return c.redirect(`${appUrl}/login?error=token_exchange_failed`);
+  }
+
+  const { access_token } = await tokenRes.json() as { access_token: string };
+
+  // Busca dados do usuário Google
+  const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${access_token}` },
+  });
+
+  if (!userInfoRes.ok) {
+    return c.redirect(`${appUrl}/login?error=userinfo_failed`);
+  }
+
+  const googleUser = await userInfoRes.json() as {
+    email: string;
+    name: string;
+    picture?: string;
+    hd?: string;
+  };
+
+  // Valida domínio @pitzi.com.br
+  if (!googleUser.email.toLowerCase().endsWith("@pitzi.com.br")) {
+    return c.redirect(`${appUrl}/login?error=domain_not_allowed`);
+  }
+
+  const db = c.get("db");
+  const email = googleUser.email.toLowerCase();
+
+  let [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+  if (!user) {
+    const [created] = await db
+      .insert(users)
+      .values({
+        name: googleUser.name,
+        email,
+        authMethod: "google",
+        avatarUrl: googleUser.picture ?? null,
+        status: "active",
+      })
+      .returning();
+    user = created;
+  } else {
+    await db
+      .update(users)
+      .set({ avatarUrl: googleUser.picture ?? user.avatarUrl, authMethod: "google" })
+      .where(eq(users.id, user.id));
+  }
+
+  if (user.status !== "active") {
+    return c.redirect(`${appUrl}/login?error=user_inactive`);
+  }
+
+  const authUser: AuthUser = {
+    userId: user.id,
+    tenantId: user.tenantId ?? null,
+    role: user.isAdmin ? "admin" : "user",
+  };
+
+  const accessToken = await signAccessToken(authUser, c.env.JWT_SECRET);
+  const refreshToken = await signRefreshToken(user.id, c.env.JWT_REFRESH_SECRET, true);
+
+  const tokenHash = await sha256(refreshToken);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  await db.insert(refreshTokens).values({ userId: user.id, tokenHash, expiresAt });
+
+  setAuthCookies(c, accessToken, refreshToken, true);
+
+  return c.redirect(appUrl);
 });
 
 export { auth };
