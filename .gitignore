@@ -69,3 +69,9 @@ agents/logs/
 .mcp.json
 server/config/openrouter-keys.ts
 .replit
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
