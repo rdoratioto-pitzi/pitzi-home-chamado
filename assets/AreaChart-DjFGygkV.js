@@ -1,1 +1,0 @@
-import{g as a,X as r,Y as s,f as i}from"./generateCategoricalChart-OPlM5QWq.js";import{A as x}from"./Area-DzRSuvuE.js";var o=a({chartName:"AreaChart",GraphicalChild:x,axisComponents:[{axisType:"xAxis",AxisComp:r},{axisType:"yAxis",AxisComp:s}],formatAxisMap:i});export{o as A};

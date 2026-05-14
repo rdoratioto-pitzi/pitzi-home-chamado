@@ -1,0 +1,1 @@
+import{j as e,c as r}from"./index-DKcznQG_.js";import{I as s}from"./input-npirq6J4.js";function o({className:t,...a}){return e.jsx(s,{...a,type:"date",className:r("date-picker-full",t)})}export{o as D};
