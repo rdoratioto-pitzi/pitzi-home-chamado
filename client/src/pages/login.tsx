@@ -1,4 +1,4 @@
-import { RenovLogo } from "@/components/renov-logo";
+import { PitziLogo as RenovLogo } from "@/components/renov-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -315,7 +315,7 @@ export default function LoginPage() {
                 opacity: 0.9,
               }}
             >
-              Sua Troca Inteligente.
+              Gestão Inteligente de Chamados.
             </p>
             <p
               className="text-white"
@@ -326,7 +326,7 @@ export default function LoginPage() {
                 opacity: 0.6,
               }}
             >
-              Plataforma de Gestão Interna
+              Plataforma Interna Pitzi
             </p>
           </motion.div>
         </div>

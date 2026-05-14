@@ -4,11 +4,14 @@ import { type Setting } from "@shared/schema";
 import { useTheme } from "@/hooks/use-theme";
 import { fetchWithAuth } from "@/lib/queryClient";
 
-interface RenovLogoProps {
+interface PitziLogoProps {
   variant?: "light" | "dark" | "white" | "auto";
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }
+
+/** @deprecated Use PitziLogoProps */
+type RenovLogoProps = PitziLogoProps;
 
 const sizeMap = {
   sm: { width: 90, height: 25 },
@@ -27,7 +30,7 @@ function normalizeObjectPath(path: string): string {
   return `${API_BASE}${normalized}`;
 }
 
-export function RenovLogo({ variant = "auto", size = "md", className = "" }: RenovLogoProps) {
+export function PitziLogo({ variant = "auto", size = "md", className = "" }: PitziLogoProps) {
   const { theme } = useTheme();
   // 0 = nenhum erro, 1 = DB falhou (tenta static), 2 = static falhou (usa SVG inline)
   const [imgError, setImgError] = useState<0 | 1 | 2>(0);
@@ -54,6 +57,7 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
     retry: false,
   });
 
+
   // Resetar ao trocar de setting
   useEffect(() => {
     setImgError(0);
@@ -65,10 +69,9 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
   const logoUrlSetting = resolvedVariant === "dark" || resolvedVariant === "white" ? logoUrlDark : logoUrlLight;
   const isLoading = resolvedVariant === "dark" || resolvedVariant === "white" ? isLoadingDark : isLoadingLight;
 
-  // Asset estático comprometido no repositório — fallback garantido
   const staticSrc = resolvedVariant === "dark" || resolvedVariant === "white"
-    ? "/brand/renov-logo-dark.svg"
-    : "/brand/renov-logo-light.svg";
+    ? "/brand/pitzi-logo-dark.svg"
+    : "/brand/pitzi-logo-light.svg";
 
   if (isLoading) {
     return <div style={{ width, height }} className={className} />;
@@ -79,7 +82,7 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
     return (
       <img
         src={normalizeObjectPath(logoUrlSetting.value)}
-        alt="Renov Logo"
+        alt="Pitzi Logo"
         style={{ width, height, objectFit: 'contain' }}
         className={className}
         onError={() => setImgError(1)}
@@ -92,7 +95,7 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
     return (
       <img
         src={staticSrc}
-        alt="Renov Logo"
+        alt="Pitzi Logo"
         style={{ width, height, objectFit: 'contain' }}
         className={className}
         onError={() => setImgError(2)}
@@ -101,94 +104,54 @@ export function RenovLogo({ variant = "auto", size = "md", className = "" }: Ren
   }
 
   // Nível 3: SVG inline (zero dependência externa)
-  const textColor = resolvedVariant === "dark" || resolvedVariant === "white" ? "#FFFFFF" : "#000000";
+  const textColor = resolvedVariant === "dark" || resolvedVariant === "white" ? "#FFFFFF" : "#0A0A0A";
 
   return (
     <svg
-      viewBox="0 0 180 50"
+      viewBox="0 0 200 56"
       width={width}
       height={height}
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
       <text
-        x="0"
-        y="30"
-        fontFamily="Montserrat, sans-serif"
-        fontWeight="700"
-        fontSize="28"
+        x="4"
+        y="42"
+        fontFamily="Montserrat, Arial, sans-serif"
+        fontWeight="800"
+        fontSize="44"
         fill={textColor}
-        letterSpacing="-1"
+        letterSpacing="-2"
       >
-        ren
-      </text>
-      <g transform="translate(52, 5)">
-        <circle
-          cx="12"
-          cy="17"
-          r="10"
-          fill="none"
-          stroke={resolvedVariant === "white" ? "#FFFFFF" : "#00A137"}
-          strokeWidth="4"
-        />
-        <path
-          d="M12 7 L12 2 L17 7"
-          fill="none"
-          stroke={resolvedVariant === "white" ? "#FFFFFF" : "#00A137"}
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </g>
-      <text
-        x="78"
-        y="30"
-        fontFamily="Montserrat, sans-serif"
-        fontWeight="700"
-        fontSize="28"
-        fill={textColor}
-        letterSpacing="-1"
-      >
-        v.
-      </text>
-      <text
-        x="50"
-        y="46"
-        fontFamily="Montserrat, sans-serif"
-        fontWeight="600"
-        fontSize="16"
-        fill={textColor}
-        letterSpacing="0"
-      >
-        home
+        Pitzi
       </text>
     </svg>
   );
 }
 
-export function RenovLogoIcon({ className = "" }: { className?: string }) {
+/** @deprecated Use PitziLogo */
+export const RenovLogo = PitziLogo;
+
+export function PitziLogoIcon({ className = "" }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 32 32"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <circle
-        cx="16"
-        cy="16"
-        r="12"
-        fill="none"
-        stroke="#00A137"
-        strokeWidth="4"
-      />
-      <path
-        d="M16 4 L16 -1 L21 4"
-        fill="none"
-        stroke="#00A137"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <rect width="32" height="32" rx="8" fill="#0A0A0A" />
+      <text
+        x="5"
+        y="24"
+        fontFamily="Montserrat, Arial, sans-serif"
+        fontWeight="800"
+        fontSize="22"
+        fill="#FFFFFF"
+        letterSpacing="-1"
+      >P</text>
     </svg>
   );
 }
+
+/** @deprecated Use PitziLogoIcon */
+export const RenovLogoIcon = PitziLogoIcon;
