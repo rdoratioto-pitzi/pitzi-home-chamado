@@ -15,6 +15,27 @@ if (API_BASE) {
   };
 }
 
+// ─── Token sessionStorage (fallback para cookies cross-origin bloqueados) ───
+const TOKEN_KEY = "pitzi_access_token";
+
+export function getStoredToken(): string | null {
+  try { return sessionStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+
+export function setStoredToken(token: string): void {
+  try { sessionStorage.setItem(TOKEN_KEY, token); } catch {}
+}
+
+export function clearStoredToken(): void {
+  try { sessionStorage.removeItem(TOKEN_KEY); } catch {}
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getStoredToken();
+  return token ? { "Authorization": `Bearer ${token}` } : {};
+}
+
+// ─── Unauthorized handling ───────────────────────────────────────────────────
 let _handlingUnauthorized = false;
 
 async function tryRefreshToken(): Promise<boolean> {
@@ -22,16 +43,24 @@ async function tryRefreshToken(): Promise<boolean> {
     const res = await fetch(`${API_BASE}/api/auth/refresh`, {
       method: "POST",
       credentials: "include",
+      headers: authHeaders(),
     });
-    return res.ok;
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data?.accessToken) {
+        setStoredToken(data.accessToken);
+      }
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
 }
 
 // Verifica com /api/auth/me antes de redirecionar para /login.
-// Isso evita que um 401 transitório (race condition, cookie cross-origin
-// não enviado na primeira requisição, etc.) derrube usuários autenticados.
+// Evita que um 401 transitório (cookie cross-origin bloqueado, race
+// condition) derrube usuários com sessão ainda válida.
 function handleUnauthorized() {
   const base = import.meta.env.BASE_URL.replace(/\/$/, "");
   const loginPath = base + "/login";
@@ -39,18 +68,22 @@ function handleUnauthorized() {
   if (_handlingUnauthorized) return;
   _handlingUnauthorized = true;
 
-  fetch(`${API_BASE}/api/auth/me`, { credentials: "include" })
+  fetch(`${API_BASE}/api/auth/me`, {
+    credentials: "include",
+    headers: authHeaders(),
+  })
     .then((res) => (res.ok ? res.json() : null))
     .then((data) => {
       if (data?.user) {
         // Sessão ainda válida — 401 foi transitório, não redirecionar
         _handlingUnauthorized = false;
       } else {
+        clearStoredToken();
         window.location.href = loginPath;
       }
     })
     .catch(() => {
-      // Falha de rede — não redirecionar (pode ser temporário)
+      // Falha de rede — não redirecionar
       _handlingUnauthorized = false;
     });
 }
@@ -66,11 +99,11 @@ async function throwIfResNotOk(res: Response) {
 }
 
 /**
- * Wrapper para fetch que envia cookies automaticamente.
- * Substitui o antigo fetchWithAuth (que injetava Bearer token).
+ * Wrapper para fetch que envia cookies + Authorization header automaticamente.
  */
 export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const headers: Record<string, string> = {
+    ...authHeaders(),
     ...(options.headers as Record<string, string> || {}),
   };
 
@@ -93,7 +126,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
       response = await fetch(fullUrl, {
         ...options,
         credentials: "include",
-        headers,
+        headers: { ...authHeaders(), ...(options.headers as Record<string, string> || {}) },
       });
     }
     if (response.status === 401) {
@@ -109,7 +142,9 @@ export async function apiRequest(
   url: string,
   data?: unknown,
 ): Promise<Response> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    ...authHeaders(),
+  };
 
   if (data) {
     headers["Content-Type"] = "application/json";
@@ -130,7 +165,7 @@ export async function apiRequest(
     if (refreshed) {
       res = await fetch(fullUrl, {
         method,
-        headers,
+        headers: { ...authHeaders(), ...(data ? { "Content-Type": "application/json" } : {}) },
         body: data ? JSON.stringify(data) : undefined,
         credentials: "include",
       });
@@ -152,13 +187,17 @@ export const getQueryFn: <T>(options: {
 
     let res = await fetch(fullUrl, {
       credentials: "include",
+      headers: authHeaders(),
     });
 
     // On 401, try refresh then retry
     if (res.status === 401 && !url.includes("/api/auth/")) {
       const refreshed = await tryRefreshToken();
       if (refreshed) {
-        res = await fetch(fullUrl, { credentials: "include" });
+        res = await fetch(fullUrl, {
+          credentials: "include",
+          headers: authHeaders(),
+        });
       }
     }
 

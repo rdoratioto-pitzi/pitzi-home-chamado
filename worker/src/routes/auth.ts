@@ -71,6 +71,7 @@ auth.post("/api/auth/login", async (c) => {
 
   return c.json({
     success: true,
+    accessToken,
     user: {
       id: user.id,
       name: user.name,
@@ -176,7 +177,7 @@ auth.post("/api/auth/refresh", async (c) => {
     maxAge: 2 * 60 * 60,
   });
 
-  return c.json({ success: true });
+  return c.json({ success: true, accessToken: newAccessToken });
 });
 
 // ─── POST /api/auth/logout ──────────────────────────────────────

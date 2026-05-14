@@ -62,6 +62,13 @@ function matchesRoute(
   });
 }
 
+// Extrai token do header Authorization: Bearer <token>
+function getBearerToken(c: Context): string | null {
+  const auth = c.req.header("Authorization");
+  if (!auth?.startsWith("Bearer ")) return null;
+  return auth.slice(7);
+}
+
 export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const method = c.req.method;
   const path = c.req.path;
@@ -95,8 +102,9 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
     return next();
   }
 
-  // Try to extract and verify access token
-  const token = getAccessTokenFromCookie(c);
+  // Aceita cookie OU Authorization: Bearer — necessário para CORS cross-domain
+  // onde browsers modernos bloqueiam cookies SameSite=None de terceiros.
+  const token = getAccessTokenFromCookie(c) || getBearerToken(c);
 
   // Optional auth routes — proceed even without token
   if (matchesRoute(method, path, OPTIONAL_AUTH_ROUTES)) {

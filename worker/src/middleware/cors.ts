@@ -9,7 +9,7 @@ export function createCorsMiddleware(): MiddlewareHandler<AppEnv> {
       origin: (requestOrigin) =>
         allowedOrigins.includes(requestOrigin) ? requestOrigin : allowedOrigins[0],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type", "X-Claude-Usage-Secret"],
+      allowHeaders: ["Content-Type", "X-Claude-Usage-Secret", "Authorization"],
       credentials: true,
       maxAge: 86400,
     });
