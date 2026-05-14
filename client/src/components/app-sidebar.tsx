@@ -109,6 +109,7 @@ const workspaceSubItems = [
   { title: "Reuniões", url: "/reunioes", icon: Video },
   { title: "Fluxogramas", url: "/fluxogramas", icon: Workflow },
   { title: "Diagramas", url: "/diagramas", icon: PenLine },
+  { title: "Markdown", url: "/markdown", icon: FileText },
 ];
 
 const metasSubItems = [

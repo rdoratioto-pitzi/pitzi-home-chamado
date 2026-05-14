@@ -81,6 +81,7 @@ const FluxogramasPage                  = lazy(() => import("@/pages/fluxogramas/
 const FlowchartEditorPage              = lazy(() => import("@/pages/fluxogramas/editor"));
 const DiagramasPage                    = lazy(() => import("@/pages/diagramas/index"));
 const DiagramaEditorPage               = lazy(() => import("@/pages/diagramas/editor"));
+const MarkdownPage                     = lazy(() => import("@/pages/markdown/index"));
 const UpdatesPage                      = lazy(() => import("@/pages/updates/index"));
 const GitAnalyticsPage                 = lazy(() => import("@/pages/git-analytics/index"));
 const EstoquesPosicaoPage              = lazy(() => import("@/pages/estoques/posicao"));
@@ -178,6 +179,11 @@ function Router() {
       <Route path="/reunioes/:id">
         <ProtectedRoute requiredPermission="reunioes">
           <MeetingDetailPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/markdown">
+        <ProtectedRoute>
+          <MarkdownPage />
         </ProtectedRoute>
       </Route>
       <Route path="/fluxogramas">
