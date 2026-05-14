@@ -208,8 +208,9 @@ gitAnalytics.get("/api/git-analytics/developer-tokens", async (c) => {
   const startDate = startDateStr ? new Date(startDateStr) : new Date(now.getFullYear(), now.getMonth(), 1);
   const endDate = endDateStr ? new Date(endDateStr) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-  // Import pure data module
-  const { DEVELOPER_KEYS, getAllDevelopers } = await import("../../../server/config/openrouter-keys");
+  // openrouter-keys.ts é gitignored (contém keys reais) — usa defaults vazios
+  const DEVELOPER_KEYS: Record<string, Array<{ keyName: string; apiKey: string }>> = {};
+  const getAllDevelopers = () => [] as string[];
 
   // Claude Code usage from DB
   const claudeRows = await storage.getClaudeCodeUsageByPeriod(startDate, endDate);
