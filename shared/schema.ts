@@ -1770,7 +1770,7 @@ export type InsertComercialKpi = z.infer<typeof insertComercialKpiSchema>;
 export type ComercialKpi = typeof comercialKpis.$inferSelect;
 
 // ============== SLACK THREAD MAPPING ==============
-// Mapeia 1 entidade do Renov Home (chamado/projeto) → 1 thread no Slack.
+// Mapeia 1 entidade do Pitzi Home (chamado/projeto) → 1 thread no Slack.
 // Idempotência: garante que cada CHA-XXXX e PRO-XXXX tenha exatamente uma
 // mensagem-mãe no canal #devs-renov, e que updates (replies, reações) usem
 // sempre o mesmo thread_ts. Atividades (kanban_cards) NÃO têm linha aqui —

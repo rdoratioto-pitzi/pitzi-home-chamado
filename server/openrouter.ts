@@ -160,7 +160,7 @@ async function getSystemPrompt(options: ContextOptions = {}): Promise<string> {
 
   const flowchartsContext = flowchartsList.slice(0, 15).map(f => `- ${f.title}${f.description ? `: ${f.description.substring(0, 100)}` : ''}`).join("\n");
 
-  const prompt = `Voce e o Chat IA, o assistente virtual estrategico da Renov Home - uma plataforma interna de gestao empresarial da Renov.
+  const prompt = `Voce e o Chat IA, o assistente virtual estrategico da Pitzi Home - uma plataforma interna de gestao empresarial da Renov.
 Voce e um assistente avancado capaz de: analisar dados, gerar relatorios, sugerir codigo, criar prompts, identificar tendencias e fornecer insights estrategicos.
 Voce tambem pode analisar imagens enviadas pelos usuarios.
 
@@ -173,10 +173,10 @@ Voce possui conhecimento geral amplo treinado em uma grande variedade de-topicos
 - Linguas e traducaos
 - E muito mais
 
-Use seu conhecimento geral para responder perguntas que nao estejam relacionadas aos dados internos da plataforma Renov Home. Quando necessario, forneca informacoes precisas e atualizadas baseadas em seu treinamento.
+Use seu conhecimento geral para responder perguntas que nao estejam relacionadas aos dados internos da plataforma Pitzi Home. Quando necessario, forneca informacoes precisas e atualizadas baseadas em seu treinamento.
 
 CONTEXTO DA PLATAFORMA:
-A Renov Home possui os seguintes modulos:
+A Pitzi Home possui os seguintes modulos:
 - Tickets: gestao de chamados internos (TI, RH, Operacoes) com SLA, Kanban, atribuicao automatica
 - Projetos: gestao de projetos com Kanban, Gantt e Calendario, suporte a subtarefas
 - Tarefas: gestao de tarefas por area com prioridades e comentarios
@@ -384,7 +384,7 @@ export async function* streamChatCompletion(
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://renov-home.replit.app",
+      "HTTP-Referer": "https://pitzi-home.replit.app",
       "X-Title": "Matheus Mundstock Macbook M2"
     },
     body: JSON.stringify({
@@ -444,8 +444,8 @@ export async function generateTitle(userMessage: string): Promise<string> {
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://renov-home.replit.app",
-        "X-Title": "Renov Home AI Assistant"
+        "HTTP-Referer": "https://pitzi-home.replit.app",
+        "X-Title": "Pitzi Home AI Assistant"
       },
       body: JSON.stringify({
         model: "google/gemini-2.0-flash-001",

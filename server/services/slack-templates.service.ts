@@ -22,12 +22,12 @@ import type { SlackBlock } from "./slack.service";
  * Fallback defensivo para `baseUrl`. Em runtime sempre deve vir um valor
  * concreto via `env.APP_URL`; este default só protege contra config faltando.
  */
-const APP_BASE_URL_FALLBACK = "https://home.renovsmart.com.br";
+const APP_BASE_URL_FALLBACK = "https://rdoratioto-pitzi.github.io/pitzi-home-chamado";
 
 export type EntityType = "chamado" | "projeto" | "atividade";
 
 /**
- * Constrói URL canônica para uma entidade no Renov Home. Os paths refletem
+ * Constrói URL canônica para uma entidade no Pitzi Home. Os paths refletem
  * as rotas reais do frontend (`client/src/App.tsx`):
  *  - chamado   → /chamados/<uuid>           (`pages/chamados/[id].tsx`)
  *  - projeto   → /projetos/<uuid>           (`pages/projetos/kanban.tsx`)
@@ -173,7 +173,7 @@ export function buildChamadoCriadoBlocks(input: ChamadoCriadoInput): {
       elements: [
         {
           type: "button",
-          text: { type: "plain_text", text: "Ver no Renov Home", emoji: true },
+          text: { type: "plain_text", text: "Ver no Pitzi Home", emoji: true },
           url,
           style: "primary",
         },

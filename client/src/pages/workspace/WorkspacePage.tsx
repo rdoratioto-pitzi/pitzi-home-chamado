@@ -148,7 +148,7 @@ export default function WorkspacePage() {
       <PageHeader
         title="Workspace"
         breadcrumbs={[
-          { label: "Renov Home", href: "/" },
+          { label: "Pitzi Home", href: "/" },
           { label: "Workspace" },
         ]}
         actions={

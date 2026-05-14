@@ -8,7 +8,7 @@ const client = new Anthropic({
 export async function atlas(state: AgentState): Promise<Partial<AgentState>> {
   console.log('\n🗺️  Atlas analisando...\n');
 
-  const prompt = `Você é Atlas, o planejador técnico do sistema Renov Home.
+  const prompt = `Você é Atlas, o planejador técnico do sistema Pitzi Home.
 
 # STACK E PADRÕES DO PROJETO
 

@@ -91,7 +91,7 @@ export function generateICSContent(
   const rawLines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Renov Home//Meeting Invite//PT",
+    "PRODID:-//Pitzi Home//Meeting Invite//PT",
     "CALSCALE:GREGORIAN",
     "METHOD:REQUEST",
     "BEGIN:VEVENT",

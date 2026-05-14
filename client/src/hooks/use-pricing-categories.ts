@@ -7,7 +7,7 @@ export interface PricingCategory {
 
 // Lista de categorias disponíveis na API externa
 // IMPORTANTE: A API externa usa UUIDs para categoryId, não nomes de fabricantes!
-// UUIDs válidos conforme a pasta de teste (teste/renov-home/client/src/lib/pricing-categories.ts):
+// UUIDs válidos conforme a pasta de teste (teste/pitzi-home/client/src/lib/pricing-categories.ts):
 // - d7f3dcd8-ddf9-4750-b1f8-c20a5bc9d345 = iPhone (Apple)
 // - d686a25d-045d-4b8c-9d7c-35a21d29d31b = Android (todas as outras marcas)
 const DEFAULT_CATEGORIES = [

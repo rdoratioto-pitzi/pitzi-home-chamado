@@ -1,10 +1,10 @@
 /**
- * Normalização de dados da API proxy RenovSmart (Lapisco)
+ * Normalização de dados da API proxy Pitzi (Lapisco)
  * Transforma dados por FOTO em dados por DISPOSITIVO
  * Aplica regras POP 101 V3: Grade D → C, granularidade por dispositivo
  */
 
-import type { Grade, FotoArea as FotoAreaType, FotoAvaliacao, TradeInAvaliacao } from "./renovsmart-avaliacoes";
+import type { Grade, FotoArea as FotoAreaType, FotoAvaliacao, TradeInAvaliacao } from "./pitzi-avaliacoes";
 
 // ─── 7-slot photo definitions (ordered) ─────────────────────────────────────
 

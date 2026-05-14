@@ -301,7 +301,7 @@ app.get("/api/test-email-url/:code", (req, res) => {
   const { code } = req.params;
   const baseUrl = process.env.APP_URL
     || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : null)
-    || "https://home.renovsmart.com.br";
+    || "https://rdoratioto-pitzi.github.io/pitzi-home-chamado";
   const ticketUrl = `${baseUrl}/chamados?id=${code}`;
   
   res.json({
@@ -312,7 +312,7 @@ app.get("/api/test-email-url/:code", (req, res) => {
       REPLIT_DEV_DOMAIN: process.env.REPLIT_DEV_DOMAIN || "(não definido)",
       resolvedBaseUrl: baseUrl
     },
-    expectedFormat: "https://home.renovsmart.com.br/chamados?id=CHA-XXXX",
+    expectedFormat: "https://rdoratioto-pitzi.github.io/pitzi-home-chamado/chamados?id=CHA-XXXX",
     isCorrect: ticketUrl.includes("?id=")
   });
 });
@@ -428,7 +428,7 @@ app.post("/api/estoques/dashboard/gerar-estoque", async (req, res) => {
       return res.status(400).json({ success: false, error: "Informe o campo 'imeis' (lista ou string)." });
     }
 
-    const response = await fetch("https://dash.renovsmart.com.br/api/dash_estoque/defeitos", {
+    const response = await fetch("https://dash.pitzi.com.br/api/dash_estoque/defeitos", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

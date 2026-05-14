@@ -1,9 +1,9 @@
 /**
  * Serviço de agregação de dados de triagem
- * Consome os endpoints da API Admin Logística (dash.renovsmart.com.br/api)
+ * Consome os endpoints da API Admin Logística (dash.pitzi.com.br/api)
  */
 
-const PIPELINE_RS_BASE = "https://dash.renovsmart.com.br/api";
+const PIPELINE_RS_BASE = "https://dash.pitzi.com.br/api";
 const PIPELINE_RS_TOKEN = "Renov123";
 
 // ─── Fetch helper ──────────────────────────────────────────────────────────────

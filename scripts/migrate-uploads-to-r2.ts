@@ -8,13 +8,13 @@
 import fs from "fs";
 import path from "path";
 
-const WORKER_API = "https://homeapi.renovsmart.com.br";
+const WORKER_API = "https://pitzi-home-api.workers.dev";
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 const COOKIE = process.env.COOKIE; // "access_token=eyJ..."
 
 if (!COOKIE) {
   console.error("Usage: COOKIE='access_token=<JWT>' npx tsx scripts/migrate-uploads-to-r2.ts");
-  console.error("Get the JWT by logging into home-next.renovsmart.com.br and copying the access_token cookie.");
+  console.error("Get the JWT by logging into home-next.pitzi.com.br and copying the access_token cookie.");
   process.exit(1);
 }
 

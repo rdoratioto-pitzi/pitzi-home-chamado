@@ -12,7 +12,7 @@ import {
 
 // ─── Constants & helpers (duplicados do service para isolamento do worker) ────
 
-const PIPELINE_RS_BASE = "https://dash.renovsmart.com.br/api";
+const PIPELINE_RS_BASE = "https://dash.pitzi.com.br/api";
 const DESCONTO_POR_GRADE: Record<string, number> = { A: 0, B: 0.25, C: 0.70 };
 
 type Grade = "A" | "B" | "C";
@@ -489,7 +489,7 @@ avaliacoes.get("/api/avaliacoes/trade-ins/:tradeInId", async (c) => {
 
 avaliacoes.get("/api/avaliacoes/avaliadores", async (c) => {
   try {
-    // A API RenovSmart não expõe lista de avaliadores — retornar lista vazia
+    // A API Pitzi não expõe lista de avaliadores — retornar lista vazia
     return c.json({ success: true, data: [] });
   } catch (error: unknown) {
     return c.json({ success: false, error: error instanceof Error ? error.message : "Erro interno" }, 500);

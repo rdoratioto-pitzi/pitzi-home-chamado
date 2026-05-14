@@ -43,7 +43,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-const API_BASE_URL = "https://dash.renovsmart.com.br/api/adm_logistica";
+const API_BASE_URL = "https://dash.pitzi.com.br/api/adm_logistica";
 const POSTMAN_DOC_URL = "https://documenter.getpostman.com/view/49982216/2sBXcAJNtS";
 
 interface ConnectionStatus {

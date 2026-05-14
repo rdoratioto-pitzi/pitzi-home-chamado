@@ -26,7 +26,7 @@ export const config = {
 };
 
 console.log('🔧 Configuração dos Agentes:');
-console.log(`   Projeto Renov Home: ${config.paths.renovHome}`);
+console.log(`   Projeto Pitzi Home: ${config.paths.renovHome}`);
 console.log(`   GitHub Repo: ${config.github.repo}`);
 
 if (!config.anthropic.apiKey) {

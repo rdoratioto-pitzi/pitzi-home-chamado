@@ -322,7 +322,7 @@ export default function IndicadoresPage() {
                 <h3 className="font-semibold mb-2">Indicadores de Deflação</h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   Para análise de deflação e variação de preços, acesse os detalhes de um dispositivo específico.
-                  Os dados históricos de preços são obtidos diretamente da API RenovSmart.
+                  Os dados históricos de preços são obtidos diretamente da API Pitzi.
                 </p>
                 <Link href="/pricing">
                   <Button data-testid="button-go-pricing">

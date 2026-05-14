@@ -2,7 +2,7 @@
 /**
  * Pricing Service - Versão Simplificada
  * 
- * Usa apenas o cache da API externa (RenovSmart), como na aplicação de referência.
+ * Usa apenas o cache da API externa (Pitzi), como na aplicação de referência.
  * A lógica de 7 dias é gerenciada pela API externa.
  * 
  * Fluxo:
@@ -12,7 +12,7 @@
  * 4. Retornar produtos + preços para o frontend
  */
 
-const RENOVSMART_API_BASE = "https://rp.renovsmart.com.br/api";
+const RENOVSMART_API_BASE = "https://rp.pitzi.com.br/api";
 
 export interface EligibleDevice {
   categoryId: string;

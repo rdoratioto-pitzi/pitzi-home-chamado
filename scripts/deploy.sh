@@ -24,7 +24,7 @@ fi
 echo "  Todos os assets referenciados existem no build."
 
 echo "→ Deploy Pages (frontend)..."
-npx wrangler pages deploy dist/public --project-name renov-home --commit-dirty=true
+npx wrangler pages deploy dist/public --project-name pitzi-home --commit-dirty=true
 
 echo "→ Deploy Worker (backend)..."
 cd worker && npm install && npx wrangler deploy --env=""

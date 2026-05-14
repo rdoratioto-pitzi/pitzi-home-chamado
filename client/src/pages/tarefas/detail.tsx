@@ -377,7 +377,7 @@ export default function TaskDetailPage() {
     
     doc.setFontSize(18);
     doc.setTextColor(0, 161, 55);
-    doc.text("Renov Home - Agenda de Reunião", 14, 20);
+    doc.text("Pitzi Home - Agenda de Reunião", 14, 20);
     
     doc.setFontSize(14);
     doc.setTextColor(0, 0, 0);

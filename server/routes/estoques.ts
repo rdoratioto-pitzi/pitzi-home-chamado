@@ -1522,7 +1522,7 @@ export function registerEstoqueRoutes(router: Router) {
 
   // ============== PIPELINE DE DISPOSITIVOS ==============
 
-  const PIPELINE_RS_BASE = "https://dash.renovsmart.com.br/api";
+  const PIPELINE_RS_BASE = "https://dash.pitzi.com.br/api";
   const PIPELINE_RS_TOKEN = "Renov123";
 
   async function fetchPipelineApi(path: string, params: Record<string, string> = {}): Promise<any[]> {

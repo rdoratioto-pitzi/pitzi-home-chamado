@@ -11,9 +11,9 @@ import {
 } from "../services/pricing-service";
 
 export function registerPricingRoutes(router: Router) {
-  const RENOVSMART_API_BASE = "https://rp.renovsmart.com.br/api";
+  const RENOVSMART_API_BASE = "https://rp.pitzi.com.br/api";
 
-  // ============== PRICING API PROXY (RenovSmart) ==============
+  // ============== PRICING API PROXY (Pitzi) ==============
   router.get("/api/pricing/eligible-devices", async (req, res) => {
     try {
       const { categoryId, pageNumber = "1", pageSize = "100" } = req.query;
@@ -34,7 +34,7 @@ export function registerPricingRoutes(router: Router) {
         url,
         method: 'GET',
         headers: {
-          'User-Agent': 'RenovSmart-Pricing/1.0',
+          'User-Agent': 'Pitzi-Pricing/1.0',
           'Accept': 'application/json'
         }
       });
@@ -42,7 +42,7 @@ export function registerPricingRoutes(router: Router) {
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'User-Agent': 'RenovSmart-Pricing/1.0',
+          'User-Agent': 'Pitzi-Pricing/1.0',
           'Accept': 'application/json'
         }
       });

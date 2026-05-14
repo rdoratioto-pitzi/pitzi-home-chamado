@@ -407,7 +407,7 @@ export default function LoginPage() {
                           />
                           <Input
                             type="email"
-                            placeholder="seuemail@renovsmart.com.br"
+                            placeholder="seuemail@pitzi.com.br"
                             className={`${darkInputClass} pl-10`}
                             data-testid="input-login-email"
                             onKeyDown={handleEmailKeyDown}
@@ -630,7 +630,7 @@ export default function LoginPage() {
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
                             type="email"
-                            placeholder="seuemail@renovsmart.com.br"
+                            placeholder="seuemail@pitzi.com.br"
                             className="pl-10"
                             data-testid="input-forgot-password-email"
                             aria-label="Email para recuperação de senha"

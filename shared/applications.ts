@@ -22,9 +22,9 @@ export interface Application {
 
 export const APPLICATIONS: Record<string, Application> = {
   // Stack IA
-  "renov-home": {
-    key: "renov-home",
-    label: "Renov Home",
+  "pitzi-home": {
+    key: "pitzi-home",
+    label: "Pitzi Home",
     category: "Stack IA",
     repos: ["Renov-BD/Renov.Home"],
     defaultBranch: "develop",
@@ -50,39 +50,39 @@ export const APPLICATIONS: Record<string, Application> = {
     label: "Renov Smart (RS)",
     category: "Renov Smart (Backend)",
     repos: [
-      "Renov-BD/RenovSmart.Api",
-      "Renov-BD/RenovSmart.Front",
-      "Renov-BD/RenovSmart.Infra",
-      "Renov-BD/RenovSmart.DataLake.Infra",
+      "Renov-BD/Pitzi.Api",
+      "Renov-BD/Pitzi.Front",
+      "Renov-BD/Pitzi.Infra",
+      "Renov-BD/Pitzi.DataLake.Infra",
     ],
     defaultBranch: "main",
   },
   "renov-smart-api": {
     key: "renov-smart-api",
-    label: "RenovSmart API",
+    label: "Pitzi API",
     category: "Renov Smart (Backend)",
-    repos: ["Renov-BD/RenovSmart.Api"],
+    repos: ["Renov-BD/Pitzi.Api"],
     defaultBranch: "main",
   },
   "renov-smart-front": {
     key: "renov-smart-front",
-    label: "RenovSmart Front",
+    label: "Pitzi Front",
     category: "Renov Smart (Backend)",
-    repos: ["Renov-BD/RenovSmart.Front"],
+    repos: ["Renov-BD/Pitzi.Front"],
     defaultBranch: "main",
   },
   "renov-smart-infra": {
     key: "renov-smart-infra",
-    label: "RenovSmart Infra",
+    label: "Pitzi Infra",
     category: "Renov Smart (Backend)",
-    repos: ["Renov-BD/RenovSmart.Infra"],
+    repos: ["Renov-BD/Pitzi.Infra"],
     defaultBranch: "main",
   },
   "renov-smart-datalake": {
     key: "renov-smart-datalake",
-    label: "RenovSmart DataLake",
+    label: "Pitzi DataLake",
     category: "Renov Smart (Backend)",
-    repos: ["Renov-BD/RenovSmart.DataLake.Infra"],
+    repos: ["Renov-BD/Pitzi.DataLake.Infra"],
     defaultBranch: "main",
   },
 
@@ -117,11 +117,11 @@ export const APPLICATIONS: Record<string, Application> = {
     repos: ["Renov-BD/Dashboards"],
     defaultBranch: "main",
   },
-  "renovsmart-com-br": {
-    key: "renovsmart-com-br",
-    label: "renovsmart.com.br",
+  "pitzi-com-br": {
+    key: "pitzi-com-br",
+    label: "pitzi.com.br",
     category: "Dashboard & Site",
-    repos: ["Renov-BD/renovsmart.com.br"],
+    repos: ["Renov-BD/pitzi.com.br"],
     defaultBranch: "main",
   },
 

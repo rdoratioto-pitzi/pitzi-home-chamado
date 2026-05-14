@@ -1,7 +1,7 @@
 /**
  * server/services/slack-notifier.service.ts
  *
- * Orquestração entre eventos do Renov Home e o Slack. Esta é a camada que
+ * Orquestração entre eventos do Pitzi Home e o Slack. Esta é a camada que
  * os hooks das rotas chamam (em Express e em Cloudflare Worker). Lida com:
  *  - Buscar/criar mapping na tabela slack_thread_mapping (idempotência)
  *  - Decidir entre mensagem-mãe vs reply em thread

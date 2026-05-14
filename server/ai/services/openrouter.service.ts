@@ -58,7 +58,7 @@ class OpenRouterService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`,
-          'HTTP-Referer': 'https://renovsmart.com.br',
+          'HTTP-Referer': 'https://pitzi.com.br',
           'X-Title': 'Renov AI Dev System',
         },
         body: JSON.stringify({

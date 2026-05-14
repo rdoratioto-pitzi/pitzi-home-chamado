@@ -1,5 +1,5 @@
 /**
- * Email service for Cloudflare Workers — Renov Home
+ * Email service for Cloudflare Workers — Pitzi Home
  *
  * Replaces server/email-service.ts (nodemailer/SMTP) with SendPulse REST API.
  * All 15 exported email functions are faithfully reproduced.
@@ -156,7 +156,7 @@ export async function sendPasswordResetEmail(
     title: "Redefinicao de Senha",
     greeting: `Ola ${user.name},`,
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Recebemos uma solicitacao para redefinir sua senha no Renov Home.</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Recebemos uma solicitacao para redefinir sua senha no Pitzi Home.</p>
       ${sectionCard(`
         <div style="text-align:center;">
           <p style="color:#64748b;font-size:13px;margin:0 0 8px;">Sua nova senha temporaria</p>
@@ -173,7 +173,7 @@ export async function sendPasswordResetEmail(
   try {
     await sendMail(env, {
       to: [{ name: user.name, email: user.email }],
-      subject: "Renov Home - Redefinicao de Senha",
+      subject: "Pitzi Home - Redefinicao de Senha",
       html,
     });
     logEmailSent("password_reset", [user.email]);
@@ -191,13 +191,13 @@ export async function sendWelcomeEmail(
   initialPassword: string
 ): Promise<{ success: boolean; error?: string }> {
   const html = emailTemplate({
-    title: "Bem-vindo ao Renov Home",
+    title: "Bem-vindo ao Pitzi Home",
     greeting: `Ola <strong>${user.name}</strong>,`,
     body: `
       <p style="color:#334155;font-size:15px;line-height:1.6;">Voce foi cadastrado na plataforma interna de gestao da Renov. Abaixo estao suas informacoes de acesso:</p>
       ${sectionCard(`
         ${infoTable([
-          { label: "Link", value: `<a href="https://home.renovsmart.com.br/" style="color:#00A137;font-weight:600;">home.renovsmart.com.br</a>` },
+          { label: "Link", value: `<a href="https://rdoratioto-pitzi.github.io/pitzi-home-chamado/" style="color:#00A137;font-weight:600;">rdoratioto-pitzi.github.io/pitzi-home-chamado</a>` },
           { label: "E-mail", value: user.email },
           { label: "Senha inicial", value: `<code style="background:#e8f5e9;padding:4px 8px;border-radius:4px;font-weight:600;">${initialPassword}</code>` },
         ])}
@@ -211,7 +211,7 @@ export async function sendWelcomeEmail(
   try {
     await sendMail(env, {
       to: [{ name: user.name, email: user.email }],
-      subject: "Bem-vindo ao Renov Home - Acesso ao Sistema",
+      subject: "Bem-vindo ao Pitzi Home - Acesso ao Sistema",
       html,
     });
     logEmailSent("welcome", [user.email]);
@@ -256,7 +256,7 @@ export async function sendTicketCreatedEmail(
     subtitle: `${ticket.code} - ${ticket.title}`,
     breadcrumbParts: ["Chamados", ticket.code, "Criado"],
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Um novo chamado foi aberto no Renov Home:</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Um novo chamado foi aberto no Pitzi Home:</p>
       ${actionBy(requester.name, "abriu este chamado", ticket.dataAbertura || new Date())}
       ${sectionCard(`
         <div style="font-weight:700;font-size:16px;color:#1a1a2e;margin-bottom:16px;">${ticket.code} — ${ticket.title}</div>
@@ -314,7 +314,7 @@ export async function sendTicketAssignedEmail(
     breadcrumbParts: ["Chamados", ticket.code, "Atribuicao"],
     greeting: `Ola ${assignee.name},`,
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Um chamado foi atribuido a voce no Renov Home:</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Um chamado foi atribuido a voce no Pitzi Home:</p>
       ${sectionCard(`
         <div style="font-weight:700;font-size:16px;color:#1a1a2e;margin-bottom:16px;">${ticket.code} — ${ticket.title}</div>
         ${infoTable([
@@ -822,7 +822,7 @@ export async function sendMeetingInviteEmail(
     subtitle: task.title,
     breadcrumbParts: ["Reunioes", task.title],
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Voce foi convidado(a) para uma reuniao no Renov Home:</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Voce foi convidado(a) para uma reuniao no Pitzi Home:</p>
       ${actionBy(organizer.name, "organizou esta reuniao")}
       ${sectionCard(`
         <div style="font-weight:700;font-size:16px;color:#1a1a2e;margin-bottom:16px;">${task.title}</div>
@@ -836,7 +836,7 @@ export async function sendMeetingInviteEmail(
       ${meetingData.agenda ? sectionCard(`<div style="color:#64748b;font-size:13px;line-height:1.6;white-space:pre-wrap;">${meetingData.agenda}</div>`, "Pauta") : ""}
       <p style="margin-top:16px;font-size:13px;color:#64748b;">O arquivo de calendario (.ics) esta anexado a este e-mail. Voce pode adiciona-lo diretamente a sua agenda.</p>
     `,
-    ctaText: "Ver no Renov Home",
+    ctaText: "Ver no Pitzi Home",
     ctaUrl: `${env.APP_URL}/tarefas`,
   });
 
@@ -915,7 +915,7 @@ export async function sendMeetingUpdatedEmail(
         ])}
       `)}
     `,
-    ctaText: "Ver no Renov Home",
+    ctaText: "Ver no Pitzi Home",
     ctaUrl: `${env.APP_URL}/tarefas`,
   });
 

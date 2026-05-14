@@ -1,5 +1,5 @@
 export const renovHomeContext = `
-# Renov Home - Contexto do Projeto
+# Pitzi Home - Contexto do Projeto
 
 ## Stack Tecnológica
 - **Frontend**: React 18 + TypeScript + Wouter + TanStack Query

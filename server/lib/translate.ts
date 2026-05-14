@@ -48,8 +48,8 @@ REGRAS:
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://home.renovsmart.com.br",
-        "X-Title": "Renov Home - Tradutor de Prompts"
+        "HTTP-Referer": "https://rdoratioto-pitzi.github.io/pitzi-home-chamado",
+        "X-Title": "Pitzi Home - Tradutor de Prompts"
       },
       body: JSON.stringify({
         model: "anthropic/claude-3.5-sonnet",

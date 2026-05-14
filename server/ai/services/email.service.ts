@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 function getBaseUrl(): string {
   if (process.env.APP_URL) return process.env.APP_URL;
   if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  return "https://home.renovsmart.com.br";
+  return "https://rdoratioto-pitzi.github.io/pitzi-home-chamado";
 }
 
 export class AIEmailService {
@@ -43,7 +43,7 @@ export class AIEmailService {
             <p><strong>⏱️ Tempo:</strong> ${Math.round(params.tempoTotal / 60)}min</p>
             <p><strong>💰 Custo:</strong> $${params.custoTotal.toFixed(2)}</p>
             <p><strong>📁 Arquivos:</strong> ${params.arquivosModificados.length}</p>
-            <a href="${baseUrl}" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px;">Acessar Renov Home</a>
+            <a href="${baseUrl}" style="display: inline-block; background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px;">Acessar Pitzi Home</a>
           </div>
         </div>
       </body>

@@ -498,7 +498,7 @@ export class DatabaseStorage implements IStorage {
     return {
       id: "mock-admin-id",
       name: "Matheus",
-      email: "Matheus@renovsmart.com.br",
+      email: "Matheus@pitzi.com.br",
       password: "MOCK_PASSWORD_DO_NOT_USE",
       isAdmin: true,
       perfilAcesso: "diretor",
