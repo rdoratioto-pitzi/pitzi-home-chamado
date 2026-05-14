@@ -5,7 +5,10 @@ import { readFileSync } from "fs";
 
 const pkg = JSON.parse(readFileSync(path.resolve(import.meta.dirname, "package.json"), "utf-8"));
 
+const isProduction = process.env.NODE_ENV === "production";
+
 export default defineConfig({
+  base: isProduction ? "/pitzi-home-chamado/" : "/",
   plugins: [react(), {
     name: 'inject-build-timestamp',
     transformIndexHtml(html) {
