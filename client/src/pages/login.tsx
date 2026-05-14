@@ -109,7 +109,7 @@ function PhonePatternIcon({ className, style, size = 60, rotate = 0 }: {
 
 // Dark input classes — always dark regardless of app theme
 const darkInputClass =
-  "h-[52px] bg-white/[0.08] border-white/[0.12] rounded-xl text-white placeholder:text-white/30 focus-visible:ring-1 focus-visible:ring-[#00A137] focus-visible:border-[#00A137] text-sm";
+  "h-[52px] bg-black/[0.05] border-black/[0.10] rounded-xl text-gray-900 placeholder:text-black/30 focus-visible:ring-1 focus-visible:ring-[#3B42DE] focus-visible:border-[#3B42DE] text-sm";
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -240,7 +240,7 @@ export default function LoginPage() {
   const passwordValue = form.watch("password");
 
   return (
-    <div className="min-h-screen flex" style={{ background: "#0A0A0A" }}>
+    <div className="min-h-screen flex" style={{ background: "#FFFFFF" }}>
 
       {/* Login success overlay */}
       <AnimatePresence>
@@ -257,7 +257,7 @@ export default function LoginPage() {
               animate={{ scale: 1 }}
               transition={{ type: "spring", damping: 15, stiffness: 300 }}
             >
-              <CheckCircle2 className="w-24 h-24" style={{ color: "#00A137" }} />
+              <CheckCircle2 className="w-24 h-24" style={{ color: "#3B42DE" }} />
             </motion.div>
           </motion.div>
         )}
@@ -310,7 +310,7 @@ export default function LoginPage() {
       {/* ── RIGHT PANEL — Form ── */}
       <div
         className="flex-1 flex flex-col items-center justify-center px-6 md:px-14"
-        style={{ background: "#0A0A0A", minHeight: "100vh" }}
+        style={{ background: "#FFFFFF", minHeight: "100vh" }}
       >
         <motion.div
           variants={containerVariants}
@@ -331,7 +331,7 @@ export default function LoginPage() {
           {/* Heading */}
           <motion.div variants={itemVariants} className="mb-8">
             <h1
-              className="text-white font-bold mb-1"
+              className="text-gray-900 font-bold mb-1"
               style={{
                 fontFamily: "Montserrat, sans-serif",
                 fontSize: "24px",
@@ -344,7 +344,7 @@ export default function LoginPage() {
                 fontFamily: "Montserrat, sans-serif",
                 fontSize: "14px",
                 fontWeight: 400,
-                color: "rgba(255,255,255,0.5)",
+                color: "rgba(0,0,0,0.5)",
               }}
             >
               Faça login para continuar
@@ -369,7 +369,7 @@ export default function LoginPage() {
                           fontWeight: 600,
                           letterSpacing: "0.6px",
                           textTransform: "uppercase",
-                          color: "rgba(255,255,255,0.5)",
+                          color: "rgba(0,0,0,0.5)",
                         }}
                       >
                         Email
@@ -378,7 +378,7 @@ export default function LoginPage() {
                         <div className="relative">
                           <Mail
                             className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 pointer-events-none"
-                            style={{ color: "rgba(255,255,255,0.35)" }}
+                            style={{ color: "rgba(0,0,0,0.35)" }}
                           />
                           <Input
                             type="email"
@@ -417,7 +417,7 @@ export default function LoginPage() {
                             fontWeight: 600,
                             letterSpacing: "0.6px",
                             textTransform: "uppercase",
-                            color: "rgba(255,255,255,0.5)",
+                            color: "rgba(0,0,0,0.5)",
                           }}
                         >
                           Senha
@@ -425,13 +425,13 @@ export default function LoginPage() {
                         <button
                           type="button"
                           className="transition-colors duration-150 hover:underline underline-offset-4"
-                          style={{ fontSize: "11px", color: "rgba(255,255,255,0.5)" }}
+                          style={{ fontSize: "11px", color: "rgba(0,0,0,0.5)" }}
                           data-testid="button-forgot-password"
                           onClick={handleOpenForgotPassword}
                           aria-label="Esqueceu sua senha? Clique para recuperar"
-                          onMouseEnter={(e) => (e.currentTarget.style.color = "#00A137")}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "#3B42DE")}
                           onMouseLeave={(e) =>
-                            (e.currentTarget.style.color = "rgba(255,255,255,0.5)")
+                            (e.currentTarget.style.color = "rgba(0,0,0,0.5)")
                           }
                         >
                           Esqueceu a senha?
@@ -489,7 +489,7 @@ export default function LoginPage() {
                         className="font-normal cursor-pointer select-none"
                         style={{
                           fontSize: "13px",
-                          color: "rgba(255,255,255,0.7)",
+                          color: "rgba(0,0,0,0.7)",
                         }}
                       >
                         Lembrar-me
@@ -508,7 +508,7 @@ export default function LoginPage() {
                   aria-busy={isLoading}
                   className="w-full font-semibold text-white transition-colors duration-200 rounded-xl"
                   style={{
-                    background: "#00A137",
+                    background: "#3B42DE",
                     height: "48px",
                     fontSize: "16px",
                     fontWeight: 600,
@@ -517,11 +517,11 @@ export default function LoginPage() {
                   }}
                   onMouseEnter={(e) => {
                     if (!isLoading)
-                      (e.currentTarget as HTMLButtonElement).style.background = "#068130";
+                      (e.currentTarget as HTMLButtonElement).style.background = "#2B32C4";
                   }}
                   onMouseLeave={(e) => {
                     if (!isLoading)
-                      (e.currentTarget as HTMLButtonElement).style.background = "#00A137";
+                      (e.currentTarget as HTMLButtonElement).style.background = "#3B42DE";
                   }}
                 >
                   {isLoading ? (
@@ -571,9 +571,9 @@ export default function LoginPage() {
                 animate={{ scale: 1 }}
                 transition={{ type: "spring", damping: 15, stiffness: 300, delay: 0.1 }}
                 className="flex items-center justify-center w-16 h-16 rounded-full"
-                style={{ background: "rgba(0,161,55,0.1)" }}
+                style={{ background: "rgba(59,66,222,0.1)" }}
               >
-                <Mail className="w-8 h-8" style={{ color: "#00A137" }} />
+                <Mail className="w-8 h-8" style={{ color: "#3B42DE" }} />
               </motion.div>
               <div className="text-center space-y-2">
                 <p className="text-sm text-muted-foreground">
