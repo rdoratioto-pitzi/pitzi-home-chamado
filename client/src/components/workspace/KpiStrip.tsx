@@ -41,8 +41,8 @@ function getKpiItems(kpis: WorkspaceKpis, variant: string): KpiItem[] {
       { label: "Abertos", value: kpis.abertos },
       { label: "Em Andamento", value: kpis.andamento },
       { label: "Bloqueados", value: kpis.bloqueados, negativeWhen: (v) => v > 0 },
-      { label: "Resolvidos", value: kpis.resolvidos, color: "#00c853" },
-      { label: "No Prazo", value: kpis.noPrazo, color: "#00c853" },
+      { label: "Resolvidos", value: kpis.resolvidos, color: "#5B62EC" },
+      { label: "No Prazo", value: kpis.noPrazo, color: "#5B62EC" },
       { label: "Em Atraso", value: kpis.emAtraso, negativeWhen: (v) => v > 0 },
     ];
   }
@@ -52,7 +52,7 @@ function getKpiItems(kpis: WorkspaceKpis, variant: string): KpiItem[] {
       { label: "Proj. Ativos", value: kpis.total, isFirst: true },
       { label: "Tarefas Abertas", value: kpis.abertos },
       { label: "Em Andamento", value: kpis.andamento },
-      { label: "Concluídas", value: kpis.resolvidos, color: "#00c853" },
+      { label: "Concluídas", value: kpis.resolvidos, color: "#5B62EC" },
       { label: "Atrasadas", value: kpis.emAtraso, negativeWhen: (v) => v > 0 },
     ];
   }
@@ -63,8 +63,8 @@ function getKpiItems(kpis: WorkspaceKpis, variant: string): KpiItem[] {
     { label: "Chamados", value: kpis.chamados ?? 0 },
     { label: "Tarefas", value: kpis.tarefas ?? 0 },
     { label: "Em Andamento", value: kpis.andamento },
-    { label: "Resolvidos", value: kpis.resolvidos, color: "#00c853" },
-    { label: "No Prazo", value: kpis.noPrazo, color: "#00c853" },
+    { label: "Resolvidos", value: kpis.resolvidos, color: "#5B62EC" },
+    { label: "No Prazo", value: kpis.noPrazo, color: "#5B62EC" },
     { label: "Em Atraso", value: kpis.emAtraso, negativeWhen: (v) => v > 0 },
   ];
 }
@@ -109,7 +109,7 @@ export function KpiStrip({ kpis, variant, loading, activeKpi, onKpiClick }: KpiS
             style={{
               cursor: isClickable ? "pointer" : "default",
               borderLeft: item.isFirst
-                ? `2px solid ${isActive ? "#00e676" : "#00c853"}`
+                ? `2px solid ${isActive ? "#7B80F0" : "#5B62EC"}`
                 : isActive
                 ? "2px solid rgba(0,200,83,0.5)"
                 : undefined,
@@ -119,7 +119,7 @@ export function KpiStrip({ kpis, variant, loading, activeKpi, onKpiClick }: KpiS
                 ? "var(--bg3)"
                 : undefined,
               borderRadius: item.isFirst ? "4px 0 0 4px" : undefined,
-              outline: isActive && !item.isFirst ? "1px solid rgba(0,200,83,0.3)" : undefined,
+              outline: isActive && !item.isFirst ? "1px solid rgba(59,66,222,0.3)" : undefined,
               transition: "background 0.15s, outline 0.15s",
             }}
           >

@@ -163,8 +163,8 @@ export function ChamadosView() {
               onClick={() => setPeriodo(p)}
               className="px-3 py-1.5 text-xs font-medium transition-colors"
               style={{
-                background: periodo === p ? "rgba(0,200,83,0.15)" : "transparent",
-                color: periodo === p ? "#00c853" : "var(--l2)",
+                background: periodo === p ? "rgba(59,66,222,0.15)" : "transparent",
+                color: periodo === p ? "#5B62EC" : "var(--l2)",
               }}
             >
               {periodLabels[p]}
@@ -217,8 +217,8 @@ export function ChamadosView() {
               onClick={() => setViewMode(mode)}
               className="p-1.5 transition-colors"
               style={{
-                background: viewMode === mode ? "rgba(0,200,83,0.15)" : "transparent",
-                color: viewMode === mode ? "#00c853" : "var(--l3)",
+                background: viewMode === mode ? "rgba(59,66,222,0.15)" : "transparent",
+                color: viewMode === mode ? "#5B62EC" : "var(--l3)",
               }}
               title={mode.charAt(0).toUpperCase() + mode.slice(1)}
             >

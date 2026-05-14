@@ -14,7 +14,7 @@
   --popover: 0 0% 100%;
   --popover-foreground: 222 47% 11%;
 
-  --primary: 140.5 100% 31.6%;
+  --primary: 237 71% 55%;
   --primary-foreground: 210 40% 98%;
 
   --secondary: 0 0% 96.1%;
@@ -31,7 +31,7 @@
 
   --border: 0 0% 92%;
   --input: 0 0% 92%;
-  --ring: 140.5 100% 31.6%;
+  --ring: 237 71% 55%;
 
   --radius: 0.75rem;
   --renov-version: 1;
@@ -40,12 +40,12 @@
 
   --sidebar: 0 0% 98%;
   --sidebar-foreground: 215 25% 27%;
-  --sidebar-primary: 140.5 100% 31.6%;
+  --sidebar-primary: 237 71% 55%;
   --sidebar-accent: 0 0% 96.1%;
-  --sidebar-accent-foreground: 140.5 100% 25%;
+  --sidebar-accent-foreground: 237 71% 40%;
   --sidebar-border: 0 0% 92%;
 
-  /* Renov Brand Tokens — Label Colors (Apple HIG) */
+  /* Pitzi Brand Tokens — Label Colors (Apple HIG) */
   --l1: rgba(0,0,0,0.88);
   --l2: rgba(0,0,0,0.56);
   --l3: rgba(0,0,0,0.38);
@@ -61,12 +61,12 @@
   /* Separator */
   --sep: rgba(0,0,0,0.08);
 
-  /* Verde Palette */
-  --vb: #00A137;
-  --ve: #048E33;
-  --vf: #068130;
-  --vm: #066828;
-  --vb-low: rgba(0,161,55,0.08);
+  /* Pitzi Blue Palette */
+  --vb: #3B42DE;
+  --ve: #2D34B8;
+  --vf: #252AA3;
+  --vm: #1B208A;
+  --vb-low: rgba(59,66,222,0.08);
 }
 
 .dark {
@@ -80,8 +80,8 @@
   --popover: 240 5.6% 7.1%;
   --popover-foreground: 210 40% 98%;
 
-  --primary: 140.5 100% 31.6%;
-  --primary-foreground: 0 0% 3.9%;
+  --primary: 237 71% 55%;
+  --primary-foreground: 210 40% 98%;
 
   --secondary: 240 5.1% 11.6%;
   --secondary-foreground: 210 40% 98%;
@@ -97,16 +97,16 @@
 
   --border: 240 1% 13%;
   --input: 240 1% 13%;
-  --ring: 140.5 100% 31.6%;
+  --ring: 237 71% 55%;
 
   --sidebar: 240 5.6% 7.1%;
   --sidebar-foreground: 215 20% 85%;
-  --sidebar-primary: 140.5 100% 31.6%;
+  --sidebar-primary: 237 71% 55%;
   --sidebar-accent: 240 5.1% 11.6%;
-  --sidebar-accent-foreground: 140.5 80% 60%;
+  --sidebar-accent-foreground: 237 71% 75%;
   --sidebar-border: 240 1% 13%;
 
-  /* Renov Brand Tokens — Label Colors (Apple HIG) */
+  /* Pitzi Brand Tokens — Label Colors (Apple HIG) */
   --l1: rgba(255,255,255,0.93);
   --l2: rgba(255,255,255,0.62);
   --l3: rgba(255,255,255,0.38);
@@ -122,12 +122,12 @@
   /* Separator */
   --sep: rgba(255,255,255,0.06);
 
-  /* Verde Palette */
-  --vb: #00A137;
-  --ve: #048E33;
-  --vf: #068130;
-  --vm: #066828;
-  --vb-low: rgba(0,161,55,0.10);
+  /* Pitzi Blue Palette */
+  --vb: #3B42DE;
+  --ve: #2D34B8;
+  --vf: #252AA3;
+  --vm: #1B208A;
+  --vb-low: rgba(59,66,222,0.10);
 }
 
 @layer base {
@@ -645,7 +645,7 @@ button:where(:not([class*="destructive"]):not([class*="ghost"]):not([class*="out
 .badge-success,
 [data-variant="success"] {
   background: rgba(0, 161, 55, 0.10);
-  color: #00A137;
+  color: #3B42DE;
 }
 
 /* Warning badge */
@@ -671,7 +671,7 @@ button:where(:not([class*="destructive"]):not([class*="ghost"]):not([class*="out
 /* Tier chips */
 .chip-diamond {
   background: rgba(0, 161, 55, 0.10);
-  color: #048E33;
+  color: #2D34B8;
 }
 
 .chip-gold {
@@ -805,7 +805,7 @@ html:not(.dark) main {
 .rich-text-content .mention,
 .ql-editor .mention {
   background: rgba(0, 161, 55, 0.15) !important;
-  color: #00A137 !important;
+  color: #3B42DE !important;
   padding: 2px 8px !important;
   border-radius: 999px !important;
   font-weight: 500;
@@ -885,7 +885,7 @@ html:not(.dark) main {
 }
 .rich-text-content blockquote,
 .ql-editor blockquote {
-  border-left: 3px solid #00A137;
+  border-left: 3px solid #3B42DE;
   padding-left: 12px;
   color: rgba(255, 255, 255, 0.7);
   margin: 8px 0;
