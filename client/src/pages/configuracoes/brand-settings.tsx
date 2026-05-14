@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Upload, Image, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { RenovLogo } from "@/components/renov-logo";
+import { PitziLogo as RenovLogo } from "@/components/renov-logo";
 import { apiRequest, queryClient, fetchWithAuth } from "@/lib/queryClient";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";

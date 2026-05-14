@@ -71,7 +71,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { RenovLogo } from "./renov-logo";
+import { PitziLogo as RenovLogo } from "./renov-logo";
 import { VersionBadge } from "./version-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
