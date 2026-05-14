@@ -1,1 +1,0 @@
-import{j as e,c as r}from"./index-DfEm_o8M.js";import{I as s}from"./input-BIx-YfH4.js";function o({className:t,...a}){return e.jsx(s,{...a,type:"date",className:r("date-picker-full",t)})}export{o as D};
