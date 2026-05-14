@@ -1,9 +1,0 @@
-<svg viewBox="0 0 180 50" width="180" height="50" xmlns="http://www.w3.org/2000/svg">
-  <text x="0" y="30" font-family="Montserrat, sans-serif" font-weight="700" font-size="28" fill="#FFFFFF" letter-spacing="-1">ren</text>
-  <g transform="translate(52, 5)">
-    <circle cx="12" cy="17" r="10" fill="none" stroke="#FFFFFF" stroke-width="4"/>
-    <path d="M12 7 L12 2 L17 7" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
-  <text x="78" y="30" font-family="Montserrat, sans-serif" font-weight="700" font-size="28" fill="#FFFFFF" letter-spacing="-1">v.</text>
-  <text x="50" y="46" font-family="Montserrat, sans-serif" font-weight="600" font-size="16" fill="#FFFFFF" letter-spacing="0">home</text>
-</svg>
