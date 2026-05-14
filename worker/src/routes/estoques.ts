@@ -48,7 +48,7 @@ function extrairMarca(descricao: string): string {
 
 // ─── Pipeline helpers ─────────────────────────────────────────────────────────
 
-const PIPELINE_RS_BASE = "https://dash.renovsmart.com.br/api";
+const PIPELINE_RS_BASE = "https://dash.pitzi.com.br/api";
 const PIPELINE_RS_TOKEN = "Renov123";
 
 async function fetchPipelineApi(path: string, params: Record<string, string> = {}): Promise<any[]> {

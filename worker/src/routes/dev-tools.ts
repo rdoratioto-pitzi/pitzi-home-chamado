@@ -5,7 +5,7 @@ import type { AppEnv } from "../index";
 
 const devTools = new Hono<AppEnv>();
 
-const EXTERNAL_API_BASE = "https://dash.renovsmart.com.br/api/sql";
+const EXTERNAL_API_BASE = "https://dash.pitzi.com.br/api/sql";
 
 // POST /api/dev/sql-execute (admin — security fix: was unprotected)
 devTools.post("/api/dev/sql-execute", requireAdmin, async (c) => {

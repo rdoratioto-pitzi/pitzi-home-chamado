@@ -189,7 +189,7 @@ export default function Home() {
       <PageHeader title="Início" />
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h1 className="text-[22px] font-bold tracking-tight">Bem-vindo ao Renov Home</h1>
+          <h1 className="text-[22px] font-bold tracking-tight">Bem-vindo ao Pitzi Home</h1>
           <p className="text-muted-foreground mt-2">
             Acesse rapidamente os módulos da plataforma
           </p>

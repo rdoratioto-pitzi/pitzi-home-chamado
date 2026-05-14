@@ -16,7 +16,7 @@ import type { Ticket } from "../../../shared/schema";
 // Constantes (espelhadas do Express)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const HERMES_EXECUTION_SCOPE = ["renov-home", "renov-hub", "venus"] as const;
+export const HERMES_EXECUTION_SCOPE = ["pitzi-home", "renov-hub", "venus"] as const;
 export const HERMES_BLOCKED_APPLICATIONS = ["pitzi-duda"] as const;
 
 const HERMES_TIMEOUT_MS = 5_000;

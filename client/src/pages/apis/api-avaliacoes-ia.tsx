@@ -234,7 +234,7 @@ export default function ApiAvaliacoesIaPage() {
               Ativo
             </Badge>
             <span className="text-xs text-muted-foreground font-mono">
-              URL Base: https://dash.renovsmart.com.br/api/avaliacoes-ia/
+              URL Base: https://dash.pitzi.com.br/api/avaliacoes-ia/
             </span>
           </div>
           <a
@@ -747,7 +747,7 @@ export default function ApiAvaliacoesIaPage() {
     "Status_Assertividade": "ACERTOU",
     "Is_Match": 1,
     "Data_Avaliacao": "2024-01-15T10:30:00Z",
-    "Link_Fotos": "https://app.renovsmart.com.br/..."
+    "Link_Fotos": "https://app.pitzi.com.br/..."
   }
 ]`}
                     </pre>
@@ -923,7 +923,7 @@ export default function ApiAvaliacoesIaPage() {
     "Is_Match": 1,
     "Data_Avaliacao": "2024-03-10T14:22:00Z",
     "Categoria": "Smartphone",
-    "Link_Fotos": "https://app.renovsmart.com.br/..."
+    "Link_Fotos": "https://app.pitzi.com.br/..."
   }
 ]`}
                     </pre>

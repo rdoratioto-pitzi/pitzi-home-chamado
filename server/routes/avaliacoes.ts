@@ -1,6 +1,6 @@
 /**
  * Rotas para módulo de Avaliações Estéticas
- * Integra com API RenovSmart e persiste curadoria no PostgreSQL
+ * Integra com API Pitzi e persiste curadoria no PostgreSQL
  */
 import { Router } from "express";
 import { requireAuth, getSessionUser } from "../middleware/auth";
@@ -22,7 +22,7 @@ import {
   getConfiguracoes,
   updateConfiguracoes,
   type AvaliacoesFilters,
-} from "../services/renovsmart-avaliacoes";
+} from "../services/pitzi-avaliacoes";
 import type { VersaoIA } from "@shared/schema";
 
 export function registerAvaliacoesRoutes(router: Router) {

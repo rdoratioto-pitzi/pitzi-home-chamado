@@ -1,41 +1,27 @@
-account_id = "bfd46eef1d57c99e94fd8106ee6a8870"
-name = "renov-home-api"
+account_id = "def20b63679ab729ae63aeb53fe6979c"
+name = "pitzi-home-api"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
 
 workers_dev = true
-routes = [
-  { pattern = "homeapi.renovsmart.com.br", custom_domain = true }
-]
 
 [placement]
 mode = "smart"
 
-[[r2_buckets]]
-binding = "ATTACHMENTS"
-bucket_name = "renov-home-attachments"
-
 [vars]
-APP_URL = "https://home.renovsmart.com.br"
-CORS_ORIGIN = "https://home.renovsmart.com.br,https://renov-home.pages.dev,https://rdoratioto-pitzi.github.io"
-API_URL = "https://homeapi.renovsmart.com.br"
-SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
-SENDPULSE_FROM_NAME = "Renov Home"
+APP_URL = "https://rdoratioto-pitzi.github.io/pitzi-home-chamado"
+CORS_ORIGIN = "https://rdoratioto-pitzi.github.io"
+API_URL = "https://pitzi-home-api.rodrigo-doratioto.workers.dev"
+SENDPULSE_FROM_EMAIL = "noreply@pitzi.com.br"
+SENDPULSE_FROM_NAME = "Pitzi Home"
 
 [env.dev]
-name = "renov-home-api-dev"
-routes = [
-  { pattern = "homeapi-dev.renovsmart.com.br", custom_domain = true }
-]
+name = "pitzi-home-api-dev"
 
 [env.dev.vars]
-APP_URL = "https://home-dev.renovsmart.com.br"
-CORS_ORIGIN = "https://home-dev.renovsmart.com.br,https://renov-home-dev.pages.dev"
-API_URL = "https://homeapi-dev.renovsmart.com.br"
-SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
-SENDPULSE_FROM_NAME = "Renov Home (Dev)"
-
-[[env.dev.r2_buckets]]
-binding = "ATTACHMENTS"
-bucket_name = "renov-home-attachments-dev"
+APP_URL = "http://localhost:5050"
+CORS_ORIGIN = "http://localhost:5050"
+API_URL = "http://localhost:8787"
+SENDPULSE_FROM_EMAIL = "noreply@pitzi.com.br"
+SENDPULSE_FROM_NAME = "Pitzi Home (Dev)"

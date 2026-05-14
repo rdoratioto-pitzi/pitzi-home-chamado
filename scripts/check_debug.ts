@@ -15,12 +15,12 @@ async function check() {
     console.log("Specific settings found:", specificSettings);
 
     console.log("\nChecking specific user...");
-    const targetUser = await db.select().from(users).where(eq(users.email, "matheus@renovsmart.com.br"));
+    const targetUser = await db.select().from(users).where(eq(users.email, "matheus@pitzi.com.br"));
     console.log("Target user found:", targetUser);
 
     if (targetUser.length === 0) {
         console.log("Trying matheus.freitas just in case...");
-        const altUser = await db.select().from(users).where(eq(users.email, "matheus.freitas@renovsmart.com.br"));
+        const altUser = await db.select().from(users).where(eq(users.email, "matheus.freitas@pitzi.com.br"));
         console.log("Alt user found:", altUser.map(u => ({ email: u.email, password: u.password })));
     }
 

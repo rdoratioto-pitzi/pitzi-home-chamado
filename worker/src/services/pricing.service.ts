@@ -1,7 +1,7 @@
 // worker/src/services/pricing.service.ts
 // Pure fetch-based service — no Node.js dependencies, compatible with Workers as-is
 
-const RENOVSMART_API_BASE = "https://rp.renovsmart.com.br/api";
+const RENOVSMART_API_BASE = "https://rp.pitzi.com.br/api";
 
 export interface EligibleDevice {
   categoryId: string;

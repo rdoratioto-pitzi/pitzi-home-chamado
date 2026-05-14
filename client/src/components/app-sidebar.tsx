@@ -1,5 +1,5 @@
 /**
-* AppSidebar - Menu lateral principal do Renov Home
+* AppSidebar - Menu lateral principal do Pitzi Home
 */
 import { Link, useLocation } from "wouter";
 import { useState, useMemo, useEffect, useCallback } from "react";

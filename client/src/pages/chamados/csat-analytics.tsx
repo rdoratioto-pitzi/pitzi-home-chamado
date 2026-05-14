@@ -161,7 +161,7 @@ export function CSATAnalytics() {
     if (!analytics) return;
 
     const wsData = [
-      ["Relatório CSAT - Renov Home"],
+      ["Relatório CSAT - Pitzi Home"],
       ["Gerado em:", format(new Date(), "dd/MM/yyyy HH:mm")],
       ["Período:", period === "7d" ? "Últimos 7 dias" : period === "30d" ? "Últimos 30 dias" : period === "90d" ? "Últimos 90 dias" : period === "this_month" ? "Este mês" : "Mês passado"],
       [],

@@ -1,4 +1,4 @@
-// Renov Home - Sistema de Gestão Operacional
+// Pitzi Home - Sistema de Gestão Operacional
 import React, { lazy, Suspense } from "react";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";

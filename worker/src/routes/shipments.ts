@@ -393,7 +393,7 @@ shipments.get("/api/logistica-reversa/check-api-status", async (c) => {
 
 // ============== RS LOGISTICA API INTEGRATION ==============
 
-const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
+const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
 const RS_API_TOKEN = "Renov123";
 
 const normalizeLogisticaKey = (rawKey: string): string => {

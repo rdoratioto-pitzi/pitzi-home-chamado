@@ -26,7 +26,7 @@ import type { Ticket } from "../../shared/schema";
  * Aplicações para as quais Hermes pode triagem/executar.
  * Manter sincronizada com worker/src/services/hermes-trigger.service.ts.
  */
-export const HERMES_EXECUTION_SCOPE = ["renov-home", "renov-hub", "venus"] as const;
+export const HERMES_EXECUTION_SCOPE = ["pitzi-home", "renov-hub", "venus"] as const;
 
 /**
  * Aplicações explicitamente bloqueadas (clientes externos).

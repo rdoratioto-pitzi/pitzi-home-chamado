@@ -146,7 +146,7 @@ export async function seedDatabase() {
 
     // Credenciais padrão (consistentes com/sem DB)
     const DEFAULT_USERS = [
-      { name: "Matheus", email: "Matheus@renovsmart.com.br", password: "ma061184", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true, updates: true } },
+      { name: "Matheus", email: "Matheus@pitzi.com.br", password: "ma061184", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true, updates: true } },
       { name: "Administrador", email: "admin@renov.com.br", password: "admin123", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true } },
     ];
 

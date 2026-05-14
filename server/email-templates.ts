@@ -1,5 +1,5 @@
 /**
- * Sistema de Templates de E-mail — Renov Home
+ * Sistema de Templates de E-mail — Pitzi Home
  *
  * Template base reutilizável com identidade visual Renov,
  * usado por todas as funções de envio de e-mail do sistema.
@@ -75,7 +75,7 @@ export function formatDate(date: Date | string | null): string {
 function getBaseUrl(): string {
   if (process.env.APP_URL) return process.env.APP_URL;
   if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  return "https://home.renovsmart.com.br";
+  return "https://rdoratioto-pitzi.github.io/pitzi-home-chamado";
 }
 
 export function getTicketUrl(ticketCode: string): string {
@@ -312,7 +312,7 @@ export function emailTemplate(options: EmailTemplateOptions): string {
                 <tr>
                   <td align="center">
                     <p style="color:${BRAND.textLight};font-size:12px;margin:0 0 8px;line-height:1.5;">
-                      <strong style="color:${BRAND.gray};">Renov Home</strong> — Sistema de Gest\u00e3o Interna
+                      <strong style="color:${BRAND.gray};">Pitzi Home</strong> — Sistema de Gest\u00e3o Interna
                     </p>
                     <p style="color:${BRAND.textLight};font-size:11px;margin:0 0 12px;line-height:1.5;">
                       Este \u00e9 um e-mail autom\u00e1tico. N\u00e3o responda diretamente.

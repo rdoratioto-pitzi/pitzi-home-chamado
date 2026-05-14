@@ -193,7 +193,7 @@ export function BrandSettings() {
     <div className="space-y-6">
       <Card className="shadow-sm border-border/60">
         <CardHeader className="pb-4">
-          <CardTitle className="text-[18px] font-bold">Logo Renov Home</CardTitle>
+          <CardTitle className="text-[18px] font-bold">Logo Pitzi Home</CardTitle>
           <CardDescription className="text-[13px]">
             Clique nos quadros abaixo para fazer upload dos logos específicos para cada tema.
             Recomendado: 180x50px, até 5MB.
@@ -277,7 +277,7 @@ export function BrandSettings() {
 
       <Card className="shadow-sm border-border/60">
         <CardHeader className="pb-4">
-          <CardTitle className="text-[18px] font-bold">Favicon Renov Home</CardTitle>
+          <CardTitle className="text-[18px] font-bold">Favicon Pitzi Home</CardTitle>
           <CardDescription className="text-[13px]">
             Clique no quadro abaixo para fazer upload do ícone da aba do navegador.
             Medida ideal: 32x32px ou 48x48px. Formatos: PNG ou ICO.

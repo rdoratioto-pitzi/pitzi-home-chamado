@@ -172,7 +172,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
     label: "Relatorio Geral",
     description: "Relatorio consolidado de todos os modulos",
     icon: BarChart3,
-    prompt: "Gere um relatorio executivo consolidado da plataforma Renov Home. Inclua: KPIs principais de cada modulo (tickets, projetos, tarefas, metas, OKRs, pricing, logistica), tendencias, pontos de atencao e recomendacoes estrategicas. Formate com secoes claras, tabelas e destaques."
+    prompt: "Gere um relatorio executivo consolidado da plataforma Pitzi Home. Inclua: KPIs principais de cada modulo (tickets, projetos, tarefas, metas, OKRs, pricing, logistica), tendencias, pontos de atencao e recomendacoes estrategicas. Formate com secoes claras, tabelas e destaques."
   },
   {
     command: "/codigo",

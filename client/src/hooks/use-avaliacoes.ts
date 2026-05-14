@@ -418,7 +418,7 @@ export function useMatrizConfusao(filtros: AvaliacoesFilters = {}) {
   });
 }
 
-// ─── Proxy API Types (RenovSmart) ─────────────────────────────────────────────
+// ─── Proxy API Types (Pitzi) ─────────────────────────────────────────────
 
 export interface ResumoIAItem {
   Grade_Humano_Real: string;

@@ -75,7 +75,7 @@ export function setAuthCookies(
   const isProduction = c.env.APP_URL.startsWith("https://");
   const refreshMaxAge = rememberMe ? 7 * 24 * 60 * 60 : 24 * 60 * 60;
 
-  // Cross-site cookies (pages.dev → renovsmart.com.br) require SameSite=None + Secure.
+  // Cross-site cookies (pages.dev → pitzi.com.br) require SameSite=None + Secure.
   // Omit domain so cookie is scoped to the API host only.
   const cookieOpts = {
     httpOnly: true,

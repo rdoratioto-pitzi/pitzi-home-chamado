@@ -173,7 +173,7 @@ export default function OmieOverview() {
             Sobre a Integração
           </CardTitle>
           <CardDescription>
-            Esta integração permite consultar dados do ERP Omie diretamente no Renov Home
+            Esta integração permite consultar dados do ERP Omie diretamente no Pitzi Home
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">

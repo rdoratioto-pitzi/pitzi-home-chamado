@@ -12,9 +12,9 @@ import {
 
 const pricing = new Hono<AppEnv>();
 
-const RENOVSMART_API_BASE = "https://rp.renovsmart.com.br/api";
+const RENOVSMART_API_BASE = "https://rp.pitzi.com.br/api";
 
-// ============== PRICING API PROXY (RenovSmart) ==============
+// ============== PRICING API PROXY (Pitzi) ==============
 
 // GET /api/pricing/eligible-devices
 pricing.get("/api/pricing/eligible-devices", async (c) => {
@@ -36,7 +36,7 @@ pricing.get("/api/pricing/eligible-devices", async (c) => {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "User-Agent": "RenovSmart-Pricing/1.0",
+        "User-Agent": "Pitzi-Pricing/1.0",
         Accept: "application/json",
       },
     });

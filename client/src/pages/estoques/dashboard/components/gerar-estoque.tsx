@@ -25,7 +25,7 @@ interface GerarEstoqueResponse {
   total: number;
 }
 
-const DASH_ESTOQUE_EXTERNAL_URL = "https://dash.renovsmart.com.br/api/dash_estoque/defeitos";
+const DASH_ESTOQUE_EXTERNAL_URL = "https://dash.pitzi.com.br/api/dash_estoque/defeitos";
 const DASH_ESTOQUE_EXTERNAL_TOKEN = "Renov123";
 
 function normalizeImeis(values: unknown[]): string[] {

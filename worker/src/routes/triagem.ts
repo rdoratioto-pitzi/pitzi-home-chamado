@@ -7,7 +7,7 @@ import type { AppEnv } from "../index";
 
 // ─── Pipeline helpers (duplicado do server para isolamento do worker) ─────────
 
-const PIPELINE_RS_BASE = "https://dash.renovsmart.com.br/api";
+const PIPELINE_RS_BASE = "https://dash.pitzi.com.br/api";
 const PIPELINE_RS_TOKEN = "Renov123";
 
 async function fetchPipelineApi(path: string, params: Record<string, string> = {}): Promise<any[]> {

@@ -271,7 +271,7 @@ export default function AlertasPage() {
                 <h3 className="font-semibold mb-2">Alertas de Preço</h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   Para acompanhar a variação de preços de um dispositivo específico, acesse os detalhes do produto.
-                  Os dados são atualizados automaticamente via API RenovSmart.
+                  Os dados são atualizados automaticamente via API Pitzi.
                 </p>
                 <div className="flex items-center justify-center gap-2">
                   <Link href="/pricing">

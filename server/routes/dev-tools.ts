@@ -13,7 +13,7 @@ export function registerDevToolsRoutes(router: Router) {
       }
 
       // Configuração baseada no sql_api.postman_collection.json
-      const externalApiUrl = "https://dash.renovsmart.com.br/api/sql/execute";
+      const externalApiUrl = "https://dash.pitzi.com.br/api/sql/execute";
       const token = "Renov123"; // Token de referência fornecido
 
       const response = await axios.post(
@@ -54,7 +54,7 @@ export function registerDevToolsRoutes(router: Router) {
       }
 
       // Configuração baseada no sql_api.postman_collection.json e no arquivo sql_api.py fornecido
-      const externalApiUrl = "https://dash.renovsmart.com.br/api/sql/export";
+      const externalApiUrl = "https://dash.pitzi.com.br/api/sql/export";
       const token = "Renov123"; // Token de referência fornecido
 
       const response = await axios.post(

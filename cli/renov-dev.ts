@@ -47,7 +47,7 @@ program
         planPath: fullPath,
         modeloNome: options.model,
         userId: 1,
-        userEmail: 'matheus@renovsmart.com.br',
+        userEmail: 'matheus@pitzi.com.br',
       });
       
       if (result.success) {

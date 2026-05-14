@@ -6,7 +6,7 @@ import { requireAuth } from "../middleware/auth";
 
 export function registerIntegrationRoutes(router: Router) {
   console.log("Registering Integration Routes...");
-  const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
+  const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
   const RS_API_TOKEN = process.env.RENOVSMART_API_TOKEN || "Renov123";
 
   const fetchApoioVendas = async (endpoint: string, query: any) => {
@@ -125,7 +125,7 @@ export function registerIntegrationRoutes(router: Router) {
     
     // Assume external API follows similar structure: /avaliacoes-ia/{endpoint}
     // If RS_API_BASE_URL ends with /api, we append /avaliacoes-ia/{endpoint}
-    // Result: https://dash.renovsmart.com.br/api/avaliacoes-ia/resumo
+    // Result: https://dash.pitzi.com.br/api/avaliacoes-ia/resumo
     const url = `${RS_API_BASE_URL}/avaliacoes-ia/${endpoint}`;
     const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
     

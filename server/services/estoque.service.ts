@@ -13,7 +13,7 @@ import { getCachedProdutos } from "./estoque-cache.service";
 
 // ─── Helpers internos ──────────────────────────────────────────────────────────
 
-const PIPELINE_BASE = "https://dash.renovsmart.com.br/api";
+const PIPELINE_BASE = "https://dash.pitzi.com.br/api";
 const PIPELINE_TOKEN = "Renov123";
 
 async function fetchPipeline(path: string): Promise<any[]> {

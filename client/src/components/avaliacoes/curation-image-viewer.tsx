@@ -47,7 +47,7 @@ export function CurationImageViewer({ imagens, linkFotos }: CurationImageViewerP
         <div className="flex flex-col items-center justify-center h-64 rounded-xl border border-dashed border-border bg-muted/30 gap-4 text-muted-foreground px-6">
           <ExternalLink className="h-12 w-12 opacity-40" />
           <div className="flex flex-col items-center gap-2 text-center">
-            <span className="text-sm font-medium">Fotos disponíveis no sistema RenovSmart</span>
+            <span className="text-sm font-medium">Fotos disponíveis no sistema Pitzi</span>
             <span className="text-xs opacity-70">As fotos estão hospedadas no portal de avaliações</span>
           </div>
           <a href={linkFotos} target="_blank" rel="noopener noreferrer">

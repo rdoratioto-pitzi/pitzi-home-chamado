@@ -10,7 +10,7 @@
  * Configuração (variáveis de ambiente ou editar as constantes abaixo):
  *   CLAUDE_DEV_NAME     — nome do desenvolvedor (ex: "Matheus Mundstock")
  *   CLAUDE_USAGE_SECRET — secret compartilhado (ver .env do servidor)
- *   APP_URL             — URL do backend (ex: https://home.renovsmart.com.br)
+ *   APP_URL             — URL do backend (ex: https://rdoratioto-pitzi.github.io/pitzi-home-chamado)
  */
 
 import fs from "fs";
@@ -22,7 +22,7 @@ import http from "http";
 // ─── CONFIGURAÇÃO ────────────────────────────────────────────────────────────
 const DEVELOPER_NAME  = process.env.CLAUDE_DEV_NAME     || "Matheus Mundstock";
 const USAGE_SECRET    = process.env.CLAUDE_USAGE_SECRET  || "495c9359ca573a28192f853ea343fb8d88aa5743424ca410b3b0c2122e5bae56";
-const API_BASE        = process.env.APP_URL              || "https://home.renovsmart.com.br";
+const API_BASE        = process.env.APP_URL              || "https://rdoratioto-pitzi.github.io/pitzi-home-chamado";
 const SOURCE_MACHINE  = os.hostname();
 // ─────────────────────────────────────────────────────────────────────────────
 
