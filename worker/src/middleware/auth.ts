@@ -3,6 +3,8 @@ import type { AppEnv } from "../index";
 import { verifyAccessToken, getAccessTokenFromCookie, getBearerToken } from "../lib/jwt";
 import { secretMatches } from "../lib/crypto";
 import { loadActiveSession } from "../lib/sessions";
+import { modulesForPath } from "../../../shared/module-routes";
+import { hasModulePermission } from "../../../shared/permissions";
 
 /** Routes that require NO authentication at all */
 const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
@@ -122,6 +124,13 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
   const user = await resolveUser(c, token);
   if (!user) {
     return c.json({ error: "Sessao expirada ou encerrada" }, 401);
+  }
+
+  // Permissão de módulo também vale na API, não só para esconder telas.
+  const modules = modulesForPath(path);
+  const isAdmin = user.role === "admin";
+  if (modules && !modules.some((m) => hasModulePermission({ isAdmin, modulePermissions: user.modulePermissions }, m))) {
+    return c.json({ error: "Sem permissao para este modulo" }, 403);
   }
   c.set("user", user);
 

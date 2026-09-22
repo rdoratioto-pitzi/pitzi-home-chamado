@@ -27,6 +27,7 @@ describe.skipIf(!url)("sessões", () => {
     a.use("/api/*", authMiddleware);
     a.route("/", auth);
     a.get("/api/whoami", (c) => c.json(c.get("user")));
+    a.get("/api/estoques/resumo", (c) => c.json({ ok: true }));
     return a;
   };
   const call = (path: string, token: string, method = "GET") =>
@@ -94,5 +95,19 @@ describe.skipIf(!url)("sessões", () => {
     await pool.query("UPDATE users SET is_admin = true WHERE id = $1", [userId]);
     const res = await call("/api/whoami", token);
     expect(((await res.json()) as any).role).toBe("admin");
+  });
+
+  it("rota de módulo exige a permissão do módulo; admin passa sempre", async () => {
+    const token = await newSession();
+    expect((await call("/api/estoques/resumo", token)).status).toBe(403);
+    await pool.query(`UPDATE users SET module_permissions = '{"estoques": true}' WHERE id = $1`, [userId]);
+    expect((await call("/api/estoques/resumo", token)).status).toBe(200);
+    await pool.query(`UPDATE users SET module_permissions = '{}', is_admin = true WHERE id = $1`, [userId]);
+    expect((await call("/api/estoques/resumo", token)).status).toBe(200);
+  });
+
+  it("rota fora de módulo não exige permissão de módulo", async () => {
+    const token = await newSession();
+    expect((await call("/api/whoami", token)).status).toBe(200);
   });
 });
