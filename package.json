@@ -10,6 +10,7 @@
     "build:dev": "tsx scripts/build.ts --mode=staging",
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "db:migrate": "tsx scripts/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:apply:dev": "./scripts/db-apply-dev.sh",
     "db:apply:prod": "./scripts/db-apply-prod.sh",
