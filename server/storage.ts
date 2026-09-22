@@ -85,7 +85,7 @@ import {
   refreshTokens,
  } from "@shared/schema";
  import { db as defaultDb, type Database } from "./db";
- import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
+ import { eq, and, or, sql, asc, desc, gt, isNull, type SQL } from "drizzle-orm";
 import { hashPassword, isPasswordHash } from "../shared/password";
  import { alias } from "drizzle-orm/pg-core";
  
@@ -120,7 +120,7 @@ import { hashPassword, isPasswordHash } from "../shared/password";
 
   // Tickets
   getTicket(id: string): Promise<Ticket | undefined>;
-  getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]>;
+  getTickets(filters?: TicketFilters): Promise<Ticket[]>;
   createTicket(ticket: InsertTicket): Promise<Ticket>;
   updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined>;
   deleteTicket(id: string): Promise<boolean>;
@@ -469,6 +469,28 @@ async function hashIfPlain<T extends string | null | undefined>(password: T): Pr
   return hashPassword(password);
 }
 
+export interface TicketFilters {
+  requesterId?: string;
+  assigneeId?: string;
+  /** Quando presente (inclusive null), restringe ao tenant — null casa só com tenant_id NULL. */
+  tenantId?: string | null;
+}
+
+function ticketFilterConditions(filters: TicketFilters): SQL[] {
+  const conditions: SQL[] = [];
+  if (filters.requesterId && filters.assigneeId) {
+    conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
+  } else if (filters.requesterId) {
+    conditions.push(eq(tickets.requesterId, filters.requesterId));
+  } else if (filters.assigneeId) {
+    conditions.push(eq(tickets.assigneeId, filters.assigneeId));
+  }
+  if ("tenantId" in filters) {
+    conditions.push(filters.tenantId == null ? isNull(tickets.tenantId) : eq(tickets.tenantId, filters.tenantId));
+  }
+  return conditions;
+}
+
 /** Violação de unicidade do Postgres (23505), com pg (Express) ou Neon (Worker). */
 export function isUniqueViolation(error: unknown): boolean {
   const e = error as { code?: string; cause?: { code?: string } } | null;
@@ -598,19 +620,12 @@ export class DatabaseStorage implements IStorage {
     if (!result) return undefined;
     return { ...result.ticket, requesterName: result.requesterName, assigneeName: result.assigneeName };
   }
-  async getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]> {
+  async getTickets(filters?: TicketFilters): Promise<Ticket[]> {
     if (!this.db) throw new Error("Database not connected");
     try {
       let query = this.db.select().from(tickets);
       if (filters) {
-        const conditions: SQL[] = [];
-        if (filters.requesterId && filters.assigneeId) {
-          conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
-        } else if (filters.requesterId) {
-          conditions.push(eq(tickets.requesterId, filters.requesterId));
-        } else if (filters.assigneeId) {
-          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
-        }
+        const conditions = ticketFilterConditions(filters);
         
         if (conditions.length > 0) {
           return await query.where(and(...conditions));
@@ -622,7 +637,7 @@ export class DatabaseStorage implements IStorage {
       throw e;
     }
   }
-  async getTicketsForListing(filters?: { requesterId?: string; assigneeId?: string }) {
+  async getTicketsForListing(filters?: TicketFilters) {
     if (!this.db) throw new Error("Database not connected");
     try {
       const requester = alias(users, "requester");
@@ -652,14 +667,7 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(assignee, eq(tickets.assigneeId, assignee.id));
 
       if (filters) {
-        const conditions: SQL[] = [];
-        if (filters.requesterId && filters.assigneeId) {
-          conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
-        } else if (filters.requesterId) {
-          conditions.push(eq(tickets.requesterId, filters.requesterId));
-        } else if (filters.assigneeId) {
-          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
-        }
+        const conditions = ticketFilterConditions(filters);
 
         if (conditions.length > 0) {
           return await baseQuery.where(and(...conditions));
@@ -671,7 +679,7 @@ export class DatabaseStorage implements IStorage {
       throw e;
     }
   }
-  async getTicketsForWorkspace(filters?: { requesterId?: string; assigneeId?: string }) {
+  async getTicketsForWorkspace(filters?: TicketFilters) {
     if (!this.db) throw new Error("Database not connected");
     try {
       const baseQuery = this.db
@@ -697,14 +705,7 @@ export class DatabaseStorage implements IStorage {
         .from(tickets);
 
       if (filters) {
-        const conditions: SQL[] = [];
-        if (filters.requesterId && filters.assigneeId) {
-          conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
-        } else if (filters.requesterId) {
-          conditions.push(eq(tickets.requesterId, filters.requesterId));
-        } else if (filters.assigneeId) {
-          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
-        }
+        const conditions = ticketFilterConditions(filters);
         if (conditions.length > 0) {
           return await baseQuery.where(and(...conditions));
         }

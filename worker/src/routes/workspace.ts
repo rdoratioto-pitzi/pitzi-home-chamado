@@ -14,6 +14,7 @@ import {
 } from "../../../shared/schema";
 import type { Ticket, SlaRule } from "../../../shared/schema";
 import { isValidApplicationKey } from "../../../shared/applications";
+import { sameTenant } from "../../../shared/tenant";
 import { extractMentions } from "../lib/sanitize-rich-text";
 import {
   notifyChamadoCriado,
@@ -151,15 +152,15 @@ const workspace = new Hono<AppEnv>();
 // ─── Counts (lightweight) ──────────────────────────────────────────────────
 workspace.get("/api/workspace/counts", async (c) => {
   try {
-    const { userId, role } = c.get("user");
+    const { userId, role, tenantId } = c.get("user");
     const isAdmin = role === "admin";
     const db = c.get("db");
     const storage = getStorage(db);
 
     const [allTickets, allCards] = await Promise.all([
       isAdmin
-        ? storage.getTickets()
-        : storage.getTickets({ requesterId: userId, assigneeId: userId }),
+        ? storage.getTickets({ tenantId })
+        : storage.getTickets({ requesterId: userId, assigneeId: userId, tenantId }),
       db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
     ]);
 
@@ -181,14 +182,14 @@ workspace.get("/api/workspace/counts", async (c) => {
 
 workspace.get("/api/workspace/chamados", async (c) => {
   try {
-    const { userId, role } = c.get("user");
+    const { userId, role, tenantId } = c.get("user");
     const isAdmin = role === "admin";
     const periodo = c.req.query("periodo") || "este-ano";
     const storage = getStorage(c.get("db"));
 
     const allTickets: Ticket[] = isAdmin
-      ? await storage.getTickets()
-      : await storage.getTickets({ requesterId: userId, assigneeId: userId });
+      ? await storage.getTickets({ tenantId })
+      : await storage.getTickets({ requesterId: userId, assigneeId: userId, tenantId });
 
     const allUsers = await storage.getUsers();
     const slaRules: SlaRule[] = await storage.getSlaRules();
@@ -305,7 +306,7 @@ workspace.get("/api/workspace/chamados", async (c) => {
 
 workspace.post("/api/workspace/chamados", async (c) => {
   try {
-    const { userId } = c.get("user");
+    const { userId, tenantId } = c.get("user");
     const body = await c.req.json<{ titulo?: string; descricao?: string; categoria?: string; tipo?: string; prioridade?: string; applicationKey?: string }>();
     const { titulo, descricao, categoria, tipo, prioridade, applicationKey } = body;
 
@@ -332,7 +333,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
       impact: "medio",
       status: "open",
       requesterId: userId,
-      tenantId: null,
+      tenantId,
     } as any);
 
     // Slack: notifica criação no canal #devs-renov (fire-and-forget via waitUntil).
@@ -664,7 +665,7 @@ workspace.post("/api/workspace/projetos", async (c) => {
 
 workspace.get("/api/workspace/todos", async (c) => {
   try {
-    const { userId, role } = c.get("user");
+    const { userId, role, tenantId } = c.get("user");
     const isAdmin = role === "admin";
     const db = c.get("db");
     const storage = getStorage(db);
@@ -672,8 +673,8 @@ workspace.get("/api/workspace/todos", async (c) => {
     const [allTickets, cards, allProjects, allUsers, slaRules] =
       await Promise.all([
         isAdmin
-          ? storage.getTickets()
-          : storage.getTickets({ requesterId: userId, assigneeId: userId }),
+          ? storage.getTickets({ tenantId })
+          : storage.getTickets({ requesterId: userId, assigneeId: userId, tenantId }),
         db.select().from(kanbanCards).where(isNull(kanbanCards.parentCardId)),
         db.select().from(projects),
         storage.getUsers(),
@@ -897,7 +898,7 @@ workspace.get("/api/workspace/projetos", async (c) => {
 workspace.patch("/api/workspace/chamados/:id", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
-    const { userId: actorId } = c.get("user");
+    const { userId: actorId, role, tenantId } = c.get("user");
     const { status, prioridade, responsavelId, titulo, descricao, applicationKey } = await c.req.json();
     const db = c.get("db");
     const storage = getStorage(db);
@@ -915,6 +916,13 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
 
     // Captura estado anterior para detectar transições (atribuição, fechamento).
     const previous = await storage.getTicket(String(id));
+    // Mesma regra de PATCH /api/tickets/:id: admin, solicitante ou responsável, no mesmo tenant.
+    if (!previous || !sameTenant(previous.tenantId, tenantId)) {
+      return c.json({ error: "Chamado não encontrado" }, 404);
+    }
+    if (role !== "admin" && previous.requesterId !== actorId && previous.assigneeId !== actorId) {
+      return c.json({ error: "Acesso negado" }, 403);
+    }
 
     const updateData: Partial<Ticket> = {};
     if (status !== undefined) updateData.status = status;
