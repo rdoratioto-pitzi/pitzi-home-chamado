@@ -10,6 +10,7 @@ import {
   insertTicketCommentSchema,
 } from "../../../shared/schema";
 import { isValidApplicationKey } from "../../../shared/applications";
+import { filterVisibleComments, resolveIsInternal } from "../../../shared/ticket-comments";
 import { extractMentions } from "../lib/sanitize-rich-text";
 import {
   sendTicketCreatedEmail,
@@ -388,7 +389,8 @@ tickets.get("/api/tickets/:id/comments", async (c) => {
     return c.json({ error: "Access denied" }, 403);
   }
   const comments = await storage.getTicketComments(id);
-  return c.json(comments);
+  const viewer = { userId: user.userId, isAdmin: user.role === "admin" };
+  return c.json(filterVisibleComments(comments, viewer, ticket));
 });
 
 // POST /api/tickets/:id/comments
@@ -409,16 +411,20 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
   }
 
   const body = await c.req.json();
+  const viewer = { userId: user.userId, isAdmin: user.role === "admin" };
   const validated = insertTicketCommentSchema.parse({
     ...body,
     ticketId: id,
     userId: user.userId,
+    isInternal: resolveIsInternal(body?.isInternal, viewer, ticket),
     mentions: extractMentions(body?.content),
   });
   const comment = await storage.createTicketComment(validated);
+  const isInternal = comment.isInternal === true;
 
-  // First response tracking
+  // First response tracking — nota interna não conta como primeira resposta ao solicitante.
   if (
+    !isInternal &&
     ticket.assigneeId &&
     comment.userId === ticket.assigneeId &&
     !ticket.dataPrimeiraResposta
@@ -438,7 +444,7 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
   }
 
   // Notifications for requester and assignee
-  if (requester && commenter && commenter.id !== requester.id) {
+  if (!isInternal && requester && commenter && commenter.id !== requester.id) {
     storage.createNotification({
       userId: requester.id,
       fromUserId: commenter.id,
@@ -477,7 +483,12 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
           u.name.toLowerCase() === mentionedName.toLowerCase() &&
           u.status === "active"
       );
-      if (mentionedUser && commenter) {
+      // Nota interna não é enviada ao solicitante, mesmo que ele seja mencionado.
+      if (
+        mentionedUser &&
+        commenter &&
+        !(isInternal && mentionedUser.id === ticket.requesterId && mentionedUser.id !== ticket.assigneeId)
+      ) {
         sendMentionNotificationEmail(
           env, storage, mentionedUser, commenter.name, ticket.title, ticket.id, validated.content
         ).catch(console.error);
