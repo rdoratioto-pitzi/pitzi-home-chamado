@@ -8,6 +8,7 @@ import { loadActiveSession } from "../lib/sessions";
 const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "POST", path: "/api/auth/login" },
   { method: "POST", path: "/api/auth/forgot-password" },
+  { method: "POST", path: "/api/auth/reset-password" },
   { method: "POST", path: "/api/auth/refresh" },
   { method: "POST", path: "/api/auth/logout" },
   { method: "GET", path: "/api/health" },

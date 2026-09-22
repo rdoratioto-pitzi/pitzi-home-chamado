@@ -558,8 +558,8 @@ export default function LoginPage() {
             <DialogTitle>Recuperar Senha</DialogTitle>
             <DialogDescription>
               {forgotPasswordSent
-                ? "Verifique seu email para a senha temporária."
-                : "Digite seu email cadastrado para receber uma senha temporária."}
+                ? "Verifique seu email para redefinir a senha."
+                : "Digite seu email cadastrado para receber um link de redefinição."}
             </DialogDescription>
           </DialogHeader>
 
@@ -580,10 +580,10 @@ export default function LoginPage() {
               </motion.div>
               <div className="text-center space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Se o email estiver cadastrado no sistema, você receberá uma senha temporária em instantes.
+                  Se o email estiver cadastrado no sistema, você receberá um link em instantes.
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Use essa senha para acessar o sistema.
+                  O link vale por 30 minutos. Sua senha atual continua valendo até você trocá-la.
                 </p>
               </div>
               <Button
