@@ -91,6 +91,8 @@ export type AuthUser = {
   userId: string;
   tenantId: string | null;
   role: "admin" | "user";
+  /** Linha de refresh_tokens que representa a sessão (dispositivo) do token de acesso. */
+  sessionId?: string;
 };
 
 type Variables = {

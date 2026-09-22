@@ -1,7 +1,8 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { AppEnv } from "../index";
-import { verifyAccessToken, getAccessTokenFromCookie } from "../lib/jwt";
+import { verifyAccessToken, getAccessTokenFromCookie, getBearerToken } from "../lib/jwt";
 import { secretMatches } from "../lib/crypto";
+import { loadActiveSession } from "../lib/sessions";
 
 /** Routes that require NO authentication at all */
 const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
@@ -60,11 +61,13 @@ function matchesRoute(
   });
 }
 
-// Extrai token do header Authorization: Bearer <token>
-function getBearerToken(c: Context): string | null {
-  const auth = c.req.header("Authorization");
-  if (!auth?.startsWith("Bearer ")) return null;
-  return auth.slice(7);
+// Token válido não basta: a sessão precisa existir e o usuário estar ativo. Papel e tenant
+// vêm do banco, não do token, para que mudanças valham na próxima requisição.
+// Tokens sem sid (emitidos antes desta regra) são recusados; o frontend renova via refresh.
+async function resolveUser(c: Context<AppEnv>, token: string) {
+  const payload = await verifyAccessToken(token, c.env.JWT_SECRET);
+  if (!payload?.sid) return null;
+  return loadActiveSession(c.get("db"), payload.userId, payload.sid);
 }
 
 export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
@@ -101,20 +104,12 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
 
   // Aceita cookie OU Authorization: Bearer — necessário para CORS cross-domain
   // onde browsers modernos bloqueiam cookies SameSite=None de terceiros.
-  const token = getAccessTokenFromCookie(c) || getBearerToken(c);
+  const token = getAccessTokenFromCookie(c) || getBearerToken(c.req.header("Authorization"));
 
   // Optional auth routes — proceed even without token
   if (matchesRoute(method, path, OPTIONAL_AUTH_ROUTES)) {
-    if (token) {
-      const payload = await verifyAccessToken(token, c.env.JWT_SECRET);
-      if (payload) {
-        c.set("user", {
-          userId: payload.userId,
-          tenantId: payload.tenantId,
-          role: payload.role,
-        });
-      }
-    }
+    const user = token ? await resolveUser(c, token) : null;
+    if (user) c.set("user", user);
     return next();
   }
 
@@ -123,16 +118,11 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
     return c.json({ error: "Nao autenticado" }, 401);
   }
 
-  const payload = await verifyAccessToken(token, c.env.JWT_SECRET);
-  if (!payload) {
-    return c.json({ error: "Token expirado ou invalido" }, 401);
+  const user = await resolveUser(c, token);
+  if (!user) {
+    return c.json({ error: "Sessao expirada ou encerrada" }, 401);
   }
-
-  c.set("user", {
-    userId: payload.userId,
-    tenantId: payload.tenantId,
-    role: payload.role,
-  });
+  c.set("user", user);
 
   return next();
 };
