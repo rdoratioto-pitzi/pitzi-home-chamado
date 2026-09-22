@@ -13,7 +13,12 @@ export async function loadActiveSession(
   sessionId: string,
 ): Promise<AuthUser | null> {
   const [row] = await db
-    .select({ tenantId: users.tenantId, isAdmin: users.isAdmin, status: users.status })
+    .select({
+      tenantId: users.tenantId,
+      isAdmin: users.isAdmin,
+      status: users.status,
+      modulePermissions: users.modulePermissions,
+    })
     .from(refreshTokens)
     .innerJoin(users, eq(users.id, refreshTokens.userId))
     .where(and(
@@ -28,6 +33,7 @@ export async function loadActiveSession(
     tenantId: row.tenantId ?? null,
     role: row.isAdmin ? "admin" : "user",
     sessionId,
+    modulePermissions: row.modulePermissions,
   };
 }
 
