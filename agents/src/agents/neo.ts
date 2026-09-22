@@ -4,6 +4,7 @@ import { renovHomeContext } from '../config/renov-context';
 import { AgentState } from '../types/agent-state';
 import fs from 'fs';
 import path from 'path';
+import { resolverDentroDoRepo } from '../utils/safe-path';
 
 export async function neo(state: AgentState): Promise<Partial<AgentState>> {
   if (!state.planoAprovado) {
@@ -28,8 +29,12 @@ export async function neo(state: AgentState): Promise<Partial<AgentState>> {
     let conteudoAtual = '';
     let statusArquivo = '➕ NOVO';
     
+    const caminhoCompleto = resolverDentroDoRepo(config.paths.renovHome, arquivo);
+    if (!caminhoCompleto) {
+      console.log(`    ⛔ Ignorado: caminho fora do repositório`);
+      continue;
+    }
     try {
-      const caminhoCompleto = path.join(config.paths.renovHome, arquivo);
       if (fs.existsSync(caminhoCompleto)) {
         conteudoAtual = fs.readFileSync(caminhoCompleto, 'utf-8');
         statusArquivo = '✏️ MODIFICAR';
