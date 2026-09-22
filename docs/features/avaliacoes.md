@@ -1,4 +1,4 @@
-# Módulo Avaliações — Renov Home
+# Módulo Avaliações — Pitzi Home
 
 ## Visão Geral
 
@@ -17,7 +17,7 @@ realizar curadoria por amostragem e configurar parâmetros do processo avaliativ
 | Páginas       | `client/src/pages/avaliacoes/` (4 páginas)                  |
 | Componentes   | `client/src/components/avaliacoes/` (11 componentes)        |
 | Hooks         | `client/src/hooks/use-avaliacoes.ts`                        |
-| Serviço       | `server/services/renovsmart-avaliacoes.ts`                  |
+| Serviço       | `server/services/pitzi-avaliacoes.ts`                  |
 | Rotas Express | `server/routes/avaliacoes.ts`                               |
 | Rotas Worker  | `worker/src/routes/avaliacoes.ts`                           |
 | Schema        | `shared/schema.ts` (tabelas: `curadoria_avaliacoes`, `curadoria_configuracoes`) |
@@ -126,7 +126,7 @@ o módulo completo.
 
 ## Referências Externas
 
-- **POP 101 — Avaliação Estética de Dispositivos V3** — documento interno Renov
+- **POP 101 — Avaliação Estética de Dispositivos V3** — documento interno Pitzi
 - **IA de Avaliação:** Lapisco (parceiro externo)
 - **Responsáveis:** Gabriel Campos / Matheus Mundstock
 - **Categorias avaliadas:** Smartphone, iPhone, Console

@@ -147,7 +147,7 @@ export async function seedDatabase() {
     // Credenciais padrão (consistentes com/sem DB)
     const DEFAULT_USERS = [
       { name: "Matheus", email: "Matheus@pitzi.com.br", password: "ma061184", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true, updates: true } },
-      { name: "Administrador", email: "admin@renov.com.br", password: "admin123", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true } },
+      { name: "Administrador", email: "admin@pitzi.com.br", password: "admin123", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true } },
     ];
 
     for (const u of DEFAULT_USERS) {
@@ -165,7 +165,7 @@ export async function seedDatabase() {
       }
     }
 
-    const [adminRow] = await db.select().from(users).where(eq(users.email, "admin@renov.com.br"));
+    const [adminRow] = await db.select().from(users).where(eq(users.email, "admin@pitzi.com.br"));
     const adminId = adminRow?.id ?? "";
 
     const defaultAreas = [
@@ -229,7 +229,7 @@ async function fetchGitHubOrgRepos(org: string): Promise<any[]> {
       path: `/orgs/${org}/repos?per_page=100&type=all`,
       headers: {
         Authorization: `token ${token}`,
-        "User-Agent": "Renov-Home-App",
+        "User-Agent": "Pitzi-Home-App",
       },
     };
     https.get(options, (res) => {
@@ -257,9 +257,9 @@ async function seedGitRepositories() {
       return;
     }
 
-    const repos = await fetchGitHubOrgRepos("Renov-BD");
+    const repos = await fetchGitHubOrgRepos("Pitzi-BD");
     if (repos.length === 0) {
-      console.log("[seed] No GitHub repos found for Renov-BD (token missing or no access).");
+      console.log("[seed] No GitHub repos found for Pitzi-BD (token missing or no access).");
       return;
     }
 

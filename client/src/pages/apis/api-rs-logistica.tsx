@@ -186,7 +186,7 @@ export default function ApiRsLogisticaPage() {
     <div className="flex flex-col min-h-full">
       <PageHeader 
         title="API RS - Logística" 
-        description="Coleção de endpoints para serviços de logística Renov"
+        description="Coleção de endpoints para serviços de logística Pitzi"
         breadcrumbs={[
           { label: "Integrações", href: "/apis" },
           { label: "API RS - Logística" }
@@ -200,8 +200,8 @@ export default function ApiRsLogisticaPage() {
               <Truck className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Renov API - Logística</h2>
-              <p className="text-sm text-muted-foreground">Coleção de endpoints para serviços de logística Renov</p>
+              <h2 className="text-lg font-bold">Pitzi API - Logística</h2>
+              <p className="text-sm text-muted-foreground">Coleção de endpoints para serviços de logística Pitzi</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -283,7 +283,7 @@ export default function ApiRsLogisticaPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        Esta integração permite consultar dados de logística do Dashboard Renov. 
+                        Esta integração permite consultar dados de logística do Dashboard Pitzi. 
                         A API disponibiliza endpoints para consulta de dispositivos e fechamentos.
                       </p>
                       

@@ -256,7 +256,7 @@ git commit -m "feat(ui): criar componente VersionBadge com versão front e back"
 
 - [ ] **Step 1: Importar VersionBadge**
 
-Em `client/src/components/app-sidebar.tsx`, adicionar import após a linha do `RenovLogo`:
+Em `client/src/components/app-sidebar.tsx`, adicionar import após a linha do `PitziLogo`:
 
 ```typescript
 import { VersionBadge } from "./version-badge";
@@ -294,12 +294,12 @@ git commit -m "feat(ui): adicionar VersionBadge no rodapé da sidebar"
 ### Task 6: Fix logo — prepender API_BASE na URL
 
 **Files:**
-- Modify: `client/src/components/renov-logo.tsx:1,19-23,33-34,43-44,73-76`
+- Modify: `client/src/components/pitzi-logo.tsx:1,19-23,33-34,43-44,73-76`
 - Modify: `client/src/pages/configuracoes/brand-settings.tsx:9,11-15,119,158-172,213-214,249-250,295-296`
 
-- [ ] **Step 1: Corrigir renov-logo.tsx — adicionar API_BASE ao normalizeObjectPath**
+- [ ] **Step 1: Corrigir pitzi-logo.tsx — adicionar API_BASE ao normalizeObjectPath**
 
-Em `client/src/components/renov-logo.tsx`, substituir a função `normalizeObjectPath` (linhas 19-23):
+Em `client/src/components/pitzi-logo.tsx`, substituir a função `normalizeObjectPath` (linhas 19-23):
 
 ```typescript
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -364,9 +364,9 @@ queryFn: async () => {
 },
 ```
 
-- [ ] **Step 4: Corrigir renov-logo.tsx — fetch das settings com credenciais**
+- [ ] **Step 4: Corrigir pitzi-logo.tsx — fetch das settings com credenciais**
 
-Em `renov-logo.tsx`, as queries (linhas 33, 43) usam `fetch("/api/settings/...")` sem credenciais. Substituir:
+Em `pitzi-logo.tsx`, as queries (linhas 33, 43) usam `fetch("/api/settings/...")` sem credenciais. Substituir:
 
 Adicionar import:
 
@@ -411,7 +411,7 @@ const requestRes = await fetchWithAuth("/api/uploads/request-url", {
 - [ ] **Step 6: Commit**
 
 ```bash
-git add client/src/components/renov-logo.tsx client/src/pages/configuracoes/brand-settings.tsx
+git add client/src/components/pitzi-logo.tsx client/src/pages/configuracoes/brand-settings.tsx
 git commit -m "fix(logo): prepender API_BASE na URL do logo e usar fetchWithAuth"
 ```
 

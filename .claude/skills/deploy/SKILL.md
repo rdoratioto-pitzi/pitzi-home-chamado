@@ -1,9 +1,9 @@
 ---
 name: deploy
-description: Deploy do Renov Home para produção via Cloudflare Pages — valida tokens, build e publica
+description: Deploy do Pitzi Home para produção via Cloudflare Pages — valida tokens, build e publica
 ---
 
-# Skill: Deploy Renov Home
+# Skill: Deploy Pitzi Home
 
 ## Pré-checagem (NUNCA pular)
 
@@ -64,11 +64,11 @@ Output esperado: pasta `dist/` gerada com o bundle de produção.
 
 ### Etapa 8 — Deploy Cloudflare Pages
 ```bash
-npx wrangler pages deploy dist --project-name renov-home
+npx wrangler pages deploy dist --project-name pitzi-home
 ```
 
 ### Etapa 9 — Confirmar produção
-- Acessar o domínio de produção do Renov Home
+- Acessar o domínio de produção do Pitzi Home
 - Verificar que a build está ativa (checar versão ou feature deployada)
 
 ## Em caso de falha
@@ -80,9 +80,9 @@ npx wrangler pages deploy dist --project-name renov-home
 
 ## Referências
 
-- **Projeto**: `renov-home` (Cloudflare Pages)
+- **Projeto**: `pitzi-home` (Cloudflare Pages)
 - **Build output**: `dist/`
 - **Branch produção**: `main`
 - **Branch dev**: `develop`
 - **Reviewer padrão**: `marcelo-maciel`
-- **Workspace**: `~/Documentos/workspaces/renov.home.macmini/Renov.Home`
+- **Workspace**: `~/Documentos/workspaces/pitzi.home.macmini/Pitzi.Home`

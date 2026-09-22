@@ -1,8 +1,8 @@
 ---
-name: renov-issue-handler
+name: pitzi-issue-handler
 description: >
   Detecta e resolve proativamente issues (bugs e melhorias) abertas no repositorio
-  Renov.Home. Use esta skill quando o usuario pedir para verificar chamados abertos,
+  Pitzi.Home. Use esta skill quando o usuario pedir para verificar chamados abertos,
   resolver bugs, implementar melhorias, ou quando mencionar "issues", "chamados",
   "bugs", "REN-", "Linear", "melhorias pendentes", "backlog", ou qualquer referencia
   a tarefas abertas no projeto. Tambem ativa quando o usuario pede para "assumir um
@@ -10,14 +10,14 @@ description: >
 license: Apache-2.0
 compatibility: Requires git, gh CLI, and access to GitHub Issues / Linear API
 metadata:
-  author: renov-home-team
+  author: pitzi-home-team
   version: "1.0"
 allowed-tools: Bash(git:*) Bash(gh:*) Read Write Edit Glob Grep
 ---
 
-# Renov Issue Handler
+# Pitzi Issue Handler
 
-Skill para deteccao proativa e resolucao automatizada de bugs e melhorias no Renov.Home.
+Skill para deteccao proativa e resolucao automatizada de bugs e melhorias no Pitzi.Home.
 
 ## Fluxo Completo
 
@@ -29,11 +29,11 @@ Buscar issues abertas no repositorio usando GitHub Issues e/ou Linear:
 
 ```bash
 # GitHub Issues - buscar bugs e melhorias abertos
-gh issue list --repo Renov-BD/Renov.Home --state open --label "bug" --json number,title,body,labels,assignees,createdAt
-gh issue list --repo Renov-BD/Renov.Home --state open --label "enhancement" --json number,title,body,labels,assignees,createdAt
+gh issue list --repo Pitzi-BD/Pitzi.Home --state open --label "bug" --json number,title,body,labels,assignees,createdAt
+gh issue list --repo Pitzi-BD/Pitzi.Home --state open --label "enhancement" --json number,title,body,labels,assignees,createdAt
 
 # Se Linear estiver disponivel via MCP, buscar tambem:
-# Issues com status "Todo" ou "In Progress" do projeto Renov Home
+# Issues com status "Todo" ou "In Progress" do projeto Pitzi Home
 ```
 
 Priorizar por:
@@ -75,7 +75,7 @@ Investigar a causa raiz do problema:
 4. **Identificar a causa raiz** para bugs, ou **mapear o escopo** para melhorias
 5. **Verificar dependencias** — outros modulos/funcoes afetados
 
-Arquivos-chave do Renov.Home para investigacao:
+Arquivos-chave do Pitzi.Home para investigacao:
 
 - `shared/schema.ts` — Schema central (Drizzle ORM)
 - `server/storage.ts` — Camada de dados (~126KB)
@@ -119,7 +119,7 @@ Aprovar para prosseguir?
 
 Apos aprovacao:
 
-1. **Criar branch seguindo o padrao** (usar skill renov-git-workflow se disponivel):
+1. **Criar branch seguindo o padrao** (usar skill pitzi-git-workflow se disponivel):
 
    ```bash
    git checkout develop

@@ -1314,9 +1314,9 @@ export const gitRepositories = pgTable("git_repositories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),
   githubId: integer("github_id").notNull(),
-  name: text("name").notNull(),                    // ex: "Renov.Home"
-  fullName: text("full_name").notNull(),           // ex: "Renov-BD/Renov.Home"
-  owner: text("owner").notNull(),                  // ex: "Renov-BD"
+  name: text("name").notNull(),                    // ex: "Pitzi.Home"
+  fullName: text("full_name").notNull(),           // ex: "Pitzi-BD/Pitzi.Home"
+  owner: text("owner").notNull(),                  // ex: "Pitzi-BD"
   defaultBranch: text("default_branch").default("main"),
   isActive: boolean("is_active").default(true),
   syncEnabled: boolean("sync_enabled").default(true),
@@ -1772,7 +1772,7 @@ export type ComercialKpi = typeof comercialKpis.$inferSelect;
 // ============== SLACK THREAD MAPPING ==============
 // Mapeia 1 entidade do Pitzi Home (chamado/projeto) → 1 thread no Slack.
 // Idempotência: garante que cada CHA-XXXX e PRO-XXXX tenha exatamente uma
-// mensagem-mãe no canal #devs-renov, e que updates (replies, reações) usem
+// mensagem-mãe no canal #devs-pitzi, e que updates (replies, reações) usem
 // sempre o mesmo thread_ts. Atividades (kanban_cards) NÃO têm linha aqui —
 // suas notificações replicam na thread do projeto pai.
 export const slackThreadMapping = pgTable(

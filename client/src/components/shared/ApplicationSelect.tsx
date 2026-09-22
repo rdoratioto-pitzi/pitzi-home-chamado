@@ -33,7 +33,7 @@ const SENTINEL_ALL = "__all__";
 const SENTINEL_NULL = "__none__";
 
 /**
- * Dropdown de Aplicação Renov agrupado por categoria.
+ * Dropdown de Aplicação Pitzi agrupado por categoria.
  * Importa a fonte de verdade de shared/applications.ts.
  */
 export function ApplicationSelect({

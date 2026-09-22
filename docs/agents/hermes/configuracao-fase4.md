@@ -2,9 +2,9 @@
 
 A Fase 4 fecha o loop do Hermes: quando o humano clica em **✅ Aprovar**
 na thread Slack, o backend dispara uma segunda Routine — o **Hermes
-Executor** — que recebe o `/prompt-renov` aprovado, executa fielmente
+Executor** — que recebe o `/prompt-pitzi` aprovado, executa fielmente
 no repo correto, abre PR contra `develop`, e reporta status à thread
-Slack original e ao Renov Home.
+Slack original e ao Pitzi Home.
 
 ---
 
@@ -16,7 +16,7 @@ Slack original e ao Renov Home.
    - `execution_started_at`, `execution_completed_at`
    - `execution_pr_url`, `execution_pr_number`
    - `execution_error`
-   - `execution_plan` (snapshot do `/prompt-renov` da Triagem)
+   - `execution_plan` (snapshot do `/prompt-pitzi` da Triagem)
 
 2. **Service** `hermes-executor-trigger.service.ts` (Express + Worker):
    função `fireExecutor(...)` que marca `running` no banco e dispara
@@ -63,10 +63,10 @@ No painel https://claude.ai/code/routines (conta Pitzi):
 
 1. **New Routine** → nome: `Hermes — Executor`.
 2. Repos a habilitar:
-   - `Renov-BD/Renov.Home`
-   - `Renov-BD/Renov.Hub`
-   - `Renov-BD/venus`
-3. Ambiente: `Renov-Default` (mesmo da Triagem).
+   - `Pitzi-BD/Pitzi.Home`
+   - `Pitzi-BD/Pitzi.Hub`
+   - `Pitzi-BD/venus`
+3. Ambiente: `Pitzi-Default` (mesmo da Triagem).
 4. Modelo recomendado: **Sonnet 4.6** (`claude-sonnet-4-6`).
 5. Setup script: incluir antes de qualquer execução:
 
@@ -125,9 +125,9 @@ Configurar o prompt da Routine Executor recém-criada com o conteúdo de
 
 ## Plano de teste E2E (em DEV)
 
-1. Criar um chamado novo em https://home-dev.renovsmart.com.br/workspace/chamados:
+1. Criar um chamado novo em https://home-dev.pitzi.com.br/workspace/chamados:
    - Título: "Teste Fase 4 Hermes Executor"
-   - Aplicação: Renov Home
+   - Aplicação: Pitzi Home
    - Tipo: Bug
 2. Aguardar (≤ 30s) — Hermes Triagem deve postar mensagem-mãe no canal
    de devs com 3 botões.
@@ -148,7 +148,7 @@ Configurar o prompt da Routine Executor recém-criada com o conteúdo de
    ```
 6. Aguardar 3–10 min (Executor rodando).
 7. Esperado:
-   - Reply na thread: `✅ PR aberto: https://github.com/Renov-BD/Renov.Home/pull/<n> — aguardando review do Marcelo`
+   - Reply na thread: `✅ PR aberto: https://github.com/Pitzi-BD/Pitzi.Home/pull/<n> — aguardando review do Marcelo`
    - Banco:
      ```sql
      SELECT execution_status, execution_pr_url, execution_pr_number,
@@ -176,7 +176,7 @@ Se DEV está OK:
    ```
 2. Confirmar `HERMES_EXECUTOR_URL` e `HERMES_EXECUTOR_TOKEN` nos secrets
    do Worker prod (passo 3 acima, sem `--env=dev`).
-3. Atualizar `RENOV_API_URL` da Routine Triagem pra prod (já feito na
+3. Atualizar `PITZI_HOME_API_URL` da Routine Triagem pra prod (já feito na
    Fase 3 em produção).
 4. Repetir o teste E2E em prod com um chamado de teste real.
 
@@ -212,7 +212,7 @@ Se DEV está OK:
 - **`/api/integrations/hermes/execution-update` retorna 401**: o token
   de service account expirou (TTL = 1 ano). Gerar novo via
   `/api/admin/service-accounts/<id>/generate-token` e atualizar
-  `RENOV_API_TOKEN` no ambiente da Routine Executor.
+  `PITZI_HOME_API_TOKEN` no ambiente da Routine Executor.
 - **404 em `execution-update`**: `chamado_id` enviado pelo Executor
   não bate com nenhuma linha — Triagem nunca chamou
   `thread-registered` ou foi limpo. Investigar logs da Triagem.
@@ -227,5 +227,5 @@ Se DEV está OK:
   Executor).
 - Loop de auto-fix em caso de CI vermelho — fica como melhoria futura
   (Fase 5 hipotética).
-- UI no Renov Home mostrando histórico de execuções do Hermes (a tabela
+- UI no Pitzi Home mostrando histórico de execuções do Hermes (a tabela
   já carrega os dados, mas a tela é trabalho separado).

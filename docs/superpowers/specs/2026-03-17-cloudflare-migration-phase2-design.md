@@ -3,7 +3,7 @@
 **Data:** 2026-03-17
 **Status:** Revisado (v4 — 3 rounds de review, verificacao cruzada com codigo-fonte)
 **Autor:** Marcelo + Claude
-**Pre-requisito:** Fase 1 concluida (PR #115) — Worker Hono com auth + settings deployado em `homeapi-dev.renovsmart.com.br`
+**Pre-requisito:** Fase 1 concluida (PR #115) — Worker Hono com auth + settings deployado em `homeapi-dev.pitzi.com.br`
 
 ---
 
@@ -211,9 +211,9 @@ Arquivo inteiro deletado. Todas as importacoes redirecionadas para `useAuth()`.
 **Tarefas:**
 1. Criar script `build:client` no `package.json` raiz: `cd client && vite build` (output: `dist/public/`)
 2. Remover plugins Replit do `vite.config.ts`: `runtimeErrorOverlay`, `cartographer`, `devBanner`
-3. Adicionar variavel `VITE_API_BASE_URL` (ex: `https://homeapi-dev.renovsmart.com.br`)
+3. Adicionar variavel `VITE_API_BASE_URL` (ex: `https://homeapi-dev.pitzi.com.br`)
 4. Conectar repo GitHub ao Cloudflare Pages
-5. Configurar dominio `home-dev.renovsmart.com.br` → Pages
+5. Configurar dominio `home-dev.pitzi.com.br` → Pages
 6. Build command: `npm run build:client`
 7. Output directory: `dist/public`
 8. Branch: `develop` (preview), `main` (producao futura)
@@ -242,7 +242,7 @@ Traducao mecanica Express → Hono. Cada rota:
 | **flowcharts** | 6 | CRUD + checagem de permissao por usuario |
 | **updates** | 4 | CRUD changelog |
 | **labels** | 3 | `bwip-js` para Code128 barcode (PNG base64). Testar com `nodejs_compat`. Rota `GET /api/etiquetas/barcode/:imei` e publica (ja no middleware auth) |
-| **dev-tools** | 2 | Proxy SQL para `dash.renovsmart.com.br`. **Adicionar `requireAdmin`** (hoje nao tem auth). Rota sql-export usa `axios` com `responseType: "stream"` (Node.js streams) — trocar por `fetch()` com `response.body` (ReadableStream) |
+| **dev-tools** | 2 | Proxy SQL para `dash.pitzi.com.br`. **Adicionar `requireAdmin`** (hoje nao tem auth). Rota sql-export usa `axios` com `responseType: "stream"` (Node.js streams) — trocar por `fetch()` com `response.body` (ReadableStream) |
 | **ai** | 4 | SSE streaming — adaptar de `res.write()` para `ReadableStream`. **Grafo de dependencias (nao linear):** `ai.ts` importa diretamente de `openrouter.ts` E de `firecrawl-service.ts`. `openrouter.ts` importa de `external-data.ts` e `firecrawl-service.ts`. Modulos que precisam de factory: `openrouter.ts` (importa `storage` singleton + usa `process.env.OPENROUTER_API_KEY` em 3 pontos), `firecrawl-service.ts` (usa `process.env.FIRECRAWL_API_KEY`). `external-data.ts` usa apenas `fetch()` nativo (API Open-Meteo, sem key). Mais complexo que aparenta |
 
 #### Nota sobre SSE (ai.ts)
@@ -274,9 +274,9 @@ return new Response(
 
 | Rota | Handlers | Notas especificas |
 |---|---|---|
-| **pricing** | 17 | Proxy para API RenovSmart externa via `fetch()`. Depende de `server/services/pricing-service.ts` (201 linhas) — usa `fetch()` com URL hardcoded, compativel com Workers sem alteracoes |
+| **pricing** | 17 | Proxy para API Pitzi externa via `fetch()`. Depende de `server/services/pricing-service.ts` (201 linhas) — usa `fetch()` com URL hardcoded, compativel com Workers sem alteracoes |
 | **omie** | 12 | Integracao ERP. Requer refactor de `omie.service.ts` (ver abaixo) |
-| **integrations** | 11 | APIs externas (RenovSmart, Logistica Reversa) via `fetch()` |
+| **integrations** | 11 | APIs externas (Pitzi, Logistica Reversa) via `fetch()` |
 | **okrs** | 12 | CRUD + permissoes por usuario |
 | **metas** | 12 | CRUD com soft deletes |
 | **knowledge** | 13 | Versionamento de documentos, audit logging |
@@ -525,7 +525,7 @@ worker/
 - [ ] `getStorage(db)` funciona no Worker E `storage` singleton continua funcionando no Express
 - [ ] Email via SendPulse envia pelo menos `sendWelcomeEmail` com sucesso
 - [ ] Client faz login via cookies, `GET /api/auth/me` retorna usuario, logout limpa sessao
-- [ ] Pages deploya em `home-dev.renovsmart.com.br` e carrega o frontend
+- [ ] Pages deploya em `home-dev.pitzi.com.br` e carrega o frontend
 - [ ] Fluxo completo: Pages → login → dashboard funciona end-to-end
 
 ### 2B
@@ -538,7 +538,7 @@ worker/
 - [ ] 7 rotas respondendo no Worker
 - [ ] Omie: `callApi()` retorna dados, config salva no banco, sync logs funcionam
 - [ ] Cache Omie: tabelas criadas, leitura/escrita funciona, TTL 60min respeitado
-- [ ] Pricing: proxy para API RenovSmart retorna dados
+- [ ] Pricing: proxy para API Pitzi retorna dados
 
 ### 2D
 - [ ] 5 rotas respondendo no Worker

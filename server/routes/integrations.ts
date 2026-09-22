@@ -7,7 +7,7 @@ import { requireAuth } from "../middleware/auth";
 export function registerIntegrationRoutes(router: Router) {
   console.log("Registering Integration Routes...");
   const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
-  const RS_API_TOKEN = process.env.RENOVSMART_API_TOKEN || "Renov123";
+  const RS_API_TOKEN = process.env.PITZI_API_TOKEN || "Renov123";
 
   const fetchApoioVendas = async (endpoint: string, query: any) => {
     const params = new URLSearchParams();

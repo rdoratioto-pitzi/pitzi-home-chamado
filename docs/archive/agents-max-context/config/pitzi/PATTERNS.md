@@ -1,4 +1,4 @@
-# 📐 RENOV - Code Patterns & Best Practices
+# 📐 PITZI - Code Patterns & Best Practices
 
 ## Philosophy: "Vibe Coding" with Standards
 
@@ -502,7 +502,7 @@ export function useTickets() {}
 export function formatDate() {}
 
 // Constants: UPPER_SNAKE_CASE
-export const API_BASE_URL = 'https://api.renov.com'
+export const API_BASE_URL = 'https://api.pitzi.com.br'
 
 // Types/Interfaces: PascalCase
 export interface TicketFormProps {}
@@ -654,4 +654,4 @@ Closes #42
 
 ---
 
-These patterns aren't rules to memorize - they're guidelines that emerged from building Renov. When in doubt, look at existing code and follow the pattern. When patterns don't serve you, question them. Pragmatism > dogma. 🚀
+These patterns aren't rules to memorize - they're guidelines that emerged from building Pitzi. When in doubt, look at existing code and follow the pattern. When patterns don't serve you, question them. Pragmatism > dogma. 🚀

@@ -59,7 +59,7 @@ function ImpactoSection({ titulo, over, under, liquido }: {
             </span>
           </div>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            Grade melhor que a correta — Renov paga mais
+            Grade melhor que a correta — Pitzi paga mais
           </p>
         </div>
       </div>

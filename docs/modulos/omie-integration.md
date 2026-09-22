@@ -2,7 +2,7 @@
 
 ## 📋 Visão Geral
 
-A integração com a API Omie permite consultar dados do ERP diretamente no Renov Home, abrangendo:
+A integração com a API Omie permite consultar dados do ERP diretamente no Pitzi Home, abrangendo:
 
 - Gestão de Compras, Estoque e Produção
 - Vendas e Documentos Fiscais (NF-e, NFS-e)
@@ -273,7 +273,7 @@ CREATE TABLE omie_sync_log (
 
 **Causa:** Usuário não autenticado ou sessão expirada
 
-**Solução:** Fazer login novamente no Renov Home
+**Solução:** Fazer login novamente no Pitzi Home
 
 ### Erro 500 - Credenciais Inválidas
 
@@ -347,7 +347,7 @@ CREATE TABLE omie_sync_log (
 - [ ] Webhooks da Omie (se disponível)
 - [ ] Dashboard com métricas consolidadas
 - [ ] Exportação de relatórios (CSV/Excel)
-- [ ] Integrações cruzadas com outros módulos Renov Home
+- [ ] Integrações cruzadas com outros módulos Pitzi Home
 - [ ] Cache de consultas frequentes
 - [ ] Notificações de contas vencidas
 
@@ -371,7 +371,7 @@ https://developer.omie.com.br/service-list/
 
 Acessar painel Omie → Suporte
 
-**Equipe Renov:**
+**Equipe Pitzi:**
 
 - Matheus (CEO/Tech Lead)
 - Marcelo (CTO)

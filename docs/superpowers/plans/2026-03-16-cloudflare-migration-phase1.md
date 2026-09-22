@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stand up a Cloudflare Worker (Hono) with JWT auth, Neon serverless DB, and 2 proof-of-concept routes (auth + settings), deployed to `homeapi-dev.renovsmart.com.br`.
+**Goal:** Stand up a Cloudflare Worker (Hono) with JWT auth, Neon serverless DB, and 2 proof-of-concept routes (auth + settings), deployed to `homeapi-dev.pitzi.com.br`.
 
 **Architecture:** New `worker/` directory at project root containing a Hono app. Uses `@neondatabase/serverless` + `drizzle-orm/neon-http` for per-request DB. JWT via Web Crypto API (HS256). R2 bucket binding configured but not wired to routes yet (Phase 2).
 
@@ -26,7 +26,7 @@
 
 ```json
 {
-  "name": "renov-home-api",
+  "name": "pitzi-home-api",
   "private": true,
   "type": "module",
   "scripts": {
@@ -75,7 +75,7 @@
 - [ ] **Step 3: Create `worker/wrangler.toml`**
 
 ```toml
-name = "renov-home-api"
+name = "pitzi-home-api"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -85,21 +85,21 @@ mode = "smart"
 
 [[r2_buckets]]
 binding = "ATTACHMENTS"
-bucket_name = "renov-home-attachments"
+bucket_name = "pitzi-home-attachments"
 
 [vars]
-APP_URL = "https://home-next.renovsmart.com.br"
-CORS_ORIGIN = "https://home-next.renovsmart.com.br"
+APP_URL = "https://home-next.pitzi.com.br"
+CORS_ORIGIN = "https://home-next.pitzi.com.br"
 
 [env.dev]
-name = "renov-home-api-dev"
+name = "pitzi-home-api-dev"
 [env.dev.vars]
-APP_URL = "https://home-dev.renovsmart.com.br"
-CORS_ORIGIN = "https://home-dev.renovsmart.com.br"
+APP_URL = "https://home-dev.pitzi.com.br"
+CORS_ORIGIN = "https://home-dev.pitzi.com.br"
 
 [[env.dev.r2_buckets]]
 binding = "ATTACHMENTS"
-bucket_name = "renov-home-attachments-dev"
+bucket_name = "pitzi-home-attachments-dev"
 ```
 
 - [ ] **Step 4: Create minimal `worker/src/index.ts`**
@@ -479,7 +479,7 @@ export function setAuthCookies(
   rememberMe: boolean,
 ) {
   const isProduction = c.env.APP_URL.startsWith("https://");
-  const domain = ".renovsmart.com.br";
+  const domain = ".pitzi.com.br";
   const refreshMaxAge = rememberMe ? 7 * 24 * 60 * 60 : 24 * 60 * 60;
 
   // Access token cookie
@@ -504,7 +504,7 @@ export function setAuthCookies(
 }
 
 export function clearAuthCookies(c: Context<AppEnv>) {
-  const domain = ".renovsmart.com.br";
+  const domain = ".pitzi.com.br";
   deleteCookie(c, ACCESS_TOKEN_COOKIE, { domain, path: "/" });
   deleteCookie(c, REFRESH_TOKEN_COOKIE, { domain, path: "/api/auth/" });
 }
@@ -1066,7 +1066,7 @@ auth.post("/api/auth/refresh", async (c) => {
     httpOnly: true,
     secure: isProduction,
     sameSite: "Lax",
-    domain: ".renovsmart.com.br",
+    domain: ".pitzi.com.br",
     path: "/",
     maxAge: 2 * 60 * 60,
   });
@@ -1322,7 +1322,7 @@ git commit -m "feat(worker): add settings routes as proof of concept"
 
 ```bash
 cd worker
-npx wrangler r2 bucket create renov-home-attachments-dev
+npx wrangler r2 bucket create pitzi-home-attachments-dev
 ```
 
 Expected: Bucket created successfully
@@ -1347,33 +1347,33 @@ cd worker
 npx wrangler deploy --env dev
 ```
 
-Expected: Deployed to `renov-home-api-dev.<account>.workers.dev`
+Expected: Deployed to `pitzi-home-api-dev.<account>.workers.dev`
 
 - [ ] **Step 4: Configure custom domain**
 
 In Cloudflare Dashboard:
-1. Go to Workers & Pages → `renov-home-api-dev`
+1. Go to Workers & Pages → `pitzi-home-api-dev`
 2. Settings → Triggers → Custom Domains
-3. Add `homeapi-dev.renovsmart.com.br`
+3. Add `homeapi-dev.pitzi.com.br`
 
 Or via wrangler — add to `wrangler.toml` under `[env.dev]`:
 ```toml
 [[env.dev.routes]]
-pattern = "homeapi-dev.renovsmart.com.br"
+pattern = "homeapi-dev.pitzi.com.br"
 custom_domain = true
 ```
 
 - [ ] **Step 5: Test deployed health check**
 
 ```bash
-curl https://homeapi-dev.renovsmart.com.br/api/health
+curl https://homeapi-dev.pitzi.com.br/api/health
 # Expected: {"status":"ok","db":"connected",...}
 ```
 
 - [ ] **Step 6: Test deployed login**
 
 ```bash
-curl -X POST https://homeapi-dev.renovsmart.com.br/api/auth/login \
+curl -X POST https://homeapi-dev.pitzi.com.br/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"<dev-user-email>","password":"<dev-user-password>"}' \
   -v 2>&1 | grep -E "(Set-Cookie|{)"
@@ -1393,7 +1393,7 @@ git commit -m "chore(worker): configure dev deployment and custom domain"
 ## What's Next
 
 Phase 1 is complete when:
-- [x] Worker runs on `homeapi-dev.renovsmart.com.br`
+- [x] Worker runs on `homeapi-dev.pitzi.com.br`
 - [x] Health check returns DB connected
 - [x] Login returns JWT cookies + user data
 - [x] `/api/auth/me` validates access token and returns user

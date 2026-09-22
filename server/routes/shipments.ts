@@ -209,7 +209,7 @@ export function registerShipmentRoutes(router: Router) {
       const correiosParams: correiosService.SolicitarPostagemReversaParams = {
         codigo_servico: codigoServico,
         destinatario: {
-          nome: destinatario?.nome || 'RENOV SOLUCOES E SERVICOS LTDA',
+          nome: destinatario?.nome || 'PITZI SOLUCOES E SERVICOS LTDA',
           logradouro: destinatario?.logradouro || 'R LUIGI GALVANI',
           numero: destinatario?.numero || '200',
           complemento: destinatario?.complemento,

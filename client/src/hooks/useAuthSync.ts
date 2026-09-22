@@ -16,7 +16,7 @@ export function useAuthSync() {
   useEffect(() => {
     let bc: BroadcastChannel | null = null;
     try {
-      bc = new BroadcastChannel("renov-auth");
+      bc = new BroadcastChannel("pitzi-auth");
       bc.onmessage = (event) => {
         if (event.data?.type === "logout") {
           queryClient.clear();

@@ -1,4 +1,4 @@
-import { PitziLogo as RenovLogo } from "@/components/renov-logo";
+import { PitziLogo } from "@/components/pitzi-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -327,7 +327,7 @@ export default function LoginPage() {
               className="inline-flex items-center justify-center rounded-2xl px-6 py-3"
               style={{ background: "#3B42DE" }}
             >
-              <RenovLogo variant="white" size="md" />
+              <PitziLogo variant="white" size="md" />
             </div>
           </motion.div>
 

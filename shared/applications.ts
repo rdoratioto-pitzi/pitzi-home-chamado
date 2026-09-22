@@ -1,9 +1,9 @@
-// Fonte de verdade das aplicações Renov.
+// Fonte de verdade das aplicações Pitzi.
 // NUNCA hard-codar valores em outro arquivo — sempre importar daqui.
 
 export const APPLICATION_CATEGORIES = [
   "Stack IA",
-  "Renov Smart (Backend)",
+  "Pitzi Smart (Backend)",
   "IA & Avaliação",
   "Dashboard & Site",
   "Manutenção legada",
@@ -26,86 +26,86 @@ export const APPLICATIONS: Record<string, Application> = {
     key: "pitzi-home",
     label: "Pitzi Home",
     category: "Stack IA",
-    repos: ["Renov-BD/Renov.Home"],
+    repos: ["Pitzi-BD/Pitzi.Home"],
     defaultBranch: "develop",
   },
-  "renov-hub": {
-    key: "renov-hub",
-    label: "Renov Hub",
+  "pitzi-hub": {
+    key: "pitzi-hub",
+    label: "Pitzi Hub",
     category: "Stack IA",
-    repos: ["Renov-BD/Renov.Hub"],
+    repos: ["Pitzi-BD/Pitzi.Hub"],
     defaultBranch: "develop",
   },
   "venus": {
     key: "venus",
     label: "Venus",
     category: "Stack IA",
-    repos: ["Renov-BD/venus"],
+    repos: ["Pitzi-BD/venus"],
     defaultBranch: "main",
   },
 
-  // Renov Smart (Backend)
-  "renov-smart": {
-    key: "renov-smart",
-    label: "Renov Smart (RS)",
-    category: "Renov Smart (Backend)",
+  // Pitzi Smart (Backend)
+  "pitzi-smart": {
+    key: "pitzi-smart",
+    label: "Pitzi Smart (RS)",
+    category: "Pitzi Smart (Backend)",
     repos: [
-      "Renov-BD/Pitzi.Api",
-      "Renov-BD/Pitzi.Front",
-      "Renov-BD/Pitzi.Infra",
-      "Renov-BD/Pitzi.DataLake.Infra",
+      "Pitzi-BD/Pitzi.Api",
+      "Pitzi-BD/Pitzi.Front",
+      "Pitzi-BD/Pitzi.Infra",
+      "Pitzi-BD/Pitzi.DataLake.Infra",
     ],
     defaultBranch: "main",
   },
-  "renov-smart-api": {
-    key: "renov-smart-api",
+  "pitzi-smart-api": {
+    key: "pitzi-smart-api",
     label: "Pitzi API",
-    category: "Renov Smart (Backend)",
-    repos: ["Renov-BD/Pitzi.Api"],
+    category: "Pitzi Smart (Backend)",
+    repos: ["Pitzi-BD/Pitzi.Api"],
     defaultBranch: "main",
   },
-  "renov-smart-front": {
-    key: "renov-smart-front",
+  "pitzi-smart-front": {
+    key: "pitzi-smart-front",
     label: "Pitzi Front",
-    category: "Renov Smart (Backend)",
-    repos: ["Renov-BD/Pitzi.Front"],
+    category: "Pitzi Smart (Backend)",
+    repos: ["Pitzi-BD/Pitzi.Front"],
     defaultBranch: "main",
   },
-  "renov-smart-infra": {
-    key: "renov-smart-infra",
+  "pitzi-smart-infra": {
+    key: "pitzi-smart-infra",
     label: "Pitzi Infra",
-    category: "Renov Smart (Backend)",
-    repos: ["Renov-BD/Pitzi.Infra"],
+    category: "Pitzi Smart (Backend)",
+    repos: ["Pitzi-BD/Pitzi.Infra"],
     defaultBranch: "main",
   },
-  "renov-smart-datalake": {
-    key: "renov-smart-datalake",
+  "pitzi-smart-datalake": {
+    key: "pitzi-smart-datalake",
     label: "Pitzi DataLake",
-    category: "Renov Smart (Backend)",
-    repos: ["Renov-BD/Pitzi.DataLake.Infra"],
+    category: "Pitzi Smart (Backend)",
+    repos: ["Pitzi-BD/Pitzi.DataLake.Infra"],
     defaultBranch: "main",
   },
 
   // IA & Avaliação
-  "renov-ia-backend": {
-    key: "renov-ia-backend",
-    label: "Renov IA Backend",
+  "pitzi-ia-backend": {
+    key: "pitzi-ia-backend",
+    label: "Pitzi IA Backend",
     category: "IA & Avaliação",
-    repos: ["Renov-BD/RenovIA.BackEnd"],
+    repos: ["Pitzi-BD/PitziIA.BackEnd"],
     defaultBranch: "main",
   },
-  "renov-ia-vc": {
-    key: "renov-ia-vc",
-    label: "Renov IA VC",
+  "pitzi-ia-vc": {
+    key: "pitzi-ia-vc",
+    label: "Pitzi IA VC",
     category: "IA & Avaliação",
-    repos: ["Renov-BD/RenovIA.VC"],
+    repos: ["Pitzi-BD/PitziIA.VC"],
     defaultBranch: "main",
   },
-  "renov-avaliador-macnotes": {
-    key: "renov-avaliador-macnotes",
+  "pitzi-avaliador-macnotes": {
+    key: "pitzi-avaliador-macnotes",
     label: "Avaliador MacNotes",
     category: "IA & Avaliação",
-    repos: ["Renov-BD/Renov.AvaliadorMacNotes"],
+    repos: ["Pitzi-BD/Pitzi.AvaliadorMacNotes"],
     defaultBranch: "main",
   },
 
@@ -114,37 +114,37 @@ export const APPLICATIONS: Record<string, Application> = {
     key: "dashboards",
     label: "Dashboard",
     category: "Dashboard & Site",
-    repos: ["Renov-BD/Dashboards"],
+    repos: ["Pitzi-BD/Dashboards"],
     defaultBranch: "main",
   },
   "pitzi-com-br": {
     key: "pitzi-com-br",
     label: "pitzi.com.br",
     category: "Dashboard & Site",
-    repos: ["Renov-BD/pitzi.com.br"],
+    repos: ["Pitzi-BD/pitzi.com.br"],
     defaultBranch: "main",
   },
 
   // Manutenção legada
-  "renov-hubfront": {
-    key: "renov-hubfront",
-    label: "Renov HubFront",
+  "pitzi-hubfront": {
+    key: "pitzi-hubfront",
+    label: "Pitzi HubFront",
     category: "Manutenção legada",
-    repos: ["Renov-BD/Renov.HubFront"],
+    repos: ["Pitzi-BD/Pitzi.HubFront"],
     defaultBranch: "main",
   },
-  "renov-go-api": {
-    key: "renov-go-api",
-    label: "RenovGo API",
+  "pitzi-go-api": {
+    key: "pitzi-go-api",
+    label: "PitziGo API",
     category: "Manutenção legada",
-    repos: ["Renov-BD/RenovGoAppleAPI"],
+    repos: ["Pitzi-BD/PitziGoAppleAPI"],
     defaultBranch: "main",
   },
-  "renov-go-front": {
-    key: "renov-go-front",
-    label: "RenovGo Front",
+  "pitzi-go-front": {
+    key: "pitzi-go-front",
+    label: "PitziGo Front",
     category: "Manutenção legada",
-    repos: ["Renov-BD/RenovGoFront"],
+    repos: ["Pitzi-BD/PitziGoFront"],
     defaultBranch: "main",
   },
 

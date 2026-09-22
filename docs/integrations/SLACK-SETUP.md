@@ -1,13 +1,13 @@
-# Integração Slack — Renov Home
+# Integração Slack — Pitzi Home
 
 > Status: **Fase 1 (de 4)** — fundação outbound. Mensagens são enviadas do
-> Renov Home para o Slack quando eventos acontecem nos módulos Workspace
+> Pitzi Home para o Slack quando eventos acontecem nos módulos Workspace
 > (Chamados + Projetos + Atividades). Eventos inbound (slash commands,
 > botões interativos) virão na Fase 2.
 
 ## 1. Visão geral
 
-Quando essa integração está ativa, o canal `#devs-renov` (workspace Pitzi)
+Quando essa integração está ativa, o canal `#devs-pitzi` (workspace Pitzi)
 recebe automaticamente:
 
 | Evento | Tipo de mensagem |
@@ -35,20 +35,20 @@ A tabela `slack_thread_mapping` garante a idempotência (1 entidade = 1 thread).
 ### Política de visibilidade
 
 Projetos com `visibility = 'private'` **NÃO** geram mensagem no canal público
-`#devs-renov`. Atividades em projetos privados também não vazam (caem no
+`#devs-pitzi`. Atividades em projetos privados também não vazam (caem no
 silêncio porque o projeto pai não tem mapping).
 
 ### Mapeamento de usuários
 
 Como todas as contas do Slack são corporativas Pitzi (`@pitzi.com.br`) e os
-usuários do Renov Home têm o mesmo email, o match é automático via
+usuários do Pitzi Home têm o mesmo email, o match é automático via
 `users.lookupByEmail`. O Slack User ID é cacheado em `users.slack_user_id`
 após a primeira resolução para evitar lookups repetidos.
 
 ## 2. Criar a Slack App
 
 1. Vá para [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** → **From scratch**.
-2. Nome sugerido: `Renov Home`. Workspace: **Pitzi**.
+2. Nome sugerido: `Pitzi Home`. Workspace: **Pitzi**.
 
 ### 2.1 Bot Token Scopes
 
@@ -77,15 +77,15 @@ Copie e salve — esse é o `SLACK_BOT_TOKEN`.
 No Slack:
 
 ```
-/invite @Renov Home
+/invite @Pitzi Home
 ```
 
-executado dentro de `#devs-renov`. Sem isso, o bot pode postar mas não
+executado dentro de `#devs-pitzi`. Sem isso, o bot pode postar mas não
 consegue ler histórico (não importa para Fase 1 — só importa em Fase 2).
 
 ### 2.4 Pegar o Channel ID
 
-No Slack desktop, clique no nome `#devs-renov` no topo do canal → ver
+No Slack desktop, clique no nome `#devs-pitzi` no topo do canal → ver
 detalhes → role até o final → **Channel ID** (começa com `C…`). Esse é o
 `SLACK_CHANNEL_DEVS`.
 
@@ -156,7 +156,7 @@ npm run dev
 
 1. Abrir [http://localhost:5050](http://localhost:5050)
 2. Criar um chamado teste no módulo Workspace
-3. Verificar mensagem em `#devs-renov` — deve mostrar `🎫 Novo chamado: CHA-XXXX`
+3. Verificar mensagem em `#devs-pitzi` — deve mostrar `🎫 Novo chamado: CHA-XXXX`
 4. Atribuir o chamado a um usuário Pitzi → reação 🙋 + reply na thread + DM
 5. Mudar status para `resolved` → reação ✅ + reply na thread
 
@@ -168,8 +168,8 @@ npm run dev
 | Sintoma | Causa provável | Como verificar |
 |---|---|---|
 | Nenhuma mensagem chega | `SLACK_INTEGRATION_ENABLED=false` ou token ausente | `grep "[slack]" logs` |
-| `users_not_found` em DMs | Email do Renov ≠ email do Slack | Verificar `users.email` |
-| `not_in_channel` | Bot não foi adicionado ao canal | Rodar `/invite @Renov Home` no canal |
+| `users_not_found` em DMs | Email do Pitzi ≠ email do Slack | Verificar `users.email` |
+| `not_in_channel` | Bot não foi adicionado ao canal | Rodar `/invite @Pitzi Home` no canal |
 | `channel_not_found` | `SLACK_CHANNEL_DEVS` errado | Pegar Channel ID novamente (passo 2.4) |
 | Atividades não aparecem | Projeto pai não tem mapping (private ou pré-integração) | Esperado — política de visibilidade |
 | Mensagem duplicada | Idempotência foi quebrada | Verificar `slack_thread_mapping` no DB |

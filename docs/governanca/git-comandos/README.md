@@ -2,7 +2,7 @@
 
 ## 🚀 Comece Aqui
 
-Este guia contém todos os comandos essenciais do Git para trabalhar com o repositório Renov.Home.
+Este guia contém todos os comandos essenciais do Git para trabalhar com o repositório Pitzi.Home.
 
 ---
 
@@ -91,7 +91,7 @@ O SSH já está configurado. Para testar a conexão:
 ssh -T git@github.com
 ```
 
-Resposta esperada: `Hi Renov-BD! You've successfully authenticated...`
+Resposta esperada: `Hi Pitzi-BD! You've successfully authenticated...`
 
 ---
 
@@ -125,6 +125,6 @@ git checkout -b nome-nova-branch
 
 ## ℹ️ Informações do Repositório
 
-- **Remote**: git@github.com:Renov-BD/Renov.Home.git
+- **Remote**: git@github.com:Pitzi-BD/Pitzi.Home.git
 - **SSH**: ✅ Configurado
 - **Aliases**: ✅ Configurados

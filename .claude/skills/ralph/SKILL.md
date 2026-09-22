@@ -19,7 +19,7 @@ Each item follows the full git workflow automatically.
 
 For each PRD item:
 1. **Create branch** — `feat/REN-XXX-description` from `develop`
-2. **Implement** — write code following Renov standards
+2. **Implement** — write code following Pitzi standards
 3. **Test** — run tests, verify build passes
 4. **Commit** — conventional commits format
 5. **PR** — create PR against `develop` with reviewer `marcelo-maciel`
@@ -54,14 +54,14 @@ Ralph expects a numbered list with clear acceptance criteria:
 
 - **Always** base branch: `develop`
 - **Always** deliver via PR (never direct push to main)
-- **Always** follow Renov git conventions
+- **Always** follow Pitzi git conventions
 - **Always** run `npm run check` before committing
 - Report progress after each completed item
 
 ## Integration
 
-- Uses `renov-git-workflow` for branch/commit/PR conventions
-- Uses `renov-brand` for any UI work
+- Uses `pitzi-git-workflow` for branch/commit/PR conventions
+- Uses `pitzi-brand` for any UI work
 - Repo reference: https://github.com/snarktank/ralph
 
 ## Progress Report Format

@@ -11,7 +11,7 @@ import fs from 'fs';
 const program = new Command();
 
 program
-  .name('renov-dev')
+  .name('pitzi-dev')
   .description('🤖 AI Dev System - Automação de desenvolvimento')
   .version('2.0.0');
 
@@ -22,7 +22,7 @@ program
   .option('-m, --model <nome>', 'Modelo a usar', 'Minimax M2.5')
   .option('--dry-run', 'Simular sem executar')
   .action(async (planPath: string, options: any) => {
-    console.log('\n🤖 Renov AI Dev System V2\n');
+    console.log('\n🤖 Pitzi AI Dev System V2\n');
     
     try {
       const fullPath = path.resolve(planPath);

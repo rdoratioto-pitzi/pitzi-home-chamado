@@ -1,3 +1,3 @@
 #!/bin/bash
-cd ~/Documents/Workspaces/Renov-Home2/Renov.Home/agents
+cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home/agents
 npm run agents

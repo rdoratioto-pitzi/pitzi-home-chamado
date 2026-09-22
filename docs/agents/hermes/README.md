@@ -1,7 +1,7 @@
 # Hermes — Agente de Triagem e Execução de Chamados
 
 > Agente baseado em Claude que recebe eventos de chamados (tickets) do
-> Renov.Home, faz triagem inicial e — quando aplicável — executa ações
+> Pitzi.Home, faz triagem inicial e — quando aplicável — executa ações
 > diretamente via API usando uma service account dedicada.
 
 ## Status
@@ -18,10 +18,10 @@
 Hermes nasce como uma combinação de três peças:
 
 1. **Routines da Anthropic** — orquestra os prompts de triagem e execução,
-   recebendo o contexto do chamado via webhook do Renov.Home.
-2. **Slack App da Renov** — entrega o resultado da triagem ao canal/DM
+   recebendo o contexto do chamado via webhook do Pitzi.Home.
+2. **Slack App da Pitzi** — entrega o resultado da triagem ao canal/DM
    apropriado e captura aprovações humanas para ações executáveis.
-3. **Service account `hermes@renovsmart.com.br`** — credencial técnica do agente
+3. **Service account `hermes@pitzi.com.br`** — credencial técnica do agente
    no banco do Home. É o "usuário" que aparece como autor de comentários
    em chamados quando Hermes age, e é dela que sai o token Bearer usado
    nas chamadas autenticadas para a API do Home.
@@ -47,8 +47,8 @@ A Fase 2 conecta o ponto de criação de chamado à Routine Hermes:
 - `server/services/hermes-trigger.service.ts` (Express) e
   `worker/src/services/hermes-trigger.service.ts` (Worker) são acionados
   por hook fire-and-forget na rota `POST /api/tickets`.
-- Disparo só ocorre se `type === 'bug'` e `applicationKey ∈ {renov-home,
-  renov-hub, venus}`. `pitzi-duda` é explicitamente bloqueada.
+- Disparo só ocorre se `type === 'bug'` e `applicationKey ∈ {pitzi-home,
+  pitzi-hub, venus}`. `pitzi-duda` é explicitamente bloqueada.
 - Em caso de falha de rede, timeout ou config ausente, o serviço loga e
   retorna; a criação do chamado **nunca** é afetada.
 

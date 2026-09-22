@@ -59,7 +59,7 @@ class OpenRouterService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`,
           'HTTP-Referer': 'https://pitzi.com.br',
-          'X-Title': 'Renov AI Dev System',
+          'X-Title': 'Pitzi AI Dev System',
         },
         body: JSON.stringify({
           model: params.model,

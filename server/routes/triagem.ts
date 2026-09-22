@@ -12,7 +12,7 @@ import {
 } from "../services/triagem.service";
 
 const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
-const RS_API_TOKEN = process.env.RENOVSMART_API_TOKEN || "Renov123";
+const RS_API_TOKEN = process.env.PITZI_API_TOKEN || "Renov123";
 
 function buildSearchParams(query: Record<string, unknown>) {
   const params = new URLSearchParams();

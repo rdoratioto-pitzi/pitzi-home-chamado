@@ -12,7 +12,7 @@ import {
 
 const pricing = new Hono<AppEnv>();
 
-const RENOVSMART_API_BASE = "https://rp.pitzi.com.br/api";
+const PITZI_API_BASE = "https://rp.pitzi.com.br/api";
 
 // ============== PRICING API PROXY (Pitzi) ==============
 
@@ -32,7 +32,7 @@ pricing.get("/api/pricing/eligible-devices", async (c) => {
     params.append("pageNumber", pageNumber);
     params.append("pageSize", pageSize);
 
-    const url = `${RENOVSMART_API_BASE}/eligible-devices?${params.toString()}`;
+    const url = `${PITZI_API_BASE}/eligible-devices?${params.toString()}`;
     const response = await fetch(url, {
       method: "GET",
       headers: {
@@ -72,7 +72,7 @@ pricing.get("/api/pricing/search", async (c) => {
     const queryParams = new URLSearchParams(
       c.req.query() as Record<string, string>,
     ).toString();
-    const url = `${RENOVSMART_API_BASE}/search?${queryParams}`;
+    const url = `${PITZI_API_BASE}/search?${queryParams}`;
     const response = await fetch(url);
     if (!response.ok) return c.json({ raw: { shopping_results: [] } });
     const data = await response.json();
@@ -89,7 +89,7 @@ pricing.get("/api/pricing/agg/by-device", async (c) => {
     const queryParams = new URLSearchParams(
       c.req.query() as Record<string, string>,
     ).toString();
-    const url = `${RENOVSMART_API_BASE}/agg/by-device?${queryParams}`;
+    const url = `${PITZI_API_BASE}/agg/by-device?${queryParams}`;
     const response = await fetch(url);
     if (!response.ok) return c.json([]);
     const data = await response.json();
@@ -106,7 +106,7 @@ pricing.get("/api/pricing/eligible-devices/price", async (c) => {
     const queryParams = new URLSearchParams(
       c.req.query() as Record<string, string>,
     ).toString();
-    const url = `${RENOVSMART_API_BASE}/eligible-devices/price?${queryParams}`;
+    const url = `${PITZI_API_BASE}/eligible-devices/price?${queryParams}`;
     const response = await fetch(url);
     if (!response.ok) return c.json({});
     const data = await response.json();
@@ -143,7 +143,7 @@ pricing.get("/api/pricing/devices", async (c) => {
       params.append("pageNumber", "1");
       params.append("pageSize", "200");
 
-      const url = `${RENOVSMART_API_BASE}/eligible-devices?${params.toString()}`;
+      const url = `${PITZI_API_BASE}/eligible-devices?${params.toString()}`;
       const response = await fetch(url);
       if (response.ok) {
         const data = (await response.json()) as any;

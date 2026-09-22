@@ -103,7 +103,7 @@ Two new services are introduced: `github-sync.ts` (copy from Express with depend
 
 | Method | Path | Auth | Notes |
 |--------|------|------|-------|
-| POST | `/api/integrations/relatorio-pedidos/test-connection` | public | Tests RenovSmart API connection |
+| POST | `/api/integrations/relatorio-pedidos/test-connection` | public | Tests Pitzi API connection |
 | GET | `/api/integrations/relatorio-pedidos/orders/advanced` | public | Proxy with 16 query params |
 | POST | `/api/logistica-reversa/eventos` | public | Webhook receiver, validates with Zod |
 | GET | `/api/avaliacoes-ia/resumo` | public | AI evaluation proxy |

@@ -1,4 +1,4 @@
-# Renov Typography Guide
+# Pitzi Typography Guide
 
 ## Font Import
 

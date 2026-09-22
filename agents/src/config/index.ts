@@ -3,7 +3,7 @@ import path from 'path';
 
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const renovHomePath = path.resolve(__dirname, '../../../');
+const pitziHomePath = path.resolve(__dirname, '../../../');
 
 export const config = {
   anthropic: {
@@ -17,16 +17,16 @@ export const config = {
     name: process.env.GITHUB_REPO!.split('/')[1],
   },
   paths: {
-    renovHome: renovHomePath,
-    shared: path.join(renovHomePath, 'shared'),
-    server: path.join(renovHomePath, 'server'),
-    client: path.join(renovHomePath, 'client/src'),
+    pitziHome: pitziHomePath,
+    shared: path.join(pitziHomePath, 'shared'),
+    server: path.join(pitziHomePath, 'server'),
+    client: path.join(pitziHomePath, 'client/src'),
     agentsLogs: path.join(__dirname, '../../logs'),
   },
 };
 
 console.log('🔧 Configuração dos Agentes:');
-console.log(`   Projeto Pitzi Home: ${config.paths.renovHome}`);
+console.log(`   Projeto Pitzi Home: ${config.paths.pitziHome}`);
 console.log(`   GitHub Repo: ${config.github.repo}`);
 
 if (!config.anthropic.apiKey) {

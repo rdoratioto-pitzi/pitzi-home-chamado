@@ -165,7 +165,7 @@ export default function RomaneiosPage() {
           <div>
             <h1 className="text-2xl font-bold" data-testid="title-romaneios">Romaneios</h1>
             <p className="text-sm text-muted-foreground">
-              Consulte coletas do Dashboard Renov com filtros avançados
+              Consulte coletas do Dashboard Pitzi com filtros avançados
             </p>
           </div>
         </div>

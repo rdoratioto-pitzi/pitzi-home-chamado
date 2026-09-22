@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ========================================
-# 🚀 Script Git Automatizado - Renov.Home
+# 🚀 Script Git Automatizado - Pitzi.Home
 # ========================================
 
 # Cores
@@ -12,7 +12,7 @@ VERMELHO='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${AZUL}========================================${NC}"
-echo -e "${AZUL}  🚀 Git Automatizado - Renov.Home${NC}"
+echo -e "${AZUL}  🚀 Git Automatizado - Pitzi.Home${NC}"
 echo -e "${AZUL}========================================${NC}"
 echo ""
 

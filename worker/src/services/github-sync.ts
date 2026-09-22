@@ -26,7 +26,7 @@ async function githubFetch(endpoint: string, githubToken: string): Promise<any> 
     headers: {
       Authorization: `token ${githubToken}`,
       Accept: "application/vnd.github.v3+json",
-      "User-Agent": "Renov-Home-App",
+      "User-Agent": "Pitzi-Home-App",
     },
   });
 

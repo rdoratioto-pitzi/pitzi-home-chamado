@@ -1,4 +1,4 @@
-# Renov Components Reference
+# Pitzi Components Reference
 
 Detailed CSS examples for every core component. All values reference `tokens.css`.
 

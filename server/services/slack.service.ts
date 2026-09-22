@@ -226,7 +226,7 @@ export async function resolveSlackUserIdByEmail(
   try {
     const result = await client.users.lookupByEmail({ email });
     if (!result.ok || !result.user?.id) {
-      // "users_not_found" é comum se o email do Renov ≠ email do Slack
+      // "users_not_found" é comum se o email do Pitzi ≠ email do Slack
       return null;
     }
     return result.user.id;

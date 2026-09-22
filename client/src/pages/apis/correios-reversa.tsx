@@ -169,7 +169,7 @@ export default function CorreiosReversaPage() {
       const payload = {
         codigo_servico: data.codigo_servico,
         destinatario: {
-          nome: "RENOV SOLUCOES E SERVICOS LTDA",
+          nome: "PITZI SOLUCOES E SERVICOS LTDA",
           logradouro: "R LUIGI GALVANI",
           numero: "200",
           complemento: "CONJ 11",
@@ -517,7 +517,7 @@ export default function CorreiosReversaPage() {
                             Destinatário Fixo (Sua Empresa)
                           </h4>
                           <div className="text-xs space-y-1 text-muted-foreground">
-                            <p><strong>Nome:</strong> RENOV SOLUCOES E SERVICOS LTDA</p>
+                            <p><strong>Nome:</strong> PITZI SOLUCOES E SERVICOS LTDA</p>
                             <p><strong>Endereço:</strong> R LUIGI GALVANI, 200, CONJ 11</p>
                             <p><strong>Bairro/Cidade:</strong> CIDADE MONCOES, SAO PAULO - SP</p>
                             <p><strong>CEP:</strong> 04575-020</p>

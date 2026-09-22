@@ -329,7 +329,7 @@ function BidirectionalErrorCard({ errors, isLoading }: { errors: ErrorBreakdown;
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  IA deu grade melhor que a correta (ex: IA=A, correto=C) — Renov paga mais
+                  IA deu grade melhor que a correta (ex: IA=A, correto=C) — Pitzi paga mais
                 </p>
               </div>
             </div>

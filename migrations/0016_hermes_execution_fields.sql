@@ -12,7 +12,7 @@
 --     - execution_pr_url        URL do PR aberto pela Routine
 --     - execution_pr_number     número do PR aberto
 --     - execution_error         mensagem de erro (apenas quando failed)
---     - execution_plan          snapshot do /prompt-renov gerado pela Triagem
+--     - execution_plan          snapshot do /prompt-pitzi gerado pela Triagem
 
 ALTER TABLE hermes_slack_threads
   ADD COLUMN IF NOT EXISTS execution_status       TEXT,

@@ -438,7 +438,7 @@ function SecaoGrades() {
               Percentuais conforme <strong>POP 101 — Avaliação Estética de Dispositivos V3</strong>.
             </p>
             <p>
-              Alterações devem ser feitas via revisão do POP com aprovação da Renov.
+              Alterações devem ser feitas via revisão do POP com aprovação da Pitzi.
             </p>
             <p className="text-muted-foreground">
               Última revisão: Dezembro 2025 · Próxima revisão: Junho 2026

@@ -1,6 +1,6 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { config } from '../config';
-import { renovHomeContext } from '../config/renov-context';
+import { pitziHomeContext } from '../config/pitzi-context';
 import { AgentState } from '../types/agent-state';
 import fs from 'fs';
 import path from 'path';
@@ -29,7 +29,7 @@ export async function neo(state: AgentState): Promise<Partial<AgentState>> {
     let statusArquivo = '➕ NOVO';
     
     try {
-      const caminhoCompleto = path.join(config.paths.renovHome, arquivo);
+      const caminhoCompleto = path.join(config.paths.pitziHome, arquivo);
       if (fs.existsSync(caminhoCompleto)) {
         conteudoAtual = fs.readFileSync(caminhoCompleto, 'utf-8');
         statusArquivo = '✏️ MODIFICAR';
@@ -39,7 +39,7 @@ export async function neo(state: AgentState): Promise<Partial<AgentState>> {
     }
 
     const promptKilo = `
-${renovHomeContext}
+${pitziHomeContext}
 
 # Neo - Implementador de Código
 

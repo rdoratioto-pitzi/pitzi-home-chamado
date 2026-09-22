@@ -4,43 +4,43 @@ title = "Pitzi Home — Gitleaks Config"
 useDefault = true
 
 # ══════════════════════════════════════════════
-# REGRAS CUSTOMIZADAS RENOV HOME
-# Herda 150+ regras padrão + adiciona Renov-específicas
+# REGRAS CUSTOMIZADAS PITZI HOME
+# Herda 150+ regras padrão + adiciona Pitzi-específicas
 # ══════════════════════════════════════════════
 
 # Omie ERP credentials
 [[rules]]
-id = "renov-omie-appkey"
+id = "pitzi-omie-appkey"
 description = "Omie ERP App Key exposta"
 regex = '''(?i)(omie[_-]?app[_-]?key\s*[=:]\s*['"]?\d{10,}['"]?)'''
-tags = ["renov", "omie", "credentials"]
+tags = ["pitzi", "omie", "credentials"]
 
 [[rules]]
-id = "renov-omie-appsecret"
+id = "pitzi-omie-appsecret"
 description = "Omie ERP App Secret exposto"
 regex = '''(?i)(omie[_-]?app[_-]?secret\s*[=:]\s*['"][a-zA-Z0-9]{20,}['"])'''
-tags = ["renov", "omie", "credentials"]
+tags = ["pitzi", "omie", "credentials"]
 
 # Neon Postgres connection strings
 [[rules]]
-id = "renov-neon-connection"
+id = "pitzi-neon-connection"
 description = "Neon Postgres connection string exposta"
 regex = '''postgres(?:ql)?://[^:]+:[^@]+@[a-z0-9-]+\.neon\.tech[^\s'"]*'''
-tags = ["renov", "database", "neon"]
+tags = ["pitzi", "database", "neon"]
 
 # Express session secret
 [[rules]]
-id = "renov-express-session-secret"
+id = "pitzi-express-session-secret"
 description = "Express session secret hardcoded"
 regex = '''(?i)(session[_-]?secret\s*[=:]\s*['"][^'"$\s]{8,}['"])'''
-tags = ["renov", "express", "session"]
+tags = ["pitzi", "express", "session"]
 
 # Cloudflare tokens (Home usa Cloudflare para deploy)
 [[rules]]
-id = "renov-cloudflare-token"
+id = "pitzi-cloudflare-token"
 description = "Cloudflare API token exposto"
 regex = '''(?i)(cloudflare[_-]?(?:api[_-]?)?token\s*[=:]\s*['"][a-zA-Z0-9_-]{40,}['"])'''
-tags = ["renov", "cloudflare", "credentials"]
+tags = ["pitzi", "cloudflare", "credentials"]
 
 # ══════════════════════════════════════════════
 # ALLOWLIST GLOBAL — falsos positivos conhecidos

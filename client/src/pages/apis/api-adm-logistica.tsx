@@ -413,7 +413,7 @@ export default function ApiAdmLogisticaPage() {
     <div className="flex flex-col min-h-full">
       <PageHeader 
         title="Administração Logística" 
-        description="Integração com a API de Administração Logística do Dashboard Renov."
+        description="Integração com a API de Administração Logística do Dashboard Pitzi."
         breadcrumbs={[
           { label: "Integrações", href: "/apis" },
           { label: "Administração Logística" }
@@ -427,7 +427,7 @@ export default function ApiAdmLogisticaPage() {
               <Settings2 className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Admin Logística API - Dashboard Renov</h2>
+              <h2 className="text-lg font-bold">Admin Logística API - Dashboard Pitzi</h2>
               <p className="text-sm text-muted-foreground">Documentação oficial das APIs de Administração Logística</p>
             </div>
           </div>
@@ -526,7 +526,7 @@ export default function ApiAdmLogisticaPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        Esta integração permite consultar dados de administração logística do Dashboard Renov. 
+                        Esta integração permite consultar dados de administração logística do Dashboard Pitzi. 
                         A API disponibiliza endpoints para coletas, recebimentos, triagem, bloqueados, 
                         manutenção e divergentes.
                       </p>

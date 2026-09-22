@@ -126,7 +126,7 @@ const NODE_COLORS = [
   { name: "Amarelo", bg: "#fef9c3", border: "#eab308", text: "#854d0e" },
   { name: "Vermelho", bg: "#fee2e2", border: "#ef4444", text: "#991b1b" },
   { name: "Roxo", bg: "#f3e8ff", border: "#a855f7", text: "#6b21a8" },
-  { name: "Renov", bg: "#d1fae5", border: "#00A137", text: "#065f46" },
+  { name: "Pitzi", bg: "#d1fae5", border: "#00A137", text: "#065f46" },
 ];
 
 function RectangleNode({ data, selected }: { data: any; selected: boolean }) {

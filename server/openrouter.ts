@@ -160,7 +160,7 @@ async function getSystemPrompt(options: ContextOptions = {}): Promise<string> {
 
   const flowchartsContext = flowchartsList.slice(0, 15).map(f => `- ${f.title}${f.description ? `: ${f.description.substring(0, 100)}` : ''}`).join("\n");
 
-  const prompt = `Voce e o Chat IA, o assistente virtual estrategico da Pitzi Home - uma plataforma interna de gestao empresarial da Renov.
+  const prompt = `Voce e o Chat IA, o assistente virtual estrategico da Pitzi Home - uma plataforma interna de gestao empresarial da Pitzi.
 Voce e um assistente avancado capaz de: analisar dados, gerar relatorios, sugerir codigo, criar prompts, identificar tendencias e fornecer insights estrategicos.
 Voce tambem pode analisar imagens enviadas pelos usuarios.
 

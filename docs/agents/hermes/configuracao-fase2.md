@@ -2,7 +2,7 @@
 
 > Esta página documenta como ligar o webhook outbound de chamados → Routine
 > Hermes em ambientes dev e prod. Pré-requisito: Fase 1 mergeada (service
-> account `hermes@renovsmart.com.br` + endpoint de geração de token).
+> account `hermes@pitzi.com.br` + endpoint de geração de token).
 
 ## Variáveis novas
 
@@ -16,7 +16,7 @@ loga `"config-ausente"` e segue o fluxo normal de criação do chamado.
 
 ## Onde obter os valores
 
-1. Acessar https://claude.com/code → painel da conta Renov
+1. Acessar https://claude.com/code → painel da conta Pitzi
 2. Routines → criar (ou editar) a Routine `Hermes Triage`
 3. Aba **Triggers** → criar trigger HTTP
 4. Copiar:
@@ -47,10 +47,10 @@ npm run dev
 curl -X POST http://localhost:5050/api/tickets \
   -H "Content-Type: application/json" \
   -H "Cookie: <sessão admin>" \
-  -d '{"title":"teste hermes","description":"x","category":"...","type":"bug","applicationKey":"renov-home"}'
+  -d '{"title":"teste hermes","description":"x","category":"...","type":"bug","applicationKey":"pitzi-home"}'
 
 # Logs do server devem mostrar:
-# [hermes-trigger] CHA-XXXX disparado (ambiente=dev, app=renov-home)
+# [hermes-trigger] CHA-XXXX disparado (ambiente=dev, app=pitzi-home)
 ```
 
 ## Configuração — Cloudflare Worker (dev e prod)
@@ -58,7 +58,7 @@ curl -X POST http://localhost:5050/api/tickets \
 Variáveis `HERMES_ROUTINE_URL` e `HERMES_ROUTINE_TOKEN` são tratadas como
 **secrets** (não vão em `wrangler.toml` versionado).
 
-### Ambiente dev (`renov-home-api-dev` / homeapi-dev.renovsmart.com.br)
+### Ambiente dev (`pitzi-home-api-dev` / homeapi-dev.pitzi.com.br)
 
 ```bash
 cd worker
@@ -69,7 +69,7 @@ npx wrangler secret put HERMES_ROUTINE_TOKEN --env dev
 # Cola o token e ENTER
 ```
 
-### Ambiente prod (`renov-home-api` / homeapi.renovsmart.com.br)
+### Ambiente prod (`pitzi-home-api` / homeapi.pitzi.com.br)
 
 ```bash
 cd worker
@@ -92,18 +92,18 @@ Deve listar `HERMES_ROUTINE_URL` e `HERMES_ROUTINE_TOKEN` em ambos.
 ## Validação manual após deploy
 
 1. Confirmar deploy: `bash scripts/deploy.sh` (prod) ou pipeline dev
-2. Em `https://home-dev.renovsmart.com.br`, criar chamado novo:
+2. Em `https://home-dev.pitzi.com.br`, criar chamado novo:
    - tipo: `bug`
-   - aplicação: `Renov Home`, `Renov Hub` ou `Venus`
+   - aplicação: `Pitzi Home`, `Pitzi Hub` ou `Venus`
    - prioridade: qualquer
 3. Acompanhar:
    ```bash
    cd worker
    npx wrangler tail --env dev --format=pretty | grep hermes-trigger
    ```
-4. Esperado: linha `[hermes-trigger] CHA-XXXX disparado (ambiente=dev, app=renov-home)`
+4. Esperado: linha `[hermes-trigger] CHA-XXXX disparado (ambiente=dev, app=pitzi-home)`
 5. Em ~30–60s, mensagem do Hermes deve aparecer na thread do chamado em
-   `#repo-renov-home` (Slack)
+   `#repo-pitzi-home` (Slack)
 
 ## Cenários de não-disparo (esperados)
 

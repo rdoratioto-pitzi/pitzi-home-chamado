@@ -1,10 +1,10 @@
-# 🔧 RENOV - Technical Stack Deep Dive
+# 🔧 PITZI - Technical Stack Deep Dive
 
-## Project: Renov Home (Internal Operations Platform)
+## Project: Pitzi Home (Internal Operations Platform)
 
-**Repository:** https://github.com/renov-tech/renov-home  
+**Repository:** https://github.com/pitzi-tech/pitzi-home  
 **Branch Strategy:** `develop` (base) → `main` (production)  
-**Workspace:** `/Users/macbookm2/Documents/Workspaces/Renov-Home2/Renov.Home`
+**Workspace:** `/Users/macbookm2/Documents/Workspaces/Pitzi-Home2/Pitzi.Home`
 
 ---
 
@@ -189,7 +189,7 @@ VITE_API_URL=http://localhost:3000
 VITE_ENVIRONMENT=development
 
 # .env.production
-VITE_API_URL=https://api.renov.com
+VITE_API_URL=https://api.pitzi.com.br
 VITE_ENVIRONMENT=production
 ```
 
@@ -388,7 +388,7 @@ router.post('/tickets', async (req, res) => {
 
 **Development (.env):**
 ```bash
-DATABASE_URL=postgresql://user:pass@localhost:5432/renov_dev
+DATABASE_URL=postgresql://user:pass@localhost:5432/pitzi_dev
 PORT=3000
 NODE_ENV=development
 SESSION_SECRET=dev-secret-change-in-prod

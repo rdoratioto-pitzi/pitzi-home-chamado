@@ -335,7 +335,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
       tenantId: null,
     } as any);
 
-    // Slack: notifica criação no canal #devs-renov (fire-and-forget via waitUntil).
+    // Slack: notifica criação no canal #devs-pitzi (fire-and-forget via waitUntil).
     fireSlack(c, () =>
       notifyChamadoCriado({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id),
     );

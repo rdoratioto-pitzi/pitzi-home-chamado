@@ -57,7 +57,7 @@ export function registerAuthRoutes(router: Router) {
         req.session.cookie.maxAge = 24 * 60 * 60 * 1000;
       }
 
-      const sessionToken = `renov_${req.sessionID}_${Date.now()}`;
+      const sessionToken = `pitzi_${req.sessionID}_${Date.now()}`;
 
       res.json({
         success: true,
@@ -107,7 +107,7 @@ export function registerAuthRoutes(router: Router) {
       if (err) {
         return res.status(500).json({ error: "Erro ao fazer logout" });
       }
-      res.clearCookie("renov.sid");
+      res.clearCookie("pitzi.sid");
       res.json({ success: true });
     });
   });

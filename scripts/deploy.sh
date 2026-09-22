@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd ~/Documentos/workspaces/renov.home.macmini/Renov.Home
+cd ~/Documentos/workspaces/pitzi.home.macmini/Pitzi.Home
 
 echo "→ Build do frontend..."
 npm run build

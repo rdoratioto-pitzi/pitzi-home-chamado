@@ -211,20 +211,20 @@ In `worker/wrangler.toml`, add to `[vars]` section:
 
 ```toml
 [vars]
-APP_URL = "https://home-next.renovsmart.com.br"
-CORS_ORIGIN = "https://home-next.renovsmart.com.br"
-SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
-SENDPULSE_FROM_NAME = "Renov Home"
+APP_URL = "https://home-next.pitzi.com.br"
+CORS_ORIGIN = "https://home-next.pitzi.com.br"
+SENDPULSE_FROM_EMAIL = "noreply@pitzi.com.br"
+SENDPULSE_FROM_NAME = "Pitzi Home"
 ```
 
 And to `[env.dev.vars]`:
 
 ```toml
 [env.dev.vars]
-APP_URL = "https://home-dev.renovsmart.com.br"
-CORS_ORIGIN = "https://home-dev.renovsmart.com.br"
-SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
-SENDPULSE_FROM_NAME = "Renov Home (Dev)"
+APP_URL = "https://home-dev.pitzi.com.br"
+CORS_ORIGIN = "https://home-dev.pitzi.com.br"
+SENDPULSE_FROM_EMAIL = "noreply@pitzi.com.br"
+SENDPULSE_FROM_NAME = "Pitzi Home (Dev)"
 ```
 
 The `SENDPULSE_CLIENT_ID` and `SENDPULSE_CLIENT_SECRET` are secrets — set via `wrangler secret put`, NOT in wrangler.toml.
@@ -314,7 +314,7 @@ export function generateICSContent(
   meeting: MeetingICSInput,
   attendees: { name: string; email: string }[]
 ): string {
-  const uid = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@renovhome.com.br`;
+  const uid = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@pitzi.com.br`;
   const now = new Date();
   const SAO_PAULO_TZ = "America/Sao_Paulo";
 
@@ -354,7 +354,7 @@ export function generateICSContent(
   const rawLines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Renov Home//Meeting Invite//PT",
+    "PRODID:-//Pitzi Home//Meeting Invite//PT",
     "CALSCALE:GREGORIAN",
     "METHOD:REQUEST",
     "BEGIN:VEVENT",
@@ -564,7 +564,7 @@ export async function sendPasswordResetEmail(
     title: "Redefinicao de Senha",
     greeting: `Ola ${user.name},`,
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Recebemos uma solicitacao para redefinir sua senha no Renov Home.</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Recebemos uma solicitacao para redefinir sua senha no Pitzi Home.</p>
       ${sectionCard(`
         <div style="text-align:center;">
           <p style="color:#64748b;font-size:13px;margin:0 0 8px;">Sua nova senha temporaria</p>
@@ -579,7 +579,7 @@ export async function sendPasswordResetEmail(
 
   await sendMail(env, {
     to: [{ name: user.name, email: user.email }],
-    subject: "Renov Home - Redefinicao de Senha",
+    subject: "Pitzi Home - Redefinicao de Senha",
     html,
   });
   logEmailSent("password_reset", [user.email]);
@@ -828,7 +828,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     // Broadcast to other tabs
     try {
-      const bc = new BroadcastChannel("renov-auth");
+      const bc = new BroadcastChannel("pitzi-auth");
       bc.postMessage({ type: "logout" });
       bc.close();
     } catch {
@@ -1128,7 +1128,7 @@ export function useAuthSync() {
   useEffect(() => {
     let bc: BroadcastChannel | null = null;
     try {
-      bc = new BroadcastChannel("renov-auth");
+      bc = new BroadcastChannel("pitzi-auth");
       bc.onmessage = (event) => {
         if (event.data?.type === "logout") {
           queryClient.clear();
@@ -1605,12 +1605,12 @@ VITE_API_BASE_URL=
 
 `client/.env.production`:
 ```
-VITE_API_BASE_URL=https://homeapi.renovsmart.com.br
+VITE_API_BASE_URL=https://homeapi.pitzi.com.br
 ```
 
-**Nota:** Confirmar com o time o dominio correto da API de producao. O `wrangler.toml` usa `APP_URL=https://home-next.renovsmart.com.br` que pode ser diferente do dominio da API. Ajustar conforme necessario.
+**Nota:** Confirmar com o time o dominio correto da API de producao. O `wrangler.toml` usa `APP_URL=https://home-next.pitzi.com.br` que pode ser diferente do dominio da API. Ajustar conforme necessario.
 
-**Note:** The dev environment URL will be set in Cloudflare Pages dashboard as a build environment variable: `VITE_API_BASE_URL=https://homeapi-dev.renovsmart.com.br`
+**Note:** The dev environment URL will be set in Cloudflare Pages dashboard as a build environment variable: `VITE_API_BASE_URL=https://homeapi-dev.pitzi.com.br`
 
 - [ ] **Step 3: Add `.env*` files to .gitignore if not already there**
 
@@ -1638,18 +1638,18 @@ This task involves Cloudflare Dashboard configuration — NOT code changes. Docu
 
 In Cloudflare Dashboard > Pages:
 1. Create new project
-2. Connect GitHub repo: `Renov-BD/Renov.Home` (or whatever the org/repo name is)
+2. Connect GitHub repo: `Pitzi-BD/Pitzi.Home` (or whatever the org/repo name is)
 3. Framework preset: None (custom)
 4. Build command: `npm run build:client`
 5. Build output directory: `dist/public`
 6. Root directory: `/` (root of the repo)
-7. Environment variable: `VITE_API_BASE_URL=https://homeapi-dev.renovsmart.com.br`
+7. Environment variable: `VITE_API_BASE_URL=https://homeapi-dev.pitzi.com.br`
 
 - [ ] **Step 2: Configure custom domain**
 
 In Pages project settings > Custom domains:
-1. Add `home-dev.renovsmart.com.br` (preview/dev)
-2. Future: `home-next.renovsmart.com.br` (production)
+1. Add `home-dev.pitzi.com.br` (preview/dev)
+2. Future: `home-next.pitzi.com.br` (production)
 
 - [ ] **Step 3: Configure branch deployments**
 
@@ -1660,7 +1660,7 @@ In Pages project settings > Custom domains:
 
 Push to develop and verify:
 1. Pages builds successfully
-2. `home-dev.renovsmart.com.br` loads the frontend
+2. `home-dev.pitzi.com.br` loads the frontend
 3. Login flow works end-to-end (Pages → Worker API → cookie → authenticated requests)
 
 ---
@@ -1672,7 +1672,7 @@ After all tasks are complete, verify these success criteria from the spec:
 - [ ] `getStorage(db)` works in Worker AND `storage` singleton continues working in Express
 - [ ] Email via SendPulse sends at least `sendWelcomeEmail` successfully
 - [ ] Client does login via cookies, `GET /api/auth/me` returns user, logout clears session
-- [ ] Pages deploys at `home-dev.renovsmart.com.br` and loads the frontend
+- [ ] Pages deploys at `home-dev.pitzi.com.br` and loads the frontend
 - [ ] Full flow: Pages → login → dashboard works end-to-end
 
 **Test commands:**

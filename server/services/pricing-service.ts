@@ -12,7 +12,7 @@
  * 4. Retornar produtos + preços para o frontend
  */
 
-const RENOVSMART_API_BASE = "https://rp.pitzi.com.br/api";
+const PITZI_API_BASE = "https://rp.pitzi.com.br/api";
 
 export interface EligibleDevice {
   categoryId: string;
@@ -63,7 +63,7 @@ export async function fetchEligibleDevices(
     params.append("pageNumber", String(pageNumber));
     params.append("pageSize", String(pageSize));
 
-    const url = `${RENOVSMART_API_BASE}/eligible-devices?${params.toString()}`;
+    const url = `${PITZI_API_BASE}/eligible-devices?${params.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {
@@ -107,7 +107,7 @@ export async function scrapeDevicePrices(
     params.append("storage", String(storage));
     params.append("ignoreLastUpdateDate", String(forceRefresh));
 
-    const url = `${RENOVSMART_API_BASE}/search?${params.toString()}`;
+    const url = `${PITZI_API_BASE}/search?${params.toString()}`;
     const response = await fetch(url);
 
     if (!response.ok) {

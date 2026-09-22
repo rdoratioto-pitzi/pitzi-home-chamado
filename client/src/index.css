@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Metronic / Renov Identity Styles */
+/* Metronic / Pitzi Identity Styles */
 :root {
   --background: 0 0% 100%;
   --foreground: 222 47% 11%;
@@ -34,7 +34,7 @@
   --ring: 237 71% 55%;
 
   --radius: 0.75rem;
-  --renov-version: 1;
+  --pitzi-version: 1;
 
   --font-sans: 'Montserrat', sans-serif;
 
@@ -467,7 +467,7 @@ html.dark .date-picker-full {
 }
 
 /* ============================================
-   RENOV BRAND — SIDEBAR & TOPBAR OVERRIDES
+   PITZI BRAND — SIDEBAR & TOPBAR OVERRIDES
    ============================================ */
 
 /* Sidebar transition — 220ms ease (brand spec) */
@@ -542,7 +542,7 @@ html.dark .date-picker-full {
 }
 
 /* ============================================
-   RENOV BRAND — TYPOGRAPHY HIERARCHY
+   PITZI BRAND — TYPOGRAPHY HIERARCHY
    ============================================ */
 
 /* Utility classes — canonical typography scale */
@@ -613,7 +613,7 @@ table tbody tr:last-child {
 }
 
 /* ============================================
-   RENOV BRAND — BUTTONS
+   PITZI BRAND — BUTTONS
    ============================================ */
 
 /* Primary (default) — Verde Bandeira */
@@ -623,7 +623,7 @@ button[class*="bg-primary"],
 }
 
 /* CSS-driven button brand colors */
-.btn-renov-primary,
+.btn-pitzi-primary,
 button:where(:not([class*="destructive"]):not([class*="ghost"]):not([class*="outline"]):not([class*="secondary"])) {
   /* handled by Tailwind + overrides below */
 }
@@ -638,7 +638,7 @@ button:where(:not([class*="destructive"]):not([class*="ghost"]):not([class*="out
 }
 
 /* ============================================
-   RENOV BRAND — BADGE SEMANTIC VARIANTS
+   PITZI BRAND — BADGE SEMANTIC VARIANTS
    ============================================ */
 
 /* Success badge */
@@ -690,7 +690,7 @@ button:where(:not([class*="destructive"]):not([class*="ghost"]):not([class*="out
 }
 
 /* ============================================
-   RENOV BRAND — LIGHT MODE ZERO-DARK COMPLIANCE
+   PITZI BRAND — LIGHT MODE ZERO-DARK COMPLIANCE
    ============================================
    Rule: ZERO dark surfaces in light mode.
    body is PARENT of .app — must be set explicitly.
@@ -797,7 +797,7 @@ html:not(.dark) main {
   line-height: 1;
 }
 
-/* Mention badge — Verde Bandeira Renov.
+/* Mention badge — Verde Bandeira Pitzi.
    quill-mention v6 só insere o "@" no DOM; o nome do usuário fica em
    data-display-name. Renderizamos o nome via CSS ::after.
    Usamos !important pra vencer o CSS default do plugin (quill.mention.css
@@ -833,7 +833,7 @@ html:not(.dark) main {
   user-select: all; /* atomic — Backspace remove o token inteiro */
 }
 
-/* Dropdown de autocomplete do quill-mention — tema dark Renov */
+/* Dropdown de autocomplete do quill-mention — tema dark Pitzi */
 .ql-mention-list-container {
   background: #111113 !important;
   border: 1px solid rgba(0, 161, 55, 0.3) !important;

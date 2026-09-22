@@ -17,7 +17,7 @@
 
 4. **Layout dos e-mails é básico** — Templates atuais têm:
    - Header verde simples sem logo
-   - Sem identidade visual Renov (sem logo, sem tipografia Montserrat real via Google Fonts)
+   - Sem identidade visual Pitzi (sem logo, sem tipografia Montserrat real via Google Fonts)
    - Footer minimalista sem links úteis
    - Sem informações contextuais ricas (quem mudou, quando, histórico)
    - Sem CTA (call-to-action) destacado
@@ -77,7 +77,7 @@
 **3.1 — Criar sistema de template base**
 - Arquivo: `server/email-templates.ts` (novo)
 - Template HTML base reutilizável com:
-  - **Header**: Logo Renov (via URL pública ou base64 inline), gradiente verde marca (#00A137), nome do sistema
+  - **Header**: Logo Pitzi (via URL pública ou base64 inline), gradiente verde marca (#00A137), nome do sistema
   - **Google Fonts**: Montserrat via link externo
   - **Corpo**: Layout responsivo 600px, card estilizado com sombra sutil
   - **CTA Button**: Botão com destaque, bordas arredondadas, cor da marca

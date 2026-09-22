@@ -150,7 +150,7 @@ You are the Chief Coordinator of a team with 18 specialists:
 - 4 Professional Analysts  
 - 2 Management Experts
 
-## Renov Home Stack
+## Pitzi Home Stack
 - React 18 + TypeScript
 - Express.js + Node.js
 - PostgreSQL + Drizzle ORM

@@ -1,4 +1,4 @@
-# Renov - Contexto Empresarial e Filosofia
+# Pitzi - Contexto Empresarial e Filosofia
 
 > **"Vibe Coding: Pragmatismo, Aprendizado e Resultados"**
 
@@ -7,7 +7,7 @@
 ## 🏢 A Empresa
 
 ### Informações Básicas
-- **Nome:** Renov
+- **Nome:** Pitzi
 - **Tipo:** Empresa brasileira de tecnologia
 - **Segmento:** Sistemas de gestão operacional interna
 - **Modelo:** 100% remoto
@@ -27,7 +27,7 @@ Ser referência em **gestão operacional tecnológica** que entrega ROI claro, a
 
 ## 💡 Filosofia: "Vibe Coding"
 
-O "Vibe Coding" é a filosofia que guia todas as decisões técnicas e de produto na Renov.
+O "Vibe Coding" é a filosofia que guia todas as decisões técnicas e de produto na Pitzi.
 
 ### Princípios Fundamentais
 
@@ -87,10 +87,10 @@ O "Vibe Coding" é a filosofia que guia todas as decisões técnicas e de produt
 
 ---
 
-## 🎯 Produto Principal: Renov Home
+## 🎯 Produto Principal: Pitzi Home
 
 ### O Que É
-Sistema web de **gestão operacional interna** modular e integrado, desenvolvido especificamente para as necessidades da Renov e clientes.
+Sistema web de **gestão operacional interna** modular e integrado, desenvolvido especificamente para as necessidades da Pitzi e clientes.
 
 ### Características
 - **Arquitetura modular:** 8 módulos independentes mas integrados
@@ -136,7 +136,7 @@ Sistema web de **gestão operacional interna** modular e integrado, desenvolvido
 ## 📊 Estado Atual (Fevereiro 2026)
 
 ### Em Produção
-- ✅ Renov Home operacional com 8 módulos
+- ✅ Pitzi Home operacional com 8 módulos
 - ✅ Usuários: Time interno + clientes beta
 - ✅ Stack estável: React + Express + PostgreSQL
 - ✅ Deploy: Replit (transicionando)
@@ -202,7 +202,7 @@ Escolhemos ferramentas e abordagens baseado em:
 
 ---
 
-## 🚀 Diferenciais Renov
+## 🚀 Diferenciais Pitzi
 
 ### O Que Nos Torna Únicos
 
@@ -277,7 +277,7 @@ Escolhemos ferramentas e abordagens baseado em:
 - Processos de desenvolvimento maduros
 
 **Médio Prazo (1-2 anos):**
-- Renov Home como plataforma modular vendável
+- Pitzi Home como plataforma modular vendável
 - Marketplace de módulos
 - Time expandido mas mantendo cultura
 
@@ -303,8 +303,8 @@ Escolhemos ferramentas e abordagens baseado em:
 
 ---
 
-**Este é o Renov. Este é o Vibe Coding. 🚀**
+**Este é o Pitzi. Este é o Vibe Coding. 🚀**
 
 *Última atualização: Fevereiro 2026*  
 *Versão: 1.0*  
-*Autor: Time Renov*
+*Autor: Time Pitzi*

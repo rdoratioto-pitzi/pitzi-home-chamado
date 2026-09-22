@@ -181,18 +181,18 @@ Add `API_URL` var to both environments in `worker/wrangler.toml`:
 
 ```toml
 [vars]
-APP_URL = "https://home-next.renovsmart.com.br"
-CORS_ORIGIN = "https://home-next.renovsmart.com.br"
-API_URL = "https://homeapi.renovsmart.com.br"
-SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
-SENDPULSE_FROM_NAME = "Renov Home"
+APP_URL = "https://home-next.pitzi.com.br"
+CORS_ORIGIN = "https://home-next.pitzi.com.br"
+API_URL = "https://homeapi.pitzi.com.br"
+SENDPULSE_FROM_EMAIL = "noreply@pitzi.com.br"
+SENDPULSE_FROM_NAME = "Pitzi Home"
 
 [env.dev.vars]
-APP_URL = "https://home-dev.renovsmart.com.br"
-CORS_ORIGIN = "https://home-dev.renovsmart.com.br"
-API_URL = "https://homeapi-dev.renovsmart.com.br"
-SENDPULSE_FROM_EMAIL = "noreply@renovsmart.com.br"
-SENDPULSE_FROM_NAME = "Renov Home (Dev)"
+APP_URL = "https://home-dev.pitzi.com.br"
+CORS_ORIGIN = "https://home-dev.pitzi.com.br"
+API_URL = "https://homeapi-dev.pitzi.com.br"
+SENDPULSE_FROM_EMAIL = "noreply@pitzi.com.br"
+SENDPULSE_FROM_NAME = "Pitzi Home (Dev)"
 ```
 
 Also add `API_URL: string;` to the `Bindings` type in `worker/src/index.ts`.
@@ -223,7 +223,7 @@ git commit -m "feat(worker): add R2 upload routes with HMAC-signed tokens"
 **Files:**
 - Modify: `client/src/hooks/use-upload.ts`
 
-**Context:** The `useUpload` hook calls `/api/uploads/request-url` with a relative URL. In Cloudflare, the frontend is on `home-next.renovsmart.com.br` and the API on `homeapi.renovsmart.com.br`. The hook needs `API_BASE` prefix + `credentials: "include"` for the request-url call. The upload PUT itself goes to the API domain (returned by the server), so it also needs credentials.
+**Context:** The `useUpload` hook calls `/api/uploads/request-url` with a relative URL. In Cloudflare, the frontend is on `home-next.pitzi.com.br` and the API on `homeapi.pitzi.com.br`. The hook needs `API_BASE` prefix + `credentials: "include"` for the request-url call. The upload PUT itself goes to the API domain (returned by the server), so it also needs credentials.
 
 - [ ] **Step 1: Add API_BASE and credentials to all fetch calls**
 
@@ -401,7 +401,7 @@ Expected: All secrets listed above appear in the output.
 
 **Files:** None (CLI operations)
 
-**Context:** With secrets configured, deploy the Worker to production. The `wrangler.toml` default environment is production (name: `renov-home-api`).
+**Context:** With secrets configured, deploy the Worker to production. The `wrangler.toml` default environment is production (name: `pitzi-home-api`).
 
 - [ ] **Step 1: Dry-run deploy to check bundle**
 
@@ -413,21 +413,21 @@ Expected: Bundle compiles successfully. Check bundle size is under 10MB.
 
 Run: `cd worker && npx wrangler deploy`
 
-Expected: Worker deployed to `renov-home-api.{account}.workers.dev`
+Expected: Worker deployed to `pitzi-home-api.{account}.workers.dev`
 
 - [ ] **Step 3: Configure custom domain**
 
-In Cloudflare Dashboard → Workers & Pages → `renov-home-api` → Settings → Triggers → Custom Domains:
-- Add `homeapi.renovsmart.com.br`
+In Cloudflare Dashboard → Workers & Pages → `pitzi-home-api` → Settings → Triggers → Custom Domains:
+- Add `homeapi.pitzi.com.br`
 
 Or via CLI:
 ```bash
-cd worker && npx wrangler deploy --route "homeapi.renovsmart.com.br/*"
+cd worker && npx wrangler deploy --route "homeapi.pitzi.com.br/*"
 ```
 
 - [ ] **Step 4: Verify health endpoint**
 
-Run: `curl -s https://homeapi.renovsmart.com.br/api/health | jq .`
+Run: `curl -s https://homeapi.pitzi.com.br/api/health | jq .`
 
 Expected: `{ "status": "ok", "database": "connected" }` (or similar health response)
 
@@ -437,7 +437,7 @@ Expected: `{ "status": "ok", "database": "connected" }` (or similar health respo
 
 **Files:** None (CLI/Dashboard operations)
 
-**Context:** The frontend Pages project (`renov-home`) already has CI/CD via `.github/workflows/deploy-pages.yml`. Need to verify the `VITE_API_URL` GitHub variable points to the production API and that the custom domain `home-next.renovsmart.com.br` is configured.
+**Context:** The frontend Pages project (`pitzi-home`) already has CI/CD via `.github/workflows/deploy-pages.yml`. Need to verify the `VITE_API_URL` GitHub variable points to the production API and that the custom domain `home-next.pitzi.com.br` is configured.
 
 - [ ] **Step 1: Fix env var name mismatch in Pages workflow**
 
@@ -461,12 +461,12 @@ git commit -m "fix(ci): correct env var name VITE_API_BASE_URL in Pages workflow
 - [ ] **Step 2: Verify GitHub variable VITE_API_URL**
 
 In GitHub → repo Settings → Secrets and variables → Actions → Variables:
-- `VITE_API_URL` should be `https://homeapi.renovsmart.com.br`
+- `VITE_API_URL` should be `https://homeapi.pitzi.com.br`
 
 - [ ] **Step 3: Verify Pages custom domain**
 
-In Cloudflare Dashboard → Pages → `renov-home` → Custom Domains:
-- `home-next.renovsmart.com.br` should be configured
+In Cloudflare Dashboard → Pages → `pitzi-home` → Custom Domains:
+- `home-next.pitzi.com.br` should be configured
 
 - [ ] **Step 4: Trigger a deploy**
 
@@ -474,7 +474,7 @@ Either push to `main` or use GitHub Actions → workflow_dispatch to trigger a m
 
 - [ ] **Step 5: Verify frontend loads**
 
-Open `https://home-next.renovsmart.com.br` in browser. Should show the login page.
+Open `https://home-next.pitzi.com.br` in browser. Should show the login page.
 
 ---
 
@@ -484,11 +484,11 @@ Open `https://home-next.renovsmart.com.br` in browser. Should show the login pag
 
 **Context:** With both Worker and Pages deployed to production Cloudflare, validate all critical modules using real production data (same Neon database `ep-wispy-grass`).
 
-**⚠️ IMPORTANT:** The production Replit (`home.renovsmart.com.br`) continues running in parallel. Tests run on `home-next.renovsmart.com.br` only.
+**⚠️ IMPORTANT:** The production Replit (`home.pitzi.com.br`) continues running in parallel. Tests run on `home-next.pitzi.com.br` only.
 
 - [ ] **Step 1: Auth — Login flow**
 
-1. Open `https://home-next.renovsmart.com.br`
+1. Open `https://home-next.pitzi.com.br`
 2. Login with a test account
 3. Verify: cookies set (`access_token`, `refresh_token`)
 4. Refresh page → should stay logged in (verify `GET /api/auth/me`)
@@ -583,13 +583,13 @@ ls -la uploads/
 import fs from "fs";
 import path from "path";
 
-const WORKER_API = "https://homeapi.renovsmart.com.br";
+const WORKER_API = "https://homeapi.pitzi.com.br";
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 const COOKIE = process.env.COOKIE; // "access_token=eyJ..."
 
 if (!COOKIE) {
   console.error("Usage: COOKIE='access_token=<JWT>' npx tsx scripts/migrate-uploads-to-r2.ts");
-  console.error("Get the JWT by logging into home-next.renovsmart.com.br and copying the access_token cookie.");
+  console.error("Get the JWT by logging into home-next.pitzi.com.br and copying the access_token cookie.");
   process.exit(1);
 }
 
@@ -667,7 +667,7 @@ async function migrateLocalFiles() {
 migrateLocalFiles().catch(console.error);
 ```
 
-**Note:** The script requires a valid JWT cookie. Login to `home-next.renovsmart.com.br`, copy the `access_token` cookie value from browser DevTools, and pass it as the `COOKIE` env var. The token is valid for 2h — sufficient for migrating a small number of files.
+**Note:** The script requires a valid JWT cookie. Login to `home-next.pitzi.com.br`, copy the `access_token` cookie value from browser DevTools, and pass it as the `COOKIE` env var. The token is valid for 2h — sufficient for migrating a small number of files.
 
 - [ ] **Step 3: Run migration from Replit**
 
@@ -680,7 +680,7 @@ Expected: All files uploaded successfully.
 - [ ] **Step 4: Verify migrated files are accessible**
 
 For each migrated file, verify it loads via:
-`https://homeapi.renovsmart.com.br/objects/uploads/{filename}`
+`https://homeapi.pitzi.com.br/objects/uploads/{filename}`
 
 - [ ] **Step 5: Commit migration script**
 
@@ -710,4 +710,4 @@ git commit -m "chore: add one-time migration script for Replit uploads to R2"
 - Access to production Neon credentials
 - Access to Replit instance (for file migration)
 
-**Post-Phase 3:** With validation complete, Phase 4 (Cutover) is a DNS swap: `home.renovsmart.com.br` → Cloudflare Pages. Users will need to re-login (JWT cookies ≠ Replit session cookies).
+**Post-Phase 3:** With validation complete, Phase 4 (Cutover) is a DNS swap: `home.pitzi.com.br` → Cloudflare Pages. Users will need to re-login (JWT cookies ≠ Replit session cookies).

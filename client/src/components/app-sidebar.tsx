@@ -71,7 +71,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { PitziLogo as RenovLogo } from "./renov-logo";
+import { PitziLogo } from "./pitzi-logo";
 import { VersionBadge } from "./version-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -373,7 +373,7 @@ export function AppSidebar() {
     <Sidebar className="border-r" style={{ borderRightColor: 'var(--sep)' }}>
       <SidebarHeader className="h-14 flex items-center justify-center">
         <Link href="/" data-testid="link-home" className="flex items-center justify-center w-full px-6">
-          <RenovLogo
+          <PitziLogo
             variant={theme === "dark" ? "dark" : "light"}
             className="h-8 w-auto mx-auto"
           />

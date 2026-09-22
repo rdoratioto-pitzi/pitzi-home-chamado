@@ -59,4 +59,4 @@ const callOmieApi = async (endpoint: string, call: string, params: any[], catego
 
 ---
 
-*Desenvolvido seguindo padrões do Renov Home*
+*Desenvolvido seguindo padrões do Pitzi Home*

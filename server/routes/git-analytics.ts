@@ -439,7 +439,7 @@ export function registerGitAnalyticsRoutes(router: Router) {
       const { fullName } = req.body;
       
       if (!fullName) {
-        return res.status(400).json({ error: "fullName é obrigatório (ex: Renov-BD/Renov.Home)" });
+        return res.status(400).json({ error: "fullName é obrigatório (ex: Pitzi-BD/Pitzi.Home)" });
       }
       
       const { addRepository } = await import("../services/github-sync");

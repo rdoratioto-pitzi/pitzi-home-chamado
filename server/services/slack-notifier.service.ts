@@ -144,7 +144,7 @@ async function getKanbanCard(db: SlackDb, id: string): Promise<KanbanCard | null
 }
 
 /**
- * Resolve Slack user ID para um usuário Renov. Cacheia em users.slack_user_id
+ * Resolve Slack user ID para um usuário Pitzi. Cacheia em users.slack_user_id
  * após primeira resolução bem-sucedida.
  */
 async function resolveSlackIdForUser(
@@ -183,7 +183,7 @@ function getErrorMessage(error: unknown): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Notifica criação de novo chamado no canal #devs-renov.
+ * Notifica criação de novo chamado no canal #devs-pitzi.
  * Cria mensagem-mãe + salva mapping. Se prioridade=critical, envia
  * mensagem adicional com @here.
  */
@@ -338,7 +338,7 @@ export async function notifyChamadoFechado(
 /**
  * Notifica criação de novo projeto.
  * IMPORTANTE: projetos com visibility='private' NÃO são postados no canal.
- * (Política de visibilidade — projetos privados não vazam para devs-renov.)
+ * (Política de visibilidade — projetos privados não vazam para devs-pitzi.)
  */
 export async function notifyProjetoCriado(
   deps: NotifierDeps,

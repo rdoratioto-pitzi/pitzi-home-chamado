@@ -193,7 +193,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
     label: "Pesquisar Preços",
     description: "Busca preços de smartphones no Mercado Livre via Firecrawl",
     icon: DollarSign,
-    prompt: "Pesquise os preços atuais de [PRODUTO] usado no Mercado Livre. Informe: total de anúncios, preço mínimo, médio e máximo. Calcule o preço sugerido de trade-in para a Renov com 25% de margem operacional."
+    prompt: "Pesquise os preços atuais de [PRODUTO] usado no Mercado Livre. Informe: total de anúncios, preço mínimo, médio e máximo. Calcule o preço sugerido de trade-in para a Pitzi com 25% de margem operacional."
   },
 ];
 

@@ -2,7 +2,7 @@
 
 Esta fase introduz o **approval gate humano** no Slack: o Hermes posta
 uma mensagem-mãe na thread do chamado com 3 botões (Aprovar, Ajustar,
-Cancelar) e o Renov Home registra a decisão em `hermes_slack_threads`.
+Cancelar) e o Pitzi Home registra a decisão em `hermes_slack_threads`.
 
 A execução real pós-aprovação **continua sendo feita manualmente** —
 isso é escopo da Fase 4.
@@ -48,7 +48,7 @@ App: **Hermes** em https://api.slack.com/apps.
 
 1. Em **Interactivity & Shortcuts**:
    - Toggle **Interactivity = On**
-   - **Request URL** = `https://homeapi-dev.renovsmart.com.br/api/integrations/slack/interactions`
+   - **Request URL** = `https://homeapi-dev.pitzi.com.br/api/integrations/slack/interactions`
    - Salvar
 2. Verificar em **OAuth & Permissions** que o bot tem os escopos:
    - `chat:write`
@@ -83,25 +83,25 @@ Routine: **Hermes — Triagem** em https://claude.ai/code/routines.
 
 1. Substituir todo o conteúdo do prompt pelo arquivo
    [`docs/agents/hermes/prompts/triage-v6.md`](prompts/triage-v6.md).
-2. No ambiente **Renov-Default**, criar/atualizar variáveis:
-   - `RENOV_API_URL` = `https://homeapi-dev.renovsmart.com.br`
-   - `RENOV_API_TOKEN` = _token gerado para `hermes@renov.com` em dev_
+2. No ambiente **Pitzi-Default**, criar/atualizar variáveis:
+   - `PITZI_HOME_API_URL` = `https://homeapi-dev.pitzi.com.br`
+   - `PITZI_HOME_API_TOKEN` = _token gerado para `hermes@pitzi.com.br` em dev_
 
 Para gerar o token (autenticado como admin via cookie de sessão):
 
 ```bash
 curl -X POST \
-  https://homeapi-dev.renovsmart.com.br/api/admin/service-accounts/<hermes_user_id>/generate-token \
-  -H "Cookie: renov.sid=<sessão admin>"
+  https://homeapi-dev.pitzi.com.br/api/admin/service-accounts/<hermes_user_id>/generate-token \
+  -H "Cookie: pitzi.sid=<sessão admin>"
 ```
 
 Resposta inclui o `token` em plaintext **uma única vez**.
 
 ### 5. Plano de teste E2E em Dev
 
-1. Criar um chamado novo em https://home-dev.renovsmart.com.br/workspace/chamados:
+1. Criar um chamado novo em https://home-dev.pitzi.com.br/workspace/chamados:
    - Título: "Teste Fase 3 Hermes"
-   - Aplicação: Renov Home
+   - Aplicação: Pitzi Home
    - Tipo: Bug
 2. Aguardar (≤ 30s) — Hermes deve postar mensagem-mãe no canal de devs
    com 3 botões.
@@ -137,13 +137,13 @@ Se 5 está OK:
 1. Aplicar `migrations/0015_hermes_slack_threads.sql` no Neon **prod**
    (branch `production`).
 2. Mudar **Request URL** no Slack App para
-   `https://homeapi.renovsmart.com.br/api/integrations/slack/interactions`.
+   `https://homeapi.pitzi.com.br/api/integrations/slack/interactions`.
 
    > Atenção: o Slack só permite **uma** Request URL por app. Para manter
    > dev e prod simultâneos é necessário criar um segundo Slack App
    > apontando para dev. Por enquanto, alternar manualmente é aceitável.
-3. Atualizar `RENOV_API_URL` na Routine para
-   `https://homeapi.renovsmart.com.br` e `RENOV_API_TOKEN` para o
+3. Atualizar `PITZI_HOME_API_URL` na Routine para
+   `https://homeapi.pitzi.com.br` e `PITZI_HOME_API_TOKEN` para o
    token de produção.
 4. Repetir o teste E2E em prod com um chamado real (ou de teste
    marcado).
@@ -159,8 +159,8 @@ Se 5 está OK:
 
 URLs públicas:
 
-- Dev:  `https://homeapi-dev.renovsmart.com.br`
-- Prod: `https://homeapi.renovsmart.com.br`
+- Dev:  `https://homeapi-dev.pitzi.com.br`
+- Prod: `https://homeapi.pitzi.com.br`
 
 ---
 
@@ -175,7 +175,7 @@ URLs públicas:
 - **Routine recebe 401 ao chamar `thread-registered`**: token expirou
   (TTL = 1 ano) ou foi rotacionado. Gerar novo via
   `/api/admin/service-accounts/<id>/generate-token` e atualizar a
-  variável `RENOV_API_TOKEN` no ambiente da Routine.
+  variável `PITZI_HOME_API_TOKEN` no ambiente da Routine.
 - **Modal não abre ao clicar em "Ajustar"**: falta o escopo
   `views:write` no Slack App ou o `trigger_id` expirou (vale 3s).
 
@@ -188,4 +188,4 @@ URLs públicas:
   webhook do Home quando `decision = 'aprovado'`).
 - Re-análise automática após "Ajustar" — por enquanto o feedback fica
   só registrado em `ajuste_feedback`.
-- UI no Renov Home mostrando o histórico de decisões do Hermes.
+- UI no Pitzi Home mostrando o histórico de decisões do Hermes.

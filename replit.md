@@ -1,8 +1,8 @@
-# Renov Home - Project Guide
+# Pitzi Home - Project Guide
 
 ## Overview
 
-**Renov Home** is a full-stack internal operational management platform built for the Brazilian company **Renov**. It centralizes multiple business functions into a single web application:
+**Pitzi Home** is a full-stack internal operational management platform built for the Brazilian company **Pitzi**. It centralizes multiple business functions into a single web application:
 
 - **Tickets (Chamados):** Support ticket management with priorities, categories, and SLAs
 - **Projects (Projetos):** Kanban-based project management
@@ -99,7 +99,7 @@ Preferred communication style: Simple, everyday language.
 - **AI Tools System:** `server/ai-tools.ts` — defines tools the AI can call to query internal DB data on-demand (e.g., `search_tickets`)
 - **External Data:** `server/external-data.ts` — real-time weather via Open-Meteo (no API key needed)
 - **AI Dev Agents (`agents/`):** Separate LangGraph-based multi-agent system (Atlas planner, Turing QA, Giter) using Anthropic Claude — runs independently via `npm run agents` or `agents/src/qa-git.ts`
-- **CLI Tool:** `cli/renov-dev.ts` — CLI for running AI development plans via Zeus agent
+- **CLI Tool:** `cli/pitzi-dev.ts` — CLI for running AI development plans via Zeus agent
 
 ### Multi-Agent System (`agents/`)
 

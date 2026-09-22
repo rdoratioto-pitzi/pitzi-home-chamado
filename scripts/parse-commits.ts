@@ -26,12 +26,12 @@ export async function parseCommits() {
   try {
     // Busca últimos 50 commits da API do GitHub
     const response = await fetch(
-      'https://api.github.com/repos/Renov-BD/Renov.Home/commits?per_page=50',
+      'https://api.github.com/repos/Pitzi-BD/Pitzi.Home/commits?per_page=50',
       {
         headers: {
           'Authorization': `token ${token}`,
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'Renov-Home-App'
+          'User-Agent': 'Pitzi-Home-App'
         }
       }
     );

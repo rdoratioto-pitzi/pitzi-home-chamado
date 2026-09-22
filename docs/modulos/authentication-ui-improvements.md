@@ -9,7 +9,7 @@
 
 ## 📋 Visão Geral
 
-Este documento descreve o plano de melhorias para a interface de autenticação (tela de login) do sistema Renov.Home, com foco em UX (Experiência do Usuário) e UI (Interface do Usuário).
+Este documento descreve o plano de melhorias para a interface de autenticação (tela de login) do sistema Pitzi.Home, com foco em UX (Experiência do Usuário) e UI (Interface do Usuário).
 
 ### Arquivos Envolvidos
 - `client/src/pages/login.tsx` - Página principal de login

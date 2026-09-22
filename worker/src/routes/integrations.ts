@@ -11,7 +11,7 @@ const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
 
 function getApiToken(c?: any): string {
   try {
-    return c?.env?.RENOVSMART_API_TOKEN || "Renov123";
+    return c?.env?.PITZI_API_TOKEN || "Renov123";
   } catch {
     return "Renov123";
   }

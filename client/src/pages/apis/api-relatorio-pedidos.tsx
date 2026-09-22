@@ -180,7 +180,7 @@ export default function ApiRelatorioPedidosPage() {
               <FileText className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-bold">Pedidos API - Dashboard Renov</h2>
+              <h2 className="text-lg font-bold">Pedidos API - Dashboard Pitzi</h2>
               <p className="text-sm text-muted-foreground">Documentação oficial da API de Relatório de Pedidos</p>
             </div>
           </div>
@@ -267,7 +267,7 @@ export default function ApiRelatorioPedidosPage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        API para consulta avançada de pedidos e vouchers do Dashboard Renov. Permite filtrar pedidos por múltiplos critérios incluindo IMEI, voucher, CPF, datas, rede, vendedor, regional, filial e status.
+                        API para consulta avançada de pedidos e vouchers do Dashboard Pitzi. Permite filtrar pedidos por múltiplos critérios incluindo IMEI, voucher, CPF, datas, rede, vendedor, regional, filial e status.
                       </p>
 
                       <Separator />

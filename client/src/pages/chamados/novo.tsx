@@ -383,7 +383,7 @@ export default function NovoChamadoPage() {
                             </TooltipTrigger>
                             <TooltipContent className="max-w-[280px]">
                               <p className="text-xs">
-                                <strong>Aplicação</strong> indica a qual produto/sistema Renov o chamado se refere.
+                                <strong>Aplicação</strong> indica a qual produto/sistema Pitzi o chamado se refere.
                               </p>
                             </TooltipContent>
                           </Tooltip>

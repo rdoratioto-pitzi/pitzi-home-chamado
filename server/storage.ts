@@ -528,7 +528,7 @@ export class DatabaseStorage implements IStorage {
         ...this.getMockAdmin(),
         id: "mock-admin2-id",
         name: "Administrador",
-        email: "admin@renov.com.br",
+        email: "admin@pitzi.com.br",
         password: "MOCK_PASSWORD_DO_NOT_USE",
         modulePermissions: JSON.stringify({
           chamados: true,

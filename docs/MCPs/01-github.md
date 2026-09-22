@@ -46,5 +46,5 @@ O MCP espera a variável `GITHUB_PERSONAL_ACCESS_TOKEN`, mas aqui mapeamos o `GI
 
 ## Notas
 - O token `GITHUB_TOKEN` existente foi criado para o módulo Git Analytics — as permissões já devem ser suficientes
-- Repositório principal: `Renov-BD/renov-home` (conforme histórico de PRs)
+- Repositório principal: `Pitzi-BD/pitzi-home` (conforme histórico de PRs)
 - Para operações de escrita (criar PR, comentar issue), o token precisa de escopo `repo` completo
