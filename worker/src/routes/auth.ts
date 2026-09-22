@@ -10,9 +10,13 @@ import {
   setAuthCookies,
   clearAuthCookies,
   getRefreshTokenFromCookie,
+  getAccessTokenFromCookie,
+  getBearerToken,
+  verifyAccessToken,
 } from "../lib/jwt";
 import { setCookie } from "hono/cookie";
 import type { AppEnv, AuthUser } from "../index";
+import { endSession } from "../lib/sessions";
 import { sendPasswordResetEmail } from "../lib/email";
 
 const auth = new Hono<AppEnv>();
@@ -53,19 +57,23 @@ auth.post("/api/auth/login", async (c) => {
     await db.update(users).set({ password: hashed }).where(eq(users.id, user.id));
   }
 
+  const refreshToken = await signRefreshToken(user.id, c.env.JWT_REFRESH_SECRET, body.rememberMe);
+
+  // Store refresh token hash in DB — a linha é a sessão; seu id vai no token de acesso.
+  const tokenHash = await sha256(refreshToken);
+  const expiresAt = new Date(Date.now() + (body.rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000));
+  const [session] = await db
+    .insert(refreshTokens)
+    .values({ userId: user.id, tokenHash, expiresAt })
+    .returning({ id: refreshTokens.id });
+
   const authUser: AuthUser = {
     userId: user.id,
     tenantId: user.tenantId ?? null,
     role: user.isAdmin ? "admin" : "user",
+    sessionId: session.id,
   };
-
   const accessToken = await signAccessToken(authUser, c.env.JWT_SECRET);
-  const refreshToken = await signRefreshToken(user.id, c.env.JWT_REFRESH_SECRET, body.rememberMe);
-
-  // Store refresh token hash in DB
-  const tokenHash = await sha256(refreshToken);
-  const expiresAt = new Date(Date.now() + (body.rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000));
-  await db.insert(refreshTokens).values({ userId: user.id, tokenHash, expiresAt });
 
   setAuthCookies(c, accessToken, refreshToken, body.rememberMe);
 
@@ -142,7 +150,7 @@ auth.post("/api/auth/refresh", async (c) => {
     .where(eq(refreshTokens.tokenHash, tokenHash))
     .limit(1);
 
-  if (!storedToken) {
+  if (!storedToken || storedToken.expiresAt <= new Date()) {
     clearAuthCookies(c);
     return c.json({ success: false, message: "Refresh token revogado" }, 401);
   }
@@ -164,6 +172,7 @@ auth.post("/api/auth/refresh", async (c) => {
     userId: user.id,
     tenantId: user.tenantId ?? null,
     role: user.isAdmin ? "admin" : "user",
+    sessionId: storedToken.id,
   };
   const newAccessToken = await signAccessToken(authUser, c.env.JWT_SECRET);
 
@@ -182,13 +191,17 @@ auth.post("/api/auth/refresh", async (c) => {
 
 // ─── POST /api/auth/logout ──────────────────────────────────────
 auth.post("/api/auth/logout", async (c) => {
+  const db = c.get("db");
   const token = getRefreshTokenFromCookie(c);
-
   if (token) {
-    const db = c.get("db");
     const tokenHash = await sha256(token);
     await db.delete(refreshTokens).where(eq(refreshTokens.tokenHash, tokenHash));
   }
+
+  // Sem cookie (bloqueado cross-origin), a sessão é identificada pelo token de acesso.
+  const accessToken = getAccessTokenFromCookie(c) ?? getBearerToken(c.req.header("Authorization"));
+  const payload = accessToken ? await verifyAccessToken(accessToken, c.env.JWT_SECRET) : null;
+  if (payload?.sid) await endSession(db, payload.sid);
 
   clearAuthCookies(c);
   return c.json({ success: true });

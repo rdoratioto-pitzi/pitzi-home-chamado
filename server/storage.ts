@@ -82,6 +82,7 @@ import {
   // Git Analytics
   gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches,
   claudeCodeUsageReports,
+  refreshTokens,
  } from "@shared/schema";
  import { db as defaultDb, type Database } from "./db";
  import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
@@ -564,6 +565,13 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) return undefined;
     const values = data.password === undefined ? data : { ...data, password: await hashIfPlain(data.password) };
     const [user] = await this.db.update(users).set(values).where(eq(users.id, id)).returning();
+    // Senha nova (texto puro recebido) ou desativação encerram todas as sessões do usuário.
+    // Um hash recebido é só a migração da mesma senha no login e não derruba sessões.
+    const passwordChanged = typeof data.password === "string" && !isPasswordHash(data.password);
+    const deactivated = data.status !== undefined && data.status !== "active";
+    if (user && (passwordChanged || deactivated)) {
+      await this.db.delete(refreshTokens).where(eq(refreshTokens.userId, id));
+    }
     return user;
   }
 
