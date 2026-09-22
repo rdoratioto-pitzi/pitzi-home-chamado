@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { storage } from "../storage";
+import { generateTemporaryPassword, hashPassword, verifyPassword } from "@shared/password";
 import { sendPasswordResetEmail } from "../email-service";
 
 // Rate limiter para tentativas de login - protege contra força bruta
@@ -35,12 +36,16 @@ export function registerAuthRoutes(router: Router) {
       const users = await storage.getUsers();
       const user = users.find(u => u.email.toLowerCase() === validated.email.toLowerCase());
 
-      if (!user) {
+      if (!user || !user.password) {
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
       }
 
-      if (user.password !== validated.password) {
+      const { valid, needsRehash } = await verifyPassword(validated.password, user.password);
+      if (!valid) {
         return res.status(401).json({ success: false, message: "Credenciais inválidas" });
+      }
+      if (needsRehash) {
+        await storage.updateUser(user.id, { password: await hashPassword(validated.password) });
       }
 
       if (user.status !== "active") {
@@ -130,11 +135,7 @@ export function registerAuthRoutes(router: Router) {
         return res.json({ success: true, message: "Se o email estiver cadastrado, você receberá uma nova senha temporária." });
       }
 
-      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-      let temporaryPassword = "";
-      for (let i = 0; i < 8; i++) {
-        temporaryPassword += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
+      const temporaryPassword = generateTemporaryPassword();
 
       await storage.updateUser(user.id, { password: temporaryPassword });
 

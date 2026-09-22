@@ -59,6 +59,8 @@ type Bindings = {
   CORREIOS_HOMOLOGACAO: string;
   FIRECRAWL_API_KEY: string;
   CLAUDE_USAGE_SECRET: string;
+  // Segredo do emissor externo de eventos de logística reversa (header X-Webhook-Secret).
+  LOGISTICA_WEBHOOK_SECRET?: string;
   GITHUB_TOKEN: string;
   GITHUB_WEBHOOK_SECRET: string;
   // Slack (Fase 1 — outbound only). Todos opcionais — service desabilita
