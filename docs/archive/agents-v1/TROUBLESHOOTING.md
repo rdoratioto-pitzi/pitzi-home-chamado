@@ -16,7 +16,7 @@ client/src/pages/chamados/ticket-detail-sheet.tsx(123,45): error...
 **Solução A - Corrigir Erros Antigos:**
 ```bash
 # Ver todos os erros
-cd ~/Documents/Workspaces/Renov-Home2/Renov.Home
+cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home
 npx tsc --noEmit
 
 # Cola no Kilo para corrigir todos
@@ -40,7 +40,7 @@ git push
 
 **Solução:**
 ```bash
-cd ~/Documents/Workspaces/Renov-Home2/Renov.Home/agents
+cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home/agents
 cat src/agents/atlas.ts | grep "maxTokens"
 
 # Deve mostrar: maxTokens: 300
@@ -78,7 +78,7 @@ Error [ERR_MODULE_NOT_FOUND]: Cannot find module
 
 **Solução:**
 ```bash
-cd ~/Documents/Workspaces/Renov-Home2/Renov.Home/agents
+cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home/agents
 npm install
 npm run build  # Se existir
 ```
@@ -121,13 +121,13 @@ Error: Rate limit exceeded
 ### Ver Logs Detalhados
 ```bash
 # Turing com erros completos
-cd ~/Documents/Workspaces/Renov-Home2/Renov.Home
+cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home
 npx tsc --noEmit 2>&1 | tee typescript-errors.log
 ```
 
 ### Testar Agente Isoladamente
 ```bash
-cd ~/Documents/Workspaces/Renov-Home2/Renov.Home/agents
+cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home/agents
 
 # Testar Atlas
 npm run agents
@@ -158,4 +158,4 @@ Se o problema persistir:
 
 1. Verificar documentação: `docs/agents/`
 2. Ver exemplos: `docs/agents/GUIA-USO.md`
-3. Contatar: matheus@renov.com.br
+3. Contatar: matheus@pitzi.com.br

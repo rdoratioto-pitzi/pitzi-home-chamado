@@ -21,7 +21,7 @@ Sem memória, o Claude começa "do zero" em cada sessão — você precisa re-ex
   "command": "npx",
   "args": ["-y", "@modelcontextprotocol/server-memory"],
   "env": {
-    "MEMORY_FILE_PATH": "/Users/matheusmundstock/workspaces/renov.home.imac/.mcp-memory.json"
+    "MEMORY_FILE_PATH": "/Users/matheusmundstock/workspaces/pitzi.home.imac/.mcp-memory.json"
   }
 }
 ```
@@ -32,7 +32,7 @@ Sem memória, o Claude começa "do zero" em cada sessão — você precisa re-ex
 | `MEMORY_FILE_PATH` | `.mcp-memory.json` na raiz do projeto |
 
 ## Arquivo de Memória
-- **Localização:** `/Users/matheusmundstock/workspaces/renov.home.imac/.mcp-memory.json`
+- **Localização:** `/Users/matheusmundstock/workspaces/pitzi.home.imac/.mcp-memory.json`
 - **Formato:** Knowledge graph em JSON (entidades e relações)
 - **Gitignore:** Sim — não versionado (`.gitignore` já inclui `.mcp-memory.json`)
 
@@ -43,7 +43,7 @@ Sem memória, o Claude começa "do zero" em cada sessão — você precisa re-ex
 "Lembre que o port do dev server é 5050, não 3000"
 "Quais decisões arquiteturais foram salvas sobre o módulo de reuniões?"
 "Salve que a branch principal de desenvolvimento é 'develop', não 'main'"
-"O que você sabe sobre o projeto renov.home?"
+"O que você sabe sobre o projeto pitzi.home?"
 ```
 
 ## Notas

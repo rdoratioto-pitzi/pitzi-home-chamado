@@ -113,7 +113,7 @@ I cannot:
 I cannot:
 - Test API endpoints
 - Verify external integrations
-- Call Renov's APIs
+- Call Pitzi's APIs
 
 **Solution:** I provide curl/Postman examples you can test.
 
@@ -186,7 +186,7 @@ Max uses the `create-file.sh` helper script for reliable file creation.
 **How it works:**
 ```bash
 # Max executes via bash
-~/.openclaw/workspace/renov/create-file.sh \
+~/.openclaw/workspace/pitzi/create-file.sh \
   "/path/to/file.tsx" \
   "file content here"
 ```
@@ -205,7 +205,7 @@ Max uses the `create-file.sh` helper script for reliable file creation.
 
 **I operate within:**
 ```
-/Users/macbookm2/Documents/Workspaces/Renov-Home2/Renov.Home
+/Users/macbookm2/Documents/Workspaces/Pitzi-Home2/Pitzi.Home
 ```
 
 **I can access:**

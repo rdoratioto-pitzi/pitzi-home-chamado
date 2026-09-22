@@ -4,7 +4,7 @@ Versão da Routine que substitui o **v6** após o merge da Fase 4 do Hermes.
 
 Mudanças vs. v6 (apenas uma — pequena, mas crítica pra Fase 4):
 
-1. Após postar a mensagem-mãe no Slack e gerar o `/prompt-renov` (plano
+1. Após postar a mensagem-mãe no Slack e gerar o `/prompt-pitzi` (plano
    passo-a-passo de execução), a Routine inclui o plano completo no
    campo `execution_plan` ao chamar
    `POST /api/integrations/hermes/thread-registered`.
@@ -34,8 +34,8 @@ são variáveis do **backend**, não da Routine Triagem).
 Onde a v6 faz:
 
 ```
-POST {RENOV_API_URL}/api/integrations/hermes/thread-registered
-Authorization: Bearer {RENOV_API_TOKEN}
+POST {PITZI_HOME_API_URL}/api/integrations/hermes/thread-registered
+Authorization: Bearer {PITZI_HOME_API_TOKEN}
 Content-Type: application/json
 
 {
@@ -48,15 +48,15 @@ Content-Type: application/json
 A v7 faz:
 
 ```
-POST {RENOV_API_URL}/api/integrations/hermes/thread-registered
-Authorization: Bearer {RENOV_API_TOKEN}
+POST {PITZI_HOME_API_URL}/api/integrations/hermes/thread-registered
+Authorization: Bearer {PITZI_HOME_API_TOKEN}
 Content-Type: application/json
 
 {
   "chamado_id": "<uuid>",
   "thread_ts": "<ts>",
   "channel_id": "<channel>",
-  "execution_plan": "<texto integral do /prompt-renov gerado para este chamado>"
+  "execution_plan": "<texto integral do /prompt-pitzi gerado para este chamado>"
 }
 ```
 
@@ -69,8 +69,8 @@ Esse mesmo texto é o que vai pro Hermes Executor quando aprovado.
 ## Sequência mental do prompt
 
 1. Recebe input com dados do chamado + ambiente (`dev`|`prod`).
-2. Investiga o repo (Renov.Home / Renov.Hub / Venus, conforme aplicação).
-3. Gera triagem em prosa + plano `/prompt-renov` estruturado.
+2. Investiga o repo (Pitzi.Home / Pitzi.Hub / Venus, conforme aplicação).
+3. Gera triagem em prosa + plano `/prompt-pitzi` estruturado.
 4. Posta mensagem-mãe no Slack via Block Kit (botões Aprovar/Ajustar/Cancelar).
 5. **Registra mapping** com `execution_plan` incluso (mudança v7).
 6. Encerra. Decisão humana é assíncrona.

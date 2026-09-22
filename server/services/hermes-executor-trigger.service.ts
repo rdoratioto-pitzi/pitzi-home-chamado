@@ -6,7 +6,7 @@
  *
  * - Atualiza hermes_slack_threads (execution_status='running',
  *   execution_started_at=now(), execution_plan=<plano>) ANTES do POST.
- * - POST com payload textual contendo o plano /prompt-renov aprovado e o
+ * - POST com payload textual contendo o plano /prompt-pitzi aprovado e o
  *   contexto de Slack pra reply.
  * - Falha silenciosa: erros de rede ou config logam mas não jogam exceção.
  *

@@ -1,4 +1,4 @@
-# Renov Home — Contexto para Claude Code
+# Pitzi Home — Contexto para Claude Code
 
 ## ⚡ Início de Sessão — Executar Imediatamente
 
@@ -10,7 +10,7 @@
 
 Plataforma brasileira de **trade-in de dispositivos eletrônicos** (B2B).
 Conecta redes de varejo e operadoras de telecom para avaliação de dispositivos
-e desconto imediato em novas compras. Produto principal: Renov Home (gestão interna).
+e desconto imediato em novas compras. Produto principal: Pitzi Home (gestão interna).
 
 Stack: React 18 + Vite + TanStack Query / Express + Node.js (TypeScript) /
 PostgreSQL + Drizzle ORM / Tailwind + shadcn/ui
@@ -39,7 +39,7 @@ npm run db:apply:prod "..."                                   # exige "APLICAR E
 ```
 
 Pré-requisitos:
-- Bitwarden CLI instalado (`bw`) — já em uso na Renov
+- Bitwarden CLI instalado (`bw`) — já em uso na Pitzi
 - `bw unlock` + `export BW_SESSION=...` antes de rodar
 - Items no vault: `neon-dev-database-url` e `neon-prod-database-url`
   (password = connection string Neon completa, com `sslmode=require`)
@@ -114,9 +114,9 @@ O deploy SEMPRE requer execução manual dos comandos abaixo.
 `scripts/build.ts` aceita `--mode=<production|staging|development>` e propaga
 pro Vite, que carrega `client/.env.<mode>`. O default é `production`, então
 `npm run build` (e `bash scripts/deploy.sh`) continua apontando pra
-`https://homeapi.renovsmart.com.br`.
+`https://homeapi.pitzi.com.br`.
 
-Para gerar bundle apontando pra API de dev (`homeapi-dev.renovsmart.com.br`),
+Para gerar bundle apontando pra API de dev (`homeapi-dev.pitzi.com.br`),
 use:
 
 ```bash
@@ -124,13 +124,13 @@ npm run build:dev   # equivalente a: tsx scripts/build.ts --mode=staging
 ```
 
 Sem isso, o bundle sai apontando pra produção e o login em
-`home-dev.renovsmart.com.br` quebra com erro de CORS. Um eventual
+`home-dev.pitzi.com.br` quebra com erro de CORS. Um eventual
 `scripts/deploy-dev.sh` deve usar `npm run build:dev` em vez de `npm run build`.
 
 Validação rápida do bundle gerado:
 
 ```bash
-grep -oE "homeapi[a-z-]*\.renovsmart\.com\.br" dist/public/assets/index-*.js | sort -u
+grep -oE "homeapi[a-z-]*\.pitzi\.com\.br" dist/public/assets/index-*.js | sort -u
 ```
 
 ### Script de deploy completo (salvo em `scripts/deploy.sh`):
@@ -138,7 +138,7 @@ grep -oE "homeapi[a-z-]*\.renovsmart\.com\.br" dist/public/assets/index-*.js | s
 #!/bin/bash
 set -e
 
-cd ~/Documentos/workspaces/renov.home.macmini/Renov.Home
+cd ~/Documentos/workspaces/pitzi.home.macmini/Pitzi.Home
 
 echo "→ Build do frontend..."
 npm run build
@@ -147,7 +147,7 @@ echo "→ Forçando upload do index.html..."
 echo "<!-- deploy $(date) -->" >> dist/public/index.html
 
 echo "→ Deploy Pages (frontend)..."
-npx wrangler pages deploy dist/public --project-name renov-home --commit-dirty=true
+npx wrangler pages deploy dist/public --project-name pitzi-home --commit-dirty=true
 
 echo "→ Deploy Worker (backend)..."
 cd worker && npm install && npx wrangler deploy --env=""
@@ -175,15 +175,15 @@ e os assets JS em produção.
 Após qualquer merge em main:
 - [ ] `bash scripts/deploy.sh` executado com sucesso
 - [ ] Output mostra "Uploaded 1 files" (index.html) no Pages
-- [ ] Output mostra "Deployed renov-home-api" no Worker
-- [ ] Testar https://home.renovsmart.com.br em aba anônima
+- [ ] Output mostra "Deployed pitzi-home-api" no Worker
+- [ ] Testar https://home.pitzi.com.br em aba anônima
 - [ ] Login funciona e aplicação carrega sem tela preta
 - [ ] Abrir DevTools → Console → zero erros de MIME type ou módulo
 
 Se aparecer tela preta após login:
 1. Verificar Console do browser — erros de módulo JS indicam index.html desatualizado no Cloudflare
 2. Rodar: `echo "<!-- fix $(date) -->" >> dist/public/index.html`
-3. Rodar: `npx wrangler pages deploy dist/public --project-name renov-home --commit-dirty=true`
+3. Rodar: `npx wrangler pages deploy dist/public --project-name pitzi-home --commit-dirty=true`
 4. Aguardar 30s e testar em aba anônima
 
 ## Bug Fixes
@@ -306,13 +306,13 @@ Rotas legadas redirecionam automaticamente: `/chamados` → `/workspace/chamados
 
 ## Skills de Segurança e Workflow (instaladas nesta sessão)
 
-### renov-security ← OBRIGATÓRIA PRÉ-PR
+### pitzi-security ← OBRIGATÓRIA PRÉ-PR
 Auditoria de segurança customizada para o Home (Express + React 18).
 Executa varredura de credenciais, analisa o diff do branch, verifica
 branch/repo correto e emite relatório com status.
 
 **REGRA INVIOLÁVEL:** Antes de abrir qualquer PR no Home, execute:
-"Use a skill renov-security para auditar este PR — projeto Home, branch develop"
+"Use a skill pitzi-security para auditar este PR — projeto Home, branch develop"
 
 Status possíveis:
 - ✅ APROVADO → PR pode ser aberto normalmente
@@ -355,19 +355,19 @@ Se skills não funcionarem: cd .claude/skills/gstack && ./setup
 - Secrets de produção são gerenciados via variáveis de ambiente do deploy (Cloudflare/Vercel)
 - Em caso de vazamento acidental: rotacionar o secret IMEDIATAMENTE e notificar o time
 
-## Segundo Cérebro — rag-obsidian-renov
+## Segundo Cérebro — rag-obsidian-pitzi
 
-Repo bare: /home/matheus/Documentos/workspaces/rag-obsidian-renov.git
-Clone MacBook: ~/Documents/rag-obsidian-renov/
-Clone iMac:    ~/Documents/rag-obsidian-renov/
+Repo bare: /home/matheus/Documentos/workspaces/rag-obsidian-pitzi.git
+Clone MacBook: ~/Documents/rag-obsidian-pitzi/
+Clone iMac:    ~/Documents/rag-obsidian-pitzi/
 MCP: "obsidian" disponível no Claude Desktop de cada máquina
 
 ### Consultar antes de sessões relevantes
-- projetos/renov-home/index.md — stack, git flow, status
-- projetos/renov-home/decisoes/ — decisões anteriores
+- projetos/pitzi-home/index.md — stack, git flow, status
+- projetos/pitzi-home/decisoes/ — decisões anteriores
 
 ### Registrar após decisões arquiteturais
-Arquivo: projetos/renov-home/decisoes/YYYY-MM-DD-[tema].md
+Arquivo: projetos/pitzi-home/decisoes/YYYY-MM-DD-[tema].md
 Template: _templates/decisao-sessao.md
 Commit: git add -A && git commit -m "vault: decisao [tema]" && git push
 

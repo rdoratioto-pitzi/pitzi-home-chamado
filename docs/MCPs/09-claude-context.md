@@ -57,7 +57,7 @@ MILVUS_TOKEN=sua-api-key-zilliz
 
 ### 4. Indexar o codebase (uma vez)
 ```bash
-npx @zilliz/claude-context-mcp@latest index /Users/matheusmundstock/workspaces/renov.home.imac
+npx @zilliz/claude-context-mcp@latest index /Users/matheusmundstock/workspaces/pitzi.home.imac
 ```
 
 Reindexar quando houver grandes mudanças no código.

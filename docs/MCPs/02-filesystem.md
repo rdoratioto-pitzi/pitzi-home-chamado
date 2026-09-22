@@ -19,7 +19,7 @@
   "args": [
     "-y",
     "@modelcontextprotocol/server-filesystem",
-    "/Users/matheusmundstock/workspaces/renov.home.imac"
+    "/Users/matheusmundstock/workspaces/pitzi.home.imac"
   ]
 }
 ```
@@ -37,7 +37,7 @@ Nenhuma necessária.
 ```
 
 ## Segurança
-- O acesso é **restrito ao diretório do projeto** (`/Users/matheusmundstock/workspaces/renov.home.imac`)
+- O acesso é **restrito ao diretório do projeto** (`/Users/matheusmundstock/workspaces/pitzi.home.imac`)
 - Para acessar outros diretórios (ex: Downloads), adicione como argumento extra no `.mcp.json`
 - Arquivos sensíveis como `.env` ficam acessíveis — use com consciência
 

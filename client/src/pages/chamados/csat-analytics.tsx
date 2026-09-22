@@ -182,7 +182,7 @@ export function CSATAnalytics() {
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "CSAT Report");
-    XLSX.writeFile(wb, `CSAT_RenovHome_${format(new Date(), "yyyyMMdd")}.xlsx`);
+    XLSX.writeFile(wb, `CSAT_PitziHome_${format(new Date(), "yyyyMMdd")}.xlsx`);
   };
 
   const evaluationRate = overview.evaluationRate || 0;

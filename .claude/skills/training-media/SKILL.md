@@ -2,24 +2,24 @@
 name: training-media
 description: >
   Generates training materials including AI-generated images and videos for
-  Renov internal training modules. Use when creating training content, visual
+  Pitzi internal training modules. Use when creating training content, visual
   materials, educational assets, onboarding media. Trigger on: "material de
   treinamento", "gerar imagem", "criar vídeo", "training", "onboarding visual",
   "tutorial visual", "treinamento".
 ---
 
-# Training Media — Visual Content for Renov Training
+# Training Media — Visual Content for Pitzi Training
 
 ## Image Generation
 
 ### Structured Prompts
-- Screenshots simulados de interfaces Renov
+- Screenshots simulados de interfaces Pitzi
 - Diagramas de fluxo para processos de trade-in
 - Infográficos com KPIs e métricas
 - Step-by-step visuais para onboarding
 
 ### Brand Compliance
-All images/videos MUST follow `renov-brand`:
+All images/videos MUST follow `pitzi-brand`:
 - **Verde Bandeira** (#00A137) como cor de destaque
 - **Montserrat** como fonte principal
 - Vocabulário aprovado (Vantagem, não Desconto; Valor de troca, não Preço)

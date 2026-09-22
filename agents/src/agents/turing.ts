@@ -93,7 +93,7 @@ function contarErrosTypeScript(): number {
   
   try {
     execSync('npx tsc --noEmit --pretty false', {
-      cwd: config.paths.renovHome,
+      cwd: config.paths.pitziHome,
       stdio: 'pipe',
     });
     console.log('    ✅ OK - Sem erros');
@@ -113,7 +113,7 @@ function contarErrosTypeScript(): number {
 function buscarErrosDetalhados(): string {
   try {
     execSync('npx tsc --noEmit --pretty false', {
-      cwd: config.paths.renovHome,
+      cwd: config.paths.pitziHome,
       stdio: 'pipe',
     });
     return '';
@@ -129,7 +129,7 @@ function verificarESLint(): { erros: number } {
   
   try {
     execSync('npx eslint . --ext .ts,.tsx --max-warnings 50', {
-      cwd: config.paths.renovHome,
+      cwd: config.paths.pitziHome,
       stdio: 'pipe',
     });
     console.log('    ✅ OK');

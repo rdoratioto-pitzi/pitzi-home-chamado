@@ -7,7 +7,7 @@ do agente antes de abrir o trabalho desta Fase 1.
 
 - **Entrada**: ticket cru em JSON, prompt curto pedindo categoria.
 - **Resultado**: Claude classificou bem chamados óbvios mas alucinou em
-  casos com termos internos da Renov (ex.: "Trade-in Magalu",
+  casos com termos internos da Pitzi (ex.: "Trade-in Magalu",
   "ListarPosEstoque"). Não diferenciou pedido de informação de bug.
 - **Aprendizado**: precisa de glossário do domínio inline e de exemplos
   few-shot.

@@ -1,7 +1,7 @@
-# Renov Home - Governança e Workflows
+# Pitzi Home - Governança e Workflows
 
 **📅 Última atualização:** Fevereiro 2026  
-**🔗 Repositório:** https://github.com/renov-tech/renov-home
+**🔗 Repositório:** https://github.com/pitzi-tech/pitzi-home
 
 ---
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const STORAGE_KEY = "renov-notification-prefs";
+const STORAGE_KEY = "pitzi-notification-prefs";
 
 export interface NotificationPreferences {
   soundEnabled: boolean;
@@ -81,7 +81,7 @@ export function sendBrowserNotification(title: string, body: string, url?: strin
       body,
       icon: "/favicon.png",
       badge: "/favicon.png",
-      tag: "renov-notification-" + Date.now(),
+      tag: "pitzi-notification-" + Date.now(),
     });
 
     if (url) {

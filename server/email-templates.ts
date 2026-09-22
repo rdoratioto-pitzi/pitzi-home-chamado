@@ -1,7 +1,7 @@
 /**
  * Sistema de Templates de E-mail — Pitzi Home
  *
- * Template base reutilizável com identidade visual Renov,
+ * Template base reutilizável com identidade visual Pitzi,
  * usado por todas as funções de envio de e-mail do sistema.
  */
 
@@ -272,7 +272,7 @@ export function emailTemplate(options: EmailTemplateOptions): string {
                 <tr>
                   <td align="center">
                     <div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:12px;padding:8px 20px;margin-bottom:16px;">
-                      <span style="color:white;font-size:20px;font-weight:700;letter-spacing:1px;">RENOV</span>
+                      <span style="color:white;font-size:20px;font-weight:700;letter-spacing:1px;">PITZI</span>
                       <span style="color:rgba(255,255,255,0.8);font-size:20px;font-weight:400;letter-spacing:1px;"> HOME</span>
                     </div>
                   </td>

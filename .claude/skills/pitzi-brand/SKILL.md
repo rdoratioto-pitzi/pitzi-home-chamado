@@ -1,28 +1,28 @@
 ---
-name: renov-brand
+name: pitzi-brand
 description: >
-  Applies Renov's official brand identity, design system, and visual standards
+  Applies Pitzi's official brand identity, design system, and visual standards
   to any artifact — HTML pages, React components, dashboards, landing pages,
-  presentations, sites, or any web interface for the Renov ecosystem
-  (Renov Hub, Renov Home, Renov Smart).
+  presentations, sites, or any web interface for the Pitzi ecosystem
+  (Pitzi Hub, Pitzi Home, Pitzi Smart).
   Use this skill whenever creating, styling, or reviewing any visual output
-  related to Renov, trade-in interfaces, marketplace dashboards, or any
-  page/component that should carry the Renov look-and-feel.
-  Also trigger when the user mentions "Renov brand", "identidade visual Renov",
-  "padrão Renov", "design system", "tokens Renov", "cores Renov", or asks to
-  build anything for the Renov platform. Even if the user just says
+  related to Pitzi, trade-in interfaces, marketplace dashboards, or any
+  page/component that should carry the Pitzi look-and-feel.
+  Also trigger when the user mentions "Pitzi brand", "identidade visual Pitzi",
+  "padrão Pitzi", "design system", "tokens Pitzi", "cores Pitzi", or asks to
+  build anything for the Pitzi platform. Even if the user just says
   "cria uma página para o Hub" or "faz um dashboard", use this skill to ensure
   brand compliance.
-  This skill takes priority over generic frontend-design choices whenever Renov
+  This skill takes priority over generic frontend-design choices whenever Pitzi
   is the context. Also use for mobile-first or responsive layouts targeting the
-  Renov ecosystem.
+  Pitzi ecosystem.
 ---
 
-# Renov Brand Identity & Design System
+# Pitzi Brand Identity & Design System
 
 ## Overview
 
-This skill ensures every visual artifact produced for the Renov ecosystem
+This skill ensures every visual artifact produced for the Pitzi ecosystem
 faithfully follows the official **Brand Guidelines 2026** and **Design System v1**.
 It covers colors, typography, layout, components, dark/light modes, responsive
 design, tone of voice, and prohibited vocabulary.
@@ -34,10 +34,10 @@ Everything else is neutral — blacks, whites, and grays at controlled opacities
 
 ## 1. Brand Context
 
-**Renov** — Brazilian company pioneering trade-in of used devices since 2012.
-Pivoting from transactional model to decentralized marketplace (Renov Hub).
+**Pitzi** — Brazilian company pioneering trade-in of used devices since 2012.
+Pivoting from transactional model to decentralized marketplace (Pitzi Hub).
 
-- **Tagline:** "Renov. Sua Troca Inteligente."
+- **Tagline:** "Pitzi. Sua Troca Inteligente."
 - **Mission:** Utilizar tecnologia para ampliar o poder de compra das pessoas
   atraves de produtos usados
 
@@ -45,10 +45,10 @@ Pivoting from transactional model to decentralized marketplace (Renov Hub).
 
 | Application   | Role                  | Color                      |
 |---------------|-----------------------|----------------------------|
-| **Renov Hub** | Marketplace frontend  | Verde Bandeira `#00A137`   |
-| **Renov Home**| Internal backoffice   | Azul corporativo           |
-| **Renov Smart**| Backend / API        | Cinza tecnico              |
-| ~~Renov Go~~  | **DISCONTINUED**      | **Never use**              |
+| **Pitzi Hub** | Marketplace frontend  | Verde Bandeira `#00A137`   |
+| **Pitzi Home**| Internal backoffice   | Azul corporativo           |
+| **Pitzi Smart**| Backend / API        | Cinza tecnico              |
+| ~~Pitzi Go~~  | **DISCONTINUED**      | **Never use**              |
 
 ### Logo
 

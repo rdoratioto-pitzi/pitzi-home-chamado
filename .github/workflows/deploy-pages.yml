@@ -44,4 +44,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist/public --project-name ${{ github.ref == 'refs/heads/main' && 'renov-home' || 'renov-home-dev' }} --commit-dirty=true
+          command: pages deploy dist/public --project-name ${{ github.ref == 'refs/heads/main' && 'pitzi-home' || 'pitzi-home-dev' }} --commit-dirty=true

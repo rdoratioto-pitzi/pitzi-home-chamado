@@ -1,7 +1,7 @@
 ---
-name: renov-git-workflow
+name: pitzi-git-workflow
 description: >
-  Garante que todo o fluxo Git no Renov.Home siga os padroes definidos pelo time,
+  Garante que todo o fluxo Git no Pitzi.Home siga os padroes definidos pelo time,
   desde o inicio da sessao ate a entrega do PR. Use esta skill SEMPRE ao iniciar
   uma sessao de desenvolvimento, ao criar branches, fazer commits, ou abrir PRs.
   Ativa automaticamente quando detectar comandos git, mencoes a "branch", "commit",
@@ -10,14 +10,14 @@ description: >
 license: Apache-2.0
 compatibility: Requires git, gh CLI
 metadata:
-  author: renov-home-team
+  author: pitzi-home-team
   version: "1.0"
 allowed-tools: Bash(git:*) Bash(gh:*) Read Grep
 ---
 
-# Renov Git Workflow Enforcer
+# Pitzi Git Workflow Enforcer
 
-Skill que garante aderencia rigorosa ao Git Workflow do Renov.Home em todas as etapas.
+Skill que garante aderencia rigorosa ao Git Workflow do Pitzi.Home em todas as etapas.
 
 ## Inicio de Sessao — Checklist Automatico
 

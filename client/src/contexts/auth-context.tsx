@@ -70,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     // Broadcast to other tabs
     try {
-      const bc = new BroadcastChannel("renov-auth");
+      const bc = new BroadcastChannel("pitzi-auth");
       bc.postMessage({ type: "logout" });
       bc.close();
     } catch {

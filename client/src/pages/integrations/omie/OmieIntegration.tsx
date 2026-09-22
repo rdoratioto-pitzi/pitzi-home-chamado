@@ -21,7 +21,7 @@ export default function OmieIntegration() {
             <Database className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Renov API - Omie</h1>
+            <h1 className="text-2xl font-bold">Pitzi API - Omie</h1>
             <p className="text-muted-foreground">Integração com ERP Omie para gestão empresarial</p>
           </div>
         </div>

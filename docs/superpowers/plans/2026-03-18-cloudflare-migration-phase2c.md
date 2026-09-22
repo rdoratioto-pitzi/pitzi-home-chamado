@@ -20,7 +20,7 @@
 | `worker/src/routes/okrs.ts` | 12 endpoints — Objectives + Key Results CRUD, check-ins with progress calculation |
 | `worker/src/routes/metas.ts` | 12 endpoints — Meta Areas (soft delete) + Metas CRUD, check-ins |
 | `worker/src/routes/knowledge.ts` | 13 endpoints — Knowledge documents CRUD, versions, audit logs, favorites |
-| `worker/src/routes/integrations.ts` | 11 endpoints — RenovSmart proxy, AI evaluation proxy, logística reversa webhook, estoque proxy |
+| `worker/src/routes/integrations.ts` | 11 endpoints — Pitzi proxy, AI evaluation proxy, logística reversa webhook, estoque proxy |
 | `worker/src/routes/tickets.ts` | 16 endpoints — Tickets CRUD, comments, auto-assignment, 6 email types, CSAT analytics |
 | `worker/src/routes/git-analytics.ts` | 22 endpoints — Repos, commits, PRs, security alerts, branches, stats, sync, webhook |
 | `worker/src/services/github-sync.ts` | GitHub sync service with dependency injection (replaces `process.env` + global `storage`) |
@@ -733,7 +733,7 @@ import { insertLogisticaReversaEventoSchema } from "@shared/schema";
 
 const integrations = new Hono<AppEnv>();
 
-const RS_API_BASE_URL = "https://dash.renovsmart.com.br/api";
+const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
 const RS_API_TOKEN = "Renov123";
 
 // ============== HELPERS ==============
@@ -1602,7 +1602,7 @@ async function githubFetch(endpoint: string, githubToken: string): Promise<any> 
     headers: {
       Authorization: `token ${githubToken}`,
       Accept: "application/vnd.github.v3+json",
-      "User-Agent": "Renov-Home-App",
+      "User-Agent": "Pitzi-Home-App",
     },
   });
 
@@ -2333,7 +2333,7 @@ gitAnalytics.post("/api/git-analytics/add-repository", async (c) => {
   const deps = getSyncDeps(c);
   const { fullName } = await c.req.json();
   if (!fullName) {
-    return c.json({ error: "fullName é obrigatório (ex: Renov-BD/Renov.Home)" }, 400);
+    return c.json({ error: "fullName é obrigatório (ex: Pitzi-BD/Pitzi.Home)" }, 400);
   }
   const repo = await addRepository(deps, fullName);
   return c.json(repo, 201);

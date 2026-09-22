@@ -46,7 +46,7 @@ export function exportPDF(revenda?: string): void {
 
       /* ── Print header ── */
       body::before {
-        content: "Renov — Simulador CPD";
+        content: "Pitzi — Simulador CPD";
         display: block;
         font-size: 18px;
         font-weight: 700;

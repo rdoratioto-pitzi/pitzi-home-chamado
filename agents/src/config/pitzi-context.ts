@@ -1,4 +1,4 @@
-export const renovHomeContext = `
+export const pitziHomeContext = `
 # Pitzi Home - Contexto do Projeto
 
 ## Stack Tecnológica

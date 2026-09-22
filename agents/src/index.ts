@@ -15,7 +15,7 @@ function pergunta(prompt: string): Promise<string> {
 async function main() {
   console.clear();
   console.log('╔════════════════════════════════════════════════╗');
-  console.log('║   🤖 RENOV AGENTS v3.0                        ║');
+  console.log('║   🤖 PITZI AGENTS v3.0                        ║');
   console.log('║   Atlas (Planejador) · Turing (QA) · Giter   ║');
   console.log('╚════════════════════════════════════════════════╝\n');
 

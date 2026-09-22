@@ -313,7 +313,7 @@ export function registerWorkspaceRoutes(router: Router) {
         attachments: attachments || null,
       } as InsertTicket);
 
-      // Slack: notifica criação no canal #devs-renov (fire-and-forget).
+      // Slack: notifica criação no canal #devs-pitzi (fire-and-forget).
       if (db) {
         fireSlack(() => notifyChamadoCriado({ db: db as SlackDb, env: slackEnv() }, ticket.id));
       }

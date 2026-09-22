@@ -1,13 +1,13 @@
-# Renov Home - Arquitetura Técnica
+# Pitzi Home - Arquitetura Técnica
 
-**🔗 Repositório:** https://github.com/renov-tech/renov-home  
+**🔗 Repositório:** https://github.com/pitzi-tech/pitzi-home  
 **📅 Última atualização:** Fevereiro 2026
 
 ---
 
 ## 📊 Visão Geral
 
-O Renov Home é uma aplicação web **full-stack moderna** construída com arquitetura modular, permitindo escalabilidade horizontal e vertical.
+O Pitzi Home é uma aplicação web **full-stack moderna** construída com arquitetura modular, permitindo escalabilidade horizontal e vertical.
 
 ### Arquitetura Alto Nível
 

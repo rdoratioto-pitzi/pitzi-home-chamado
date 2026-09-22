@@ -60,6 +60,6 @@ fechar a aba do navegador.
 
 Hermes tem `is_admin = true` e `tenant_id = NULL`. Em queries multi-tenant
 isso significa que o agente vê todos os tickets independente de
-tenantId. Esse é o comportamento esperado para a primeira versão (Renov
+tenantId. Esse é o comportamento esperado para a primeira versão (Pitzi
 opera todos os tenants centralizadamente), mas se o produto evoluir para
 isolamento mais forte, será preciso revisitar.

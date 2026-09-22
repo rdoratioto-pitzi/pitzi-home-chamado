@@ -1,4 +1,4 @@
-# Migração Renov Home: Replit → Cloudflare + Neon
+# Migração Pitzi Home: Replit → Cloudflare + Neon
 
 **Data:** 2026-03-16
 **Status:** Aprovado
@@ -8,7 +8,7 @@
 
 ## 1. Contexto
 
-O Renov Home roda hoje no Replit (autoscale) com Neon PostgreSQL. A migração para Cloudflare visa:
+O Pitzi Home roda hoje no Replit (autoscale) com Neon PostgreSQL. A migração para Cloudflare visa:
 - Eliminar dependência do Replit
 - Melhor performance (edge network, Smart Placement)
 - Custo menor para tráfego baixo e esporádico (pay-per-request)
@@ -32,11 +32,11 @@ O Renov Home roda hoje no Replit (autoscale) com Neon PostgreSQL. A migração p
 ## 3. Arquitetura
 
 ```
-                    renovsmart.com.br (Cloudflare DNS)
+                    pitzi.com.br (Cloudflare DNS)
                            │
               ┌────────────┴────────────┐
               │                         │
-    home-next.renovsmart.com.br  homeapi.renovsmart.com.br
+    home-next.pitzi.com.br  homeapi.pitzi.com.br
               │                         │
      ┌────────┴────────┐      ┌────────┴────────┐
      │  Cloudflare     │      │  Cloudflare     │
@@ -54,9 +54,9 @@ O Renov Home roda hoje no Replit (autoscale) com Neon PostgreSQL. A migração p
 
 | Ambiente | Front (Pages) | API (Worker) | Neon |
 |---|---|---|---|
-| Produção atual (Replit) | `home.renovsmart.com.br` | — | `ep-wispy-grass` |
-| Produção CF | `home-next.renovsmart.com.br` | `homeapi.renovsmart.com.br` | `ep-wispy-grass` |
-| Develop CF | `home-dev.renovsmart.com.br` | `homeapi-dev.renovsmart.com.br` | `ep-crimson-pond` |
+| Produção atual (Replit) | `home.pitzi.com.br` | — | `ep-wispy-grass` |
+| Produção CF | `home-next.pitzi.com.br` | `homeapi.pitzi.com.br` | `ep-wispy-grass` |
+| Develop CF | `home-dev.pitzi.com.br` | `homeapi-dev.pitzi.com.br` | `ep-crimson-pond` |
 
 Produção Replit continua ativa durante toda a migração. Cutover via DNS swap.
 
@@ -82,7 +82,7 @@ Client                    Worker (Hono)                  Neon
 
 | Token | Duração | Storage | Payload |
 |---|---|---|---|
-| Access | 2h | Cookie `httpOnly`, `secure`, `sameSite=lax`, `domain=.renovsmart.com.br` | `{ userId, tenantId, role }` |
+| Access | 2h | Cookie `httpOnly`, `secure`, `sameSite=lax`, `domain=.pitzi.com.br` | `{ userId, tenantId, role }` |
 | Refresh | 7d | Cookie `httpOnly`, `secure`, `sameSite=lax`, `path=/api/auth/refresh` | `{ userId }` |
 
 ### Propagação de tenant
@@ -170,7 +170,7 @@ Client (Uppy)                Worker (Hono)              R2 Bucket
 # wrangler.toml
 [[r2_buckets]]
 binding = "ATTACHMENTS"
-bucket_name = "renov-home-attachments"
+bucket_name = "pitzi-home-attachments"
 ```
 
 ### Rotas
@@ -271,7 +271,7 @@ worker/
 
 | Item | Antes | Depois |
 |---|---|---|
-| API base URL | `/api/` (mesmo domínio) | `https://homeapi.renovsmart.com.br/api/` via `VITE_API_BASE_URL` |
+| API base URL | `/api/` (mesmo domínio) | `https://homeapi.pitzi.com.br/api/` via `VITE_API_BASE_URL` |
 | Auth | Cookie de sessão | Cookie JWT (mesmo root domain) |
 | Uploads | Presigned URL Replit | Presigned URL R2 (mesma lib Uppy) |
 | Vite plugins | `@replit/vite-plugin-*` — `runtimeErrorOverlay` (sempre ativo), `cartographer` e `devBanner` (condicionais ao `REPL_ID`) | Todos os 3 removidos |
@@ -287,7 +287,7 @@ O client atual usa `localStorage` + `Authorization: Bearer` header (via `client/
 5. **Reescrever interceptor 401**: request falha → chama `POST /api/auth/refresh` → retry → falha → redireciona para `/login`
 6. **Atualizar `login.tsx`**: parar de chamar `saveAuth({ token, user })` — cookies vêm via Set-Cookie; salvar `user` no React context. Nota: `login.tsx` usa `fetchWithAuth` para o login, que será substituído por `fetch` direto com `credentials: "include"`
 
-Nota: URLs hardcoded para `dash.renovsmart.com.br` em `client/src/pages/apis/` são endpoints de outro serviço (Renov Dash) e não são afetados pela migração.
+Nota: URLs hardcoded para `dash.pitzi.com.br` em `client/src/pages/apis/` são endpoints de outro serviço (Pitzi Dash) e não são afetados pela migração.
 
 ### Deploy
 - Build: `npm run build:client` → `dist/public/` (script novo a criar — o atual `npm run build` faz front+back junto)
@@ -304,7 +304,7 @@ Nota: URLs hardcoded para `dash.renovsmart.com.br` em `client/src/pages/apis/` s
 ### wrangler.toml
 
 ```toml
-name = "renov-home-api"
+name = "pitzi-home-api"
 main = "src/index.ts"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
@@ -314,11 +314,11 @@ mode = "smart"
 
 [[r2_buckets]]
 binding = "ATTACHMENTS"
-bucket_name = "renov-home-attachments"
+bucket_name = "pitzi-home-attachments"
 
 [vars]
-APP_URL = "https://home-next.renovsmart.com.br"
-CORS_ORIGIN = "https://home-next.renovsmart.com.br"
+APP_URL = "https://home-next.pitzi.com.br"
+CORS_ORIGIN = "https://home-next.pitzi.com.br"
 ```
 
 ### Secrets (via `wrangler secret put`)
@@ -337,11 +337,11 @@ CORS_ORIGIN = "https://home-next.renovsmart.com.br"
 ```
 GitHub push
     │
-    ├─► develop ──► Pages: home-dev.renovsmart.com.br
-    │               Worker: homeapi-dev.renovsmart.com.br
+    ├─► develop ──► Pages: home-dev.pitzi.com.br
+    │               Worker: homeapi-dev.pitzi.com.br
     │
-    └─► main ─────► Pages: home-next.renovsmart.com.br
-                    Worker: homeapi.renovsmart.com.br
+    └─► main ─────► Pages: home-next.pitzi.com.br
+                    Worker: homeapi.pitzi.com.br
 ```
 
 ### Custo estimado (tráfego baixo)
@@ -358,7 +358,7 @@ GitHub push
 
 ### Fase 1 — Fundação
 - Criar projeto Worker (Hono) + Pages no Cloudflare
-- Configurar R2 bucket `renov-home-attachments`
+- Configurar R2 bucket `pitzi-home-attachments`
 - Configurar domínios (home-next, home-dev, homeapi, homeapi-dev)
 - Implementar auth JWT (PBKDF2 + access 2h + refresh 7d)
 - Criar tabela `refresh_tokens`
@@ -380,7 +380,7 @@ GitHub push
 - Validar: login, tickets, estoques, uploads, emails, Omie
 
 ### Fase 4 — Cutover
-- DNS: `home.renovsmart.com.br` → Pages (Cloudflare)
+- DNS: `home.pitzi.com.br` → Pages (Cloudflare)
 - Desligar Replit
 - Remover domínios temporários ou manter como alias
 - **Nota:** usuários precisarão fazer login novamente após o cutover (JWT cookies ≠ session cookies do Replit)
@@ -395,7 +395,7 @@ GitHub push
 - Remover fallback plaintext de senhas (após confirmar que todas foram migradas)
 
 ### Rollback
-Em qualquer fase, `home.renovsmart.com.br` continua no Replit. Zero downtime, zero risco para usuários.
+Em qualquer fase, `home.pitzi.com.br` continua no Replit. Zero downtime, zero risco para usuários.
 
 ## 10. Riscos e Mitigações
 
@@ -405,8 +405,8 @@ Em qualquer fase, `home.renovsmart.com.br` continua no Replit. Zero downtime, ze
 | Latência DB (Worker ↔ Neon) | Média | Smart Placement posiciona Worker perto do Neon us-east-1 |
 | Libs Node incompatíveis com Workers | Média | `compatibility_date = "2025-09-01"` + `nodejs_compat`; testar xlsx, nodemailer, xml2js |
 | Migração de uploads falha | Baixa | Volume pequeno; script idempotente com retry |
-| CORS entre Pages e Worker | Baixa | Mesmo root domain; cookies com `domain=.renovsmart.com.br` |
-| Cookie collision com Replit | Baixa | JWT cookies usam nomes distintos (`access_token`, `refresh_token`) vs. session cookie Replit (`renov.sid`). Sem conflito |
+| CORS entre Pages e Worker | Baixa | Mesmo root domain; cookies com `domain=.pitzi.com.br` |
+| Cookie collision com Replit | Baixa | JWT cookies usam nomes distintos (`access_token`, `refresh_token`) vs. session cookie Replit (`pitzi.sid`). Sem conflito |
 | nodemailer em Workers | Alta | Testar com `nodejs_compat`; fallback: API HTTP (Resend/Mailgun) ou Cloudflare Email Workers |
 | CPU timeout (30s limit) | Baixa | Operações longas (Omie sync, exports grandes) podem exceder limite. Monitorar; se necessário, usar Cloudflare Queues para offload |
 | Body size limit (free plan: 1MB) | Média | Express atual permite 50MB. Validar payloads grandes (dev-tools SQL, knowledge docs). Se necessário, usar Workers Paid ($5/mês, 100MB limit) |

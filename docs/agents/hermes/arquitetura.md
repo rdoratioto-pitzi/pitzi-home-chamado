@@ -4,24 +4,24 @@
 
 ```
 ┌──────────────┐    ticket.created     ┌──────────────────┐
-│  Renov.Home  │ ────────────────────▶ │ Anthropic Routine│
+│  Pitzi.Home  │ ────────────────────▶ │ Anthropic Routine│
 │   (Worker)   │      webhook out      │  (triage v4)     │
 └──────┬───────┘                       └────────┬─────────┘
        │                                        │
        │   POST /api/tickets/:id/comments        ▼
        │   Authorization: Bearer <hermes>  ┌──────────────┐
        │ ◀──────────────────────────────── │  Slack App   │
-       │                                    │   (Renov)    │
+       │                                    │   (Pitzi)    │
        │                                    └──────────────┘
        ▼
 ┌──────────────┐
-│ Neon Postgres│  ← tabela users tem registro hermes@renovsmart.com.br
+│ Neon Postgres│  ← tabela users tem registro hermes@pitzi.com.br
 └──────────────┘
 ```
 
 ## Atores
 
-### Renov.Home (Worker Hono em produção, Express em dev)
+### Pitzi.Home (Worker Hono em produção, Express em dev)
 
 - Em algum ponto futuro emite webhook outbound em `ticket.created` /
   `ticket.updated` para a URL pública da Routine.
@@ -40,16 +40,16 @@
 
 ### Slack App
 
-- Já existe na Renov para notificações gerais.
+- Já existe na Pitzi para notificações gerais.
 - Hermes empresta esse canal para entregar o output de triagem ao
   responsável e — em ações sensíveis — pedir aprovação humana antes do
   `executor-v1` acionar a API.
 
-### Service account `hermes@renovsmart.com.br`
+### Service account `hermes@pitzi.com.br`
 
 - Linha na tabela `users` do banco Home.
 - Campos relevantes:
-  - `email = hermes@renovsmart.com.br`
+  - `email = hermes@pitzi.com.br`
   - `name = Hermes (Agente)`
   - `is_admin = true` — necessário para postar comentários em qualquer
     chamado e para ler todos os tickets do tenant
@@ -73,7 +73,7 @@
    armazenado em lugar nenhum no servidor.
 5. A Routine recebe o token via configuração da Anthropic (Routine
    secrets) e o envia em `Authorization: Bearer <token>` em todas as
-   chamadas para `https://homeapi.renovsmart.com.br/...`.
+   chamadas para `https://homeapi.pitzi.com.br/...`.
 6. Em cada request, o middleware de auth aceita Bearer tokens, faz lookup
    pelo hash, carrega o usuário e injeta o contexto como se fosse uma
    sessão admin comum.

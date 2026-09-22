@@ -5,7 +5,7 @@ description: >
   Use when starting any new feature, module, or significant change. Enforces a
   hard gate: no code until design is presented and approved. Trigger on: "vamos
   planejar", "nova feature", "quero criar", "brainstorm", "design session",
-  "antes de codar". Works with prompt-renov: brainstorming plans, prompt-renov executes.
+  "antes de codar". Works with prompt-pitzi: brainstorming plans, prompt-pitzi executes.
 ---
 
 # Brainstorming — Design Before Code
@@ -34,7 +34,7 @@ lower than the cost of rework.
   - Medium = bullet list with tradeoffs
   - Complex = full spec with diagrams and data flow
 - **Gate: NO code, NO scaffolding, NO file creation until user approves design**
-- After approval: transition to implementation (or prompt-renov for execution prompt generation)
+- After approval: transition to implementation (or prompt-pitzi for execution prompt generation)
 - Save design to `docs/` if significant
 
 ## Output Format

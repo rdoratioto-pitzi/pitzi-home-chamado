@@ -323,7 +323,7 @@ gitAnalytics.post("/api/git-analytics/add-repository", async (c) => {
   const deps = getSyncDeps(c);
   const { fullName } = await c.req.json();
   if (!fullName) {
-    return c.json({ error: "fullName é obrigatório (ex: Renov-BD/Renov.Home)" }, 400);
+    return c.json({ error: "fullName é obrigatório (ex: Pitzi-BD/Pitzi.Home)" }, 400);
   }
   const repo = await addRepository(deps, fullName);
   return c.json(repo, 201);

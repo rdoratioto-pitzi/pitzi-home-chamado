@@ -1,6 +1,6 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { config } from '../config';
-import { renovHomeContext } from '../config/renov-context';
+import { pitziHomeContext } from '../config/pitzi-context';
 import { AgentState } from '../types/agent-state';
 
 export async function ada(state: AgentState): Promise<Partial<AgentState>> {
@@ -18,7 +18,7 @@ export async function ada(state: AgentState): Promise<Partial<AgentState>> {
   });
 
   const prompt = `
-${renovHomeContext}
+${pitziHomeContext}
 
 # Ada - Revisora de Qualidade
 

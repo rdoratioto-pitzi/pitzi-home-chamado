@@ -194,7 +194,7 @@ export async function sendWelcomeEmail(
     title: "Bem-vindo ao Pitzi Home",
     greeting: `Ola <strong>${user.name}</strong>,`,
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Voce foi cadastrado na plataforma interna de gestao da Renov. Abaixo estao suas informacoes de acesso:</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Voce foi cadastrado na plataforma interna de gestao da Pitzi. Abaixo estao suas informacoes de acesso:</p>
       ${sectionCard(`
         ${infoTable([
           { label: "Link", value: `<a href="https://rdoratioto-pitzi.github.io/pitzi-home-chamado/" style="color:#00A137;font-weight:600;">rdoratioto-pitzi.github.io/pitzi-home-chamado</a>` },

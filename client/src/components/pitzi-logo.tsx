@@ -10,9 +10,6 @@ interface PitziLogoProps {
   className?: string;
 }
 
-/** @deprecated Use PitziLogoProps */
-type RenovLogoProps = PitziLogoProps;
-
 const sizeMap = {
   sm: { width: 90, height: 25 },
   md: { width: 120, height: 34 },
@@ -56,7 +53,6 @@ export function PitziLogo({ variant = "auto", size = "md", className = "" }: Pit
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
-
 
   // Resetar ao trocar de setting
   useEffect(() => {
@@ -140,9 +136,6 @@ export function PitziLogo({ variant = "auto", size = "md", className = "" }: Pit
   );
 }
 
-/** @deprecated Use PitziLogo */
-export const RenovLogo = PitziLogo;
-
 export function PitziLogoIcon({ className = "" }: { className?: string }) {
   return (
     <svg
@@ -164,5 +157,3 @@ export function PitziLogoIcon({ className = "" }: { className?: string }) {
   );
 }
 
-/** @deprecated Use PitziLogoIcon */
-export const RenovLogoIcon = PitziLogoIcon;

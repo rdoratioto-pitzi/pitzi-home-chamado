@@ -4,14 +4,14 @@
 
 - ✅ Node.js v18+
 - ✅ Git configurado
-- ✅ Acesso ao projeto Renov.Home
+- ✅ Acesso ao projeto Pitzi.Home
 - ✅ API Key Anthropic (Claude)
 
 ## 🚀 Instalação
 
 ### 1. Navegar para pasta agents
 ```bash
-cd ~/Documents/Workspaces/Renov-Home2/Renov.Home/agents
+cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home/agents
 ```
 
 ### 2. Instalar dependências
@@ -35,10 +35,10 @@ OPENROUTER_API_KEY=sk-or-xxxxx  # Opcional
 # Adicionar ao ~/.zshrc
 cat >> ~/.zshrc << 'ALIASES'
 
-# Renov Agents
-alias agents='cd ~/Documents/Workspaces/Renov-Home2/Renov.Home/agents && npm run agents'
-alias atlas='cd ~/Documents/Workspaces/Renov-Home2/Renov.Home/agents && npm run agents'
-alias turing='cd ~/Documents/Workspaces/Renov-Home2/Renov.Home/agents && npm run qa-git'
+# Pitzi Agents
+alias agents='cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home/agents && npm run agents'
+alias atlas='cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home/agents && npm run agents'
+alias turing='cd ~/Documents/Workspaces/Pitzi-Home2/Pitzi.Home/agents && npm run qa-git'
 ALIASES
 
 source ~/.zshrc
@@ -79,7 +79,7 @@ agents/
 ### "Missing script: agents"
 
 **Causa:** Não está na pasta agents  
-**Solução:** `cd ~/Documents/.../Renov.Home/agents`
+**Solução:** `cd ~/Documents/.../Pitzi.Home/agents`
 
 ### Alias não funciona
 

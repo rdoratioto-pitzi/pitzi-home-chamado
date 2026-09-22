@@ -1,7 +1,7 @@
 ---
-name: renov-security
+name: pitzi-security
 description: >
-  Auditoria de segurança customizada para o Renov.Home (Express + React 18).
+  Auditoria de segurança customizada para o Pitzi.Home (Express + React 18).
   Executa varredura de credenciais, analisa o diff do branch, verifica
   branch/repo correto e emite relatorio com status. Usar OBRIGATORIAMENTE
   antes de abrir qualquer PR no projeto Home.
@@ -9,20 +9,20 @@ description: >
 license: Apache-2.0
 compatibility: Requires git, gh CLI, npm
 metadata:
-  author: renov-home-team
+  author: pitzi-home-team
   version: "2.0"
   changelog: "v2.0 — 31/03/2026: Adicionada Fase 0 Supply Chain Check (axios incident)"
 allowed-tools: Bash(git:*) Bash(gh:*) Bash(cat:*) Bash(grep:*) Bash(npm:*) Bash(ls:*) Read Grep
 ---
 
-# Renov Security Audit Skill
+# Pitzi Security Audit Skill
 
-Skill de auditoria de segurança do Renov.Home. Deve ser executada ANTES de todo PR.
+Skill de auditoria de segurança do Pitzi.Home. Deve ser executada ANTES de todo PR.
 
 ## Como usar
 
 ```
-Use a skill renov-security para auditar este PR — projeto Home, branch develop
+Use a skill pitzi-security para auditar este PR — projeto Home, branch develop
 ```
 
 ---
@@ -145,7 +145,7 @@ git remote get-url origin
 ```
 
 - Branch deve seguir padrão: `feat/`, `fix/`, `refactor/`, `chore/`, `hotfix/`
-- Remote deve ser `https://github.com/Renov-BD/Renov.Home.git`
+- Remote deve ser `https://github.com/Pitzi-BD/Pitzi.Home.git`
 - Se não → status ⚠️ RESSALVAS
 
 ### 2.2 — Verificar tamanho do diff
@@ -195,7 +195,7 @@ Regras de prioridade:
 
 ```
 ========================================
-🔒 RENOV SECURITY AUDIT — v2.0
+🔒 PITZI SECURITY AUDIT — v2.0
 Branch: <branch>
 Data: <data>
 ========================================

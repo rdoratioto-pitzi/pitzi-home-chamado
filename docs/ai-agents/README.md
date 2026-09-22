@@ -12,7 +12,7 @@ code plans/minha-feature/plan.md
 
 2. **Executar:**
 ```bash
-npm run renov-dev run plans/minha-feature/plan.md
+npm run pitzi-dev run plans/minha-feature/plan.md
 ```
 
 3. **Aguardar email** → Testar → Aprovar!

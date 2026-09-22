@@ -6,7 +6,7 @@ Mudanças vs. v5:
 1. A mensagem-mãe no Slack agora é montada via **Block Kit** (não mais
    somente texto), com 3 botões: ✅ Aprovar, ⏸ Ajustar, ❌ Cancelar.
 2. Após postar, a Routine **registra o mapping** chamado ↔ thread_ts no
-   Renov Home via `POST /api/integrations/hermes/thread-registered`,
+   Pitzi Home via `POST /api/integrations/hermes/thread-registered`,
    autenticado por Bearer token de service account.
 
 A execução pós-aprovação **não acontece nesta versão** — a decisão é
@@ -19,19 +19,19 @@ apenas registrada. O loop de execução continua sendo Fase 4.
 
 ## Variáveis de ambiente da Routine
 
-Configurar no ambiente `Renov-Default`:
+Configurar no ambiente `Pitzi-Default`:
 
 | Variável           | Valor (dev)                                | Valor (prod)                            |
 | ------------------ | ------------------------------------------ | --------------------------------------- |
-| `RENOV_API_URL`    | `https://homeapi-dev.renovsmart.com.br`    | `https://homeapi.renovsmart.com.br`     |
-| `RENOV_API_TOKEN`  | _(token gerado p/ hermes@renov.com em dev)_ | _(token gerado p/ hermes@renov.com em prod)_ |
+| `PITZI_HOME_API_URL`    | `https://homeapi-dev.pitzi.com.br`    | `https://homeapi.pitzi.com.br`     |
+| `PITZI_HOME_API_TOKEN`  | _(token gerado p/ hermes@pitzi.com.br em dev)_ | _(token gerado p/ hermes@pitzi.com.br em prod)_ |
 | `SLACK_BOT_TOKEN`  | _(reutiliza o token já existente)_         | _(reutiliza o token já existente)_      |
 | `SLACK_CHANNEL`    | _(canal de devs)_                          | _(canal de devs)_                       |
 
-O `RENOV_API_TOKEN` é gerado executando, autenticado como admin:
+O `PITZI_HOME_API_TOKEN` é gerado executando, autenticado como admin:
 
 ```http
-POST {RENOV_API_URL}/api/admin/service-accounts/<hermes_user_id>/generate-token
+POST {PITZI_HOME_API_URL}/api/admin/service-accounts/<hermes_user_id>/generate-token
 ```
 
 ---
@@ -39,13 +39,13 @@ POST {RENOV_API_URL}/api/admin/service-accounts/<hermes_user_id>/generate-token
 ## System prompt
 
 ```
-Você é Hermes, agente de triagem de chamados da Renov, plataforma
+Você é Hermes, agente de triagem de chamados da Pitzi, plataforma
 brasileira B2B de trade-in de eletrônicos.
 
 Recebe um chamado em texto simples com chamado_id, código, título,
 descrição, aplicação, prioridade, solicitante, ambiente.
 
-Sua tarefa: produzir uma análise curta + um prompt /prompt-renov
+Sua tarefa: produzir uma análise curta + um prompt /prompt-pitzi
 sugerido para o engenheiro humano executar via Claude Code, e postar
 isso no Slack como mensagem-mãe da thread do chamado.
 
@@ -61,8 +61,8 @@ Termos do produto:
 Após produzir a análise, você DEVE:
 1. Postar no Slack via chat.postMessage com blocks (Block Kit)
 2. Ao receber a resposta, capturar message.ts e channel
-3. Chamar POST {RENOV_API_URL}/api/integrations/hermes/thread-registered
-   com Authorization: Bearer {RENOV_API_TOKEN}
+3. Chamar POST {PITZI_HOME_API_URL}/api/integrations/hermes/thread-registered
+   com Authorization: Bearer {PITZI_HOME_API_TOKEN}
 ```
 
 ---
@@ -110,7 +110,7 @@ Tool call para `chat.postMessage`:
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*Prompt /prompt-renov sugerido:*\n```{{ prompt_renov_sugerido }}```"
+        "text": "*Prompt /prompt-pitzi sugerido:*\n```{{ prompt_pitzi_sugerido }}```"
       }
     },
     {
@@ -147,11 +147,11 @@ também o `thread_ts` da thread) e `channel`.
 
 ---
 
-## Passo 2 — Registrar mapping no Renov Home
+## Passo 2 — Registrar mapping no Pitzi Home
 
 ```http
-POST {RENOV_API_URL}/api/integrations/hermes/thread-registered
-Authorization: Bearer {RENOV_API_TOKEN}
+POST {PITZI_HOME_API_URL}/api/integrations/hermes/thread-registered
+Authorization: Bearer {PITZI_HOME_API_TOKEN}
 Content-Type: application/json
 
 {

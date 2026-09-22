@@ -1,4 +1,4 @@
-# 📚 Documentação Completa - Renov Home
+# 📚 Documentação Completa - Pitzi Home
 
 ## 📋 Índice
 
@@ -19,7 +19,7 @@
 
 ## 🎯 Visão Geral
 
-**Renov Home** é uma plataforma web interna projetada para centralizar e otimizar diversos aspectos operacionais da Renov. Seu objetivo principal é aumentar a eficiência entre diferentes departamentos, fornecendo ferramentas integradas para gestão de:
+**Pitzi Home** é uma plataforma web interna projetada para centralizar e otimizar diversos aspectos operacionais da Pitzi. Seu objetivo principal é aumentar a eficiência entre diferentes departamentos, fornecendo ferramentas integradas para gestão de:
 
 - Chamados de suporte ao cliente
 - Projetos e tarefas
@@ -37,7 +37,7 @@
 2. **Aumentar produtividade** - Automação e gestão estruturada
 3. **Insights baseados em dados** - Relatórios e dashboards
 4. **Otimizar logística** - Integrações com Correios e operadores
-5. **Identidade de marca consistente** - Design system Renov
+5. **Identidade de marca consistente** - Design system Pitzi
 
 ---
 
@@ -75,7 +75,7 @@ flowchart TB
         Correios["Correios API"]
         RSLogistica["RS Logística API"]
         OpenRouter["OpenRouter AI"]
-        RenovSmart["RenovSmart API"]
+        Pitzi["Pitzi API"]
     end
 
     Client <-->|"HTTP/REST"| Server
@@ -96,7 +96,7 @@ flowchart TB
 ## 📁 Estrutura de Diretórios
 
 ```
-Renov.Home/
+Pitzi.Home/
 ├── 📁 client/                    # Frontend React
 │   ├── 📁 public/               # Arquivos estáticos
 │   │   ├── favicon.ico
@@ -202,7 +202,7 @@ Renov.Home/
 ├── 📁 docs/                      # Documentação
 ├── 📁 attached_assets/           # Assets anexados
 ├── 📁 agents/                    # Agentes de CLI (Atlas, Giter, Neo, Turing, Ada)
-├── 📁 cli/                       # CLI para desenvolvimento (renov-dev)
+├── 📁 cli/                       # CLI para desenvolvimento (pitzi-dev)
 ├── 📁 plans/                     # Planos de trabalho e documentação de planejamento
 ├── 📁 scripts/                   # Scripts utilitários (migrações, parsing, etc.)
 ├── 📁 "Comandos github"/         # Comandos GitHub para automação
@@ -268,7 +268,7 @@ Renov.Home/
 |---------|------|-----------|
 | Correios | SOAP | Logística reversa |
 | RS Logística | REST | Gestão logística |
-| RenovSmart | REST | Dados de pricing |
+| Pitzi | REST | Dados de pricing |
 | OpenRouter | REST | LLM/IA |
 | GitHub API | REST | Sincronização de prompts |
 | Google Cloud Storage | REST | Armazenamento de arquivos |
@@ -642,7 +642,7 @@ erDiagram
 - Indicadores de mercado
 - Relatórios
 
-**Integração**: RenovSmart API
+**Integração**: Pitzi API
 
 **Arquivos principais**:
 - `client/src/pages/pricing/index.tsx`
@@ -847,7 +847,7 @@ erDiagram
 **Descrição**: Módulo de integração com APIs externas, oferecendo dashboards e ferramentas de gestão.
 
 **Funcionalidades**:
-- Dashboard de APIs (Correios, RS Logística, RenovSmart)
+- Dashboard de APIs (Correios, RS Logística, Pitzi)
 - Simulação de logística reversa
 - Relatórios de pedidos
 - Administração de logística
@@ -961,7 +961,7 @@ CORREIOS_HOMOLOGACAO=true|false
 
 **Tipo**: REST API
 
-**Base URL**: `https://dash.renovsmart.com.br/api`
+**Base URL**: `https://dash.pitzi.com.br/api`
 
 **Endpoints**:
 - Dashboard de pedidos
@@ -973,7 +973,7 @@ CORREIOS_HOMOLOGACAO=true|false
 
 ---
 
-### 3. RenovSmart API (Pricing)
+### 3. Pitzi API (Pricing)
 
 **Tipo**: REST API
 
@@ -1276,8 +1276,8 @@ SMTP_PASS=
 # RS Logística
 RS_LOGISTICA_API_KEY=
 
-# RenovSmart
-RENOVSMART_API_KEY=
+# Pitzi
+PITZI_API_KEY=
 
 # GitHub (para sincronização de commits e prompts)
 GITHUB_TOKEN=ghp_seu_token_aqui

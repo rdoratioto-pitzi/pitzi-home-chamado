@@ -186,7 +186,7 @@ export const config = {
     model: 'claude-sonnet-4-20250514',
   },
   paths: {
-    renovHome: '/Users/macbookm2/.../Renov.Home',
+    pitziHome: '/Users/macbookm2/.../Pitzi.Home',
   },
 };
 ```

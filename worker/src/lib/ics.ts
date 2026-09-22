@@ -51,7 +51,7 @@ export function generateICSContent(
   meeting: MeetingICSInput,
   attendees: { name: string; email: string }[]
 ): string {
-  const uid = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@renovhome.com.br`;
+  const uid = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@pitzi.com.br`;
   const now = new Date();
   const SAO_PAULO_TZ = "America/Sao_Paulo";
 

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Upload, Image, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { PitziLogo as RenovLogo } from "@/components/renov-logo";
+import { PitziLogo } from "@/components/pitzi-logo";
 import { apiRequest, queryClient, fetchWithAuth } from "@/lib/queryClient";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -220,7 +220,7 @@ export function BrandSettings() {
                 ) : logoUrlLightSetting.value ? (
                   <img src={normalizeObjectPath(logoUrlLightSetting.value)} alt="Logo Claro Atual" className="h-12 w-auto object-contain" />
                 ) : (
-                  <RenovLogo variant="light" size="lg" className="h-12 w-auto" />
+                  <PitziLogo variant="light" size="lg" className="h-12 w-auto" />
                 )}
                 <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
                   <Upload className="h-6 w-6 text-primary" />
@@ -256,7 +256,7 @@ export function BrandSettings() {
                 ) : logoUrlDarkSetting.value ? (
                   <img src={normalizeObjectPath(logoUrlDarkSetting.value)} alt="Logo Escuro Atual" className="h-12 w-auto object-contain" />
                 ) : (
-                  <RenovLogo variant="dark" size="lg" className="h-12 w-auto" />
+                  <PitziLogo variant="dark" size="lg" className="h-12 w-auto" />
                 )}
                 <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg">
                   <Upload className="h-6 w-6 text-white" />
@@ -324,7 +324,7 @@ export function BrandSettings() {
         <CardHeader className="pb-4">
           <CardTitle className="text-[18px] font-bold">Cores da Marca</CardTitle>
           <CardDescription className="text-[13px]">
-            As cores oficiais da Renov são aplicadas automaticamente
+            As cores oficiais da Pitzi são aplicadas automaticamente
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -333,7 +333,7 @@ export function BrandSettings() {
               <div className="h-20 rounded-lg bg-[#00A137] flex items-end p-2">
                 <span className="text-white text-xs font-mono">#00A137</span>
               </div>
-              <p className="text-sm font-medium">Verde Renov</p>
+              <p className="text-sm font-medium">Verde Pitzi</p>
               <p className="text-xs text-muted-foreground">Cor primária</p>
             </div>
             <div className="space-y-2">

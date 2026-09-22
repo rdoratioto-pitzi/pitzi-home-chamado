@@ -138,7 +138,7 @@ export async function sendWelcomeEmail(
     title: "Bem-vindo ao Pitzi Home",
     greeting: `Olá <strong>${user.name}</strong>,`,
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Você foi cadastrado na plataforma interna de gestão da Renov. Abaixo estão suas informações de acesso:</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Você foi cadastrado na plataforma interna de gestão da Pitzi. Abaixo estão suas informações de acesso:</p>
       ${sectionCard(`
         ${infoTable([
           { label: "Link", value: `<a href="https://rdoratioto-pitzi.github.io/pitzi-home-chamado/" style="color:#00A137;font-weight:600;">rdoratioto-pitzi.github.io/pitzi-home-chamado</a>` },
@@ -749,7 +749,7 @@ function generateICSContent(
   },
   attendees: { name: string; email: string }[]
 ): string {
-  const uid = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@renovhome.com.br`;
+  const uid = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@pitzi.com.br`;
   const now = new Date();
 
   const [year, month, day] = meeting.date.split("-").map(Number);

@@ -1,4 +1,4 @@
-# MCPs do Projeto renov.home.imac
+# MCPs do Projeto pitzi.home.imac
 
 > Model Context Protocol servers ampliam as capacidades do Claude Code, conectando-o a ferramentas externas, bancos de dados e serviços.
 

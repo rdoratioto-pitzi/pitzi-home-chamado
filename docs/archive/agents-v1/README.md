@@ -1,4 +1,4 @@
-# 🤖 Sistema Multi-Agentes - Renov Home
+# 🤖 Sistema Multi-Agentes - Pitzi Home
 
 Sistema automatizado de planejamento, validação e deploy usando IA.
 

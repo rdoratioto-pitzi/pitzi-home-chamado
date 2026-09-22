@@ -1,4 +1,4 @@
-# Módulo Operações — Renov Home
+# Módulo Operações — Pitzi Home
 
 ## Visão Geral
 
@@ -55,9 +55,9 @@ Triagem física
 
 | API | Dados |
 |-----|-------|
-| API Pedidos Dashboard Renov | Vouchers, confirmações, valor |
+| API Pedidos Dashboard Pitzi | Vouchers, confirmações, valor |
 | API Admin Logística | Coleta, recebimento, triagem, desvios |
-| API RenovSmart (Lapisco) | Avaliações estéticas, grades, imagens |
+| API Pitzi (Lapisco) | Avaliações estéticas, grades, imagens |
 | API Omie | Saldo de estoque (`ListarPosEstoque`), NF-e, vendas |
 
 > **Atenção Omie**: usar sempre `ListarPosEstoque` para saldo — `ConsultarProduto` retorna `estoque=0`.
@@ -146,7 +146,7 @@ Monitoramento de acurácia e curadoria de avaliações estéticas por IA.
 | Páginas | `client/src/pages/avaliacoes/` (5 páginas) |
 | Componentes | `client/src/components/avaliacoes/` (11 componentes) |
 | Hooks | `client/src/hooks/use-avaliacoes.ts` (13 hooks) |
-| Serviço | `server/services/renovsmart-avaliacoes.ts` |
+| Serviço | `server/services/pitzi-avaliacoes.ts` |
 | Rotas Express | `server/routes/avaliacoes.ts` |
 | Rotas Worker | `worker/src/routes/avaliacoes.ts` |
 | Schema | `shared/schema.ts` — tabelas: `curadoria_avaliacoes`, `curadoria_configuracoes` |
@@ -437,7 +437,7 @@ Timeline completa da jornada de um dispositivo do voucher até a venda. Acesso r
 | #231 | 1 | Todos | Fundação do grupo Operações, sidebar em 2 níveis collapsible |
 | #232 | 2 | Triagem | Dashboard de KPIs e tabela de recebimentos |
 | #233 | 3 | Triagem | Fila de triagem FIFO com highlights e desvios (3 abas) |
-| #235 | 4 | Avaliações | Integração API RenovSmart, 13 endpoints, dashboard analítico |
+| #235 | 4 | Avaliações | Integração API Pitzi, 13 endpoints, dashboard analítico |
 | #236 | 5 | Avaliações | Matriz de confusão interativa IA vs Humano |
 | #237 | 6 | Avaliações | Sistema de curadoria por amostragem com galeria de imagens |
 | #239 | 7 | Avaliações | Configurações POP 101 V3 e documentação do submódulo |

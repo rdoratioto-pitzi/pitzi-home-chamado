@@ -16,7 +16,7 @@ POST /api/admin/service-accounts/:id/generate-token
   ```json
   {
     "userId": "uuid-do-hermes",
-    "email": "hermes@renovsmart.com.br",
+    "email": "hermes@pitzi.com.br",
     "token": "<plaintext-base64url-de-48-bytes>",
     "expiresAt": "2027-05-03T00:00:00.000Z"
   }
@@ -41,7 +41,7 @@ POST /api/admin/service-accounts/:id/generate-token
 
 ```http
 POST /api/tickets/abc-123/comments HTTP/1.1
-Host: homeapi.renovsmart.com.br
+Host: homeapi.pitzi.com.br
 Authorization: Bearer <plaintext-token>
 Content-Type: application/json
 

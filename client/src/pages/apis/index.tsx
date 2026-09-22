@@ -259,7 +259,7 @@ export default function ApisPage() {
                             </Badge>
                           </div>
                           <CardDescription className="mt-1.5 text-[13px]">
-                            Consulta interna via API da Renov para dados de BI do RS
+                            Consulta interna via API da Pitzi para dados de BI do RS
                           </CardDescription>
                         </div>
                       </div>

@@ -137,7 +137,7 @@ Visao gerencial com dados reais de operacao inseridos manualmente pelo time.
 
 Utiliza `window.print()` com CSS `@media print`:
 - Oculta sidebar e botoes de navegacao
-- Adiciona header "Renov — Simulador CPD" com data e revenda
+- Adiciona header "Pitzi — Simulador CPD" com data e revenda
 - Forca impressao de backgrounds (print-color-adjust: exact)
 - Layout A4 landscape com page-break entre simulador e anatomia
 

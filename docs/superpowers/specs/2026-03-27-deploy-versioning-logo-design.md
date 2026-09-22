@@ -6,7 +6,7 @@
 
 ## Contexto
 
-Três problemas identificados no Renov Home:
+Três problemas identificados no Pitzi Home:
 
 1. Deploy não dispara automaticamente ao fazer merge em `main`/`develop`
 2. Sem versionamento visível — impossível saber qual código está em produção
@@ -70,11 +70,11 @@ Deploys desnecessários ao mudar docs/workflows, mas custo baixo (Worker ~10s, P
 
 ### Causa Raiz
 
-O upload salva `objectPath` como `/objects/tenantId/uploads/uuid-file` nas settings. O `RenovLogo` renderiza `<img src={value}>` com path relativo. O frontend está em `home.renovsmart.com.br` mas o R2 serve via Worker em `homeapi.renovsmart.com.br`. A URL relativa resolve para o domínio errado do frontend.
+O upload salva `objectPath` como `/objects/tenantId/uploads/uuid-file` nas settings. O `PitziLogo` renderiza `<img src={value}>` com path relativo. O frontend está em `home.pitzi.com.br` mas o R2 serve via Worker em `homeapi.pitzi.com.br`. A URL relativa resolve para o domínio errado do frontend.
 
 ### Solução: Frontend prepende API_BASE
 
-No componente `RenovLogo`, ao montar a URL da imagem, prepende `VITE_API_BASE_URL`:
+No componente `PitziLogo`, ao montar a URL da imagem, prepende `VITE_API_BASE_URL`:
 
 ```typescript
 const logoUrl = customLogoPath
@@ -84,7 +84,7 @@ const logoUrl = customLogoPath
 
 ### Arquivos afetados
 
-- `client/src/components/renov-logo.tsx` — construção da URL do `<img>`
+- `client/src/components/pitzi-logo.tsx` — construção da URL do `<img>`
 - `client/src/pages/configuracoes/brand-settings.tsx` — preview após salvar (se aplicável)
 
 ### O que NÃO muda
@@ -100,7 +100,7 @@ const logoUrl = customLogoPath
 | `.github/workflows/deploy-worker.yml` | Remover `paths:`, injetar `APP_VERSION` no deploy |
 | `.github/workflows/deploy-pages.yml` | Remover `paths:`, injetar `VITE_APP_VERSION` no build |
 | `worker/src/index.ts` | Adicionar endpoint `GET /api/version` |
-| `client/src/components/renov-logo.tsx` | Prepender `API_BASE` na URL do logo |
+| `client/src/components/pitzi-logo.tsx` | Prepender `API_BASE` na URL do logo |
 | `client/src/pages/configuracoes/brand-settings.tsx` | Prepender `API_BASE` na preview (se necessário) |
 | `client/src/components/VersionBadge.tsx` | Novo componente — badge de versão |
 | `client/src/components/app-sidebar.tsx` | Incluir `VersionBadge` na sidebar |

@@ -3,7 +3,7 @@
 ## "Plan não encontrado"
 ```bash
 # ✅ Correto: incluir /plan.md
-npm run renov-dev run plans/nome/plan.md
+npm run pitzi-dev run plans/nome/plan.md
 ```
 
 ## "Database não conectado"
@@ -15,11 +15,11 @@ cat .env | grep DATABASE_URL
 ## "Modelo não encontrado"
 ```bash
 # Listar modelos
-npm run renov-dev models
+npm run pitzi-dev models
 ```
 
 ## QA reprovou
 ```bash
 # Rodar novamente ou ajustar plan
-npm run renov-dev run plans/nome/plan.md
+npm run pitzi-dev run plans/nome/plan.md
 ```

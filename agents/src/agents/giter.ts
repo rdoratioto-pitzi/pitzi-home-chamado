@@ -12,14 +12,14 @@ export async function giter(state: AgentState): Promise<Partial<AgentState>> {
 
   try {
     const branch = execSync('git branch --show-current', {
-      cwd: config.paths.renovHome,
+      cwd: config.paths.pitziHome,
       encoding: 'utf-8',
     }).trim();
 
     console.log(`  📍 Branch: ${branch}`);
 
     const arquivos = execSync('git status --porcelain', {
-      cwd: config.paths.renovHome,
+      cwd: config.paths.pitziHome,
       encoding: 'utf-8',
     }).split('\n').filter(l => l.trim()).length;
 
@@ -30,17 +30,17 @@ export async function giter(state: AgentState): Promise<Partial<AgentState>> {
       return { etapaAtual: 'concluido' };
     }
 
-    execSync('git add .', { cwd: config.paths.renovHome });
+    execSync('git add .', { cwd: config.paths.pitziHome });
     console.log('  ✅ git add .');
 
     const msg = `feat: ${state.requisito}\n\nValidado por Turing ✅`;
     execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, {
-      cwd: config.paths.renovHome,
+      cwd: config.paths.pitziHome,
     });
     console.log('  ✅ git commit');
 
     execSync(`git push origin ${branch}`, {
-      cwd: config.paths.renovHome,
+      cwd: config.paths.pitziHome,
     });
     console.log('  ✅ git push\n');
 

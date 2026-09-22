@@ -1,8 +1,8 @@
-# 🏢 RENOV - Project Overview
+# 🏢 PITZI - Project Overview
 
 ## Company Information
 
-**Full Name:** Renov - Tecnologia em Trade-in  
+**Full Name:** Pitzi - Tecnologia em Trade-in  
 **Founded:** [Year]  
 **Headquarters:** São Paulo, SP, Brazil  
 **CEO & CPO:** Matheus Mundstock (based in Balneário Camboriú, SC)  
@@ -21,11 +21,11 @@ Transform the trade-in experience in Brazil through AI-powered device evaluation
 **Value Proposition:**
 1. **For Partners:** Increase new device sales through instant trade-in discounts
 2. **For Customers:** Get fair, instant valuation of used devices
-3. **For Renov:** Revenue from device acquisition + data insights
+3. **For Pitzi:** Revenue from device acquisition + data insights
 
 ## Core Products
 
-### 1. RenovSmart (Backend Platform)
+### 1. Pitzi (Backend Platform)
 **Purpose:** Transaction engine and AI evaluation core  
 **Stack:** Node.js + Express + PostgreSQL  
 **Key Features:**
@@ -35,7 +35,7 @@ Transform the trade-in experience in Brazil through AI-powered device evaluation
 - Real-time pricing engine
 - AI model inference
 
-### 2. RenovGo (Customer Interface)
+### 2. PitziGo (Customer Interface)
 **Purpose:** Web application for salespeople and customers  
 **Stack:** React 18 + TypeScript + Vite  
 **Key Features:**
@@ -59,7 +59,7 @@ Transform the trade-in experience in Brazil through AI-powered device evaluation
 ```
 Customer enters store with used iPhone
          ↓
-Salesperson opens RenovGo
+Salesperson opens PitziGo
          ↓
 Fills device info (model, storage, carrier)
          ↓
@@ -67,18 +67,18 @@ Takes photos (front, back, screen on)
          ↓
 AI analyzes images → condition score
          ↓
-RenovSmart calculates trade-in value
+Pitzi calculates trade-in value
          ↓
 Customer accepts offer
          ↓
 Instant discount applied to new purchase
          ↓
-Renov collects device, processes for resale
+Pitzi collects device, processes for resale
 ```
 
 ## Technology Stack
 
-### Frontend (RenovGo)
+### Frontend (PitziGo)
 - **Framework:** React 18.3.1
 - **Language:** TypeScript 5.6.3
 - **Build:** Vite 6.0.5
@@ -89,7 +89,7 @@ Renov collects device, processes for resale
 - **Forms:** React Hook Form + Zod validation
 - **HTTP:** Axios
 
-### Backend (RenovSmart)
+### Backend (Pitzi)
 - **Runtime:** Node.js 20.x LTS
 - **Framework:** Express.js
 - **Language:** TypeScript
@@ -111,8 +111,8 @@ Renov collects device, processes for resale
 - **Development Environment:** GitHub Codespaces (120h/month free per dev)
 - **Version Control:** GitHub
 - **CI/CD:** GitHub Actions
-- **Hosting (RenovGo):** Vercel / Cloudflare Pages
-- **Hosting (RenovSmart):** Replit / Railway
+- **Hosting (PitziGo):** Vercel / Cloudflare Pages
+- **Hosting (Pitzi):** Replit / Railway
 - **AI Inference:** Modal / Replicate
 
 ### External Integrations
@@ -182,7 +182,7 @@ Renov collects device, processes for resale
 - ✅ Core trade-in platform operational
 - ✅ AI evaluation for iPhones
 - 🚧 Partner integration (2 major retailers)
-- 🚧 Internal ops platform (Renov Home)
+- 🚧 Internal ops platform (Pitzi Home)
 
 ### Phase 2: Scale (Next 6 months)
 - 📋 Expand to Android devices
@@ -229,4 +229,4 @@ Renov collects device, processes for resale
 
 ---
 
-This is Renov. This is what we're building. Every line of code, every architectural decision, every optimization - it all serves this mission. 🚀
+This is Pitzi. This is what we're building. Every line of code, every architectural decision, every optimization - it all serves this mission. 🚀

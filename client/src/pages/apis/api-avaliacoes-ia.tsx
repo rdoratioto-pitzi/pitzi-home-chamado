@@ -219,7 +219,7 @@ export default function ApiAvaliacoesIaPage() {
     <div className="flex flex-col min-h-full">
       <PageHeader
         title="API - Avaliações IA"
-        description="Integração com a API de Avaliações de IA (Lapisco) do Dashboard Renov"
+        description="Integração com a API de Avaliações de IA (Lapisco) do Dashboard Pitzi"
         breadcrumbs={[
           { label: "Integrações", href: "/apis" },
           { label: "Avaliações IA" }

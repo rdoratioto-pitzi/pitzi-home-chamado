@@ -5,7 +5,7 @@
 --
 -- O que faz:
 --   1. Adiciona colunas `api_token_hash` e `api_token_expires_at` em users
---   2. Insere o usuário hermes@renov.com como service account
+--   2. Insere o usuário hermes@pitzi.com.br como service account
 --   3. Marca o usuário como admin para que possa comentar em tickets
 
 -- 1) Colunas para Bearer token de service account ---------------------------
@@ -33,7 +33,7 @@ SELECT
   gen_random_uuid(),
   NULL,
   'Hermes (Agente)',
-  'hermes@renov.com',
+  'hermes@pitzi.com.br',
   NULL,
   'active',
   'token',
@@ -42,5 +42,5 @@ SELECT
   'agente',
   '{"chamados":true,"projetos":true,"tarefas":true,"okrs":true,"metas":true,"fluxogramas":true,"diagramas":true,"logistica":true,"triagem":true,"pricing":true,"conhecimento":true,"apis":true,"configuracoes":false,"updates":true,"estoques":true,"avaliacoes":true,"comercial":true,"apoio_vendas":true}'
 WHERE NOT EXISTS (
-  SELECT 1 FROM users WHERE email = 'hermes@renov.com'
+  SELECT 1 FROM users WHERE email = 'hermes@pitzi.com.br'
 );

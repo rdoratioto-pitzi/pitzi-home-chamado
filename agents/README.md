@@ -1,6 +1,6 @@
-# 🤖 Renov Agents - Sistema Multi-Agentes
+# 🤖 Pitzi Agents - Sistema Multi-Agentes
 
-Sistema de agentes de IA para desenvolvimento automatizado do Renov Home.
+Sistema de agentes de IA para desenvolvimento automatizado do Pitzi Home.
 
 ## 🎭 Agentes
 

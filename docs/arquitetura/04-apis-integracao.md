@@ -1,13 +1,13 @@
-# Renov Home - APIs e Integrações
+# Pitzi Home - APIs e Integrações
 
 **📅 Última atualização:** Fevereiro 2026  
-**🔗 Repositório:** https://github.com/renov-tech/renov-home
+**🔗 Repositório:** https://github.com/pitzi-tech/pitzi-home
 
 ---
 
 ## 🎯 Visão Geral
 
-O Renov Home integra-se com diversos serviços externos para expandir suas funcionalidades. Este documento centraliza todas as integrações, suas configurações e melhores práticas.
+O Pitzi Home integra-se com diversos serviços externos para expandir suas funcionalidades. Este documento centraliza todas as integrações, suas configurações e melhores práticas.
 
 ---
 
@@ -110,8 +110,8 @@ async function chatOpenRouter(
     {
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://renov-home.com', // opcional
-        'X-Title': 'Renov Home', // opcional
+        'HTTP-Referer': 'https://pitzi.com.br', // opcional
+        'X-Title': 'Pitzi Home', // opcional
       }
     }
   );
@@ -186,8 +186,8 @@ https://docs.anthropic.com
 ```bash
 # .env
 SENDGRID_API_KEY=SG...
-SENDGRID_FROM_EMAIL=noreply@renov.com
-SENDGRID_FROM_NAME=Renov Home
+SENDGRID_FROM_EMAIL=noreply@pitzi.com.br
+SENDGRID_FROM_NAME=Pitzi Home
 ```
 
 #### Template de Código
@@ -345,13 +345,13 @@ try {
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 AWS_REGION=us-east-1
-AWS_BUCKET_NAME=renov-home-uploads
+AWS_BUCKET_NAME=pitzi-home-uploads
 
 # ou (Cloudflare R2)
 R2_ACCOUNT_ID=...
 R2_ACCESS_KEY_ID=...
 R2_SECRET_ACCESS_KEY=...
-R2_BUCKET_NAME=renov-home-uploads
+R2_BUCKET_NAME=pitzi-home-uploads
 ```
 
 #### Decisão

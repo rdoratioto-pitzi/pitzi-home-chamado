@@ -1,4 +1,4 @@
-# Renov Home - Quick Start
+# Pitzi Home - Quick Start
 
 > **🎯 Objetivo:** Contexto essencial em menos de 5 minutos
 
@@ -6,7 +6,7 @@
 
 ## 🤖 Para IAs/Assistentes (Claude, ChatGPT, etc.)
 
-Você está auxiliando o desenvolvimento do **Renov Home**, sistema de gestão operacional da empresa brasileira **Renov**.
+Você está auxiliando o desenvolvimento do **Pitzi Home**, sistema de gestão operacional da empresa brasileira **Pitzi**.
 
 ### 📚 Leia Primeiro (Ordem de Prioridade)
 1. **[00-CONTEXTO.md](00-CONTEXTO.md)** - Quem somos, missão, filosofia "Vibe Coding"
@@ -22,7 +22,7 @@ Você está auxiliando o desenvolvimento do **Renov Home**, sistema de gestão o
 - Git/GitHub (controle de versão)
 
 **Repositório:**
-- 🔗 https://github.com/renov-tech/renov-home
+- 🔗 https://github.com/pitzi-tech/pitzi-home
 - Branch principal: `main` (protegida)
 - Branch de desenvolvimento: `develop`
 
@@ -35,17 +35,17 @@ Você está auxiliando o desenvolvimento do **Renov Home**, sistema de gestão o
 
 **Versão Mínima:**
 ```
-📋 Projeto: Renov Home
+📋 Projeto: Pitzi Home
 📂 Docs: /docs/README.md
 🎯 Objetivo: [sua tarefa aqui]
 ```
 
 **Versão Completa:**
 ```
-📋 RENOV HOME - Quick Context
+📋 PITZI HOME - Quick Context
 
 📂 Documentação: /docs/README.md
-🔗 Repositório: github.com/renov-tech/renov-home
+🔗 Repositório: github.com/pitzi-tech/pitzi-home
 📋 Branch: [main/develop/feature-x]
 
 🎯 OBJETIVO:
@@ -66,8 +66,8 @@ Você está auxiliando o desenvolvimento do **Renov Home**, sistema de gestão o
 
 ```bash
 # 1. Clone do repositório
-git clone https://github.com/renov-tech/renov-home.git
-cd renov-home
+git clone https://github.com/pitzi-tech/pitzi-home.git
+cd pitzi-home
 
 # 2. Leia a documentação
 cd docs
@@ -93,7 +93,7 @@ npm run dev
 
 ---
 
-## 👥 Time Renov
+## 👥 Time Pitzi
 
 | Nome | Cargo | Responsabilidade | Contato |
 |------|-------|------------------|---------|
@@ -152,7 +152,7 @@ Pull Request → Review Marcelo → Merge
 
 ## 🎯 Filosofia "Vibe Coding"
 
-Princípios que guiam o desenvolvimento na Renov:
+Princípios que guiam o desenvolvimento na Pitzi:
 
 1. **Pragmatismo** - O que funciona > o que é "perfeito"
 2. **Aprendizado Prático** - Fazer > estudar teoria eternamente
@@ -206,7 +206,7 @@ git push origin feature/minha-feature  # Push da feature
 
 ## 📚 Recursos Adicionais
 
-- **Repositório:** https://github.com/renov-tech/renov-home
+- **Repositório:** https://github.com/pitzi-tech/pitzi-home
 - **Documentação Completa:** [README.md](README.md)
 - **Arquitetura Detalhada:** [01-ARQUITETURA.md](01-ARQUITETURA.md)
 - **Roadmap:** [ROADMAP.md](ROADMAP.md)
@@ -229,6 +229,6 @@ Antes de começar a codar, você deve:
 
 ---
 
-**Bem-vindo ao Renov Home! 🚀**
+**Bem-vindo ao Pitzi Home! 🚀**
 
 *Última atualização: Fevereiro 2026*

@@ -1,19 +1,19 @@
-# Renov Home - Módulos do Sistema
+# Pitzi Home - Módulos do Sistema
 
 **📅 Última atualização:** Fevereiro 2026  
-**🔗 Repositório:** https://github.com/renov-tech/renov-home
+**🔗 Repositório:** https://github.com/pitzi-tech/pitzi-home
 
 ---
 
 ## 📊 Visão Geral
 
-O Renov Home é composto por **8 módulos principais** integrados que cobrem diferentes aspectos da gestão operacional.
+O Pitzi Home é composto por **8 módulos principais** integrados que cobrem diferentes aspectos da gestão operacional.
 
 ### Mapa de Módulos
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      RENOV HOME                             │
+│                      PITZI HOME                             │
 │                  Sistema de Gestão                          │
 └─────────────────────────────────────────────────────────────┘
                           │
@@ -139,7 +139,7 @@ Ver [modules/meetings.md](modules/meetings.md)
 ### Status: 🚧 Em Desenvolvimento Ativo - **PRIORIDADE #1**
 
 ### Descrição
-Assistente de IA estratégico que integra dados de todos os módulos do Renov Home com capacidades de análise, pesquisa externa e automação.
+Assistente de IA estratégico que integra dados de todos os módulos do Pitzi Home com capacidades de análise, pesquisa externa e automação.
 
 ### Visão
 Transformar o Macgyver de um "chatbot com IA" para um **assistente estratégico de nível empresarial** que:

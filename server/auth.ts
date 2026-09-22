@@ -56,7 +56,7 @@ export function setupSession(app: Express) {
       secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
-      name: "renov.sid",
+      name: "pitzi.sid",
       store: new MemoryStore({
         checkPeriod: 86400000 // prune expired entries every 24h
       }),

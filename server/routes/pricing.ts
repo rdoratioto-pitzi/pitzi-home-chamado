@@ -11,7 +11,7 @@ import {
 } from "../services/pricing-service";
 
 export function registerPricingRoutes(router: Router) {
-  const RENOVSMART_API_BASE = "https://rp.pitzi.com.br/api";
+  const PITZI_API_BASE = "https://rp.pitzi.com.br/api";
 
   // ============== PRICING API PROXY (Pitzi) ==============
   router.get("/api/pricing/eligible-devices", async (req, res) => {
@@ -26,7 +26,7 @@ export function registerPricingRoutes(router: Router) {
       params.append("pageNumber", String(pageNumber));
       params.append("pageSize", String(pageSize));
 
-      const url = `${RENOVSMART_API_BASE}/eligible-devices?${params.toString()}`;
+      const url = `${PITZI_API_BASE}/eligible-devices?${params.toString()}`;
       console.log("[PRICING] Calling external API:", url);
       
       // Debug: Log request details
@@ -80,7 +80,7 @@ export function registerPricingRoutes(router: Router) {
   router.get("/api/pricing/search", async (req, res) => {
     try {
       const queryParams = new URLSearchParams(req.query as Record<string, string>).toString();
-      const url = `${RENOVSMART_API_BASE}/search?${queryParams}`;
+      const url = `${PITZI_API_BASE}/search?${queryParams}`;
       const response = await fetch(url);
       if (!response.ok) return res.json({ raw: { shopping_results: [] } });
       const data = await response.json();
@@ -94,7 +94,7 @@ export function registerPricingRoutes(router: Router) {
   router.get("/api/pricing/agg/by-device", async (req, res) => {
     try {
       const queryParams = new URLSearchParams(req.query as Record<string, string>).toString();
-      const url = `${RENOVSMART_API_BASE}/agg/by-device?${queryParams}`;
+      const url = `${PITZI_API_BASE}/agg/by-device?${queryParams}`;
       const response = await fetch(url);
       if (!response.ok) return res.json([]);
       const data = await response.json();
@@ -108,7 +108,7 @@ export function registerPricingRoutes(router: Router) {
   router.get("/api/pricing/eligible-devices/price", async (req, res) => {
     try {
       const queryParams = new URLSearchParams(req.query as Record<string, string>).toString();
-      const url = `${RENOVSMART_API_BASE}/eligible-devices/price?${queryParams}`;
+      const url = `${PITZI_API_BASE}/eligible-devices/price?${queryParams}`;
       const response = await fetch(url);
       if (!response.ok) return res.json({});
       const data = await response.json();
@@ -141,7 +141,7 @@ export function registerPricingRoutes(router: Router) {
         params.append("pageNumber", "1");
         params.append("pageSize", "200");
         
-        const url = `${RENOVSMART_API_BASE}/eligible-devices?${params.toString()}`;
+        const url = `${PITZI_API_BASE}/eligible-devices?${params.toString()}`;
         console.log("[PRICING] Calling external API:", url);
         const response = await fetch(url);
         if (response.ok) {

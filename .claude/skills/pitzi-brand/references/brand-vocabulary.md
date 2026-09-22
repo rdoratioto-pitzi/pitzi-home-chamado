@@ -1,8 +1,8 @@
-# Renov Brand Vocabulary
+# Pitzi Brand Vocabulary
 
 ## Prohibited Words
 
-These words must NEVER appear in any Renov interface, communication, or artifact.
+These words must NEVER appear in any Pitzi interface, communication, or artifact.
 
 | Prohibited | Use Instead | Example |
 |------------|-------------|---------|
@@ -26,7 +26,7 @@ These words must NEVER appear in any Renov interface, communication, or artifact
 
 - **Tom:** Parceiro de negocios, transparente
 - **Foco:** Margem, qualidade, confiabilidade
-- **Exemplo:** "Lotes com triagem certificada e garantia de qualidade Renov."
+- **Exemplo:** "Lotes com triagem certificada e garantia de qualidade Pitzi."
 
 ### Consumidores (End Users)
 
@@ -46,12 +46,12 @@ These words must NEVER appear in any Renov interface, communication, or artifact
 
 | Term | Definition |
 |------|------------|
-| **Trade-in** | O ato de entregar um dispositivo usado como parte do pagamento de um novo. Modelo de negocios central da Renov. |
+| **Trade-in** | O ato de entregar um dispositivo usado como parte do pagamento de um novo. Modelo de negocios central da Pitzi. |
 | **Bid Online** | Modelo de leilao reverso onde revendas homologadas fazem lances em lotes de dispositivos. |
-| **Price AI** | Motor de precificacao da Renov que usa dados de mercado para estimar valores de troca em tempo real. |
+| **Price AI** | Motor de precificacao da Pitzi que usa dados de mercado para estimar valores de troca em tempo real. |
 | **Valor de Troca** | O valor monetario atribuido ao dispositivo usado do cliente. Substituiu "preco" no vocabulario oficial. |
-| **Varejista Parceiro** | Rede de varejo ou operadora de telecom que oferece trade-in Renov em suas lojas. |
-| **Revenda Homologada** | Empresa certificada pela Renov para comprar lotes de dispositivos via Hub. |
+| **Varejista Parceiro** | Rede de varejo ou operadora de telecom que oferece trade-in Pitzi em suas lojas. |
+| **Revenda Homologada** | Empresa certificada pela Pitzi para comprar lotes de dispositivos via Hub. |
 | **Tier** | Classificacao de parceiro baseada em NPS e volume. Niveis: Diamond (90-100), Gold (75-89), Silver (60-74), Bronze (50-59). |
 | **Lote DOA** | Lote de dispositivos "Dead on Arrival" — nao funcionais. Vendidos separadamente com desconto especifico. |
 | **Lance Proxy** | Lance automatico configurado pela revenda no Bid Online. O sistema faz lances incrementais ate o limite definido. |
@@ -66,13 +66,13 @@ These words must NEVER appear in any Renov interface, communication, or artifact
 
 | Platform | Status | Usage |
 |----------|--------|-------|
-| **Renov Hub** | ACTIVE | Marketplace descentralizado. Frontend publico para varejistas e revendas. |
-| **Renov Home** | ACTIVE | Backoffice interno. Gestao de chamados, estoques, projetos, reunioes, metas. |
-| **Renov Smart** | ACTIVE | Backend e APIs. Inclui Price AI, integracao Omie, analytics. |
-| ~~Renov Go~~ | **DISCONTINUED** | Antigo app mobile. **NUNCA referenciar em nenhum material.** |
+| **Pitzi Hub** | ACTIVE | Marketplace descentralizado. Frontend publico para varejistas e revendas. |
+| **Pitzi Home** | ACTIVE | Backoffice interno. Gestao de chamados, estoques, projetos, reunioes, metas. |
+| **Pitzi Smart** | ACTIVE | Backend e APIs. Inclui Price AI, integracao Omie, analytics. |
+| ~~Pitzi Go~~ | **DISCONTINUED** | Antigo app mobile. **NUNCA referenciar em nenhum material.** |
 
 When referencing the platform ecosystem, always list as:
-> "Renov Hub, Renov Home e Renov Smart"
+> "Pitzi Hub, Pitzi Home e Pitzi Smart"
 
-Never include Renov Go. If asked about it, respond:
-> "O Renov Go foi descontinuado. A plataforma atual consiste em Hub, Home e Smart."
+Never include Pitzi Go. If asked about it, respond:
+> "O Pitzi Go foi descontinuado. A plataforma atual consiste em Hub, Home e Smart."

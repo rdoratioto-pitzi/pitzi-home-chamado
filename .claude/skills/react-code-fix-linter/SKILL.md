@@ -35,7 +35,7 @@ description: >
 - [ ] Image optimization (lazy load, proper sizing)
 - [ ] Debounce search/filter inputs
 
-## State Management (Renov)
+## State Management (Pitzi)
 
 - **Zustand** with reactive selectors: `const x = useStore(s => s.x)`
 - **Never** destructure entire store: `const { x, y } = useStore()` — causes re-render on ANY change

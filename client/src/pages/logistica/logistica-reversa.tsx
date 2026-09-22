@@ -168,7 +168,7 @@ export default function LogisticaReversaPage() {
   });
 
   const destinatario = {
-    nome: "RENOV SOLUCOES E SERVICOS LTDA",
+    nome: "PITZI SOLUCOES E SERVICOS LTDA",
     logradouro: "R LUIGI GALVANI",
     numero: "200",
     complemento: "CONJ 11",
@@ -982,7 +982,7 @@ export default function LogisticaReversaPage() {
                         <h3 className="font-medium">Dados do Destinatário (Onde será entregue)</h3>
                       </div>
                       <p className="text-sm text-muted-foreground mb-3">
-                        O destinatário está configurado como RENOV SOLUÇÕES E SERVIÇOS LTDA. Todos os pacotes serão enviados para este endereço.
+                        O destinatário está configurado como PITZI SOLUÇÕES E SERVIÇOS LTDA. Todos os pacotes serão enviados para este endereço.
                       </p>
                       <div className="bg-background rounded-lg p-3 text-sm">
                         <p className="font-medium">{destinatario.nome}</p>

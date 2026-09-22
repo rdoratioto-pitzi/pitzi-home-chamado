@@ -17,7 +17,7 @@ Arquivo: client/src/components/...
 
 ### 2. Executar
 ```bash
-npm run renov-dev run plans/nome/plan.md
+npm run pitzi-dev run plans/nome/plan.md
 ```
 
 ### 3. Receber Email → Testar → Aprovar

@@ -1,7 +1,7 @@
 # Plano de Implementação - Módulo de Reuniões
 
 **Data:** 16 de fevereiro de 2026  
-**Projeto:** Renov.Home - Sistema de Gestão  
+**Projeto:** Pitzi.Home - Sistema de Gestão  
 **Versão:** 1.0
 
 ---

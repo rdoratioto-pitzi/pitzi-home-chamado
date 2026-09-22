@@ -26,7 +26,7 @@ import { fireExecutor } from "../services/hermes-executor-trigger.service";
 const db = maybeDb!;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Bearer-token auth para service accounts (ex.: hermes@renov.com)
+// Bearer-token auth para service accounts (ex.: hermes@pitzi.com.br)
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function authenticateServiceAccount(authHeader: string | undefined) {
@@ -175,7 +175,7 @@ const threadRegisteredSchema = z.object({
   chamado_id: z.string().uuid(),
   thread_ts: z.string().min(1),
   channel_id: z.string().min(1),
-  // Fase 5 — opcional: a Routine Triagem v7 envia o /prompt-renov gerado pra
+  // Fase 5 — opcional: a Routine Triagem v7 envia o /prompt-pitzi gerado pra
   // que a Fase 4 possa disparar o Executor sem depender de re-fetch.
   execution_plan: z.string().min(1).optional(),
 });

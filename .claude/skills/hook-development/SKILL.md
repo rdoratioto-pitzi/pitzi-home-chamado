@@ -36,7 +36,7 @@ const fullName = `${firstName} ${lastName}`
 - `useMemo`/`useCallback` only when **measured** performance issue exists
 - Don't memoize preventively — React is already fast
 
-### Renov Patterns
+### Pitzi Patterns
 - **Seletores reativos**: `const x = useStore(s => s.x)` — never destructure the whole store
 - **sessionStorage persist**: use Zustand persist middleware
 - **Query hooks**: wrap TanStack Query in domain hooks (`useDevices()`, `useBids()`)

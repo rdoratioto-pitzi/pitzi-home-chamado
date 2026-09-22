@@ -13,11 +13,11 @@
     "db:push": "drizzle-kit push",
     "db:apply:dev": "./scripts/db-apply-dev.sh",
     "db:apply:prod": "./scripts/db-apply-prod.sh",
-    "renov-dev": "tsx cli/renov-dev.ts",
+    "pitzi-dev": "tsx cli/pitzi-dev.ts",
     "build:client": "cd client && vite build",
     "pages:dev": "wrangler pages dev dist/public --port 8788",
-    "pages:deploy": "npm run build:client && wrangler pages deploy dist/public --project-name renov-home",
-    "pages:deploy:preview": "npm run build:client && wrangler pages deploy dist/public --project-name renov-home --branch preview"
+    "pages:deploy": "npm run build:client && wrangler pages deploy dist/public --project-name pitzi-home",
+    "pages:deploy:preview": "npm run build:client && wrangler pages deploy dist/public --project-name pitzi-home --branch preview"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
