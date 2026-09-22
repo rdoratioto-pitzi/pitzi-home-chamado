@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { RichTextarea } from "@/components/rich-textarea";
 import { RichContent } from "@/components/rich-content";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, fetchWithAuth } from "@/lib/queryClient";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -122,6 +122,23 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
   const [availableTags, setAvailableTags] = useState(["Tech", "Design", "Bug", "Feature"]);
   const [newTag, setNewTag] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+  // Anexos são privados: abre por uma URL assinada e temporária.
+  const openAttachment = async (path: string) => {
+    const win = window.open("", "_blank");
+    try {
+      const res = await fetchWithAuth(`/api/uploads/signed-url?path=${encodeURIComponent(path)}`);
+      const { url } = await res.json();
+      if (!res.ok || !url) throw new Error();
+      if (win) {
+        win.opener = null;
+        win.location.href = url;
+      }
+    } catch {
+      win?.close();
+      toast({ title: "Não foi possível abrir o anexo", variant: "destructive" });
+    }
+  };
 
   // Checklist state
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -1077,7 +1094,14 @@ export function CardDialog({ open, onOpenChange, projectId, columnId, cardId, pa
                               ) : (
                                 <FileIcon className="h-3 w-3 text-gray-500" />
                               )}
-                              <span className="flex-1 truncate">{att.name}</span>
+                              <button
+                                type="button"
+                                className="flex-1 truncate text-left underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                                onClick={() => openAttachment(att.path)}
+                                title="Abrir anexo"
+                              >
+                                {att.name}
+                              </button>
                               {!readOnly && (
                                 <Button
                                   type="button"

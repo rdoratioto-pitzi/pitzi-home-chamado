@@ -32,7 +32,7 @@ const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "POST", path: "/api/integrations/slack/interactions" }, // Slack signature
   // Phase 3 — Upload routes (PUT is self-authenticated via HMAC token)
   { method: "PUT", path: /^\/api\/uploads\/put\// },
-  { method: "GET", path: /^\/objects\// },
+  { method: "GET", path: /^\/objects\// }, // acesso validado in-route (assinatura, sessão ou marca)
 ];
 
 /** Routes with optional auth (return null user if not authenticated) */
@@ -65,7 +65,7 @@ function matchesRoute(
 // Token válido não basta: a sessão precisa existir e o usuário estar ativo. Papel e tenant
 // vêm do banco, não do token, para que mudanças valham na próxima requisição.
 // Tokens sem sid (emitidos antes desta regra) são recusados; o frontend renova via refresh.
-async function resolveUser(c: Context<AppEnv>, token: string) {
+export async function resolveUser(c: Context<AppEnv>, token: string) {
   const payload = await verifyAccessToken(token, c.env.JWT_SECRET);
   if (!payload?.sid) return null;
   return loadActiveSession(c.get("db"), payload.userId, payload.sid);

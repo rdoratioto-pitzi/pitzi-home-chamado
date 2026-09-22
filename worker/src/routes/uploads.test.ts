@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Hono } from "hono";
-import { uploads } from "./uploads";
+
+const settings: Record<string, string> = {};
+vi.mock("../lib/storage", () => ({
+  getStorage: () => ({ getSetting: async (key: string) => (settings[key] ? { key, value: settings[key] } : undefined) }),
+}));
+const { uploads } = await import("./uploads");
 
 const objects = new Map<string, { body: string; contentType: string }>();
 const bucket = {
@@ -19,6 +24,7 @@ function buildApp(tenantId = "tenant-a") {
   const app = new Hono<any>();
   app.use("*", async (c, next) => {
     c.set("user", { userId: "u1", tenantId, role: "user" });
+    c.set("db", {});
     await next();
   });
   app.route("/", uploads);
@@ -37,7 +43,16 @@ async function requestUrl(name: string, contentType: string) {
 const put = (uploadURL: string, contentType: string, body = "conteudo") =>
   buildApp().request(uploadURL.replace("https://api.test", ""), { method: "PUT", headers: { "content-type": contentType }, body }, env);
 
+// Lê um objeto como o frontend faz: pede a URL assinada e depois abre a URL.
+async function signedGet(key: string, tenantId = "tenant-a") {
+  const res = await buildApp(tenantId).request(`/api/uploads/signed-url?path=/objects/${key}`, {}, env);
+  if (res.status !== 200) return res;
+  const { url } = (await res.json()) as { url: string };
+  return buildApp(tenantId).request(url.replace("https://api.test", ""), {}, env);
+}
+
 beforeEach(() => {
+  for (const k of Object.keys(settings)) delete settings[k];
   objects.clear();
   vi.clearAllMocks();
 });
@@ -73,7 +88,7 @@ describe("uploads", () => {
 
   it("HTML é servido como download, isolado e sem sniffing", async () => {
     objects.set("tenant-a/uploads/p.html", { body: "<script>1</script>", contentType: "text/html" });
-    const res = await buildApp().request("/objects/tenant-a/uploads/p.html", {}, env);
+    const res = await signedGet("tenant-a/uploads/p.html");
     expect(res.headers.get("Content-Disposition")).toBe("attachment");
     expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(res.headers.get("Content-Security-Policy")).toContain("sandbox");
@@ -82,8 +97,8 @@ describe("uploads", () => {
   it("imagem e PDF continuam inline", async () => {
     objects.set("tenant-a/uploads/a.png", { body: "x", contentType: "image/png" });
     objects.set("tenant-a/uploads/a.pdf", { body: "x", contentType: "application/pdf" });
-    const png = await buildApp().request("/objects/tenant-a/uploads/a.png", {}, env);
-    const pdf = await buildApp().request("/objects/tenant-a/uploads/a.pdf", {}, env);
+    const png = await signedGet("tenant-a/uploads/a.png");
+    const pdf = await signedGet("tenant-a/uploads/a.pdf");
     expect(png.headers.get("Content-Disposition")).toBeNull();
     expect(pdf.headers.get("Content-Disposition")).toBeNull();
     expect(pdf.headers.get("Content-Security-Policy")).toBeNull();
@@ -101,5 +116,35 @@ describe("uploads", () => {
     const res = await buildApp("tenant-a").request("/api/uploads/tenant-a/uploads/x.png", { method: "DELETE" }, env);
     expect(res.status).toBe(200);
     expect(objects.has("tenant-a/uploads/x.png")).toBe(false);
+  });
+
+  it("leitura anônima sem assinatura responde 404", async () => {
+    objects.set("tenant-a/uploads/x.png", { body: "x", contentType: "image/png" });
+    const res = await buildApp().request("/objects/tenant-a/uploads/x.png", {}, env);
+    expect(res.status).toBe(404);
+  });
+
+  it("URL assinada funciona e expira", async () => {
+    objects.set("tenant-a/uploads/x.png", { body: "x", contentType: "image/png" });
+    const res = await buildApp().request("/api/uploads/signed-url?path=/objects/tenant-a/uploads/x.png", {}, env);
+    const { url } = (await res.json()) as { url: string };
+    const path = url.replace("https://api.test", "");
+    expect((await buildApp().request(path, {}, env)).status).toBe(200);
+    expect((await buildApp().request(path.replace(/sig=[^&]+/, "sig=forjada"), {}, env)).status).toBe(404);
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.now() + 16 * 60 * 1000);
+    expect((await buildApp().request(path, {}, env)).status).toBe(404);
+  });
+
+  it("não assina arquivo de outro tenant", async () => {
+    const res = await buildApp("tenant-a").request("/api/uploads/signed-url?path=/objects/tenant-b/uploads/x.png", {}, env);
+    expect(res.status).toBe(403);
+  });
+
+  it("logo configurado nas configurações continua público", async () => {
+    objects.set("tenant-a/uploads/logo.png", { body: "x", contentType: "image/png" });
+    settings.logo_url_light = "/objects/tenant-a/uploads/logo.png";
+    const res = await buildApp().request("/objects/tenant-a/uploads/logo.png", {}, env);
+    expect(res.status).toBe(200);
   });
 });

@@ -2,6 +2,9 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../index";
 import { timingSafeEqualStr } from "../lib/crypto";
+import { getAccessTokenFromCookie, getBearerToken } from "../lib/jwt";
+import { getStorage } from "../lib/storage";
+import { resolveUser } from "../middleware/auth";
 
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB
 const UPLOAD_URL_TTL_SECONDS = 15 * 60;
@@ -28,6 +31,37 @@ async function verifyUploadToken(
   if (!Number.isFinite(expires) || expires < Math.floor(Date.now() / 1000)) return false;
   const expected = await signUploadToken(key, expires, contentType, secret);
   return timingSafeEqualStr(token, expected);
+}
+
+const READ_URL_TTL_SECONDS = 15 * 60;
+// Configurações cujo arquivo é público: logos e favicon aparecem na tela de login, antes da sessão.
+const PUBLIC_BRAND_SETTINGS = ["logo_url_light", "logo_url_dark", "favicon_url"];
+
+async function hmac(payload: string, secret: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const signature = await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(payload));
+  return btoa(String.fromCharCode(...new Uint8Array(signature)));
+}
+
+const signReadUrl = (key: string, expires: number, secret: string) => hmac(`read\n${key}\n${expires}`, secret);
+
+async function hasValidReadSignature(c: any, key: string): Promise<boolean> {
+  const expires = Number(c.req.query("expires"));
+  const sig = c.req.query("sig");
+  if (!sig || !Number.isFinite(expires) || expires < Math.floor(Date.now() / 1000)) return false;
+  return timingSafeEqualStr(sig, await signReadUrl(key, expires, c.env.JWT_SECRET));
+}
+
+async function isPublicBrandAsset(c: any, key: string): Promise<boolean> {
+  const storage = getStorage(c.get("db"));
+  for (const name of PUBLIC_BRAND_SETTINGS) {
+    const value = (await storage.getSetting(name))?.value ?? "";
+    if (value.replace(/^.*\/objects\//, "") === key) return true;
+  }
+  return false;
 }
 
 /** Nome de arquivo sem separadores de caminho nem caracteres de controle. */
@@ -98,9 +132,32 @@ uploads.put("/api/uploads/put/*", async (c) => {
   return c.json({ success: true, path: `/objects/${key}` });
 });
 
-// GET /objects/* — Serve files from R2
+// GET /api/uploads/signed-url?path=/objects/... — URL de leitura temporária (para <img>/links,
+// que não enviam o token). Só para arquivos do próprio tenant.
+uploads.get("/api/uploads/signed-url", async (c) => {
+  const user = c.get("user");
+  const key = (c.req.query("path") ?? "").replace(/^\/objects\//, "");
+  if (!key || key.includes("..") || !key.startsWith(`${user.tenantId}/`)) {
+    return c.json({ error: "Acesso negado" }, 403);
+  }
+  const expires = Math.floor(Date.now() / 1000) + READ_URL_TTL_SECONDS;
+  const sig = await signReadUrl(key, expires, c.env.JWT_SECRET);
+  return c.json({ url: `${c.env.API_URL}/objects/${encodeURI(key)}?expires=${expires}&sig=${encodeURIComponent(sig)}` });
+});
+
+// GET /objects/* — Serve files from R2. Exige URL assinada, sessão do mesmo tenant ou ser um
+// arquivo público da marca; caso contrário responde 404 (não revela se o arquivo existe).
 uploads.get("/objects/*", async (c) => {
   const key = c.req.path.replace("/objects/", "");
+  const token = getAccessTokenFromCookie(c) || getBearerToken(c.req.header("Authorization"));
+  const sessionUser = token ? await resolveUser(c, token) : null;
+  const allowed =
+    (await hasValidReadSignature(c, key)) ||
+    (sessionUser !== null && key.startsWith(`${sessionUser.tenantId}/`)) ||
+    (await isPublicBrandAsset(c, key));
+  if (!allowed) {
+    return c.json({ error: "Object not found" }, 404);
+  }
   const bucket = c.env.ATTACHMENTS;
 
   const object = await bucket.get(key);
