@@ -7,6 +7,7 @@ import {
   insertTicketCommentSchema,
 } from "@shared/schema";
 import { isValidApplicationKey } from "@shared/applications";
+import { filterVisibleComments, resolveIsInternal } from "@shared/ticket-comments";
 import { extractMentions } from "../lib/sanitize-rich-text";
 import { requireAuth, requireAdmin, getSessionUser } from "../middleware/auth";
 import {
@@ -227,7 +228,7 @@ export function registerTicketRoutes(router: Router) {
       }
 
       const comments = await storage.getTicketComments(getId(req));
-      res.json(comments);
+      res.json(filterVisibleComments(comments, { userId, isAdmin }, ticket));
     } catch (error: any) {
       const status = error.status || 500;
       res.status(status).json({ error: error.message });
@@ -248,12 +249,15 @@ export function registerTicketRoutes(router: Router) {
         ...req.body,
         ticketId: getId(req),
         userId: userId,
+        isInternal: resolveIsInternal(req.body?.isInternal, { userId, isAdmin }, ticket),
         mentions: extractMentions(req.body?.content),
       });
       const comment = await storage.createTicketComment(validated);
+      const isInternal = comment.isInternal === true;
 
       if (ticket) {
-        if (ticket.assigneeId && comment.userId === ticket.assigneeId && !ticket.dataPrimeiraResposta) {
+        // Nota interna não conta como primeira resposta ao solicitante.
+        if (!isInternal && ticket.assigneeId && comment.userId === ticket.assigneeId && !ticket.dataPrimeiraResposta) {
           await storage.updateTicket(ticket.id, { dataPrimeiraResposta: new Date() });
         }
 
@@ -265,7 +269,7 @@ export function registerTicketRoutes(router: Router) {
           sendTicketCommentEmail(ticket, comment, commenter, requester, assignee || null).catch(console.error);
         }
 
-        if (requester && commenter && commenter.id !== requester.id) {
+        if (!isInternal && requester && commenter && commenter.id !== requester.id) {
           storage.createNotification({
             userId: requester.id,
             fromUserId: commenter.id,
@@ -298,7 +302,8 @@ export function registerTicketRoutes(router: Router) {
               u.name.toLowerCase() === mentionedName.toLowerCase() && u.status === "active"
             );
 
-            if (mentionedUser && commenter) {
+            // Nota interna não é enviada ao solicitante, mesmo que ele seja mencionado.
+            if (mentionedUser && commenter && !(isInternal && mentionedUser.id === ticket.requesterId && mentionedUser.id !== ticket.assigneeId)) {
               sendMentionNotificationEmail(
                 mentionedUser,
                 commenter.name,

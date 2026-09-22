@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique, bigint, date, index, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, decimal, jsonb, unique, bigint, date, index, uniqueIndex, pgSequence, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -79,6 +79,9 @@ export const refreshTokens = pgTable("refresh_tokens", {
 });
 
 // ============== TICKETS (Chamados) ==============
+// Numeração dos chamados (CHA-0001). Criada e alinhada por migrations/0017_tickets_code_unique.sql.
+export const ticketCodeSeq = pgSequence("ticket_code_seq");
+
 export const tickets = pgTable("tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),
@@ -109,7 +112,10 @@ export const tickets = pgTable("tickets", {
   satisfactionRating: integer("satisfaction_rating"), // 1-5
   satisfactionComment: text("satisfaction_comment"),
   satisfactionCreatedAt: timestamp("satisfaction_created_at"),
-});
+}, (table) => ({
+  // Criado por migrations/0017_tickets_code_unique.sql — não remover (db:push apagaria o índice).
+  codeUnique: uniqueIndex("tickets_code_unique").on(table.code),
+}));
 
 export const insertTicketSchema = createInsertSchema(tickets).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTicket = z.infer<typeof insertTicketSchema>;

@@ -36,14 +36,7 @@ async function fixOmieConfig() {
     const configCheck = await pool?.query('SELECT * FROM omie_config LIMIT 1');
     
     if (!configCheck?.rows || configCheck.rows.length === 0) {
-      console.log('[Omie Setup] Nenhuma configuração encontrada. Inserindo credenciais...');
-      
-      await pool?.query(`
-        INSERT INTO omie_config (app_key, app_secret, is_active)
-        VALUES ($1, $2, $3)
-      `, ['3512564154099', '3bf7b7131fe0f76a23f567387841fbb8', true]);
-      
-      console.log('[Omie Setup] ✓ Credenciais inseridas com sucesso');
+      console.warn('[Omie Setup] Nenhuma configuração encontrada. Cadastre as credenciais pela tela de integração Omie.');
     } else {
       console.log('[Omie Setup] ✓ Configuração existente encontrada');
       console.log('  - App Key:', configCheck.rows[0].app_key?.substring(0, 5) + '...');
@@ -315,36 +308,6 @@ app.get("/api/test-email-url/:code", (req, res) => {
     expectedFormat: "https://rdoratioto-pitzi.github.io/pitzi-home-chamado/chamados?id=CHA-XXXX",
     isCorrect: ticketUrl.includes("?id=")
   });
-});
-
-// ============== ROTA DE TESTE PÚBLICA OMIE (TEMPORÁRIA) ==============
-// Teste direto no banco de dados - apenas para debug
-app.get("/api/omie-debug/config", async (req, res) => {
-  try {
-    console.log('[OMIE DEBUG] Direct DB query test');
-    
-    const configCheck = await pool?.query('SELECT * FROM omie_config LIMIT 1');
-    
-    if (!configCheck?.rows || configCheck.rows.length === 0) {
-      return res.json({
-        success: true,
-        data: null
-      });
-    }
-    
-    // Retornar no formato esperado pelo frontend
-    res.json({
-      success: true,
-      data: {
-        app_key: configCheck.rows[0].app_key || '',
-        app_secret: configCheck.rows[0].app_secret || '',
-        is_active: configCheck.rows[0].is_active || false
-      }
-    });
-  } catch (error: any) {
-    console.error('[OMIE DEBUG] Error:', error.message);
-    res.status(500).json({ success: false, error: error.message });
-  }
 });
 
 // ── Claude Code Usage (autenticado por secret, não por sessão) ──────────────
