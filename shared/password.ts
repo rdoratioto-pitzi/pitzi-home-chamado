@@ -115,3 +115,16 @@ export function withoutPassword<T extends { password?: unknown }>(user: T): Omit
   const { password: _password, ...safe } = user;
   return safe;
 }
+
+/** Token aleatório de 256 bits em base64url, para links de uso único. */
+export function generateResetToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+export async function sha256Hex(input: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+  return bufferToHex(digest);
+}

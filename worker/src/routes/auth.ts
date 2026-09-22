@@ -17,7 +17,8 @@ import {
 import { setCookie } from "hono/cookie";
 import type { AppEnv, AuthUser } from "../index";
 import { endSession } from "../lib/sessions";
-import { sendPasswordResetEmail } from "../lib/email";
+import { sendPasswordResetLinkEmail } from "../lib/email";
+import { getStorage } from "../lib/storage";
 
 const auth = new Hono<AppEnv>();
 
@@ -222,30 +223,41 @@ auth.post("/api/auth/forgot-password", async (c) => {
     .where(eq(users.email, body.email.toLowerCase()))
     .limit(1);
 
-  // Always return success to prevent email enumeration
-  const successMsg = "Se o email estiver cadastrado, voce recebera uma nova senha temporaria.";
+  // Sempre a mesma resposta, para não revelar quais e-mails existem.
+  const successMsg = "Se o email estiver cadastrado, voce recebera um link para redefinir a senha.";
 
   if (!user || user.status !== "active") {
     return c.json({ success: true, message: successMsg });
   }
 
-  // Generate temporary password (cryptographically secure)
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  const randomBytes = crypto.getRandomValues(new Uint8Array(8));
-  let temporaryPassword = "";
-  for (let i = 0; i < 8; i++) {
-    temporaryPassword += chars.charAt(randomBytes[i] % chars.length);
+  // Não altera a senha: gera um link de uso único. Acima do limite por hora, não envia.
+  const token = await getStorage(db).createPasswordResetToken(user.id);
+  if (token) {
+    const resetUrl = `${c.env.APP_URL}/redefinir-senha?token=${encodeURIComponent(token)}`;
+    sendPasswordResetLinkEmail(c.env, user, resetUrl).catch((err) =>
+      console.error("[AUTH] Falha ao enviar email de reset:", err)
+    );
   }
 
-  // Hash before storing (fix: current code stores plaintext)
-  const hashedTemp = await hashPassword(temporaryPassword);
-  await db.update(users).set({ password: hashedTemp }).where(eq(users.id, user.id));
-
-  sendPasswordResetEmail(c.env, user, temporaryPassword).catch((err) =>
-    console.error("[AUTH] Falha ao enviar email de reset:", err)
-  );
-
   return c.json({ success: true, message: successMsg });
+});
+
+// ─── POST /api/auth/reset-password ──────────────────────────────
+const resetPasswordSchema = z.object({
+  token: z.string().min(20),
+  password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres"),
+});
+
+auth.post("/api/auth/reset-password", async (c) => {
+  const parsed = resetPasswordSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    return c.json({ success: false, message: parsed.error.errors[0]?.message ?? "Dados invalidos" }, 400);
+  }
+  const ok = await getStorage(c.get("db")).resetPasswordWithToken(parsed.data.token, parsed.data.password);
+  if (!ok) {
+    return c.json({ success: false, message: "Link invalido ou expirado. Solicite um novo." }, 400);
+  }
+  return c.json({ success: true, message: "Senha redefinida. Entre com a nova senha." });
 });
 
 export { auth };

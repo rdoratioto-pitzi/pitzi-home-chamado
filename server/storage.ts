@@ -83,10 +83,11 @@ import {
   gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches,
   claudeCodeUsageReports,
   refreshTokens,
+  passwordResetTokens,
  } from "@shared/schema";
  import { db as defaultDb, type Database } from "./db";
  import { eq, and, or, sql, asc, desc, gt, isNull, type SQL } from "drizzle-orm";
-import { hashPassword, isPasswordHash } from "../shared/password";
+import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../shared/password";
  import { alias } from "drizzle-orm/pg-core";
  
  export type NotificationPreferences = {
@@ -117,6 +118,8 @@ import { hashPassword, isPasswordHash } from "../shared/password";
   getUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+  createPasswordResetToken(userId: string): Promise<string | null>;
+  resetPasswordWithToken(token: string, newPassword: string): Promise<boolean>;
 
   // Tickets
   getTicket(id: string): Promise<Ticket | undefined>;
@@ -491,6 +494,9 @@ function ticketFilterConditions(filters: TicketFilters): SQL[] {
   return conditions;
 }
 
+const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
+const RESET_TOKENS_PER_HOUR = 3;
+
 /** Violação de unicidade do Postgres (23505), com pg (Express) ou Neon (Worker). */
 export function isUniqueViolation(error: unknown): boolean {
   const e = error as { code?: string; cause?: { code?: string } } | null;
@@ -595,6 +601,52 @@ export class DatabaseStorage implements IStorage {
       await this.db.delete(refreshTokens).where(eq(refreshTokens.userId, id));
     }
     return user;
+  }
+
+  /**
+   * Novo link de redefinição de senha. Invalida links anteriores do usuário e limita a
+   * RESET_TOKENS_PER_HOUR pedidos por hora; retorna null quando o limite foi atingido.
+   */
+  async createPasswordResetToken(userId: string): Promise<string | null> {
+    if (!this.db) throw new Error("Database not connected");
+    const since = new Date(Date.now() - 60 * 60 * 1000);
+    const [{ recent }] = await this.db
+      .select({ recent: sql<number>`count(*)::int` })
+      .from(passwordResetTokens)
+      .where(and(eq(passwordResetTokens.userId, userId), gt(passwordResetTokens.createdAt, since)));
+    if (recent >= RESET_TOKENS_PER_HOUR) return null;
+
+    // Invalida links anteriores sem apagá-los: continuam contando para o limite por hora.
+    await this.db
+      .update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(and(eq(passwordResetTokens.userId, userId), isNull(passwordResetTokens.usedAt)));
+    const token = generateResetToken();
+    await this.db.insert(passwordResetTokens).values({
+      userId,
+      tokenHash: await sha256Hex(token),
+      expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+    });
+    return token;
+  }
+
+  /** Consome o link (uso único, dentro do prazo) e troca a senha; a troca encerra as sessões. */
+  async resetPasswordWithToken(token: string, newPassword: string): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+    const [consumed] = await this.db
+      .update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(and(
+        eq(passwordResetTokens.tokenHash, await sha256Hex(token)),
+        isNull(passwordResetTokens.usedAt),
+        gt(passwordResetTokens.expiresAt, new Date()),
+      ))
+      .returning({ userId: passwordResetTokens.userId });
+    if (!consumed) return false;
+    const user = await this.getUser(consumed.userId);
+    if (!user || user.status !== "active") return false;
+    await this.updateUser(user.id, { password: newPassword });
+    return true;
   }
 
   // Tickets

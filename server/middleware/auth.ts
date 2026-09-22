@@ -30,6 +30,7 @@ export function requireAuthWithPublicRoutes(req: Request, res: Response, next: N
   const PUBLIC_ROUTES = [
     "/api/auth/login",
     "/api/auth/forgot-password",
+    "/api/auth/reset-password",
     "/api/auth/me",
   ];
 
