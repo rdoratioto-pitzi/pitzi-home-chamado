@@ -11,12 +11,14 @@ const allowed = [
   "/api/ticket-responsaveis", "/api/users", "/api/settings/ticket_types",
   "/api/slas", "/api/uploads/request-url", "/api/notifications", "/api/version",
   "/objects/tenant/anexo.pdf", "/api/external/chamados", "/api/meta-areas",
+  "/api/v1/support-groups", "/api/v1/support-groups/abc/members",
 ];
 const disabled = [
   "/api/projects", "/api/tasks", "/api/workspace/projetos", "/api/workspace/todos",
   "/api/workspace/counts", "/api/ai/chat", "/api/estoques", "/api/pricing",
   "/api/git-analytics/github-webhook", "/api/logistica-reversa/eventos",
   "/api/integrations/hermes/execution-update", "/api/tickets-other", "/api",
+  "/api/v1/projects",
 ];
 
 describe("APIs da central de chamados", () => {

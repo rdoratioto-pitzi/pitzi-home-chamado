@@ -29,20 +29,13 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, UserCheck, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useSupportGroups } from "@/hooks/use-support-groups";
 import type { TicketResponsavel, User, Setting } from "@shared/schema";
 
 interface FieldItem {
   value: string;
   label: string;
 }
-
-const defaultCategories: FieldItem[] = [
-  { value: "ti", label: "TI" },
-  { value: "rh", label: "RH" },
-  { value: "financeiro", label: "Financeiro" },
-  { value: "operacoes", label: "Operações" },
-  { value: "comercial", label: "Comercial" },
-];
 
 const defaultTypes: FieldItem[] = [
   { value: "bug", label: "Bug" },
@@ -65,14 +58,7 @@ export function ResponsaveisSettings() {
     queryKey: ["/api/users"],
   });
 
-  const { data: categoriasSetting } = useQuery<Setting>({
-    queryKey: ["/api/settings", "ticket_categories"],
-    queryFn: async () => {
-      const res = await fetch("/api/settings/ticket_categories");
-      if (!res.ok) return null;
-      return res.json();
-    },
-  });
+  const { groups: supportGroups } = useSupportGroups();
 
   const { data: tiposSetting } = useQuery<Setting>({
     queryKey: ["/api/settings", "ticket_types"],
@@ -83,9 +69,7 @@ export function ResponsaveisSettings() {
     },
   });
 
-  const categorias: FieldItem[] = categoriasSetting?.value 
-    ? JSON.parse(categoriasSetting.value) 
-    : defaultCategories;
+  const categorias: FieldItem[] = supportGroups.map(g => ({ value: g.key, label: g.name }));
 
   const tipos: FieldItem[] = tiposSetting?.value 
     ? JSON.parse(tiposSetting.value) 
@@ -158,8 +142,9 @@ export function ResponsaveisSettings() {
     return tipo?.label || value;
   };
 
+  // Chave com separador que não aparece em chaves de grupo (ex.: "suporte-ti").
   const groupedResponsaveis = responsaveis.reduce((acc, resp) => {
-    const key = `${resp.categoria}-${resp.tipo}`;
+    const key = `${resp.categoria}|${resp.tipo}`;
     if (!acc[key]) {
       acc[key] = [];
     }
@@ -174,10 +159,10 @@ export function ResponsaveisSettings() {
           <div>
             <CardTitle className="text-lg font-bold flex items-center gap-2">
               <UserCheck className="h-5 w-5 text-primary" />
-              Responsáveis por Tipo de Chamado
+              Responsáveis padrão por grupo
             </CardTitle>
             <CardDescription className="mt-1">
-              Configure quais usuários serão automaticamente atribuídos aos chamados com base na categoria e tipo.
+              Configure quem recebe automaticamente os chamados de cada grupo de atendimento e tipo. Sem regra, o chamado fica na fila do grupo.
               Quando múltiplos responsáveis estão configurados, o sistema usa balanceamento round-robin.
             </CardDescription>
           </div>
@@ -207,7 +192,7 @@ export function ResponsaveisSettings() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-[12px] font-bold uppercase tracking-wider">Categoria</TableHead>
+                <TableHead className="text-[12px] font-bold uppercase tracking-wider">Grupo</TableHead>
                 <TableHead className="text-[12px] font-bold uppercase tracking-wider">Tipo</TableHead>
                 <TableHead className="text-[12px] font-bold uppercase tracking-wider">Responsável</TableHead>
                 <TableHead className="text-[12px] font-bold uppercase tracking-wider">Ativo</TableHead>
@@ -261,7 +246,7 @@ export function ResponsaveisSettings() {
               {Object.entries(groupedResponsaveis).map(([key, resps]) => {
                 const activeResps = resps.filter(r => r.ativo);
                 if (activeResps.length === 0) return null;
-                const [categoria, tipo] = key.split("-");
+                const [categoria, tipo] = key.split("|");
                 return (
                   <div key={key}>
                     <span className="font-medium text-foreground">{getCategoriaLabel(categoria)} / {getTipoLabel(tipo)}:</span>{" "}
@@ -284,10 +269,10 @@ export function ResponsaveisSettings() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Categoria</label>
+              <label className="text-sm font-medium">Grupo de atendimento</label>
               <Select value={selectedCategoria} onValueChange={setSelectedCategoria}>
                 <SelectTrigger data-testid="select-categoria">
-                  <SelectValue placeholder="Selecione a categoria" />
+                  <SelectValue placeholder="Selecione o grupo" />
                 </SelectTrigger>
                 <SelectContent>
                   {categorias.map((cat) => (
