@@ -318,16 +318,23 @@ workspace.post("/api/workspace/chamados", async (c) => {
       return c.json({ error: "Aplicação é obrigatória e deve ser válida" }, 400);
     }
 
+    const db = c.get("db");
+    const storage = getStorage(db);
+    if (!categoria || !(await storage.getActiveSupportGroupByKey(categoria))) {
+      return c.json({ error: "Grupo de atendimento é obrigatório e deve ser válido" }, 400);
+    }
+    const tipoChamado = tipo || "bug";
+    const assigneeId = await storage.findResponsavelForTicket(categoria, tipoChamado, tenantId ?? null);
+
     const prioridadeMap: Record<string, string> = { baixa: "low", media: "medium", alta: "high", critica: "critical" };
     const mappedPriority = prioridade ? (prioridadeMap[prioridade] || prioridade) : "medium";
 
-    const db = c.get("db");
-    const storage = getStorage(db);
     const ticket = await storage.createTicket({
       title: titulo.trim(),
       description: descricao || "",
-      category: categoria || "geral",
-      type: tipo || "bug",
+      category: categoria,
+      type: tipoChamado,
+      assigneeId,
       applicationKey,
       priority: mappedPriority,
       impact: "medio",

@@ -51,6 +51,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
+import { useSupportGroups } from "@/hooks/use-support-groups";
 import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 import { getApplicationLabel } from "@shared/applications";
 
@@ -136,15 +137,6 @@ interface FieldItem {
   label: string;
 }
 
-const defaultCategories: FieldItem[] = [
-  { value: "tech", label: "Tech" },
-  { value: "rh", label: "Recursos Humanos" },
-  { value: "financeiro", label: "Financeiro" },
-  { value: "operacoes", label: "Operações" },
-  { value: "comercial", label: "Comercial" },
-  { value: "outros", label: "Outros" },
-];
-
 const defaultTypes: FieldItem[] = [
   { value: "bug", label: "Bug" },
   { value: "melhoria", label: "Melhoria" },
@@ -155,7 +147,7 @@ const defaultTypes: FieldItem[] = [
 const editFormSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
   description: z.string().max(5000, "Descrição deve ter no máximo 5.000 caracteres"),
-  category: z.string().min(1, "Selecione uma categoria"),
+  category: z.string().min(1, "Selecione o grupo de atendimento"),
   type: z.string().min(1, "Selecione um tipo"),
   applicationKey: z.string().min(1, "Selecione a aplicação"),
   priority: z.string().min(1, "Selecione uma prioridade"),
@@ -208,15 +200,7 @@ export default function TicketDetailPage() {
   });
 
   // Settings for dropdowns
-  const { data: categoriesSetting } = useQuery<Setting>({
-    queryKey: ["/api/settings", "ticket_categories"],
-    queryFn: async () => {
-      const res = await fetch("/api/settings/ticket_categories");
-      if (!res.ok) return null;
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  const { groups: supportGroups } = useSupportGroups();
 
   const { data: typesSetting } = useQuery<Setting>({
     queryKey: ["/api/settings", "ticket_types"],
@@ -256,7 +240,7 @@ export default function TicketDetailPage() {
     }
   };
 
-  const categories = parseSettingWithFallback(categoriesSetting?.value, defaultCategories);
+  const categories: FieldItem[] = supportGroups.map(g => ({ value: g.key, label: g.name }));
   const types = parseSettingWithFallback(typesSetting?.value, defaultTypes);
 
   const editForm = useForm<EditFormData>({
@@ -495,7 +479,7 @@ export default function TicketDetailPage() {
                       name="category"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Categoria</FormLabel>
+                          <FormLabel>Grupo de atendimento</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>

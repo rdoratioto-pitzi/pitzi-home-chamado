@@ -91,6 +91,34 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   userIdx: index("password_reset_tokens_user_idx").on(table.userId, table.createdAt),
 }));
 
+// ============== GRUPOS DE ATENDIMENTO ==============
+// Times que recebem chamados. A chave (ex.: "suporte-ti") é gravada em tickets.category
+// e em ticket_responsaveis.categoria. Criadas por migrations/0022_support_groups.sql.
+export const supportGroups = pgTable("support_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const supportGroupMembers = pgTable("support_group_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id").notNull().references(() => supportGroups.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  groupUser: unique("support_group_members_group_id_user_id_key").on(table.groupId, table.userId),
+  userIdx: index("support_group_members_user_idx").on(table.userId),
+}));
+
+export type SupportGroup = typeof supportGroups.$inferSelect;
+export type SupportGroupMember = typeof supportGroupMembers.$inferSelect;
+export type SupportGroupWithMembers = SupportGroup & { memberIds: string[] };
+
 // ============== TICKETS (Chamados) ==============
 // Numeração dos chamados (CHA-0001). Criada e alinhada por migrations/0017_tickets_code_unique.sql.
 export const ticketCodeSeq = pgSequence("ticket_code_seq");
