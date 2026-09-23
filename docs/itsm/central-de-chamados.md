@@ -2,11 +2,12 @@
 
 Decisão de produto: 23/09/2026, solicitada por Rodrigo.
 
-A aplicação é um sistema de chamados. A entrada abre `/chamados` diretamente,
-com lista, filtros, indicadores, kanban e abertura de chamados. URLs antigas do
-workspace e dos módulos desativados redirecionam para essa entrada.
+A aplicação é um sistema de chamados. A tela inicial (`/`) mantém o painel de
+módulos, agora apenas com o card Chamados. `/chamados` tem lista, filtros,
+indicadores, kanban e abertura de chamados. URLs antigas do workspace e dos
+módulos desativados redirecionam para a tela inicial.
 
-O menu oferece Chamados, Novo chamado e Configurações, respeitando as permissões
+O menu oferece Início, Chamados, Novo chamado e Configurações, respeitando as permissões
 existentes. Configurações mantém usuários, responsáveis, campos/SLA, autenticação,
 notificações e marca. Permissões de módulos inativos deixam de aparecer no editor.
 

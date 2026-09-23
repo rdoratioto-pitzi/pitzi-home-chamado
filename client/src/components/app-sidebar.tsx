@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Ticket, Plus, Settings, User, LogOut, ChevronDown } from "lucide-react";
+import { Home, Ticket, Plus, Settings, User, LogOut, ChevronDown } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu,
   SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { PitziLogo } from "./renov-logo";
@@ -15,6 +15,7 @@ export function AppSidebar() {
   const { user } = useAuth();
   const permissions = getUserPermissions(user);
   const items = [
+    { title: "Início", url: "/", icon: Home, visible: true },
     { title: "Chamados", url: "/chamados", icon: Ticket, visible: true },
     { title: "Novo chamado", url: "/chamados/novo", icon: Plus, visible: permissions.chamados },
     { title: "Configurações", url: "/configuracoes", icon: Settings, visible: permissions.configuracoes },
@@ -22,7 +23,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4 border-b border-border/40">
-        <Link href="/chamados" aria-label="Pitzi — Chamados"><PitziLogo size="md" /></Link>
+        <Link href="/" aria-label="Pitzi — Início"><PitziLogo size="md" /></Link>
         <span className="text-xs text-muted-foreground">Central de chamados</span>
       </SidebarHeader>
       <SidebarContent>

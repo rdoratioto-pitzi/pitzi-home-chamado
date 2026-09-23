@@ -15,6 +15,7 @@ const AppSidebar    = lazy(() => import("@/components/app-sidebar").then(m => ({
 const ProtectedRoute = lazy(() => import("@/components/protected-route").then(m => ({ default: m.ProtectedRoute })));
 
 const LoginPage = lazy(() => import("@/pages/login"));
+const HomePage = lazy(() => import("@/pages/home"));
 const RedefinirSenhaPage = lazy(() => import("@/pages/redefinir-senha"));
 const ChamadosPage = lazy(() => import("@/pages/workspace/WorkspacePage"));
 const NovoChamadoPage = lazy(() => import("@/pages/chamados/novo"));
@@ -27,6 +28,9 @@ function Router() {
     <Switch>
       <Route path="/login"><LoginPage /></Route>
       <Route path="/redefinir-senha"><RedefinirSenhaPage /></Route>
+      <Route path="/">
+        <ProtectedRoute><HomePage /></ProtectedRoute>
+      </Route>
       <Route path="/chamados">
         <ProtectedRoute>
           <WorkspaceErrorBoundary><ChamadosPage /></WorkspaceErrorBoundary>
@@ -44,8 +48,8 @@ function Router() {
       <Route path="/configuracoes">
         <ProtectedRoute requiredPermission="configuracoes"><ConfiguracoesPage /></ProtectedRoute>
       </Route>
-      {/* Início, URLs antigas do workspace e módulos desativados levam aos chamados. */}
-      <Route><Redirect to="/chamados" /></Route>
+      {/* URLs antigas do workspace e de módulos desativados levam ao início. */}
+      <Route><Redirect to="/" /></Route>
     </Switch>
   );
 }
