@@ -4,8 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase } from "./seed";
 import { setupSession, requireAuth } from "./auth";
-import { startRecurrenceJob } from "./jobs/recurrence.job";
-import { startGitSyncJob } from "./jobs/git-sync.job";
+import { activeRoutesMiddleware } from "./middleware/active-routes";
 import { storage } from "./storage";
 
 /**
@@ -112,6 +111,7 @@ process.on("uncaughtException", (error: any) => {
  * --------------------------------------------------
  */
 const app = express();
+app.use(activeRoutesMiddleware);
 const httpServer = createServer(app);
 
 declare module "http" {
@@ -357,8 +357,7 @@ export const asyncHandler =
     await testDatabaseConnection();
     
     // Schema: migrations versionadas via `npm run db:migrate` (scripts/migrate.ts).
-    // Fix Omie config on startup
-    await fixOmieConfig();
+    // A integração Omie está desativada; não altera sua configuração no startup.
     
     await seedDatabase();
     await registerRoutes(httpServer, app);
@@ -432,42 +431,8 @@ export const asyncHandler =
       async () => {
         log(`serving on port ${port}`);
 
-        // Iniciar cron job de recorrência
-        startRecurrenceJob();
+        // Jobs de reuniões, Git Analytics, estoque e biblioteca estão desativados.
 
-        // Iniciar cron job de sincronização Git Analytics
-        startGitSyncJob();
-
-        // Pré-aquecer cache de posição de estoques em background (não bloqueia startup)
-        import("./services/estoque-pos.service").then(({ getCachedPosEstoque }) => {
-          getCachedPosEstoque().then((idx) => {
-            log(`[EstoquePos] Cache pré-aquecido — ${idx.size} produtos`, "estoque-pos");
-          }).catch((err: any) => {
-            console.error("[EstoquePos] Falha no pré-aquecimento:", err.message);
-          });
-        }).catch(() => {});
-
-        // Verificar se a tabela de prompts está vazia e executar sincronização inicial
-        // Usando importação dinâmica para evitar erros de módulo na inicialização
-        try {
-          const { startPromptsSyncJob, runPromptsSyncNow } = await import("./jobs/prompts-sync.job");
-          
-          // Iniciar cron job de prompts
-          startPromptsSyncJob();
-          
-          // Verificar se precisa de sincronização inicial
-          const stats = await storage.getPromptStats();
-          if (stats.total === 0) {
-            log("[Prompts] Tabela vazia, executando primeira sincronização...", "prompts-sync");
-            const result = await runPromptsSyncNow();
-            log(`[Prompts] Sincronização inicial concluída: ${result.created} criados, ${result.updated} atualizados`, "prompts-sync");
-          } else {
-            log(`[Prompts] Biblioteca já possui ${stats.total} prompts`, "prompts-sync");
-          }
-        } catch (error) {
-          console.error("[Prompts] Erro na inicialização do módulo de prompts:", error);
-          console.error("[Prompts] O servidor continuará funcionando, mas a sincronização de prompts pode não estar disponível.");
-        }
       },
     );
   } catch (err) {
