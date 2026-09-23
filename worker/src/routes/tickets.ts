@@ -200,11 +200,16 @@ tickets.post("/api/tickets", async (c) => {
 
   const validated = insertTicketSchema.parse(data);
 
+  if (!(await storage.getActiveSupportGroupByKey(validated.category))) {
+    return c.json({ error: "Grupo de atendimento é obrigatório e deve ser válido" }, 400);
+  }
+
   // Auto-assignment
   if (!validated.assigneeId && validated.category && validated.type) {
     const autoAssignee = await storage.findResponsavelForTicket(
       validated.category,
-      validated.type
+      validated.type,
+      user.tenantId ?? null,
     );
     if (autoAssignee) validated.assigneeId = autoAssignee;
   }
@@ -267,6 +272,10 @@ tickets.patch("/api/tickets/:id", async (c) => {
     if (!isValidApplicationKey(updateData.applicationKey)) {
       return c.json({ error: "Aplicação inválida" }, 400);
     }
+  }
+
+  if (updateData.category !== undefined && !(await storage.getActiveSupportGroupByKey(updateData.category))) {
+    return c.json({ error: "Grupo de atendimento inválido" }, 400);
   }
 
   // Non-admin field restriction
@@ -518,13 +527,28 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
 // GET /api/ticket-responsaveis
 tickets.get("/api/ticket-responsaveis", async (c) => {
   const storage = getStorage(c.get("db"));
-  return c.json(await storage.getTicketResponsaveis());
+  return c.json(await storage.getTicketResponsaveis(c.get("user").tenantId ?? null));
 });
+
+/** Regra de responsável do tenant do usuário, ou undefined (404 para os demais). */
+async function findTenantResponsavel(c: { get: (k: "user" | "db") => any }, id: string) {
+  const responsavel = await getStorage(c.get("db")).getTicketResponsavel(id);
+  return responsavel && sameTenant(responsavel.tenantId, c.get("user").tenantId) ? responsavel : undefined;
+}
+
+async function isValidResponsavelRule(c: { get: (k: "user" | "db") => any }, data: { categoria?: string; usuarioResponsavelId?: string }) {
+  const storage = getStorage(c.get("db"));
+  if (data.categoria !== undefined && !(await storage.getActiveSupportGroupByKey(data.categoria))) return false;
+  if (data.usuarioResponsavelId !== undefined) {
+    const target = await storage.getUser(data.usuarioResponsavelId);
+    if (!target || !sameTenant(target.tenantId, c.get("user").tenantId)) return false;
+  }
+  return true;
+}
 
 // GET /api/ticket-responsaveis/:id
 tickets.get("/api/ticket-responsaveis/:id", async (c) => {
-  const storage = getStorage(c.get("db"));
-  const responsavel = await storage.getTicketResponsavel(c.req.param("id"));
+  const responsavel = await findTenantResponsavel(c, c.req.param("id"));
   if (!responsavel) return c.json({ error: "Responsavel not found" }, 404);
   return c.json(responsavel);
 });
@@ -533,8 +557,12 @@ tickets.get("/api/ticket-responsaveis/:id", async (c) => {
 tickets.post("/api/ticket-responsaveis", requireAdmin, async (c) => {
   const storage = getStorage(c.get("db"));
   const body = await c.req.json();
-  const validated = insertTicketResponsavelSchema.parse(body);
-  const responsavel = await storage.createTicketResponsavel(validated);
+  const { tenantId: _tenantId, ...fields } = body ?? {};
+  const validated = insertTicketResponsavelSchema.parse(fields);
+  if (!(await isValidResponsavelRule(c, validated))) {
+    return c.json({ error: "Grupo ou responsável inválido" }, 400);
+  }
+  const responsavel = await storage.createTicketResponsavel({ ...validated, tenantId: c.get("user").tenantId ?? null });
   return c.json(responsavel, 201);
 });
 
@@ -542,7 +570,14 @@ tickets.post("/api/ticket-responsaveis", requireAdmin, async (c) => {
 tickets.patch("/api/ticket-responsaveis/:id", requireAdmin, async (c) => {
   const storage = getStorage(c.get("db"));
   const body = await c.req.json();
-  const validated = insertTicketResponsavelSchema.partial().parse(body);
+  const { tenantId: _tenantId, ...fields } = body ?? {};
+  const validated = insertTicketResponsavelSchema.partial().parse(fields);
+  if (!(await findTenantResponsavel(c, c.req.param("id")))) {
+    return c.json({ error: "Responsavel not found" }, 404);
+  }
+  if (!(await isValidResponsavelRule(c, validated))) {
+    return c.json({ error: "Grupo ou responsável inválido" }, 400);
+  }
   const responsavel = await storage.updateTicketResponsavel(
     c.req.param("id"),
     validated
@@ -554,6 +589,9 @@ tickets.patch("/api/ticket-responsaveis/:id", requireAdmin, async (c) => {
 // DELETE /api/ticket-responsaveis/:id (admin only)
 tickets.delete("/api/ticket-responsaveis/:id", requireAdmin, async (c) => {
   const storage = getStorage(c.get("db"));
+  if (!(await findTenantResponsavel(c, c.req.param("id")))) {
+    return c.json({ error: "Responsavel not found" }, 404);
+  }
   const deleted = await storage.deleteTicketResponsavel(c.req.param("id"));
   if (!deleted) return c.json({ error: "Responsavel not found" }, 404);
   return c.body(null, 204);
@@ -564,7 +602,8 @@ tickets.get("/api/ticket-responsaveis/find/:categoria/:tipo", async (c) => {
   const storage = getStorage(c.get("db"));
   const responsavelId = await storage.findResponsavelForTicket(
     c.req.param("categoria"),
-    c.req.param("tipo")
+    c.req.param("tipo"),
+    c.get("user").tenantId ?? null,
   );
   return c.json({ responsavelId });
 });

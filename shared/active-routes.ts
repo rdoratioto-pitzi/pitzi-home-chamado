@@ -4,6 +4,7 @@ const SUPPORT_API_PREFIXES = [
   "/api/auth", "/api/tickets", "/api/ticket-responsaveis",
   "/api/workspace/chamados", "/api/users", "/api/settings",
   "/api/slas", "/api/notifications", "/api/uploads",
+  "/api/v1/support-groups",
 ];
 const SUPPORT_API_PATHS = new Set([
   "/api/health", "/api/version", "/api/external/chamados",
