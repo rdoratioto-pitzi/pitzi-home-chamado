@@ -80,3 +80,14 @@ Status: **APROVADO COM RESSALVAS para revisão em PR; não equivale a aprovaçã
 5. Fazer deploy somente após aprovação e validar o ambiente de destino.
 
 Não houve deploy nem alteração em banco de desenvolvimento/produção nesta validação.
+
+## Validação remota do PR #3
+
+PR: https://github.com/rdoratioto-pitzi/pitzi-home-chamado/pull/3 (rascunho).
+Primeira execução remota passou testes/migrations/build frontend e identificou
+Node 20 incompatível com o Wrangler instalado, que exige Node 22. Workflows de
+CI e deploy foram alinhados em Node 22; nova execução deve confirmar o resultado.
+
+A API do GitHub recusou a solicitação de revisão de `marcelo-maciel` (HTTP 422):
+ele não é colaborador deste fork. O responsável pelo repositório precisa conceder
+acesso antes de ser possível solicitar formalmente a revisão obrigatória.
