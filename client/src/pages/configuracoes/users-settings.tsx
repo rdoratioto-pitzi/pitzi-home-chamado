@@ -53,21 +53,6 @@ import { Label } from "@/components/ui/label";
 
 const MODULES = [
   { key: "chamados", label: "Chamados" },
-  { key: "projetos", label: "Projetos" },
-  { key: "tarefas", label: "Tarefas" },
-  { key: "reunioes", label: "Reuniões" },
-  { key: "fluxogramas", label: "Fluxogramas" },
-  { key: "metas", label: "Metas" },
-  { key: "okrs", label: "OKRs" },
-  { key: "logistica", label: "Logística" },
-  { key: "triagem", label: "Triagem" },
-  { key: "avaliacoes", label: "Avaliações" },
-  { key: "estoques", label: "Estoques" },
-  { key: "pricing", label: "Pricing" },
-  { key: "conhecimento", label: "Biblioteca" },
-  { key: "apis", label: "Integrações" },
-  { key: "comercial", label: "Comercial" },
-  { key: "apoio_vendas", label: "Apoio a Vendas" },
   { key: "configuracoes", label: "Configurações" },
 ] as const;
 
@@ -372,7 +357,7 @@ export function UsersSettings() {
     if (!user.modulePermissions) return 0;
     try {
       const perms = JSON.parse(user.modulePermissions);
-      return Object.values(perms).filter(Boolean).length;
+      return MODULES.filter(module => perms[module.key] === true).length;
     } catch {
       return 0;
     }
