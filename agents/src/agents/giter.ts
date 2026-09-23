@@ -29,10 +29,10 @@ export async function giter(state: AgentState & { qaAprovado?: boolean }): Promi
       return { etapaAtual: 'concluido' };
     }
 
-    git(['add', '--', ...arquivos]);
+    git(['--literal-pathspecs', 'add', '--', ...arquivos]);
     console.log(`  ✅ git add (${arquivos.length} arquivos)`);
 
-    git(['commit', '-m', `feat: ${state.requisito}\n\nValidado por Turing ✅`]);
+    git(['--literal-pathspecs', 'commit', '--only', '-m', `feat: ${state.requisito}\n\nValidado por Turing ✅`, '--', ...arquivos]);
     console.log('  ✅ git commit');
 
     git(['push', 'origin', `HEAD:refs/heads/${branch}`]);

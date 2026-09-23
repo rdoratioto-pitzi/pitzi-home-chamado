@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs';
 
 /**
  * Caminho absoluto de `relativo` dentro de `raiz`, ou null se ele escapar da raiz
@@ -8,5 +9,19 @@ export function resolverDentroDoRepo(raiz: string, relativo: string): string | n
   if (!relativo || path.isAbsolute(relativo) || relativo.includes('\0')) return null;
   const base = path.resolve(raiz);
   const alvo = path.resolve(base, relativo);
-  return alvo.startsWith(base + path.sep) ? alvo : null;
+  if (!alvo.startsWith(base + path.sep)) return null;
+  const partes = path.relative(base, alvo).split(path.sep);
+  if (partes.some((parte) => parte.toLowerCase() === '.git')) return null;
+  // Recusa symlinks em qualquer componente, inclusive links quebrados e diretórios.
+  // Componentes ainda inexistentes são válidos para arquivos novos.
+  let atual = base;
+  for (const parte of partes) {
+    atual = path.join(atual, parte);
+    try {
+      if (fs.lstatSync(atual).isSymbolicLink()) return null;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return null;
+    }
+  }
+  return alvo;
 }

@@ -234,7 +234,7 @@ auth.post("/api/auth/forgot-password", async (c) => {
   const token = await getStorage(db).createPasswordResetToken(user.id);
   if (token) {
     const resetUrl = `${c.env.APP_URL}/redefinir-senha?token=${encodeURIComponent(token)}`;
-    sendPasswordResetLinkEmail(c.env, user, resetUrl).catch((err) =>
+    await sendPasswordResetLinkEmail(c.env, user, resetUrl).catch((err) =>
       console.error("[AUTH] Falha ao enviar email de reset:", err)
     );
   }

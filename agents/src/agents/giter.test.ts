@@ -28,6 +28,14 @@ beforeEach(() => {
 });
 
 describe("resolverDentroDoRepo", () => {
+  it("recusa symlinks e metadados Git, mas permite novos diretórios", () => {
+    fs.symlinkSync(tmp, path.join(repo, "escape"));
+    fs.symlinkSync(path.join(tmp, "inexistente"), path.join(repo, "quebrado"));
+    expect(resolverDentroDoRepo(repo, "escape/segredo.txt")).toBeNull();
+    expect(resolverDentroDoRepo(repo, "quebrado")).toBeNull();
+    expect(resolverDentroDoRepo(repo, ".git/config")).toBeNull();
+    expect(resolverDentroDoRepo(repo, "novo/src/a.ts")).toBe(path.join(repo, "novo/src/a.ts"));
+  });
   it("recusa caminhos que escapam do repositório", () => {
     expect(resolverDentroDoRepo("/r", "src/a.ts")).toBe(path.resolve("/r/src/a.ts"));
     expect(resolverDentroDoRepo("/r", "../fora.ts")).toBeNull();
@@ -53,9 +61,17 @@ describe("giter", () => {
   it("commita só os arquivos gerados, nunca o resto da árvore", async () => {
     fs.writeFileSync(path.join(repo, "novo.ts"), "export {}");
     fs.writeFileSync(path.join(repo, ".env"), "SECRET=1");
+    sh(["add", ".env"]);
     await giter({ requisito: "r", arquivosGerados: ["novo.ts", "../fora.ts"], qaAprovado: true } as any);
     const files = sh(["show", "--name-only", "--format=", "HEAD"]).trim().split("\n");
     expect(files).toEqual(["novo.ts"]);
     expect(sh(["status", "--porcelain"])).toContain(".env");
+  });
+
+  it("não interpreta nomes gerados como pathspecs Git", async () => {
+    fs.writeFileSync(path.join(repo, "novo.ts"), "export {}");
+    await expect(giter({ requisito: "r", arquivosGerados: [":(glob)*"], qaAprovado: true } as any)).rejects.toThrow();
+    expect(sh(["log", "-1", "--format=%s"]).trim()).toBe("base");
+    expect(sh(["status", "--porcelain"])).toContain("?? novo.ts");
   });
 });
