@@ -10,6 +10,7 @@
     "build:dev": "tsx scripts/build.ts --mode=staging",
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
+    "db:migrate": "tsx scripts/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:apply:dev": "./scripts/db-apply-dev.sh",
     "db:apply:prod": "./scripts/db-apply-prod.sh",
@@ -80,7 +81,7 @@
     "diff": "^8.0.3",
     "dompurify": "^3.3.1",
     "dotenv": "^17.2.4",
-    "drizzle-orm": "^0.39.3",
+    "drizzle-orm": "^0.45.2",
     "drizzle-zod": "^0.7.0",
     "embla-carousel-react": "^8.6.0",
     "express": "^5.0.1",
@@ -96,7 +97,7 @@
     "markdown-it": "^14.1.1",
     "memorystore": "^1.6.7",
     "node-cron": "^4.2.1",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^10.0.10",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
     "pg": "^8.17.2",
@@ -160,11 +161,19 @@
     "npm": ">=9.0.0"
   },
   "overrides": {
+    "@excalidraw/excalidraw": {
+      "nanoid": "3.3.19"
+    },
+    "@excalidraw/mermaid-to-excalidraw": {
+      "nanoid": "5.1.16"
+    },
     "drizzle-kit": {
       "@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"
     },
     "glob": "^10.4.0",
-    "rimraf": "^5.0.0"
+    "rimraf": "^5.0.0",
+    "d3-color": "^3.1.0",
+    "lodash-es": "^4.18.1"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "*",

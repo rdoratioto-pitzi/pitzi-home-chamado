@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -36,6 +36,13 @@ jobs:
         id: version
         run: echo "APP_VERSION=$(TZ=America/Sao_Paulo date +%Y.%m.%d-%H.%M)-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      # Migrations versionadas ANTES do deploy: o código novo só sobe com o schema pronto.
+      # Se uma migration falhar, o deploy não acontece.
+      - name: Run database migrations
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ github.ref == 'refs/heads/develop' && secrets.DATABASE_URL_DEV || secrets.DATABASE_URL }}
+
       - name: Deploy Worker
         uses: cloudflare/wrangler-action@v3
         with:
@@ -43,17 +50,3 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: worker
           command: deploy ${{ github.ref == 'refs/heads/develop' && '-e dev' || '' }} --var APP_VERSION:${{ steps.version.outputs.APP_VERSION }}
-
-      - name: Run database migrations
-        run: |
-          sudo apt-get install -y -qq expect > /dev/null 2>&1
-          expect -c '
-            set timeout 120
-            spawn npx drizzle-kit push --force
-            expect {
-              "created or renamed" { send "\r"; exp_continue }
-              eof
-            }
-          '
-        env:
-          DATABASE_URL: ${{ github.ref == 'refs/heads/develop' && secrets.DATABASE_URL_DEV || secrets.DATABASE_URL }}

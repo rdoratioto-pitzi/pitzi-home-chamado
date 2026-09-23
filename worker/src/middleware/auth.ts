@@ -1,12 +1,16 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import type { AppEnv } from "../index";
-import { verifyAccessToken, getAccessTokenFromCookie } from "../lib/jwt";
+import { verifyAccessToken, getAccessTokenFromCookie, getBearerToken } from "../lib/jwt";
 import { secretMatches } from "../lib/crypto";
+import { loadActiveSession } from "../lib/sessions";
+import { modulesForPath } from "../../../shared/module-routes";
+import { hasModulePermission } from "../../../shared/permissions";
 
 /** Routes that require NO authentication at all */
 const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "POST", path: "/api/auth/login" },
   { method: "POST", path: "/api/auth/forgot-password" },
+  { method: "POST", path: "/api/auth/reset-password" },
   { method: "POST", path: "/api/auth/refresh" },
   { method: "POST", path: "/api/auth/logout" },
   { method: "GET", path: "/api/health" },
@@ -30,7 +34,7 @@ const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "POST", path: "/api/integrations/slack/interactions" }, // Slack signature
   // Phase 3 — Upload routes (PUT is self-authenticated via HMAC token)
   { method: "PUT", path: /^\/api\/uploads\/put\// },
-  { method: "GET", path: /^\/objects\// },
+  { method: "GET", path: /^\/objects\// }, // acesso validado in-route (assinatura, sessão ou marca)
 ];
 
 /** Routes with optional auth (return null user if not authenticated) */
@@ -60,11 +64,13 @@ function matchesRoute(
   });
 }
 
-// Extrai token do header Authorization: Bearer <token>
-function getBearerToken(c: Context): string | null {
-  const auth = c.req.header("Authorization");
-  if (!auth?.startsWith("Bearer ")) return null;
-  return auth.slice(7);
+// Token válido não basta: a sessão precisa existir e o usuário estar ativo. Papel e tenant
+// vêm do banco, não do token, para que mudanças valham na próxima requisição.
+// Tokens sem sid (emitidos antes desta regra) são recusados; o frontend renova via refresh.
+export async function resolveUser(c: Context<AppEnv>, token: string) {
+  const payload = await verifyAccessToken(token, c.env.JWT_SECRET);
+  if (!payload?.sid) return null;
+  return loadActiveSession(c.get("db"), payload.userId, payload.sid);
 }
 
 export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
@@ -101,20 +107,12 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
 
   // Aceita cookie OU Authorization: Bearer — necessário para CORS cross-domain
   // onde browsers modernos bloqueiam cookies SameSite=None de terceiros.
-  const token = getAccessTokenFromCookie(c) || getBearerToken(c);
+  const token = getAccessTokenFromCookie(c) || getBearerToken(c.req.header("Authorization"));
 
   // Optional auth routes — proceed even without token
   if (matchesRoute(method, path, OPTIONAL_AUTH_ROUTES)) {
-    if (token) {
-      const payload = await verifyAccessToken(token, c.env.JWT_SECRET);
-      if (payload) {
-        c.set("user", {
-          userId: payload.userId,
-          tenantId: payload.tenantId,
-          role: payload.role,
-        });
-      }
-    }
+    const user = token ? await resolveUser(c, token) : null;
+    if (user) c.set("user", user);
     return next();
   }
 
@@ -123,16 +121,18 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
     return c.json({ error: "Nao autenticado" }, 401);
   }
 
-  const payload = await verifyAccessToken(token, c.env.JWT_SECRET);
-  if (!payload) {
-    return c.json({ error: "Token expirado ou invalido" }, 401);
+  const user = await resolveUser(c, token);
+  if (!user) {
+    return c.json({ error: "Sessao expirada ou encerrada" }, 401);
   }
 
-  c.set("user", {
-    userId: payload.userId,
-    tenantId: payload.tenantId,
-    role: payload.role,
-  });
+  // Permissão de módulo também vale na API, não só para esconder telas.
+  const modules = modulesForPath(path);
+  const isAdmin = user.role === "admin";
+  if (modules && !modules.some((m) => hasModulePermission({ isAdmin, modulePermissions: user.modulePermissions }, m))) {
+    return c.json({ error: "Sem permissao para este modulo" }, 403);
+  }
+  c.set("user", user);
 
   return next();
 };

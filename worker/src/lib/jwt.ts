@@ -10,6 +10,7 @@ type AccessPayload = {
   userId: string;
   tenantId: string | null;
   role: "admin" | "user";
+  sid?: string;
   exp: number;
 };
 
@@ -26,6 +27,7 @@ export async function signAccessToken(
     userId: user.userId,
     tenantId: user.tenantId,
     role: user.role,
+    sid: user.sessionId,
     exp: Math.floor(Date.now() / 1000) + 2 * 60 * 60, // 2 hours
   };
   return sign(payload, secret, "HS256");
@@ -109,4 +111,10 @@ export function getAccessTokenFromCookie(c: Context<AppEnv>): string | null {
 
 export function getRefreshTokenFromCookie(c: Context<AppEnv>): string | null {
   return getCookie(c, REFRESH_TOKEN_COOKIE) ?? null;
+}
+
+/** Token do header Authorization: Bearer <token> (fallback quando cookies cross-origin são bloqueados). */
+export function getBearerToken(header: string | undefined): string | null {
+  if (!header?.startsWith("Bearer ")) return null;
+  return header.slice(7);
 }

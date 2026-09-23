@@ -1,8 +1,8 @@
 -- Fase 0 ITSM — numeração segura dos chamados (CHA-0001)
+-- migrate:no-transaction
 --
--- Este script é IDEMPOTENTE e deve ser aplicado manualmente (dev e depois prod),
--- ANTES do deploy do código que usa ticket_code_seq:
---   npm run db:apply:dev -- -f migrations/0017_tickets_code_unique.sql
+-- Este script é IDEMPOTENTE e é aplicado pelo runner (npm run db:migrate), que o
+-- deploy executa ANTES de publicar o Worker. Sem transação por causa do CONCURRENTLY.
 --
 -- Contexto: createTicket gerava o código contando os registros + 1, o que repete
 -- códigos após exclusões e em criações simultâneas. Agora o número vem da sequence
