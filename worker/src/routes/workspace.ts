@@ -314,8 +314,9 @@ workspace.post("/api/workspace/chamados", async (c) => {
       return c.json({ error: "Título obrigatório" }, 400);
     }
 
-    if (!isValidApplicationKey(applicationKey)) {
-      return c.json({ error: "Aplicação é obrigatória e deve ser válida" }, 400);
+    // Aplicação é opcional: o formulário não pede mais; se vier, precisa ser válida.
+    if (applicationKey && !isValidApplicationKey(applicationKey)) {
+      return c.json({ error: "Aplicação inválida" }, 400);
     }
 
     const db = c.get("db");
@@ -335,7 +336,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
       category: categoria,
       type: tipoChamado,
       assigneeId,
-      applicationKey,
+      applicationKey: applicationKey || null,
       priority: mappedPriority,
       impact: "medio",
       status: "open",

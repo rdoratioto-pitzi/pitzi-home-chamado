@@ -282,7 +282,7 @@ function SkeletonRows({ colTemplate }: { colTemplate: string }) {
           <SkeletonCell width={64} />
           <SkeletonCell width={160} />
           <SkeletonCell width={128} />
-          <SkeletonCell width={100} />
+          {colTemplate !== COL_TEMPLATE_CHAMADOS && <SkeletonCell width={100} />}
           <SkeletonCell width={20} height={20} rounded />
           <SkeletonCell width={80} />
           <SkeletonCell width={64} />
@@ -295,9 +295,10 @@ function SkeletonRows({ colTemplate }: { colTemplate: string }) {
   );
 }
 
-const COL_TEMPLATE_CHAMADOS = "96px 1fr 220px 140px 140px 115px 85px 62px 78px 30px";
+// Chamados sem a coluna Aplicação (o campo deixou de ser pedido na abertura).
+const COL_TEMPLATE_CHAMADOS = "96px 1fr 220px 140px 115px 85px 62px 78px 30px";
 const COL_TEMPLATE_TODOS = "96px 1fr 175px 220px 140px 140px 115px 85px 62px 78px 30px";
-const COL_TEMPLATE_CHAMADOS_MOBILE = "96px 1fr 220px 140px 140px 115px 85px 30px";
+const COL_TEMPLATE_CHAMADOS_MOBILE = "96px 1fr 220px 140px 115px 85px 30px";
 const COL_TEMPLATE_TODOS_MOBILE = "96px 1fr 175px 220px 140px 140px 115px 85px 30px";
 
 const responsiveStyles = `
@@ -319,10 +320,10 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
   const COL_TEMPLATE = variant === "todos" ? COL_TEMPLATE_TODOS : COL_TEMPLATE_CHAMADOS;
   const headers = variant === "todos"
     ? ["Código", "Título", "Projeto", "Tipo / Contexto", "Aplicação", "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""]
-    : ["Código", "Título", "Categoria / Tipo", "Aplicação", "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""];
+    : ["Código", "Título", "Categoria / Tipo", "Responsável", "Status", "Prioridade", "SLA", "Status SLA", ""];
   const tableClass = variant === "todos" ? "ws-table-todos" : "ws-table-chamados";
-  const slaCol1Idx = variant === "todos" ? 8 : 7;
-  const slaCol2Idx = variant === "todos" ? 9 : 8;
+  const slaCol1Idx = variant === "todos" ? 8 : 6;
+  const slaCol2Idx = variant === "todos" ? 9 : 7;
 
   if (loading) {
     return (
@@ -550,13 +551,6 @@ function ChamadoItemRow({ item, colTemplate, onRowClick, onDelete, onStatusChang
           {item.tipo}
         </Badge>
       </div>
-      <span
-        className="text-xs truncate"
-        style={{ color: item.applicationKey ? "var(--l2)" : "var(--l4)" }}
-        title={getApplicationLabel(item.applicationKey)}
-      >
-        {getApplicationLabel(item.applicationKey)}
-      </span>
       <ResponsavelCell initials={item.responsavelInitials} name={item.responsavel} />
       <InlineSelectChip
         value={item.status}

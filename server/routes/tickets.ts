@@ -63,9 +63,11 @@ export function registerTicketRoutes(router: Router) {
         data.requesterId = userId;
       }
 
-      if (!isValidApplicationKey(data.applicationKey)) {
-        return res.status(400).json({ error: "Aplicação é obrigatória e deve ser válida" });
+      // Aplicação é opcional: o formulário não pede mais; se vier, precisa ser válida.
+      if (data.applicationKey && !isValidApplicationKey(data.applicationKey)) {
+        return res.status(400).json({ error: "Aplicação inválida" });
       }
+      data.applicationKey = data.applicationKey || null;
 
       const validated = insertTicketSchema.parse(data);
 
