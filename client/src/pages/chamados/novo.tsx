@@ -35,6 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { HelpCircle, CheckCircle2, ArrowLeft, Plus, Eye, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
+import { useSupportGroups } from "@/hooks/use-support-groups";
 import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 import { isValidApplicationKey } from "@shared/applications";
 
@@ -43,7 +44,7 @@ const formSchema = z.object({
   description: z.string()
     .min(20, "Descrição deve ter no mínimo 20 caracteres")
     .max(5000, "Descrição deve ter no máximo 5.000 caracteres"),
-  category: z.string().min(1, "Selecione uma categoria"),
+  category: z.string().min(1, "Selecione o grupo de atendimento"),
   type: z.string().min(1, "Selecione um tipo"),
   applicationKey: z.string().refine(isValidApplicationKey, {
     message: "Selecione uma aplicação válida",
@@ -60,15 +61,6 @@ interface FieldItem {
   label: string;
 }
 
-const defaultCategories: FieldItem[] = [
-  { value: "tech", label: "Tech" },
-  { value: "rh", label: "Recursos Humanos" },
-  { value: "financeiro", label: "Financeiro" },
-  { value: "operacoes", label: "Operações" },
-  { value: "comercial", label: "Comercial" },
-  { value: "outros", label: "Outros" },
-];
-
 const defaultTypes: FieldItem[] = [
   { value: "bug", label: "Bug" },
   { value: "melhoria", label: "Melhoria" },
@@ -84,15 +76,7 @@ export default function NovoChamadoPage() {
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
   const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
 
-  const { data: categoriesSetting } = useQuery<Setting>({
-    queryKey: ["/api/settings", "ticket_categories"],
-    queryFn: async () => {
-      const res = await fetch("/api/settings/ticket_categories");
-      if (!res.ok) return null;
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  const { groups: supportGroups } = useSupportGroups();
 
   const { data: typesSetting } = useQuery<Setting>({
     queryKey: ["/api/settings", "ticket_types"],
@@ -117,7 +101,7 @@ export default function NovoChamadoPage() {
     }
   };
 
-  const categories = parseSettingWithFallback(categoriesSetting?.value, defaultCategories);
+  const categories: FieldItem[] = supportGroups.map(g => ({ value: g.key, label: g.name }));
   const types = parseSettingWithFallback(typesSetting?.value, defaultTypes);
 
   const form = useForm<FormData>({
@@ -320,7 +304,7 @@ export default function NovoChamadoPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>
-                          Categoria <span className="text-destructive">*</span>
+                          Grupo de atendimento <span className="text-destructive">*</span>
                         </FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>

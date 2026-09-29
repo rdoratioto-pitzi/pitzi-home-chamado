@@ -19,7 +19,6 @@ import {
   Save,
   X,
   Tag,
-  FolderOpen,
   Clock
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -482,15 +481,6 @@ function SlaManager() {
 }
 
 export function FieldsSettings() {
-  const defaultCategories = [
-    { value: "ti", label: "TI / Infraestrutura" },
-    { value: "rh", label: "Recursos Humanos" },
-    { value: "financeiro", label: "Financeiro" },
-    { value: "operacoes", label: "Operações" },
-    { value: "comercial", label: "Comercial" },
-    { value: "outros", label: "Outros" },
-  ];
-
   const defaultTypes = [
     { value: "bug", label: "Bug" },
     { value: "melhoria", label: "Melhoria" },
@@ -506,12 +496,8 @@ export function FieldsSettings() {
         </p>
       </div>
 
-      <Tabs defaultValue="categories" className="space-y-4">
+      <Tabs defaultValue="types" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="categories" data-testid="tab-field-categories">
-            <FolderOpen className="h-4 w-4 mr-2" />
-            Categorias
-          </TabsTrigger>
           <TabsTrigger value="types" data-testid="tab-field-types">
             <Tag className="h-4 w-4 mr-2" />
             Tipos
@@ -521,17 +507,6 @@ export function FieldsSettings() {
             SLA
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="categories">
-          <FieldManager 
-            settingKey="ticket_categories"
-            title="Categorias de Chamados"
-            description="Defina as categorias disponíveis para classificar os chamados"
-            icon={FolderOpen}
-            defaultItems={defaultCategories}
-            showLabel={false}
-          />
-        </TabsContent>
 
         <TabsContent value="types">
           <FieldManager 

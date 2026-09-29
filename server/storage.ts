@@ -2,6 +2,7 @@ import {
   type User, type InsertUser,
   type Ticket, type InsertTicket,
   type TicketResponsavel, type InsertTicketResponsavel,
+  type SupportGroup, type SupportGroupWithMembers,
   type TicketComment, type InsertTicketComment,
   type TicketCommentWithUser,
   type KanbanCommentWithUser,
@@ -66,7 +67,7 @@ import {
   type ClaudeCodeUsageReport, type InsertClaudeCodeUsage,
   type KanbanLabel, type InsertKanbanLabel,
   type KanbanCardDependency, type InsertKanbanCardDependency,
-  users, tickets, ticketResponsaveis, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
+  users, tickets, ticketResponsaveis, supportGroups, supportGroupMembers, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   kanbanLabels, kanbanCardDependencies,
   objectives, keyResults, keyResultUpdates, initiatives, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
@@ -129,13 +130,19 @@ import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../
   deleteTicket(id: string): Promise<boolean>;
 
   // Ticket Responsaveis (Assignment Rules)
-  getTicketResponsaveis(): Promise<TicketResponsavel[]>;
+  // tenantId presente (inclusive null) restringe ao tenant; ausente não filtra (legado do Express).
+  getTicketResponsaveis(tenantId?: string | null): Promise<TicketResponsavel[]>;
   getTicketResponsavel(id: string): Promise<TicketResponsavel | undefined>;
-  getTicketResponsavelByRule(categoria: string, tipo: string): Promise<TicketResponsavel[]>;
+  getTicketResponsavelByRule(categoria: string, tipo: string, tenantId?: string | null): Promise<TicketResponsavel[]>;
   createTicketResponsavel(data: InsertTicketResponsavel): Promise<TicketResponsavel>;
   updateTicketResponsavel(id: string, data: Partial<TicketResponsavel>): Promise<TicketResponsavel | undefined>;
   deleteTicketResponsavel(id: string): Promise<boolean>;
-  findResponsavelForTicket(categoria: string, tipo: string): Promise<string | null>;
+  findResponsavelForTicket(categoria: string, tipo: string, tenantId?: string | null): Promise<string | null>;
+
+  // Grupos de atendimento
+  getSupportGroups(tenantId: string | null): Promise<SupportGroupWithMembers[]>;
+  getActiveSupportGroupByKey(key: string): Promise<SupportGroup | undefined>;
+  setSupportGroupMembers(groupId: string, userIds: string[], tenantId: string | null): Promise<void>;
 
   // Ticket Comments
   getTicketComments(ticketId: string): Promise<TicketCommentWithUser[]>;
@@ -479,6 +486,10 @@ export interface TicketFilters {
   tenantId?: string | null;
 }
 
+function responsavelTenantCondition(tenantId: string | null): SQL {
+  return tenantId == null ? isNull(ticketResponsaveis.tenantId) : eq(ticketResponsaveis.tenantId, tenantId);
+}
+
 function ticketFilterConditions(filters: TicketFilters): SQL[] {
   const conditions: SQL[] = [];
   if (filters.requesterId && filters.assigneeId) {
@@ -804,23 +815,54 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // Ticket Responsaveis (Assignment Rules)
-  async getTicketResponsaveis(): Promise<TicketResponsavel[]> {
+  // Grupos de atendimento
+  async getSupportGroups(tenantId: string | null): Promise<SupportGroupWithMembers[]> {
     if (!this.db) return [];
-    return await this.db.select().from(ticketResponsaveis);
+    const groups = await this.db.select().from(supportGroups)
+      .where(eq(supportGroups.active, true))
+      .orderBy(asc(supportGroups.sortOrder), asc(supportGroups.name));
+    const members = await this.db.select({ groupId: supportGroupMembers.groupId, userId: supportGroupMembers.userId })
+      .from(supportGroupMembers)
+      .where(tenantId == null ? isNull(supportGroupMembers.tenantId) : eq(supportGroupMembers.tenantId, tenantId));
+    return groups.map(g => ({ ...g, memberIds: members.filter(m => m.groupId === g.id).map(m => m.userId) }));
+  }
+  async getActiveSupportGroupByKey(key: string): Promise<SupportGroup | undefined> {
+    if (!this.db) return undefined;
+    const [group] = await this.db.select().from(supportGroups)
+      .where(and(eq(supportGroups.key, key), eq(supportGroups.active, true)));
+    return group;
+  }
+  async setSupportGroupMembers(groupId: string, userIds: string[], tenantId: string | null): Promise<void> {
+    if (!this.db) throw new Error("Database not connected");
+    const tenantCondition = tenantId == null ? isNull(supportGroupMembers.tenantId) : eq(supportGroupMembers.tenantId, tenantId);
+    // Neon HTTP não tem transação interativa: remove e reinsere o conjunto do tenant.
+    await this.db.delete(supportGroupMembers).where(and(eq(supportGroupMembers.groupId, groupId), tenantCondition));
+    if (userIds.length > 0) {
+      await this.db.insert(supportGroupMembers)
+        .values(userIds.map(userId => ({ groupId, userId, tenantId })))
+        .onConflictDoNothing();
+    }
+  }
+
+  // Ticket Responsaveis (Assignment Rules)
+  async getTicketResponsaveis(tenantId?: string | null): Promise<TicketResponsavel[]> {
+    if (!this.db) return [];
+    if (tenantId === undefined) return await this.db.select().from(ticketResponsaveis);
+    return await this.db.select().from(ticketResponsaveis).where(responsavelTenantCondition(tenantId));
   }
   async getTicketResponsavel(id: string): Promise<TicketResponsavel | undefined> {
     if (!this.db) return undefined;
     const [resp] = await this.db.select().from(ticketResponsaveis).where(eq(ticketResponsaveis.id, id));
     return resp;
   }
-  async getTicketResponsavelByRule(categoria: string, tipo: string): Promise<TicketResponsavel[]> {
+  async getTicketResponsavelByRule(categoria: string, tipo: string, tenantId?: string | null): Promise<TicketResponsavel[]> {
     if (!this.db) return [];
     return await this.db.select().from(ticketResponsaveis).where(
       and(
         eq(ticketResponsaveis.categoria, categoria),
         eq(ticketResponsaveis.tipo, tipo),
-        eq(ticketResponsaveis.ativo, true)
+        eq(ticketResponsaveis.ativo, true),
+        tenantId === undefined ? undefined : responsavelTenantCondition(tenantId),
       )
     );
   }
@@ -839,16 +881,16 @@ export class DatabaseStorage implements IStorage {
     const result = await this.db.delete(ticketResponsaveis).where(eq(ticketResponsaveis.id, id)).returning();
     return result.length > 0;
   }
-  async findResponsavelForTicket(categoria: string, tipo: string): Promise<string | null> {
+  async findResponsavelForTicket(categoria: string, tipo: string, tenantId?: string | null): Promise<string | null> {
     if (!this.db) return null;
-    const rules = await this.getTicketResponsavelByRule(categoria, tipo);
+    const rules = await this.getTicketResponsavelByRule(categoria, tipo, tenantId);
     if (rules.length === 0) return null;
 
     if (rules.length === 1) {
       return rules[0].usuarioResponsavelId;
     }
 
-    const allTickets = await this.getTickets();
+    const allTickets = await this.getTickets(tenantId === undefined ? undefined : { tenantId });
     const openTicketCounts = new Map<string, number>();
 
     for (const rule of rules) {

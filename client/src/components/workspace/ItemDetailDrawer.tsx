@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSupportGroups } from "@/hooks/use-support-groups";
 import { X, Send, Paperclip, ExternalLink, Download, Maximize2, FileText, FileSpreadsheet, FileImage, File, FileArchive, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -143,6 +144,7 @@ function getFileIcon(name: string) {
 }
 
 export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: ItemDetailDrawerProps) {
+  const { groupName } = useSupportGroups();
   const [, setLocation] = useLocation();
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [novoComentario, setNovoComentario] = useState("");
@@ -608,12 +610,12 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                       </div>
                     )}
 
-                    {/* Categoria — só chamados */}
+                    {/* Grupo de atendimento — só chamados */}
                     {isChamado && (
                       <div className="flex items-center gap-3">
-                        <span style={ROW_LABEL_STYLE}>Categoria</span>
+                        <span style={ROW_LABEL_STYLE}>Grupo</span>
                         <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
-                          {(item as ChamadoItem).categoria || "—"}
+                          {groupName((item as ChamadoItem).categoria) || "—"}
                         </span>
                       </div>
                     )}
