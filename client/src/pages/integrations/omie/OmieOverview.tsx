@@ -57,7 +57,8 @@ export default function OmieOverview() {
 
   const handleEdit = () => {
     setEditMode(true);
-    setTempConfig({ app_key: config.app_key, app_secret: config.app_secret });
+    // A API só devolve o segredo mascarado: é preciso informar o valor completo para salvar.
+    setTempConfig({ app_key: config.app_key, app_secret: '' });
     setShowEditSecret(false);
     setMessage(null);
   };

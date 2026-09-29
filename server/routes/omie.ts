@@ -2,7 +2,8 @@
  * Rotas para integração com API Omie (ERP)
  */
 import { Router } from "express";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireAdmin } from "../middleware/auth";
+import { maskSecret } from "@shared/secrets";
 import { omieService } from "../services/omie.service";
 import { getCachedPosEstoque } from "../services/estoque-pos.service";
 
@@ -25,7 +26,7 @@ export function registerOmieRoutes(router: Router) {
         success: true,
         data: {
           app_key: config.app_key || '',
-          app_secret: config.app_secret || '',
+          app_secret: maskSecret(config.app_secret),
           is_active: config.is_active
         }
       });
@@ -36,7 +37,7 @@ export function registerOmieRoutes(router: Router) {
   });
 
   // POST /api/omie/config - Atualizar configuração
-  router.post("/api/omie/config", requireAuth, async (req, res) => {
+  router.post("/api/omie/config", requireAuth, requireAdmin, async (req, res) => {
     try {
       console.log('[OMIE Routes] POST /api/omie/config - Updating config');
       

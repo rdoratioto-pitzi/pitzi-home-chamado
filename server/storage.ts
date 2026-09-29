@@ -462,6 +462,12 @@ import {
   deletePromptFavorite(id: string): Promise<boolean>;
 }
 
+/** Violação de unicidade do Postgres (23505), com pg (Express) ou Neon (Worker). */
+export function isUniqueViolation(error: unknown): boolean {
+  const e = error as { code?: string; cause?: { code?: string } } | null;
+  return e?.code === "23505" || e?.cause?.code === "23505";
+}
+
 export class DatabaseStorage implements IStorage {
   // In-memory storage for updates when database is not available
   private mockUpdates: Update[] = [];
@@ -704,13 +710,27 @@ export class DatabaseStorage implements IStorage {
 
   async createTicket(insertTicket: InsertTicket): Promise<Ticket> {
     if (!this.db) throw new Error("Database not connected");
-    // Generate sequential code like CHA-0001
-    const allTickets = await this.db.select().from(tickets);
-    const nextNumber = allTickets.length + 1;
-    const code = `CHA-${String(nextNumber).padStart(4, '0')}`;
-
-    const [ticket] = await this.db.insert(tickets).values({ ...insertTicket, code }).returning();
-    return ticket;
+    // Código CHA-0001 vindo da sequence ticket_code_seq: atômico sob concorrência e sem
+    // reutilizar números após exclusões (contar registros + 1 repetia códigos).
+    // Se a sequence estiver atrás dos códigos existentes (criada sem seed), o índice único
+    // tickets_code_unique rejeita a colisão (23505); a sequence é realinhada e o INSERT repetido.
+    // Ver migrations/0017_tickets_code_unique.sql.
+    const code = sql`(
+      SELECT 'CHA-' || lpad(n::text, greatest(4, length(n::text)), '0')
+      FROM (SELECT nextval('ticket_code_seq') AS n) next_code
+    )`;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const [ticket] = await this.db.insert(tickets).values({ ...insertTicket, code }).returning();
+        return ticket;
+      } catch (error) {
+        if (attempt >= 3 || !isUniqueViolation(error)) throw error;
+        await this.db.execute(sql`SELECT setval('ticket_code_seq', greatest(
+          (SELECT last_value FROM ticket_code_seq),
+          (SELECT coalesce(max(substring(code from '^CHA-([0-9]+)$')::bigint), 0) FROM tickets)
+        ))`);
+      }
+    }
   }
   async updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined> {
     if (!this.db) return undefined;
