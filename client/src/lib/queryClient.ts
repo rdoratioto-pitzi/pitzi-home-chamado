@@ -9,7 +9,11 @@ if (API_BASE) {
   window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
     if (typeof input === "string" && input.startsWith("/api/")) {
       input = `${API_BASE}${input}`;
-      init = { ...init, credentials: "include" as RequestCredentials };
+      // Mesmo fallback Bearer de apiRequest: cookies cross-origin podem ser bloqueados.
+      const headers = new Headers(init?.headers);
+      const token = getStoredToken();
+      if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
+      init = { ...init, headers, credentials: "include" as RequestCredentials };
     }
     return originalFetch.call(this, input, init);
   };

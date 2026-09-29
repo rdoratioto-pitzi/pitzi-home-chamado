@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
 import { insertUserSchema } from "@shared/schema";
+import { generateTemporaryPassword, withoutPassword } from "@shared/password";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import { sendPasswordResetEmail, sendWelcomeEmail } from "../email-service";
 
@@ -35,7 +36,7 @@ export function registerUserRoutes(router: Router) {
         }
       }
 
-      res.status(201).json(user);
+      res.status(201).json(withoutPassword(user));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation failed", details: error.errors });
@@ -52,7 +53,7 @@ export function registerUserRoutes(router: Router) {
       const userId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const user = await storage.updateUser(userId, validated);
       if (!user) return res.status(404).json({ error: "User not found" });
-      res.json(user);
+      res.json(withoutPassword(user));
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Validation failed", details: error.errors });
@@ -68,11 +69,7 @@ export function registerUserRoutes(router: Router) {
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-      let temporaryPassword = "";
-      for (let i = 0; i < 8; i++) {
-        temporaryPassword += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
+      const temporaryPassword = generateTemporaryPassword();
 
       await storage.updateUser(user.id, { password: temporaryPassword });
 

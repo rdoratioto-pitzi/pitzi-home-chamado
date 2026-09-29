@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import { insertLogisticaReversaEventoSchema } from "../../../shared/schema";
+import { secretMatches } from "../lib/crypto";
 
 const integrations = new Hono<AppEnv>();
 
@@ -141,7 +142,7 @@ async function fetchApoioVendas(
 
 // ============== RELATÓRIO PEDIDOS ==============
 
-// POST /api/integrations/relatorio-pedidos/test-connection (public)
+// POST /api/integrations/relatorio-pedidos/test-connection
 integrations.post("/api/integrations/relatorio-pedidos/test-connection", async (c) => {
   try {
     const token = getApiToken(c);
@@ -170,7 +171,7 @@ integrations.post("/api/integrations/relatorio-pedidos/test-connection", async (
   }
 });
 
-// GET /api/integrations/relatorio-pedidos/orders/advanced (public)
+// GET /api/integrations/relatorio-pedidos/orders/advanced
 integrations.get("/api/integrations/relatorio-pedidos/orders/advanced", async (c) => {
   const token = getApiToken(c);
   const params = new URLSearchParams();
@@ -202,8 +203,11 @@ integrations.get("/api/integrations/relatorio-pedidos/orders/advanced", async (c
 
 // ============== LOGÍSTICA REVERSA ==============
 
-// POST /api/logistica-reversa/eventos (public)
+// POST /api/logistica-reversa/eventos — webhook externo, autenticado por X-Webhook-Secret
 integrations.post("/api/logistica-reversa/eventos", async (c) => {
+  if (!secretMatches(c.req.header("X-Webhook-Secret"), c.env.LOGISTICA_WEBHOOK_SECRET)) {
+    return c.json({ error: "Nao autorizado" }, 401);
+  }
   const storage = getStorage(c.get("db"));
   const body = await c.req.json();
   const validated = insertLogisticaReversaEventoSchema.parse(body);
@@ -266,7 +270,7 @@ integrations.get("/api/apoio-gestao/insumos-desempenho-avaliadores", async (c) =
 
 // ============== ESTOQUES ==============
 
-// GET /api/estoques (public)
+// GET /api/estoques
 integrations.get("/api/estoques", async (c) => {
   const token = getApiToken(c);
   const data = await fetchEstoque(c.req.query() as any, token);

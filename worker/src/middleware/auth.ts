@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../index";
 import { verifyAccessToken, getAccessTokenFromCookie } from "../lib/jwt";
+import { secretMatches } from "../lib/crypto";
 
 /** Routes that require NO authentication at all */
 const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
@@ -18,12 +19,9 @@ const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "GET", path: /^\/api\/cep\// },
   { method: "POST", path: "/api/etiquetas/gerar-png" },
   { method: "POST", path: "/api/etiquetas/imprimir" },
-  // Phase 2C public routes — Integrations (all public proxy endpoints)
-  { method: "POST", path: "/api/integrations/relatorio-pedidos/test-connection" },
-  { method: "GET", path: "/api/integrations/relatorio-pedidos/orders/advanced" },
+  // Webhook de logística reversa (X-Webhook-Secret validado in-route).
+  // Os proxies de relatório de pedidos, avaliações IA e estoques exigem login.
   { method: "POST", path: "/api/logistica-reversa/eventos" },
-  { method: "GET", path: /^\/api\/avaliacoes-ia\// },
-  { method: "GET", path: "/api/estoques" },
   // Phase 2C public routes — GitHub webhook (signature validated in-route)
   { method: "POST", path: "/api/git-analytics/github-webhook" },
   // Phase 3 — Hermes endpoints (autenticação custom validada in-route)
@@ -85,8 +83,7 @@ export const authMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
 
   // Secret-authenticated routes
   if (matchesRoute(method, path, SECRET_AUTH_ROUTES)) {
-    const secret = c.req.header("X-Claude-Usage-Secret");
-    if (secret !== c.env.CLAUDE_USAGE_SECRET) {
+    if (!secretMatches(c.req.header("X-Claude-Usage-Secret"), c.env.CLAUDE_USAGE_SECRET)) {
       return c.json({ error: "Nao autorizado" }, 401);
     }
     return next();

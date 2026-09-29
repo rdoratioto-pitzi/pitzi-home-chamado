@@ -15,6 +15,7 @@ import { eq } from "drizzle-orm";
 import { users, tickets, hermesSlackThreads } from "../../../shared/schema";
 import type { AppEnv } from "../index";
 import { fireExecutor } from "../services/hermes-executor-trigger.service";
+import { timingSafeEqualStr } from "../lib/crypto";
 
 const HEX_TABLE = "0123456789abcdef";
 
@@ -46,15 +47,6 @@ async function hmacSha256Hex(secret: string, message: string): Promise<string> {
     new TextEncoder().encode(message),
   );
   return bytesToHex(new Uint8Array(sig));
-}
-
-function timingSafeEqualStr(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) {
-    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return diff === 0;
 }
 
 async function authenticateServiceAccount(

@@ -1,6 +1,7 @@
 // worker/src/routes/users.ts
 import { Hono } from "hono";
 import { insertUserSchema } from "../../../shared/schema";
+import { generateTemporaryPassword, withoutPassword } from "../../../shared/password";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
@@ -39,7 +40,7 @@ users.post("/api/users", requireAdmin, async (c) => {
     }
   }
 
-  return c.json(user, 201);
+  return c.json(withoutPassword(user), 201);
 });
 
 // PATCH /api/users/:id (admin)
@@ -48,7 +49,7 @@ users.patch("/api/users/:id", requireAdmin, async (c) => {
   const validated = insertUserSchema.partial().parse(await c.req.json());
   const user = await storage.updateUser(c.req.param("id"), validated);
   if (!user) return c.json({ error: "User not found" }, 404);
-  return c.json(user);
+  return c.json(withoutPassword(user));
 });
 
 // POST /api/users/:id/reset-password (admin)
@@ -57,11 +58,7 @@ users.post("/api/users/:id/reset-password", requireAdmin, async (c) => {
   const user = await storage.getUser(c.req.param("id"));
   if (!user) return c.json({ error: "User not found" }, 404);
 
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  let temporaryPassword = "";
-  for (let i = 0; i < 8; i++) {
-    temporaryPassword += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
+  const temporaryPassword = generateTemporaryPassword();
 
   await storage.updateUser(user.id, { password: temporaryPassword });
 

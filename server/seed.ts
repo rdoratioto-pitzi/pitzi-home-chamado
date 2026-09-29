@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { storage } from "./storage";
 import { users, taskAreas, flowcharts, gitRepositories } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 import https from "https";
@@ -144,28 +145,26 @@ export async function seedDatabase() {
   try {
     console.log("[seed] Checking and seeding initial data...");
 
-    // Credenciais padrão (consistentes com/sem DB)
-    const DEFAULT_USERS = [
-      { name: "Matheus", email: "Matheus@pitzi.com.br", password: "ma061184", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true, updates: true } },
-      { name: "Administrador", email: "admin@renov.com.br", password: "admin123", modulePermissions: { chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true } },
-    ];
-
-    for (const u of DEFAULT_USERS) {
-      const existing = await db.select().from(users).where(eq(users.email, u.email));
+    // Usuário inicial opcional, sem credenciais no código: defina SEED_ADMIN_EMAIL e
+    // SEED_ADMIN_PASSWORD para criá-lo. A senha é gravada com hash por storage.createUser.
+    const seedEmail = process.env.SEED_ADMIN_EMAIL;
+    const seedPassword = process.env.SEED_ADMIN_PASSWORD;
+    if (seedEmail && seedPassword) {
+      const existing = await db.select().from(users).where(eq(users.email, seedEmail));
       if (existing.length === 0) {
-        console.log(`[seed] Creating user: ${u.email}`);
-        await db.insert(users).values({
-          name: u.name,
-          email: u.email,
-          password: u.password,
+        console.log(`[seed] Creating user: ${seedEmail}`);
+        await storage.createUser({
+          name: "Administrador",
+          email: seedEmail,
+          password: seedPassword,
           status: "active",
           authMethod: "email",
-          modulePermissions: JSON.stringify(u.modulePermissions),
-        }).returning();
+          modulePermissions: JSON.stringify({ chamados: true, projetos: true, tarefas: true, okrs: true, logistica: true, apis: true, configuracoes: true, updates: true }),
+        });
       }
     }
 
-    const [adminRow] = await db.select().from(users).where(eq(users.email, "admin@renov.com.br"));
+    const [adminRow] = await db.select().from(users).where(eq(users.email, seedEmail ?? "admin@renov.com.br"));
     const adminId = adminRow?.id ?? "";
 
     const defaultAreas = [
