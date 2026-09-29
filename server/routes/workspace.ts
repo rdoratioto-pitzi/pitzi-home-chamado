@@ -18,6 +18,7 @@ import {
   type SlackDb,
 } from "../services/slack-notifier.service";
 import { fireFor as fireHermes } from "../services/hermes-trigger.service";
+import { OPEN_TICKET_STATUSES } from "@shared/ticket-options";
 
 /**
  * Slack notifier env (Express runtime). Apenas as variáveis necessárias —
@@ -145,7 +146,7 @@ export function registerWorkspaceRoutes(router: Router) {
       ]);
 
       const chamados = allTickets.filter(
-        (t) => t.status === "open" || t.status === "in_progress" || t.status === "blocked"
+        (t) => OPEN_TICKET_STATUSES.includes(t.status)
       ).length;
 
       const myCards = allCards.filter(
@@ -189,7 +190,7 @@ export function registerWorkspaceRoutes(router: Router) {
             return created.getMonth() === prev.getMonth() && created.getFullYear() === prev.getFullYear();
           }
           case "em-tratativa": {
-            if (t.status === "open" || t.status === "in_progress" || t.status === "blocked") return true;
+            if (OPEN_TICKET_STATUSES.includes(t.status)) return true;
             if (t.status === "resolved" || t.status === "closed") {
               const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
               const closedDate = (t as any).dataFechamento ? new Date((t as any).dataFechamento) : created;
@@ -205,9 +206,9 @@ export function registerWorkspaceRoutes(router: Router) {
       });
 
       // Build KPIs
-      const abertos = filtered.filter((t) => t.status === "open").length;
+      const abertos = filtered.filter((t) => t.status === "open" || t.status === "triage").length;
       const andamento = filtered.filter((t) => t.status === "in_progress").length;
-      const bloqueados = filtered.filter((t) => t.status === "blocked").length;
+      const bloqueados = filtered.filter((t) => t.status === "blocked" || t.status === "waiting_requester").length;
       const resolvidos = filtered.filter((t) => t.status === "resolved" || t.status === "closed").length;
       const total = filtered.length;
 
@@ -802,6 +803,8 @@ export function registerWorkspaceRoutes(router: Router) {
       const getBadgeVariantForType = (tipo: string): string => {
         const map: Record<string, string> = {
           bug: "bug",
+          requisicao: "requisicao",
+          duvida: "duvida",
           melhoria: "melhoria",
           negocio: "negocio",
         };

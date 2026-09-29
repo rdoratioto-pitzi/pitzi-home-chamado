@@ -74,8 +74,12 @@ describe.skipIf(!url)("grupos de atendimento", () => {
     const sql = fs.readFileSync(path.resolve(__dirname, "../../../migrations/0022_support_groups.sql"), "utf8");
     await pool.query(sql);
     const list = await json(await app(ids.userA, "tenant-a").request("/api/v1/support-groups", {}, env));
-    expect(list.map((g: any) => g.key)).toEqual(["suporte-ti", "sap", "dados", "dev"]);
-    expect(list.map((g: any) => g.name)).toEqual(["Suporte TI", "SAP", "Dados", "Dev"]);
+    expect(list.map((g: any) => g.key)).toEqual(
+      ["consumidor", "financeiro", "parceiros", "sap", "dados", "integracoes", "helpdesk", "backoffice"],
+    );
+    expect(list.map((g: any) => g.name)).toEqual(
+      ["Consumidor", "Financeiro", "Parceiros", "SAP", "Dados", "Integrações", "Helpdesk", "Backoffice"],
+    );
   });
 
   it("abertura exige grupo válido nas duas rotas", async () => {
@@ -84,6 +88,8 @@ describe.skipIf(!url)("grupos de atendimento", () => {
     expect((await send(a, "POST", "/api/workspace/chamados", { ...base, titulo: "group-test sem grupo" })).status).toBe(400);
     expect((await send(a, "POST", "/api/workspace/chamados", { ...base, titulo: "group-test x", categoria: "rh" })).status).toBe(400);
     expect((await send(a, "POST", "/api/tickets", { ...base, code: "", title: "group-test x", description: "d", category: "geral" })).status).toBe(400);
+    // Grupos desativados (Suporte TI, Dev) não recebem chamados novos.
+    expect((await send(a, "POST", "/api/workspace/chamados", { ...base, titulo: "group-test inativo", categoria: "dev" })).status).toBe(400);
     const ok = await send(a, "POST", "/api/workspace/chamados", { ...base, titulo: "group-test ok", categoria: "sap" });
     expect(ok.status).toBe(201);
   });
@@ -117,7 +123,7 @@ describe.skipIf(!url)("grupos de atendimento", () => {
 
   it("regras de responsáveis ficam no tenant de quem cria", async () => {
     const created = await send(app(ids.adminA, "tenant-a", "admin"), "POST", "/api/ticket-responsaveis",
-      { categoria: "dev", tipo: "bug", usuarioResponsavelId: ids.agentA, tenantId: "tenant-b" });
+      { categoria: "consumidor", tipo: "bug", usuarioResponsavelId: ids.agentA, tenantId: "tenant-b" });
     expect(created.status).toBe(201);
     const rule = await json(created);
     expect(rule.tenantId).toBe("tenant-a");
@@ -127,7 +133,7 @@ describe.skipIf(!url)("grupos de atendimento", () => {
     expect((await app(ids.adminB, "tenant-b", "admin").request(`/api/ticket-responsaveis/${rule.id}`, { method: "DELETE" }, env)).status).toBe(404);
 
     const otherTenantUser = await send(app(ids.adminA, "tenant-a", "admin"), "POST", "/api/ticket-responsaveis",
-      { categoria: "dev", tipo: "bug", usuarioResponsavelId: ids.adminB });
+      { categoria: "consumidor", tipo: "bug", usuarioResponsavelId: ids.adminB });
     expect(otherTenantUser.status).toBe(400);
     const badGroup = await send(app(ids.adminA, "tenant-a", "admin"), "POST", "/api/ticket-responsaveis",
       { categoria: "rh", tipo: "bug", usuarioResponsavelId: ids.agentA });

@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { UserSelect } from "@/components/ui/user-select";
 import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
+import { TICKET_TYPES } from "@shared/ticket-options";
 
 export type ItemType = "chamado" | "tarefa" | "projeto";
 
@@ -594,12 +595,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                 value={tipoChamado}
                 onValueChange={setTipoChamado}
                 placeholder="Tipo *"
-                options={[
-                  { value: "bug", label: "Bug" },
-                  { value: "melhoria", label: "Melhoria" },
-                  { value: "processo", label: "Processo" },
-                  { value: "negocio", label: "Negócio" },
-                ]}
+                options={[...TICKET_TYPES]}
               />
               <ChipSelect
                 value={prioridadeChamado}

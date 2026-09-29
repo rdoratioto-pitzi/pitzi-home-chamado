@@ -31,17 +31,14 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import type { TicketResponsavel, User, Setting } from "@shared/schema";
+import { TICKET_TYPES } from "@shared/ticket-options";
 
 interface FieldItem {
   value: string;
   label: string;
 }
 
-const defaultTypes: FieldItem[] = [
-  { value: "bug", label: "Bug" },
-  { value: "melhoria", label: "Melhoria" },
-  { value: "negocio", label: "Negócio" },
-];
+const defaultTypes: FieldItem[] = [...TICKET_TYPES];
 
 export function ResponsaveisSettings() {
   const { toast } = useToast();

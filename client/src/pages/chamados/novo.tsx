@@ -36,6 +36,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { HelpCircle, CheckCircle2, ArrowLeft, Plus, Eye, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useSupportGroups } from "@/hooks/use-support-groups";
+import { TICKET_TYPES } from "@shared/ticket-options";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -56,11 +57,7 @@ interface FieldItem {
   label: string;
 }
 
-const defaultTypes: FieldItem[] = [
-  { value: "bug", label: "Bug" },
-  { value: "melhoria", label: "Melhoria" },
-  { value: "negocio", label: "Negócio" },
-];
+const defaultTypes: FieldItem[] = [...TICKET_TYPES];
 
 export default function NovoChamadoPage() {
   const [, setLocation] = useLocation();
