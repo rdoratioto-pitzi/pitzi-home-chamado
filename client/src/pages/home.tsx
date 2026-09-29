@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
-import { Ticket, ArrowRight } from "lucide-react";
+import { Ticket, FileText, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getUserPermissions, type UserPermissions } from "@/lib/permissions";
 import { useAuth } from "@/contexts/auth-context";
@@ -17,7 +17,8 @@ interface ModuleCard {
   permissionKey?: keyof UserPermissions;
 }
 
-// Produto ativo: central de chamados. Os demais módulos estão desativados.
+// Produto ativo: central de chamados, mais o editor Markdown (só no navegador, sem API).
+// Os demais módulos estão desativados.
 const modules: ModuleCard[] = [
   {
     title: "Chamados",
@@ -27,6 +28,14 @@ const modules: ModuleCard[] = [
     color: "text-orange-600 dark:text-orange-400",
     bgColor: "bg-orange-100 dark:bg-orange-900/30",
     permissionKey: "chamados",
+  },
+  {
+    title: "Markdown",
+    description: "Escreva em Markdown e veja formatado ao lado",
+    icon: FileText,
+    href: "/markdown",
+    color: "text-blue-600 dark:text-blue-400",
+    bgColor: "bg-blue-100 dark:bg-blue-900/30",
   },
 ];
 

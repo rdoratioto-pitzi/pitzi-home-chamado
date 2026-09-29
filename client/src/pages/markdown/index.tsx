@@ -1,7 +1,10 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useMemo } from "react";
 import MarkdownIt from "markdown-it";
+import DOMPurify from "dompurify";
 import { Button } from "@/components/ui/button";
-import { Copy, Download, Trash2, Eye, Edit3, Columns, WrapText } from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { useToast } from "@/hooks/use-toast";
+import { Copy, Download, Trash2, Eye, Edit3, Columns, WrapText, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const md = new MarkdownIt({
@@ -12,6 +15,7 @@ const md = new MarkdownIt({
 });
 
 const STORAGE_KEY = "pitzi_markdown_content";
+const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 
 const PLACEHOLDER = `# Bem-vindo ao Editor Markdown Pitzi
 
@@ -71,9 +75,14 @@ export default function MarkdownPage() {
       return PLACEHOLDER;
     }
   });
-  const [mode, setMode] = useState<ViewMode>("split");
+  // Em tela estreita os dois painéis lado a lado ficam apertados; começa só no editor.
+  const [mode, setMode] = useState<ViewMode>(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "editor" : "split",
+  );
   const [wordWrap, setWordWrap] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const saveToStorage = (val: string) => {
     try { localStorage.setItem(STORAGE_KEY, val); } catch {}
@@ -84,7 +93,9 @@ export default function MarkdownPage() {
     saveToStorage(val);
   };
 
-  const rendered = md.render(content);
+  // O Markdown aceita HTML; o resultado passa pelo DOMPurify porque um arquivo importado
+  // poderia trazer <script> ou handlers que rodariam com a sessão da pessoa.
+  const rendered = useMemo(() => DOMPurify.sanitize(md.render(content)), [content]);
 
   const wordCount = content.trim() ? content.trim().split(/\s+/).length : 0;
   const charCount = content.length;
@@ -104,8 +115,26 @@ export default function MarkdownPage() {
     }
   }, [content]);
 
-  const copyMarkdown = () => navigator.clipboard.writeText(content);
-  const copyHtml = () => navigator.clipboard.writeText(rendered);
+  const copyText = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: `${label} copiado` });
+    } catch {
+      toast({ title: "Não foi possível copiar", variant: "destructive" });
+    }
+  };
+  const copyMarkdown = () => copyText(content, "Markdown");
+  const copyHtml = () => copyText(rendered, "HTML");
+  const importFile = async (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > MAX_IMPORT_BYTES) {
+      toast({ title: "Arquivo grande demais", description: "O limite é 2 MB.", variant: "destructive" });
+      return;
+    }
+    if (content.trim() && content !== PLACEHOLDER && !confirm("Substituir o conteúdo atual pelo arquivo?")) return;
+    handleChange(await file.text());
+    toast({ title: `${file.name} importado` });
+  };
   const downloadMd = () => {
     const blob = new Blob([content], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
@@ -120,10 +149,10 @@ export default function MarkdownPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-screen bg-background">
+      <PageHeader title="Markdown" />
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-4 py-2 border-b bg-muted/30 flex-wrap">
-        <span className="text-sm font-semibold text-foreground mr-2">Markdown</span>
 
         {/* View mode toggle */}
         <div className="flex rounded-md border overflow-hidden text-xs">
@@ -177,6 +206,19 @@ export default function MarkdownPage() {
             <Copy className="w-4 h-4" />
             <span className="ml-1 text-xs hidden sm:inline">HTML</span>
           </Button>
+          <Button variant="ghost" size="sm" onClick={() => fileInputRef.current?.click()} title="Importar arquivo .md">
+            <Upload className="w-4 h-4" />
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".md,.markdown,.txt,text/markdown,text/plain"
+            className="hidden"
+            onChange={(e) => {
+              importFile(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
           <Button variant="ghost" size="sm" onClick={downloadMd} title="Baixar .md">
             <Download className="w-4 h-4" />
           </Button>
@@ -193,7 +235,7 @@ export default function MarkdownPage() {
       </div>
 
       {/* Editor area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Editor pane */}
         {(mode === "editor" || mode === "split") && (
           <div className={cn("flex flex-col border-r", mode === "split" ? "w-1/2" : "w-full")}>
