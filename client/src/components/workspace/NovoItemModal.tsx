@@ -174,7 +174,6 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
   const { groups: supportGroups } = useSupportGroups();
   const [tipoChamado, setTipoChamado] = useState("");
   const [prioridadeChamado, setPrioridadeChamado] = useState("media");
-  const [applicationKeyChamado, setApplicationKeyChamado] = useState<string | null>(null);
 
   // Tarefa applicationKey (opcional, herda do projeto pai)
   const [applicationKeyTarefa, setApplicationKeyTarefa] = useState<string | null>(null);
@@ -214,7 +213,6 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setCategoriaChamado("");
     setTipoChamado("");
     setPrioridadeChamado("media");
-    setApplicationKeyChamado(null);
     setApplicationKeyTarefa(null);
     setApplicationKeyTarefaTouched(false);
     setApplicationKeyProjeto(null);
@@ -329,7 +327,6 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
     setCategoriaChamado("");
     setTipoChamado("");
     setPrioridadeChamado("media");
-    setApplicationKeyChamado(null);
     setApplicationKeyTarefa(null);
     setApplicationKeyTarefaTouched(false);
     setApplicationKeyProjeto(null);
@@ -368,10 +365,6 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
       toast({ title: "Selecione o tipo", variant: "destructive" });
       return;
     }
-    if (type === "chamado" && !applicationKeyChamado) {
-      toast({ title: "Selecione a aplicação", variant: "destructive" });
-      return;
-    }
     if (type === "projeto" && !applicationKeyProjeto) {
       toast({ title: "Selecione a aplicação", variant: "destructive" });
       return;
@@ -390,7 +383,6 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             categoria: categoriaChamado,
             tipo: tipoChamado,
             prioridade: prioridadeChamado || undefined,
-            applicationKey: applicationKeyChamado,
             attachments: attachments.length > 0 ? JSON.stringify(attachments) : undefined,
           }),
         });
@@ -615,16 +607,6 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                 placeholder="Prioridade"
                 options={PRIORIDADE_OPTIONS}
               />
-              <div className="min-w-[180px]">
-                <ApplicationSelect
-                  value={applicationKeyChamado}
-                  onChange={setApplicationKeyChamado}
-                  required
-                  size="sm"
-                  placeholder="Aplicação *"
-                  hasError={submitAttempted && !applicationKeyChamado}
-                />
-              </div>
             </div>
           )}
 

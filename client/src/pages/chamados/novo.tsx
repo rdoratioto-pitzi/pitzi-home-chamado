@@ -36,8 +36,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { HelpCircle, CheckCircle2, ArrowLeft, Plus, Eye, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useSupportGroups } from "@/hooks/use-support-groups";
-import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
-import { isValidApplicationKey } from "@shared/applications";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -46,9 +44,6 @@ const formSchema = z.object({
     .max(5000, "Descrição deve ter no máximo 5.000 caracteres"),
   category: z.string().min(1, "Selecione o grupo de atendimento"),
   type: z.string().min(1, "Selecione um tipo"),
-  applicationKey: z.string().refine(isValidApplicationKey, {
-    message: "Selecione uma aplicação válida",
-  }),
   priority: z.string().min(1, "Selecione uma prioridade"),
   impact: z.string().min(1, "Selecione o impacto"),
   assigneeId: z.string().optional(),
@@ -111,7 +106,6 @@ export default function NovoChamadoPage() {
       description: "",
       category: "",
       type: "",
-      applicationKey: "",
       priority: "medium",
       impact: "medio",
       assigneeId: undefined,
@@ -356,36 +350,6 @@ export default function NovoChamadoPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="applicationKey"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="flex items-center gap-1">
-                          Aplicação <span className="text-destructive">*</span>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                            </TooltipTrigger>
-                            <TooltipContent className="max-w-[280px]">
-                              <p className="text-xs">
-                                <strong>Aplicação</strong> indica a qual produto/sistema Renov o chamado se refere.
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </FormLabel>
-                        <FormControl>
-                          <ApplicationSelect
-                            value={field.value || null}
-                            onChange={(v) => field.onChange(v ?? "")}
-                            required
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
                     name="priority"
                     render={({ field }) => (
                       <FormItem>
@@ -419,9 +383,6 @@ export default function NovoChamadoPage() {
                       </FormItem>
                     )}
                   />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="impact"

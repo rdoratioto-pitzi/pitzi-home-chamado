@@ -659,10 +659,10 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                       </div>
                     )}
 
-                    {/* Aplicação — inline editável.
+                    {/* Aplicação — inline editável, só para tarefas (chamados não usam mais).
                         Para tarefa, usa tarefaExtras.applicationKey como fonte de verdade
                         (hidratado do GET /tarefas/:id), com fallback ao prop. */}
-                    {(() => {
+                    {!isChamado && (() => {
                       const appKey = isChamado
                         ? (item as ChamadoItem).applicationKey ?? null
                         : (tarefaExtras.applicationKey ?? (item as UnifiedItem).applicationKey ?? null);

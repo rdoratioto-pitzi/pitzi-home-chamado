@@ -287,8 +287,9 @@ export function registerWorkspaceRoutes(router: Router) {
         return res.status(400).json({ error: "Título obrigatório" });
       }
 
-      if (!isValidApplicationKey(applicationKey)) {
-        return res.status(400).json({ error: "Aplicação é obrigatória e deve ser válida" });
+      // Aplicação é opcional: o formulário não pede mais; se vier, precisa ser válida.
+      if (applicationKey && !isValidApplicationKey(applicationKey)) {
+        return res.status(400).json({ error: "Aplicação inválida" });
       }
 
       const prioridadeMap: Record<string, string> = {
@@ -304,7 +305,7 @@ export function registerWorkspaceRoutes(router: Router) {
         description: descricao || "",
         category: categoria || "geral",
         type: tipo || "bug",
-        applicationKey,
+        applicationKey: applicationKey || null,
         priority: mappedPriority,
         impact: "medio",
         status: "open",
