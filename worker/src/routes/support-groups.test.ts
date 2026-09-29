@@ -88,6 +88,16 @@ describe.skipIf(!url)("grupos de atendimento", () => {
     expect(ok.status).toBe(201);
   });
 
+  it("aplicação é opcional na abertura, mas se vier precisa ser válida", async () => {
+    const a = app(ids.userA, "tenant-a");
+    const semApp = await send(a, "POST", "/api/workspace/chamados", { titulo: "group-test sem app", categoria: "sap" });
+    expect(semApp.status).toBe(201);
+    const { id } = await json(semApp);
+    expect((await pool.query("SELECT application_key FROM tickets WHERE id = $1", [id])).rows[0].application_key).toBeNull();
+    expect((await send(a, "POST", "/api/workspace/chamados", { titulo: "group-test app x", categoria: "sap", applicationKey: "nao-existe" })).status).toBe(400);
+    expect((await send(a, "POST", "/api/tickets", { code: "", title: "group-test app x", description: "d", category: "sap", applicationKey: "nao-existe" })).status).toBe(400);
+  });
+
   it("chamado rápido recebe o responsável padrão do grupo, só do mesmo tenant", async () => {
     await pool.query(
       "INSERT INTO ticket_responsaveis (categoria, tipo, usuario_responsavel_id, tenant_id) VALUES ('dados', 'bug', $1, 'tenant-b')",
