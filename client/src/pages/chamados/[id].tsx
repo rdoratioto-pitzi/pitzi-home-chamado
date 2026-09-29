@@ -53,22 +53,19 @@ import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { getApplicationLabel } from "@shared/applications";
+import { TICKET_STATUSES, TICKET_TYPES, ticketTypeLabel } from "@shared/ticket-options";
 
 const statusColors: Record<string, string> = {
   open: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   in_progress: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+  triage: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+  waiting_requester: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
   blocked: "bg-red-500/10 text-red-600 dark:text-red-400",
   resolved: "bg-green-500/10 text-green-600 dark:text-green-400",
   closed: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
 };
 
-const statusLabels: Record<string, string> = {
-  open: "Aberto",
-  in_progress: "Em Andamento",
-  blocked: "Bloqueado",
-  resolved: "Resolvido",
-  closed: "Fechado",
-};
+const statusLabels: Record<string, string> = Object.fromEntries(TICKET_STATUSES.map((s) => [s.value, s.label]));
 
 const priorityLabels: Record<string, string> = {
   low: "Baixa",
@@ -84,12 +81,6 @@ const impactLabels: Record<string, string> = {
   critico: "Crítico",
 };
 
-const typeLabels: Record<string, string> = {
-  bug: "Bug",
-  melhoria: "Melhoria",
-  processo: "Processo",
-  negocio: "Negócio",
-};
 
 // Helper function to format datetime in Brazilian format
 const formatDateTime = (date: Date | string | null): string => {
@@ -136,12 +127,7 @@ interface FieldItem {
   label: string;
 }
 
-const defaultTypes: FieldItem[] = [
-  { value: "bug", label: "Bug" },
-  { value: "melhoria", label: "Melhoria" },
-  { value: "processo", label: "Processo" },
-  { value: "negocio", label: "Negócio" },
-];
+const defaultTypes: FieldItem[] = [...TICKET_TYPES];
 
 const editFormSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -578,11 +564,9 @@ export default function TicketDetailPage() {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="open">Aberto</SelectItem>
-                                <SelectItem value="in_progress">Em Andamento</SelectItem>
-                                <SelectItem value="blocked">Bloqueado</SelectItem>
-                                <SelectItem value="resolved">Resolvido</SelectItem>
-                                <SelectItem value="closed">Fechado</SelectItem>
+                                {TICKET_STATUSES.map((s) => (
+                                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -643,7 +627,7 @@ export default function TicketDetailPage() {
                   </div>
                   <div className="flex flex-wrap gap-2 mb-4">
                     <Badge variant="outline">{categories.find(c => c.value === ticket.category)?.label || ticket.category}</Badge>
-                    <Badge variant="outline">{typeLabels[ticket.type as keyof typeof typeLabels] || ticket.type}</Badge>
+                    <Badge variant="outline">{ticketTypeLabel(ticket.type)}</Badge>
                     {ticket.applicationKey && (
                       <Badge variant="outline">{getApplicationLabel(ticket.applicationKey)}</Badge>
                     )}

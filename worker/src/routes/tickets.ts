@@ -21,6 +21,7 @@ import {
   sendMentionNotificationEmail,
   sendCSATReceivedEmail,
 } from "../lib/email";
+import { ticketStatusLabel } from "../../../shared/ticket-options";
 
 const tickets = new Hono<AppEnv>();
 
@@ -335,15 +336,11 @@ tickets.patch("/api/tickets/:id", async (c) => {
         env, storage, ticket, oldTicket.status, body.status, requester, assignee || null
       ).catch(console.error);
     }
-    const statusLabels: Record<string, string> = {
-      open: "Aberto", in_progress: "Em andamento", resolved: "Resolvido",
-      closed: "Fechado", pending: "Pendente",
-    };
     if (ticket.requesterId) {
       storage.createNotification({
         userId: ticket.requesterId,
         title: "Status do chamado alterado",
-        message: `O chamado "${ticket.title}" (${ticket.code || ""}) mudou para "${statusLabels[body.status] || body.status}"`,
+        message: `O chamado "${ticket.title}" (${ticket.code || ""}) mudou para "${ticketStatusLabel(body.status)}"`,
         module: "chamados",
         entityId: ticket.id,
         linkUrl: `/chamados?ticket=${ticket.id}`,

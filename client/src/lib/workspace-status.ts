@@ -1,7 +1,7 @@
 // Helpers de status/prioridade do Workspace.
 //
 // Chamados e tarefas têm vocabulários diferentes:
-// - Chamado: open / in_progress / blocked / resolved / closed (5)
+// - Chamado: open / triage / in_progress / waiting_requester / blocked / resolved / closed (7)
 // - Tarefa : a-fazer / em-andamento / bloqueado / concluido (4)
 //
 // Este módulo centraliza opções, labels e cores para que todos os
@@ -18,7 +18,9 @@ export interface StatusOption {
 
 const CHAMADO_STATUS: readonly StatusOption[] = [
   { value: "open", label: "Aberto", color: "#f59e0b" },
+  { value: "triage", label: "Triagem", color: "#a78bfa" },
   { value: "in_progress", label: "Em Andamento", color: "#00c853" },
+  { value: "waiting_requester", label: "Aguardando solicitante", color: "#38bdf8" },
   { value: "blocked", label: "Bloqueado", color: "#ef4444" },
   { value: "resolved", label: "Resolvido", color: "#4ade80" },
   { value: "closed", label: "Fechado", color: "#4ade80" },

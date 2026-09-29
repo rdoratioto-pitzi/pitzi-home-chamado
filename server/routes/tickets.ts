@@ -18,6 +18,7 @@ import {
   sendMentionNotificationEmail,
   sendCSATReceivedEmail,
 } from "../email-service";
+import { ticketStatusLabel } from "@shared/ticket-options";
 
 export function registerTicketRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
@@ -172,8 +173,7 @@ export function registerTicketRoutes(router: Router) {
         if (requester) {
           sendTicketStatusChangedEmail(ticket, oldTicket.status, req.body.status, requester, assignee || null).catch(console.error);
         }
-        const statusLabels: Record<string, string> = { open: "Aberto", in_progress: "Em andamento", resolved: "Resolvido", closed: "Fechado", pending: "Pendente" };
-        const statusLabel = statusLabels[req.body.status] || req.body.status;
+        const statusLabel = ticketStatusLabel(req.body.status);
         if (ticket.requesterId) {
           storage.createNotification({
             userId: ticket.requesterId,

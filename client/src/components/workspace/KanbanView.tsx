@@ -20,7 +20,7 @@ const COLUMNS: KanbanColumn[] = [
     key: "abertos",
     label: "Abertos / A Fazer",
     dotColor: "#f59e0b",
-    statuses: ["open", "a-fazer"],
+    statuses: ["open", "triage", "a-fazer"],
   },
   {
     key: "em_andamento",
@@ -30,9 +30,9 @@ const COLUMNS: KanbanColumn[] = [
   },
   {
     key: "bloqueados",
-    label: "Bloqueados",
+    label: "Bloqueados / Aguardando",
     dotColor: "#ef4444",
-    statuses: ["blocked", "bloqueado"],
+    statuses: ["blocked", "waiting_requester", "bloqueado"],
   },
   {
     key: "resolvidos",
@@ -44,6 +44,8 @@ const COLUMNS: KanbanColumn[] = [
 
 const typeColors: Record<string, string> = {
   bug: "bg-red-500/10 text-red-400",
+  requisicao: "bg-amber-500/10 text-amber-400",
+  duvida: "bg-sky-500/10 text-sky-400",
   melhoria: "bg-blue-500/10 text-blue-400",
   negocio: "bg-purple-500/10 text-purple-400",
   tarefa: "bg-teal-500/10 text-teal-400",
@@ -85,6 +87,8 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
 
   const statusColors: Record<string, string> = {
     in_progress: "#5B62EC",
+    triage: "#a78bfa",
+    waiting_requester: "#38bdf8",
     "em-andamento": "#5B62EC",
     open: "#f59e0b",
     "a-fazer": "#f59e0b",
