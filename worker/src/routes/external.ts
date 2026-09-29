@@ -4,10 +4,11 @@ import type { AppEnv } from "../index";
 import { tickets, users } from "../../../shared/schema";
 import { eq, and, gte, lte, inArray, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { TICKET_STATUSES } from "../../../shared/ticket-options";
 
 const external = new Hono<AppEnv>();
 
-const VALID_STATUSES = ["open", "in_progress", "blocked", "resolved", "closed"] as const;
+const VALID_STATUSES = TICKET_STATUSES.map((s) => s.value) as [string, ...string[]];
 
 const querySchema = z.object({
   status: z.string().optional(),
