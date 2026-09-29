@@ -29,7 +29,9 @@ const BRAND = {
 const STATUS_STYLES: Record<string, { bg: string; color: string; label: string }> = {
   // Chamados
   open: { bg: "#fef3cd", color: "#856404", label: "Aberto" },
+  triage: { bg: "#ede9fe", color: "#5b21b6", label: "Triagem" },
   in_progress: { bg: "#cce5ff", color: "#004085", label: "Em Andamento" },
+  waiting_requester: { bg: "#e0f2fe", color: "#075985", label: "Aguardando solicitante" },
   blocked: { bg: "#f8d7da", color: "#721c24", label: "Bloqueado" },
   resolved: { bg: "#d4edda", color: "#155724", label: "Resolvido" },
   closed: { bg: "#e2e3e5", color: "#383d41", label: "Fechado" },

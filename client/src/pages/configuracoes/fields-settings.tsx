@@ -24,6 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Setting, SlaRule } from "@shared/schema";
+import { TICKET_TYPES } from "@shared/ticket-options";
 
 interface FieldItem {
   value: string;
@@ -218,10 +219,7 @@ const priorityLabels: Record<string, string> = {
   critical: "Crítica",
 };
 
-const tipoLabels: Record<string, string> = {
-  bug: "Bug",
-  melhoria: "Melhoria",
-};
+const tipoLabels: Record<string, string> = Object.fromEntries(TICKET_TYPES.map((t) => [t.value, t.label]));
 
 function SlaManager() {
   const { toast } = useToast();
@@ -245,11 +243,7 @@ function SlaManager() {
 
   const types: FieldItem[] = typesSetting?.value 
     ? JSON.parse(typesSetting.value)
-    : [
-        { value: "bug", label: "Bug" },
-        { value: "melhoria", label: "Melhoria" },
-        { value: "negocio", label: "Negócio" },
-      ];
+    : [...TICKET_TYPES];
 
   const priorities = [
     { value: "low", label: "Baixa" },
@@ -481,11 +475,7 @@ function SlaManager() {
 }
 
 export function FieldsSettings() {
-  const defaultTypes = [
-    { value: "bug", label: "Bug" },
-    { value: "melhoria", label: "Melhoria" },
-    { value: "negocio", label: "Negócio" },
-  ];
+  const defaultTypes = [...TICKET_TYPES];
 
   return (
     <div className="space-y-6">

@@ -22,6 +22,7 @@ import { WorkspaceTable, type ChamadoItem } from "@/components/workspace/Workspa
 import { KanbanView } from "@/components/workspace/KanbanView";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { TICKET_STATUSES } from "@shared/ticket-options";
 
 type Periodo = "este-ano" | "mes-vigente" | "mes-anterior" | "em-tratativa";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
@@ -97,9 +98,9 @@ export function ChamadosView() {
   // KPI label → filter function
   function applyKpiFilter(item: ChamadoItem, kpi: string | null): boolean {
     if (!kpi || kpi === "Total") return true;
-    if (kpi === "Abertos") return item.status === "open";
+    if (kpi === "Abertos") return item.status === "open" || item.status === "triage";
     if (kpi === "Em Andamento") return item.status === "in_progress";
-    if (kpi === "Bloqueados") return item.status === "blocked";
+    if (kpi === "Bloqueados") return item.status === "blocked" || item.status === "waiting_requester";
     if (kpi === "Resolvidos") return item.status === "resolved" || item.status === "closed";
     if (kpi === "No Prazo") return item.statusSla === "dentro_prazo";
     if (kpi === "Em Atraso") return item.statusSla === "em_atraso";
@@ -176,11 +177,9 @@ export function ChamadosView() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos Status</SelectItem>
-            <SelectItem value="open">Aberto</SelectItem>
-            <SelectItem value="in_progress">Em Andamento</SelectItem>
-            <SelectItem value="blocked">Bloqueado</SelectItem>
-            <SelectItem value="resolved">Resolvido</SelectItem>
-            <SelectItem value="closed">Fechado</SelectItem>
+            {TICKET_STATUSES.map((s) => (
+              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

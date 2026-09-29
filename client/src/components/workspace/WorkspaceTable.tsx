@@ -80,6 +80,8 @@ type WorkspaceTableProps =
 
 const statusDotColors: Record<string, { bg: string }> = {
   in_progress: { bg: "#5B62EC" },
+  triage: { bg: "#a78bfa" },
+  waiting_requester: { bg: "#38bdf8" },
   resolved: { bg: "#4ade80" },
   closed: { bg: "#4ade80" },
   open: { bg: "#f59e0b" },
@@ -93,7 +95,9 @@ const statusDotColors: Record<string, { bg: string }> = {
 
 const statusLabels: Record<string, string> = {
   open: "Aberto",
+  triage: "Triagem",
   in_progress: "Em Andamento",
+  waiting_requester: "Aguardando solicitante",
   blocked: "Bloqueado",
   resolved: "Resolvido",
   closed: "Fechado",
@@ -106,7 +110,8 @@ const statusLabels: Record<string, string> = {
 // Normalize status to a group key
 const toGroup = (status: string): string => {
   if (status === "em-andamento") return "in_progress";
-  if (status === "a-fazer") return "open";
+  if (status === "a-fazer" || status === "triage") return "open";
+  if (status === "waiting_requester") return "blocked";
   if (status === "concluido" || status === "cancelado") return "resolved";
   if (status === "closed") return "resolved";
   return status;
@@ -143,6 +148,8 @@ const priorityColors: Record<string, string> = {
 
 const typeColors: Record<string, string> = {
   bug: "bg-red-500/10 text-red-400",
+  requisicao: "bg-amber-500/10 text-amber-400",
+  duvida: "bg-sky-500/10 text-sky-400",
   melhoria: "bg-blue-500/10 text-blue-400",
   negocio: "bg-purple-500/10 text-purple-400",
   tarefa: "bg-teal-500/10 text-teal-400",
