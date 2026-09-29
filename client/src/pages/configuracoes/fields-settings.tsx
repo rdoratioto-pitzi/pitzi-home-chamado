@@ -212,11 +212,12 @@ function FieldManager({
   );
 }
 
+// O SLA é por gravidade (campo "Gravidade" do chamado); em sla_rules ela fica como low…critical.
 const priorityLabels: Record<string, string> = {
-  low: "Baixa",
-  medium: "Média",
-  high: "Alta",
-  critical: "Crítica",
+  low: "Baixo",
+  medium: "Médio",
+  high: "Alto",
+  critical: "Crítico",
 };
 
 const tipoLabels: Record<string, string> = Object.fromEntries(TICKET_TYPES.map((t) => [t.value, t.label]));
@@ -246,10 +247,10 @@ function SlaManager() {
     : [...TICKET_TYPES];
 
   const priorities = [
-    { value: "low", label: "Baixa" },
-    { value: "medium", label: "Média" },
-    { value: "high", label: "Alta" },
-    { value: "critical", label: "Crítica" },
+    { value: "low", label: "Baixo" },
+    { value: "medium", label: "Médio" },
+    { value: "high", label: "Alto" },
+    { value: "critical", label: "Crítico" },
   ];
 
   const createMutation = useMutation({
@@ -354,7 +355,7 @@ function SlaManager() {
 
             <Select value={newRule.prioridade} onValueChange={(v) => setNewRule({ ...newRule, prioridade: v })}>
               <SelectTrigger className="w-[160px]" data-testid="select-new-sla-prioridade">
-                <SelectValue placeholder="Prioridade" />
+                <SelectValue placeholder="Gravidade" />
               </SelectTrigger>
               <SelectContent>
                 {priorities.map((p) => (
@@ -412,7 +413,7 @@ function SlaManager() {
 
                     <Select value={editRule.prioridade} onValueChange={(v) => setEditRule({ ...editRule, prioridade: v })}>
                       <SelectTrigger className="w-[160px]" data-testid={`select-edit-sla-prioridade-${rule.id}`}>
-                        <SelectValue placeholder="Prioridade" />
+                        <SelectValue placeholder="Gravidade" />
                       </SelectTrigger>
                       <SelectContent>
                         {priorities.map((p) => (
