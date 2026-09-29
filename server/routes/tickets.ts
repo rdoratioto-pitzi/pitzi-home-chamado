@@ -19,6 +19,7 @@ import {
   sendCSATReceivedEmail,
 } from "../email-service";
 import { ticketStatusLabel } from "@shared/ticket-options";
+import { isValidRequestSelection, normalizeRequestSelection } from "@shared/request-objects";
 
 export function registerTicketRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
@@ -69,6 +70,11 @@ export function registerTicketRoutes(router: Router) {
         return res.status(400).json({ error: "Aplicação inválida" });
       }
       data.applicationKey = data.applicationKey || null;
+
+      normalizeRequestSelection(data);
+      if (!isValidRequestSelection(data)) {
+        return res.status(400).json({ error: "Objeto da Requisição inválido" });
+      }
 
       const validated = insertTicketSchema.parse(data);
 
@@ -130,8 +136,23 @@ export function registerTicketRoutes(router: Router) {
         }
       }
 
+      if (["requestObject", "requestAction", "requestDetail"].some((k) => updateData[k] !== undefined)) {
+        normalizeRequestSelection(updateData);
+        const merged = {
+          requestObject: updateData.requestObject !== undefined ? updateData.requestObject : oldTicket.requestObject,
+          requestAction: updateData.requestAction !== undefined ? updateData.requestAction : oldTicket.requestAction,
+          requestDetail: updateData.requestDetail !== undefined ? updateData.requestDetail : oldTicket.requestDetail,
+        };
+        if (!isValidRequestSelection(merged)) {
+          return res.status(400).json({ error: "Objeto da Requisição inválido" });
+        }
+      }
+
       if (!isAdmin) {
-        const allowedFields = ["status", "title", "description", "attachments", "applicationKey", "impact", "dueDate"];
+        const allowedFields = [
+          "status", "title", "description", "attachments", "applicationKey", "impact", "dueDate",
+          "requestObject", "requestAction", "requestDetail",
+        ];
         const filteredData: any = {};
         allowedFields.forEach(field => {
           if (updateData[field] !== undefined) {

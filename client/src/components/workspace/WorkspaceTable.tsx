@@ -31,6 +31,9 @@ export interface ChamadoItem {
   abertura: string | null;
   solicitante: string | null;
   applicationKey: string | null;
+  requestObject?: string | null;
+  requestAction?: string | null;
+  requestDetail?: string | null;
   anexos: Array<{ name: string; url: string }>;
 }
 
