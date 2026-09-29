@@ -33,6 +33,8 @@ import {
 } from "@/lib/workspace-status";
 import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 import { getApplicationLabel } from "@shared/applications";
+import { formatRequestObject } from "@/components/shared/RequestObjectSelect";
+import { REQUEST_OBJECT_LABEL } from "@shared/request-objects";
 
 interface ItemDetailDrawerProps {
   open: boolean;
@@ -695,6 +697,15 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                         </div>
                       );
                     })()}
+
+                    {isChamado && (item as ChamadoItem).requestObject && (
+                      <div className="flex items-start gap-3">
+                        <span style={ROW_LABEL_STYLE}>{REQUEST_OBJECT_LABEL}</span>
+                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                          {formatRequestObject(item as ChamadoItem)}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Responsável */}
                     <div className="flex items-center gap-3">

@@ -133,6 +133,10 @@ export const tickets = pgTable("tickets", {
   category: text("category").notNull(),
   type: text("type").notNull().default("bug"), // bug, melhoria, negocio
   applicationKey: text("application_key"), // FK lógica para shared/applications.ts (substitui o antigo `location`)
+  // "Objeto da Requisição" em três níveis (shared/request-objects.ts), opcional.
+  requestObject: text("request_object"),
+  requestAction: text("request_action"),
+  requestDetail: text("request_detail"),
   priority: text("priority").notNull().default("medium"),
   impact: text("impact").notNull().default("medio"), // baixo, medio, alto, critico
   status: text("status").notNull().default("open"), // open, in_progress, blocked, resolved, closed
