@@ -22,6 +22,7 @@ import {
   sendCSATReceivedEmail,
 } from "../lib/email";
 import { ticketStatusLabel } from "../../../shared/ticket-options";
+import { isValidRequestSelection, normalizeRequestSelection } from "../../../shared/request-objects";
 
 const tickets = new Hono<AppEnv>();
 
@@ -201,6 +202,11 @@ tickets.post("/api/tickets", async (c) => {
   }
   data.applicationKey = data.applicationKey || null;
 
+  normalizeRequestSelection(data);
+  if (!isValidRequestSelection(data)) {
+    return c.json({ error: "Objeto da Requisição inválido" }, 400);
+  }
+
   const validated = insertTicketSchema.parse(data);
 
   if (!(await storage.getActiveSupportGroupByKey(validated.category))) {
@@ -277,8 +283,25 @@ tickets.patch("/api/tickets/:id", async (c) => {
     }
   }
 
-  if (updateData.category !== undefined && !(await storage.getActiveSupportGroupByKey(updateData.category))) {
+  // Só confere o grupo quando ele muda: chamados antigos de grupos desativados continuam editáveis.
+  if (
+    updateData.category !== undefined &&
+    updateData.category !== oldTicket.category &&
+    !(await storage.getActiveSupportGroupByKey(updateData.category))
+  ) {
     return c.json({ error: "Grupo de atendimento inválido" }, 400);
+  }
+
+  if (["requestObject", "requestAction", "requestDetail"].some((k) => updateData[k] !== undefined)) {
+    normalizeRequestSelection(updateData);
+    const merged = {
+      requestObject: updateData.requestObject !== undefined ? updateData.requestObject : oldTicket.requestObject,
+      requestAction: updateData.requestAction !== undefined ? updateData.requestAction : oldTicket.requestAction,
+      requestDetail: updateData.requestDetail !== undefined ? updateData.requestDetail : oldTicket.requestDetail,
+    };
+    if (!isValidRequestSelection(merged)) {
+      return c.json({ error: "Objeto da Requisição inválido" }, 400);
+    }
   }
 
   // Non-admin field restriction
@@ -286,6 +309,7 @@ tickets.patch("/api/tickets/:id", async (c) => {
     const allowedFields = [
       "status", "title", "description", "attachments",
       "applicationKey", "impact", "dueDate",
+      "requestObject", "requestAction", "requestDetail",
     ];
     const filteredData: any = {};
     allowedFields.forEach((field) => {

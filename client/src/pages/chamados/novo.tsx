@@ -37,6 +37,7 @@ import { HelpCircle, CheckCircle2, ArrowLeft, Plus, Eye, Loader2 } from "lucide-
 import { useAuth } from "@/contexts/auth-context";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { TICKET_TYPES } from "@shared/ticket-options";
+import { RequestObjectSelect } from "@/components/shared/RequestObjectSelect";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -48,6 +49,9 @@ const formSchema = z.object({
   priority: z.string().min(1, "Selecione uma prioridade"),
   impact: z.string().min(1, "Selecione o impacto"),
   assigneeId: z.string().optional(),
+  requestObject: z.string().nullable().optional(),
+  requestAction: z.string().nullable().optional(),
+  requestDetail: z.string().nullable().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -106,6 +110,9 @@ export default function NovoChamadoPage() {
       priority: "medium",
       impact: "medio",
       assigneeId: undefined,
+      requestObject: null,
+      requestAction: null,
+      requestDetail: null,
     },
   });
 
@@ -448,6 +455,19 @@ export default function NovoChamadoPage() {
                     )}
                   />
                 </div>
+
+                <RequestObjectSelect
+                  value={{
+                    requestObject: form.watch("requestObject") ?? null,
+                    requestAction: form.watch("requestAction") ?? null,
+                    requestDetail: form.watch("requestDetail") ?? null,
+                  }}
+                  onChange={(v) => {
+                    form.setValue("requestObject", v.requestObject);
+                    form.setValue("requestAction", v.requestAction);
+                    form.setValue("requestDetail", v.requestDetail);
+                  }}
+                />
 
                 <div className="flex gap-3 pt-4">
                   <Button 

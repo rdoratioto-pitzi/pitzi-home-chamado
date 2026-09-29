@@ -283,6 +283,9 @@ workspace.get("/api/workspace/chamados", async (c) => {
         solicitante: requester?.name || null,
         anexos: parseAnexos(t.attachments),
         applicationKey: (t as any).applicationKey ?? null,
+        requestObject: t.requestObject ?? null,
+        requestAction: t.requestAction ?? null,
+        requestDetail: t.requestDetail ?? null,
       };
     });
 
