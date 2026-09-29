@@ -1,6 +1,8 @@
 // worker/src/routes/omie.ts
 import { Hono } from "hono";
 import type { AppEnv } from "../index";
+import { requireAdmin } from "../middleware/auth";
+import { maskSecret } from "../../../shared/secrets";
 import { getOmieService } from "../services/omie.service";
 import { getCachedPosEstoque } from "../services/estoque-pos-cache";
 
@@ -29,7 +31,7 @@ omie.get("/api/omie/config", async (c) => {
       success: true,
       data: {
         app_key: config.app_key || "",
-        app_secret: config.app_secret || "",
+        app_secret: maskSecret(config.app_secret),
         is_active: config.is_active,
       },
     });
@@ -39,7 +41,7 @@ omie.get("/api/omie/config", async (c) => {
 });
 
 // POST /api/omie/config
-omie.post("/api/omie/config", async (c) => {
+omie.post("/api/omie/config", requireAdmin, async (c) => {
   try {
     const service = getOmie(c);
     const { app_key, app_secret } = await c.req.json();
