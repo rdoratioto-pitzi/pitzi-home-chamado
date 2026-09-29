@@ -285,6 +285,7 @@ export async function sendTicketCreatedEmail(
           { label: "Categoria", value: ticket.category },
           { label: "Tipo", value: ticket.type },
           ...(ticket.applicationKey ? [{ label: "Aplicação", value: getApplicationLabel(ticket.applicationKey) }] : []),
+          ...(ticket.requestObject ? [{ label: "Objeto da Requisição", value: [ticket.requestObject, ticket.requestAction, ticket.requestDetail].filter(Boolean).join(" › ") }] : []),
           { label: "Prioridade", value: priorityBadge(ticket.priority) },
           { label: "Solicitante", value: requester.name },
           ...(assignee ? [{ label: "Responsavel", value: assignee.name }] : []),
@@ -342,6 +343,7 @@ export async function sendTicketAssignedEmail(
           { label: "Categoria", value: ticket.category },
           { label: "Tipo", value: ticket.type },
           ...(ticket.applicationKey ? [{ label: "Aplicação", value: getApplicationLabel(ticket.applicationKey) }] : []),
+          ...(ticket.requestObject ? [{ label: "Objeto da Requisição", value: [ticket.requestObject, ticket.requestAction, ticket.requestDetail].filter(Boolean).join(" › ") }] : []),
           { label: "Prioridade", value: priorityBadge(ticket.priority) },
           { label: "Status", value: statusBadge(ticket.status) },
         ])}

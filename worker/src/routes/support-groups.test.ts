@@ -9,7 +9,13 @@ import path from "path";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "../../../shared/schema";
 
-vi.mock("../lib/email", () => new Proxy({}, { get: () => vi.fn().mockResolvedValue({ success: true }) }));
+vi.mock("../lib/email", () => {
+  const ok = () => vi.fn().mockResolvedValue({ success: true });
+  return {
+    sendCSATReceivedEmail: ok(), sendMentionNotificationEmail: ok(), sendTicketAssignedEmail: ok(),
+    sendTicketCommentEmail: ok(), sendTicketCreatedEmail: ok(), sendTicketStatusChangedEmail: ok(),
+  };
+});
 
 const { tickets } = await import("./tickets");
 const { workspace } = await import("./workspace");
@@ -70,7 +76,7 @@ describe.skipIf(!url)("grupos de atendimento", () => {
     await pool?.end();
   });
 
-  it("migration 0022 cria os quatro grupos e é idempotente", async () => {
+  it("grupos ativos seguem os Squads (0022 + 0023) e as migrations são idempotentes", async () => {
     const sql = fs.readFileSync(path.resolve(__dirname, "../../../migrations/0022_support_groups.sql"), "utf8");
     await pool.query(sql);
     const list = await json(await app(ids.userA, "tenant-a").request("/api/v1/support-groups", {}, env));
@@ -102,6 +108,38 @@ describe.skipIf(!url)("grupos de atendimento", () => {
     expect((await pool.query("SELECT application_key FROM tickets WHERE id = $1", [id])).rows[0].application_key).toBeNull();
     expect((await send(a, "POST", "/api/workspace/chamados", { titulo: "group-test app x", categoria: "sap", applicationKey: "nao-existe" })).status).toBe(400);
     expect((await send(a, "POST", "/api/tickets", { code: "", title: "group-test app x", description: "d", category: "sap", applicationKey: "nao-existe" })).status).toBe(400);
+  });
+
+  it("Objeto da Requisição: grava caminho válido, recusa combinação inexistente", async () => {
+    const a = app(ids.userA, "tenant-a");
+    const base = { code: "", title: "group-test objeto", description: "d", category: "consumidor" };
+    const ok = await send(a, "POST", "/api/tickets", {
+      ...base, requestObject: "Devices", requestAction: "Alterar Location", requestDetail: "50 Pitzi/Estoque",
+    });
+    expect(ok.status).toBe(201);
+    const { id } = await json(ok);
+    const row = (await pool.query("SELECT request_object, request_action, request_detail FROM tickets WHERE id = $1", [id])).rows[0];
+    expect(row).toEqual({ request_object: "Devices", request_action: "Alterar Location", request_detail: "50 Pitzi/Estoque" });
+
+    // ação que não pertence ao objeto
+    expect((await send(a, "POST", "/api/tickets", { ...base, requestObject: "Users", requestAction: "Emitir Boleto" })).status).toBe(400);
+    // detalhe sem ação
+    expect((await send(a, "POST", "/api/tickets", { ...base, requestObject: "Orders", requestDetail: "x" })).status).toBe(400);
+
+    // edição troca só a ação e limpa o detalhe; combinação inválida é recusada
+    expect((await send(a, "PATCH", `/api/tickets/${id}`, { requestAction: "Remover Owner", requestDetail: null })).status).toBe(200);
+    expect((await send(a, "PATCH", `/api/tickets/${id}`, { requestAction: "Cancelar" })).status).toBe(400);
+  });
+
+  it("chamado antigo de grupo desativado continua editável", async () => {
+    const created = await pool.query(
+      "INSERT INTO tickets (code, title, description, category, type, requester_id, tenant_id) VALUES ('group-test-legado', 'group-test legado', 'd', 'dev', 'bug', $1, 'tenant-a') RETURNING id",
+      [ids.userA],
+    );
+    const a = app(ids.userA, "tenant-a");
+    const id = created.rows[0].id;
+    expect((await send(a, "PATCH", `/api/tickets/${id}`, { category: "dev", title: "group-test legado editado" })).status).toBe(200);
+    expect((await send(a, "PATCH", `/api/tickets/${id}`, { category: "suporte-ti" })).status).toBe(400);
   });
 
   it("chamado rápido recebe o responsável padrão do grupo, só do mesmo tenant", async () => {

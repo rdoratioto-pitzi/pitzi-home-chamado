@@ -54,6 +54,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { getApplicationLabel } from "@shared/applications";
 import { TICKET_STATUSES, TICKET_TYPES, ticketTypeLabel } from "@shared/ticket-options";
+import { RequestObjectSelect, formatRequestObject } from "@/components/shared/RequestObjectSelect";
 
 const statusColors: Record<string, string> = {
   open: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
@@ -138,6 +139,9 @@ const editFormSchema = z.object({
   impact: z.string().min(1, "Selecione o impacto"),
   assigneeId: z.string().optional(),
   status: z.string().min(1, "Selecione o status"),
+  requestObject: z.string().nullable().optional(),
+  requestAction: z.string().nullable().optional(),
+  requestDetail: z.string().nullable().optional(),
 });
 
 type EditFormData = z.infer<typeof editFormSchema>;
@@ -253,6 +257,9 @@ export default function TicketDetailPage() {
         impact: ticket.impact || "medio",
         assigneeId: ticket.assigneeId || "",
         status: ticket.status,
+        requestObject: ticket.requestObject ?? null,
+        requestAction: ticket.requestAction ?? null,
+        requestDetail: ticket.requestDetail ?? null,
       });
       setEditedDescription(ticket.description || "");
       try {
@@ -592,6 +599,19 @@ export default function TicketDetailPage() {
                         )}
                       />
                     </div>
+
+                    <RequestObjectSelect
+                      value={{
+                        requestObject: editForm.watch("requestObject") ?? null,
+                        requestAction: editForm.watch("requestAction") ?? null,
+                        requestDetail: editForm.watch("requestDetail") ?? null,
+                      }}
+                      onChange={(v) => {
+                        editForm.setValue("requestObject", v.requestObject);
+                        editForm.setValue("requestAction", v.requestAction);
+                        editForm.setValue("requestDetail", v.requestDetail);
+                      }}
+                    />
                     
                     {/* Description and Attachments in Edit Mode */}
                     <div className="space-y-3 pt-4 border-t">
@@ -628,6 +648,9 @@ export default function TicketDetailPage() {
                   <div className="flex flex-wrap gap-2 mb-4">
                     <Badge variant="outline">{categories.find(c => c.value === ticket.category)?.label || ticket.category}</Badge>
                     <Badge variant="outline">{ticketTypeLabel(ticket.type)}</Badge>
+                    {ticket.requestObject && (
+                      <Badge variant="outline">{formatRequestObject(ticket)}</Badge>
+                    )}
                     {ticket.applicationKey && (
                       <Badge variant="outline">{getApplicationLabel(ticket.applicationKey)}</Badge>
                     )}
