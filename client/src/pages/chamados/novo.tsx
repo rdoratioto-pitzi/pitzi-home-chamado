@@ -47,7 +47,7 @@ const formSchema = z.object({
   category: z.string().min(1, "Selecione o grupo de atendimento"),
   type: z.string().min(1, "Selecione um tipo"),
   priority: z.string().min(1, "Selecione uma prioridade"),
-  impact: z.string().min(1, "Selecione o impacto"),
+  impact: z.string().min(1, "Selecione a gravidade"),
   assigneeId: z.string().optional(),
   requestObject: z.string().nullable().optional(),
   requestAction: z.string().nullable().optional(),
@@ -393,14 +393,14 @@ export default function NovoChamadoPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center gap-1">
-                          Impacto <span className="text-destructive">*</span>
+                          Gravidade <span className="text-destructive">*</span>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                             </TooltipTrigger>
                             <TooltipContent className="max-w-[280px]">
                               <p className="text-xs">
-                                <strong>Impacto</strong> mede quantas pessoas ou processos são afetados pelo problema.
+                                <strong>Gravidade</strong> define o prazo de atendimento (SLA): quanto mais grave, menor o prazo.
                               </p>
                             </TooltipContent>
                           </Tooltip>
