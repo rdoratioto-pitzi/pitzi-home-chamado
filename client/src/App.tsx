@@ -22,6 +22,7 @@ const NovoChamadoPage = lazy(() => import("@/pages/chamados/novo"));
 const TicketDetailPage = lazy(() => import("@/pages/chamados/[id]"));
 const CSATAnalytics = lazy(() => import("@/pages/chamados/csat-analytics"));
 const ConfiguracoesPage = lazy(() => import("@/pages/configuracoes/index"));
+const MarkdownPage = lazy(() => import("@/pages/markdown"));
 
 function Router() {
   return (
@@ -44,6 +45,9 @@ function Router() {
       </Route>
       <Route path="/chamados/:id">
         <ProtectedRoute requiredPermission="chamados"><TicketDetailPage /></ProtectedRoute>
+      </Route>
+      <Route path="/markdown">
+        <ProtectedRoute><MarkdownPage /></ProtectedRoute>
       </Route>
       <Route path="/configuracoes">
         <ProtectedRoute requiredPermission="configuracoes"><ConfiguracoesPage /></ProtectedRoute>
