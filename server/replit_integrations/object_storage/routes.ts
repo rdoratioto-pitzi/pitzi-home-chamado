@@ -4,6 +4,9 @@ import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 
+const LOCAL_FILENAME = /^[0-9a-f-]{36}(\.[A-Za-z0-9]{1,10})?$/;
+const MAX_LOCAL_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB, igual ao Worker
+
 /**
  * Register object storage routes for file uploads.
  *
@@ -67,7 +70,7 @@ export function registerObjectStorageRoutes(app: Express): void {
 
       // Local fallback
       const objectId = randomUUID();
-      const ext = path.extname(name);
+      const ext = /^\.[A-Za-z0-9]{1,10}$/.test(path.extname(name)) ? path.extname(name) : "";
       const localFilename = `${objectId}${ext}`;
       const uploadURL = `${req.protocol}://${req.get('host')}/api/uploads/local-put/${localFilename}`;
       const objectPath = `/objects/uploads/${localFilename}`;
@@ -88,6 +91,10 @@ export function registerObjectStorageRoutes(app: Express): void {
    */
   app.put("/api/uploads/local-put/:filename", (req, res) => {
     const filename = req.params.filename;
+    // Só nomes gerados pelo servidor (UUID + extensão): impede escrita fora de uploads/.
+    if (!LOCAL_FILENAME.test(filename)) {
+      return res.status(400).json({ error: "Invalid filename" });
+    }
     const uploadDir = path.join(process.cwd(), "uploads");
 
     if (!fs.existsSync(uploadDir)) {
@@ -97,6 +104,17 @@ export function registerObjectStorageRoutes(app: Express): void {
     const filePath = path.join(uploadDir, filename);
     const writeStream = fs.createWriteStream(filePath);
 
+    let received = 0;
+    req.on("data", (chunk: Buffer) => {
+      received += chunk.length;
+      if (received > MAX_LOCAL_UPLOAD_SIZE) {
+        req.unpipe(writeStream);
+        writeStream.destroy();
+        fs.rm(filePath, { force: true }, () => {});
+        if (!res.headersSent) res.status(413).json({ error: "File too large" });
+        req.destroy();
+      }
+    });
     req.pipe(writeStream);
 
     writeStream.on("finish", () => {
@@ -126,7 +144,7 @@ export function registerObjectStorageRoutes(app: Express): void {
         const filename = objectPath.replace("/objects/uploads/", "");
         const localPath = path.join(process.cwd(), "uploads", filename);
 
-        if (fs.existsSync(localPath)) {
+        if (LOCAL_FILENAME.test(filename) && fs.existsSync(localPath)) {
           return res.sendFile(localPath);
         }
       }

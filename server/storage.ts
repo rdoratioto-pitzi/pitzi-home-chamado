@@ -85,6 +85,7 @@ import {
  } from "@shared/schema";
  import { db as defaultDb, type Database } from "./db";
  import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
+import { hashPassword, isPasswordHash } from "../shared/password";
  import { alias } from "drizzle-orm/pg-core";
  
  export type NotificationPreferences = {
@@ -462,6 +463,11 @@ import {
   deletePromptFavorite(id: string): Promise<boolean>;
 }
 
+async function hashIfPlain<T extends string | null | undefined>(password: T): Promise<T | string> {
+  if (!password || isPasswordHash(password)) return password;
+  return hashPassword(password);
+}
+
 /** Violação de unicidade do Postgres (23505), com pg (Express) ou Neon (Worker). */
 export function isUniqueViolation(error: unknown): boolean {
   const e = error as { code?: string; cause?: { code?: string } } | null;
@@ -490,14 +496,9 @@ export class DatabaseStorage implements IStorage {
       const mock = this.getMockUsers().find(u => u.email.toLowerCase() === emailLower);
       return mock;
     }
-    try {
-      const [user] = await this.db.select().from(users).where(eq(sql`LOWER(${users.email})`, emailLower));
-      return user;
-    } catch (e) {
-      console.warn("[storage] DB query failed, using mock fallback for email:", email);
-      const mock = this.getMockUsers().find(u => u.email.toLowerCase() === emailLower);
-      return mock;
-    }
+    // Falha de banco propaga o erro: nunca substituir por usuários fictícios no caminho de login.
+    const [user] = await this.db.select().from(users).where(eq(sql`LOWER(${users.email})`, emailLower));
+    return user;
   }
 
   private getMockAdmin(): User {
@@ -505,7 +506,7 @@ export class DatabaseStorage implements IStorage {
       id: "mock-admin-id",
       name: "Matheus",
       email: "Matheus@pitzi.com.br",
-      password: "MOCK_PASSWORD_DO_NOT_USE",
+      password: "", // sem senha: o login recusa usuários fictícios
       isAdmin: true,
       perfilAcesso: "diretor",
       status: "active",
@@ -535,7 +536,7 @@ export class DatabaseStorage implements IStorage {
         id: "mock-admin2-id",
         name: "Administrador",
         email: "admin@renov.com.br",
-        password: "MOCK_PASSWORD_DO_NOT_USE",
+        password: "", // sem senha: o login recusa usuários fictícios
         modulePermissions: JSON.stringify({
           chamados: true,
           projetos: true,
@@ -550,20 +551,19 @@ export class DatabaseStorage implements IStorage {
   }
   async getUsers(): Promise<User[]> {
     if (!this.db) return this.getMockUsers();
-    try {
-      return await this.db.select().from(users);
-    } catch (e) {
-      return this.getMockUsers();
-    }
+    return await this.db.select().from(users);
   }
+  // Toda gravação de senha passa por aqui: nunca armazenar texto puro.
   async createUser(insertUser: InsertUser): Promise<User> {
     if (!this.db) throw new Error("Database not connected");
-    const [user] = await this.db.insert(users).values(insertUser).returning();
+    const values = { ...insertUser, password: await hashIfPlain(insertUser.password) };
+    const [user] = await this.db.insert(users).values(values).returning();
     return user;
   }
   async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
     if (!this.db) return undefined;
-    const [user] = await this.db.update(users).set(data).where(eq(users.id, id)).returning();
+    const values = data.password === undefined ? data : { ...data, password: await hashIfPlain(data.password) };
+    const [user] = await this.db.update(users).set(values).where(eq(users.id, id)).returning();
     return user;
   }
 
