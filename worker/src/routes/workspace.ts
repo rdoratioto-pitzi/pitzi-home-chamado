@@ -28,6 +28,7 @@ import {
 } from "../../../server/services/slack-notifier.service";
 import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 import { OPEN_TICKET_STATUSES } from "../../../shared/ticket-options";
+import { getSlaForTicket } from "../../../shared/sla";
 
 /** Extrai env Slack do binding do Worker. */
 function slackEnv(envBindings: {
@@ -342,7 +343,8 @@ workspace.post("/api/workspace/chamados", async (c) => {
       assigneeId,
       applicationKey: applicationKey || null,
       priority: mappedPriority,
-      impact: "medio",
+      // No modal rápido a prioridade escolhida também é a gravidade, que define o SLA.
+      impact: ({ baixa: "baixo", media: "medio", alta: "alto", critica: "critico" } as Record<string, string>)[prioridade ?? ""] ?? "medio",
       status: "open",
       requesterId: userId,
       tenantId,
@@ -1605,111 +1607,9 @@ workspace.post("/api/workspace/chamados/:id/comentarios", async (c) => {
 
 export { workspace };
 
-// ─── SLA helpers ──────────────────────────────────────────────────────────────
+// ─── SLA ──────────────────────────────────────────────────────────────────────
+// Cálculo em shared/sla.ts (tipo × gravidade, horário comercial de Brasília).
 
-function getSlaStatus(
-  ticket: Ticket,
-  slaRules: SlaRule[],
-): "dentro_prazo" | "em_atraso" | null {
+function getSlaStatus(ticket: Ticket, slaRules: SlaRule[]): "dentro_prazo" | "em_atraso" | null {
   return getSlaForTicket(ticket, slaRules).status;
-}
-
-function getSlaForTicket(
-  ticket: Ticket,
-  slaRules: SlaRule[],
-): { slaHoras: number | null; status: "dentro_prazo" | "em_atraso" | null } {
-  const tipo = ticket.type?.toLowerCase();
-  const rule = slaRules.find(
-    (r) => r.tipo.toLowerCase() === tipo && r.prioridade === ticket.priority && r.ativo,
-  );
-
-  if (!rule || !rule.slaHoras) {
-    return { slaHoras: null, status: null };
-  }
-
-  const slaHoras = parseFloat(rule.slaHoras.toString());
-  const createdAt = ticket.dataAbertura
-    ? new Date(ticket.dataAbertura)
-    : ticket.createdAt
-      ? new Date(ticket.createdAt)
-      : null;
-
-  if (!createdAt) {
-    return { slaHoras, status: null };
-  }
-
-  const deadline = calculateBusinessSLADeadline(createdAt, slaHoras);
-
-  if (ticket.status === "closed" || ticket.status === "resolved") {
-    if (ticket.dataResolucao) {
-      const resolutionDate = new Date(ticket.dataResolucao);
-      return {
-        slaHoras,
-        status: resolutionDate > deadline ? "em_atraso" : "dentro_prazo",
-      };
-    }
-    return { slaHoras, status: "dentro_prazo" };
-  }
-
-  const now = new Date();
-  return {
-    slaHoras,
-    status: now > deadline ? "em_atraso" : "dentro_prazo",
-  };
-}
-
-function calculateBusinessSLADeadline(
-  createdAt: Date,
-  slaHours: number,
-): Date {
-  const WORK_START_HOUR = 8;
-  const WORK_HOURS_PER_DAY = 8;
-
-  const current = new Date(createdAt);
-
-  if (current.getHours() < WORK_START_HOUR) {
-    current.setHours(WORK_START_HOUR, 0, 0, 0);
-  }
-
-  if (current.getHours() >= WORK_START_HOUR + WORK_HOURS_PER_DAY) {
-    current.setDate(current.getDate() + 1);
-    current.setHours(WORK_START_HOUR, 0, 0, 0);
-    while (current.getDay() === 0 || current.getDay() === 6) {
-      current.setDate(current.getDate() + 1);
-    }
-  }
-
-  while (current.getDay() === 0 || current.getDay() === 6) {
-    current.setDate(current.getDate() + 1);
-    current.setHours(WORK_START_HOUR, 0, 0, 0);
-  }
-
-  const fullDays = Math.floor(slaHours / WORK_HOURS_PER_DAY);
-  const remainingHours = slaHours % WORK_HOURS_PER_DAY;
-
-  for (let i = 0; i < fullDays; i++) {
-    current.setDate(current.getDate() + 1);
-    while (current.getDay() === 0 || current.getDay() === 6) {
-      current.setDate(current.getDate() + 1);
-    }
-  }
-
-  const hoursLeftInDay =
-    WORK_START_HOUR + WORK_HOURS_PER_DAY - current.getHours();
-  if (remainingHours <= hoursLeftInDay) {
-    current.setHours(current.getHours() + remainingHours);
-  } else {
-    current.setDate(current.getDate() + 1);
-    while (current.getDay() === 0 || current.getDay() === 6) {
-      current.setDate(current.getDate() + 1);
-    }
-    current.setHours(
-      WORK_START_HOUR + (remainingHours - hoursLeftInDay),
-      0,
-      0,
-      0,
-    );
-  }
-
-  return current;
 }

@@ -136,7 +136,7 @@ const editFormSchema = z.object({
   category: z.string().min(1, "Selecione o grupo de atendimento"),
   type: z.string().min(1, "Selecione um tipo"),
   priority: z.string().min(1, "Selecione uma prioridade"),
-  impact: z.string().min(1, "Selecione o impacto"),
+  impact: z.string().min(1, "Selecione a gravidade"),
   assigneeId: z.string().optional(),
   status: z.string().min(1, "Selecione o status"),
   requestObject: z.string().nullable().optional(),
@@ -538,7 +538,7 @@ export default function TicketDetailPage() {
                         name="impact"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Impacto</FormLabel>
+                            <FormLabel>Gravidade</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger>
