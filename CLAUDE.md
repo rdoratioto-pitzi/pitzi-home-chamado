@@ -20,11 +20,20 @@ PostgreSQL + Drizzle ORM / Tailwind + shadcn/ui
 ```bash
 npm run dev        # Dev server — porta 5050
 npm run build      # Build produção
-npm run db:push    # Migrations (drizzle-kit push)
+npm run db:migrate # Aplica migrations/NNNN_*.sql pendentes (o deploy roda antes de publicar)
+npm run db:push    # Só em banco local descartável — nunca em dev/prod
 npm run check      # TypeScript type check
 # Reiniciar tudo:
 pkill -f tsx && pkill -f vite && npm run dev
 ```
+
+### Migrations — regra obrigatória
+
+Toda mudança em `shared/schema.ts` precisa de um arquivo `migrations/NNNN_descricao.sql`
+(próximo número livre, idempotente). O deploy do Worker executa `npm run db:migrate`
+antes de publicar; se a migration falhar, o deploy para. Arquivos com
+`-- migrate:no-transaction` rodam comando a comando (ex.: `CREATE INDEX CONCURRENTLY`).
+O Express não altera mais o schema ao iniciar.
 
 ### Aplicar SQL nos bancos Neon (dev/prod)
 

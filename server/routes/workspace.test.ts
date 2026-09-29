@@ -17,6 +17,7 @@ vi.mock("../storage", () => ({
     getTickets: vi.fn().mockResolvedValue([]),
     getTicketsForWorkspace: vi.fn().mockResolvedValue([]),
     getUsers: vi.fn().mockResolvedValue([]),
+    getUser: vi.fn().mockResolvedValue(undefined),
     getSlaRules: vi.fn().mockResolvedValue([]),
     createTicket: vi.fn().mockResolvedValue({
       id: 1,
@@ -42,8 +43,10 @@ vi.mock("../storage", () => ({
 vi.mock("../db", () => {
   const buildSelectMock = () => {
     const fromResult: any = {
+      // .where() também pode ser aguardado direto (ex.: cards sem parentCardId)
       where: vi.fn().mockImplementation(() => ({
         limit: vi.fn().mockResolvedValue([]),
+        then: (onFulfilled: any, onRejected: any) => Promise.resolve([]).then(onFulfilled, onRejected),
       })),
     };
     // Make fromResult itself awaitable (PromiseLike) resolving to []
@@ -98,6 +101,7 @@ function buildSelectMock(rows: unknown[] = []) {
   const fromResult: any = {
     where: vi.fn().mockImplementation(() => ({
       limit: vi.fn().mockResolvedValue(rows),
+      then: (onFulfilled: any, onRejected: any) => Promise.resolve(rows).then(onFulfilled, onRejected),
     })),
   };
   fromResult.then = (onFulfilled: any, onRejected: any) =>
@@ -210,7 +214,7 @@ describe("Workspace Routes", () => {
   it("POST /api/workspace/chamados with valid titulo returns 201 with codigo", async () => {
     const res = await request(app)
       .post("/api/workspace/chamados")
-      .send({ titulo: "Test ticket" });
+      .send({ titulo: "Test ticket", applicationKey: "pitzi-home" });
     expect(res.status).toBe(201);
     expect(res.body).toHaveProperty("codigo");
     expect(typeof res.body.codigo).toBe("string");

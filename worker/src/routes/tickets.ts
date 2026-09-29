@@ -10,6 +10,7 @@ import {
   insertTicketCommentSchema,
 } from "../../../shared/schema";
 import { isValidApplicationKey } from "../../../shared/applications";
+import { sameTenant } from "../../../shared/tenant";
 import { filterVisibleComments, resolveIsInternal } from "../../../shared/ticket-comments";
 import { extractMentions } from "../lib/sanitize-rich-text";
 import {
@@ -35,7 +36,7 @@ tickets.get("/api/tickets/csat/analytics", async (c) => {
   }
 
   const storage = getStorage(c.get("db"));
-  const allTickets = await storage.getTickets();
+  const allTickets = await storage.getTickets({ tenantId: user.tenantId });
   const users = await storage.getUsers();
 
   const ticketsWithCSAT = allTickets.filter(
@@ -154,12 +155,13 @@ tickets.get("/api/tickets", async (c) => {
   const storage = getStorage(c.get("db"));
 
   if (user.role === "admin") {
-    const allTickets = await storage.getTickets();
+    const allTickets = await storage.getTickets({ tenantId: user.tenantId });
     return c.json(allTickets);
   }
   const userTickets = await storage.getTickets({
     requesterId: user.userId,
     assigneeId: user.userId,
+    tenantId: user.tenantId,
   });
   return c.json(userTickets);
 });
@@ -169,7 +171,7 @@ tickets.get("/api/tickets/:id", async (c) => {
   const user = c.get("user");
   const storage = getStorage(c.get("db"));
   const ticket = await storage.getTicket(c.req.param("id"));
-  if (!ticket) return c.json({ error: "Ticket not found" }, 404);
+  if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
   if (
     user.role !== "admin" &&
     ticket.requesterId !== user.userId &&
@@ -207,7 +209,7 @@ tickets.post("/api/tickets", async (c) => {
     if (autoAssignee) validated.assigneeId = autoAssignee;
   }
 
-  const ticket = await storage.createTicket(validated);
+  const ticket = await storage.createTicket({ ...validated, tenantId: user.tenantId });
   const requester = await storage.getUser(ticket.requesterId);
   const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
 
@@ -246,7 +248,7 @@ tickets.patch("/api/tickets/:id", async (c) => {
   const env = c.env;
   const id = c.req.param("id");
   const oldTicket = await storage.getTicket(id);
-  if (!oldTicket) return c.json({ error: "Ticket not found" }, 404);
+  if (!oldTicket || !sameTenant(oldTicket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
 
   if (
     user.role !== "admin" &&
@@ -257,7 +259,9 @@ tickets.patch("/api/tickets/:id", async (c) => {
   }
 
   const body = await c.req.json();
-  let updateData: any = { ...body };
+  // Campos de identidade e escopo não são alteráveis pela API.
+  const { id: _id, code: _code, tenantId: _tenantId, createdAt: _createdAt, ...editable } = body ?? {};
+  let updateData: any = { ...editable };
 
   if (updateData.applicationKey !== undefined && updateData.applicationKey !== null) {
     if (!isValidApplicationKey(updateData.applicationKey)) {
@@ -309,7 +313,7 @@ tickets.patch("/api/tickets/:id", async (c) => {
   }
 
   const ticket = await storage.updateTicket(id, updateData);
-  if (!ticket) return c.json({ error: "Ticket not found" }, 404);
+  if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
 
   // Status change email + notification
   if (body.status && body.status !== oldTicket.status) {
@@ -361,7 +365,7 @@ tickets.delete("/api/tickets/:id", async (c) => {
   const storage = getStorage(c.get("db"));
   const id = c.req.param("id");
   const ticket = await storage.getTicket(id);
-  if (!ticket) return c.json({ error: "Ticket not found" }, 404);
+  if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
   if (
     user.role !== "admin" &&
     ticket.requesterId !== user.userId &&
@@ -380,7 +384,7 @@ tickets.get("/api/tickets/:id/comments", async (c) => {
   const storage = getStorage(c.get("db"));
   const id = c.req.param("id");
   const ticket = await storage.getTicket(id);
-  if (!ticket) return c.json({ error: "Ticket not found" }, 404);
+  if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
   if (
     user.role !== "admin" &&
     ticket.requesterId !== user.userId &&
@@ -400,7 +404,7 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
   const env = c.env;
   const id = c.req.param("id");
   const ticket = await storage.getTicket(id);
-  if (!ticket) return c.json({ error: "Ticket not found" }, 404);
+  if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
 
   if (
     user.role !== "admin" &&
@@ -416,6 +420,7 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
     ...body,
     ticketId: id,
     userId: user.userId,
+    tenantId: ticket.tenantId,
     isInternal: resolveIsInternal(body?.isInternal, viewer, ticket),
     mentions: extractMentions(body?.content),
   });
@@ -574,7 +579,7 @@ tickets.patch("/api/tickets/:id/satisfaction", async (c) => {
   const id = c.req.param("id");
   const ticket = await storage.getTicket(id);
 
-  if (!ticket) return c.json({ error: "Ticket not found" }, 404);
+  if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
   if (ticket.requesterId !== user.userId) {
     return c.json({ error: "Apenas o solicitante pode avaliar este chamado" }, 403);
   }

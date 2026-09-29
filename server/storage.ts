@@ -82,10 +82,12 @@ import {
   // Git Analytics
   gitRepositories, gitCommits, gitPullRequests, gitSecurityAlerts, gitBranches,
   claudeCodeUsageReports,
+  refreshTokens,
+  passwordResetTokens,
  } from "@shared/schema";
  import { db as defaultDb, type Database } from "./db";
- import { eq, and, or, sql, asc, desc, gt, type SQL } from "drizzle-orm";
-import { hashPassword, isPasswordHash } from "../shared/password";
+ import { eq, and, or, sql, asc, desc, gt, isNull, type SQL } from "drizzle-orm";
+import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../shared/password";
  import { alias } from "drizzle-orm/pg-core";
  
  export type NotificationPreferences = {
@@ -116,10 +118,12 @@ import { hashPassword, isPasswordHash } from "../shared/password";
   getUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+  createPasswordResetToken(userId: string): Promise<string | null>;
+  resetPasswordWithToken(token: string, newPassword: string): Promise<boolean>;
 
   // Tickets
   getTicket(id: string): Promise<Ticket | undefined>;
-  getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]>;
+  getTickets(filters?: TicketFilters): Promise<Ticket[]>;
   createTicket(ticket: InsertTicket): Promise<Ticket>;
   updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined>;
   deleteTicket(id: string): Promise<boolean>;
@@ -468,6 +472,31 @@ async function hashIfPlain<T extends string | null | undefined>(password: T): Pr
   return hashPassword(password);
 }
 
+export interface TicketFilters {
+  requesterId?: string;
+  assigneeId?: string;
+  /** Quando presente (inclusive null), restringe ao tenant — null casa só com tenant_id NULL. */
+  tenantId?: string | null;
+}
+
+function ticketFilterConditions(filters: TicketFilters): SQL[] {
+  const conditions: SQL[] = [];
+  if (filters.requesterId && filters.assigneeId) {
+    conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
+  } else if (filters.requesterId) {
+    conditions.push(eq(tickets.requesterId, filters.requesterId));
+  } else if (filters.assigneeId) {
+    conditions.push(eq(tickets.assigneeId, filters.assigneeId));
+  }
+  if ("tenantId" in filters) {
+    conditions.push(filters.tenantId == null ? isNull(tickets.tenantId) : eq(tickets.tenantId, filters.tenantId));
+  }
+  return conditions;
+}
+
+const RESET_TOKEN_TTL_MS = 30 * 60 * 1000;
+const RESET_TOKENS_PER_HOUR = 3;
+
 /** Violação de unicidade do Postgres (23505), com pg (Express) ou Neon (Worker). */
 export function isUniqueViolation(error: unknown): boolean {
   const e = error as { code?: string; cause?: { code?: string } } | null;
@@ -564,7 +593,60 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) return undefined;
     const values = data.password === undefined ? data : { ...data, password: await hashIfPlain(data.password) };
     const [user] = await this.db.update(users).set(values).where(eq(users.id, id)).returning();
+    // Senha nova (texto puro recebido) ou desativação encerram todas as sessões do usuário.
+    // Um hash recebido é só a migração da mesma senha no login e não derruba sessões.
+    const passwordChanged = typeof data.password === "string" && !isPasswordHash(data.password);
+    const deactivated = data.status !== undefined && data.status !== "active";
+    if (user && (passwordChanged || deactivated)) {
+      await this.db.delete(refreshTokens).where(eq(refreshTokens.userId, id));
+    }
     return user;
+  }
+
+  /**
+   * Novo link de redefinição de senha. Invalida links anteriores do usuário e limita a
+   * RESET_TOKENS_PER_HOUR pedidos por hora; retorna null quando o limite foi atingido.
+   */
+  async createPasswordResetToken(userId: string): Promise<string | null> {
+    if (!this.db) throw new Error("Database not connected");
+    const since = new Date(Date.now() - 60 * 60 * 1000);
+    const [{ recent }] = await this.db
+      .select({ recent: sql<number>`count(*)::int` })
+      .from(passwordResetTokens)
+      .where(and(eq(passwordResetTokens.userId, userId), gt(passwordResetTokens.createdAt, since)));
+    if (recent >= RESET_TOKENS_PER_HOUR) return null;
+
+    // Invalida links anteriores sem apagá-los: continuam contando para o limite por hora.
+    await this.db
+      .update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(and(eq(passwordResetTokens.userId, userId), isNull(passwordResetTokens.usedAt)));
+    const token = generateResetToken();
+    await this.db.insert(passwordResetTokens).values({
+      userId,
+      tokenHash: await sha256Hex(token),
+      expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
+    });
+    return token;
+  }
+
+  /** Consome o link (uso único, dentro do prazo) e troca a senha; a troca encerra as sessões. */
+  async resetPasswordWithToken(token: string, newPassword: string): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+    const [consumed] = await this.db
+      .update(passwordResetTokens)
+      .set({ usedAt: new Date() })
+      .where(and(
+        eq(passwordResetTokens.tokenHash, await sha256Hex(token)),
+        isNull(passwordResetTokens.usedAt),
+        gt(passwordResetTokens.expiresAt, new Date()),
+      ))
+      .returning({ userId: passwordResetTokens.userId });
+    if (!consumed) return false;
+    const user = await this.getUser(consumed.userId);
+    if (!user || user.status !== "active") return false;
+    await this.updateUser(user.id, { password: newPassword });
+    return true;
   }
 
   // Tickets
@@ -590,19 +672,12 @@ export class DatabaseStorage implements IStorage {
     if (!result) return undefined;
     return { ...result.ticket, requesterName: result.requesterName, assigneeName: result.assigneeName };
   }
-  async getTickets(filters?: { requesterId?: string; assigneeId?: string }): Promise<Ticket[]> {
+  async getTickets(filters?: TicketFilters): Promise<Ticket[]> {
     if (!this.db) throw new Error("Database not connected");
     try {
       let query = this.db.select().from(tickets);
       if (filters) {
-        const conditions: SQL[] = [];
-        if (filters.requesterId && filters.assigneeId) {
-          conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
-        } else if (filters.requesterId) {
-          conditions.push(eq(tickets.requesterId, filters.requesterId));
-        } else if (filters.assigneeId) {
-          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
-        }
+        const conditions = ticketFilterConditions(filters);
         
         if (conditions.length > 0) {
           return await query.where(and(...conditions));
@@ -614,7 +689,7 @@ export class DatabaseStorage implements IStorage {
       throw e;
     }
   }
-  async getTicketsForListing(filters?: { requesterId?: string; assigneeId?: string }) {
+  async getTicketsForListing(filters?: TicketFilters) {
     if (!this.db) throw new Error("Database not connected");
     try {
       const requester = alias(users, "requester");
@@ -644,14 +719,7 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(assignee, eq(tickets.assigneeId, assignee.id));
 
       if (filters) {
-        const conditions: SQL[] = [];
-        if (filters.requesterId && filters.assigneeId) {
-          conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
-        } else if (filters.requesterId) {
-          conditions.push(eq(tickets.requesterId, filters.requesterId));
-        } else if (filters.assigneeId) {
-          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
-        }
+        const conditions = ticketFilterConditions(filters);
 
         if (conditions.length > 0) {
           return await baseQuery.where(and(...conditions));
@@ -663,7 +731,7 @@ export class DatabaseStorage implements IStorage {
       throw e;
     }
   }
-  async getTicketsForWorkspace(filters?: { requesterId?: string; assigneeId?: string }) {
+  async getTicketsForWorkspace(filters?: TicketFilters) {
     if (!this.db) throw new Error("Database not connected");
     try {
       const baseQuery = this.db
@@ -689,14 +757,7 @@ export class DatabaseStorage implements IStorage {
         .from(tickets);
 
       if (filters) {
-        const conditions: SQL[] = [];
-        if (filters.requesterId && filters.assigneeId) {
-          conditions.push(or(eq(tickets.requesterId, filters.requesterId), eq(tickets.assigneeId, filters.assigneeId))!);
-        } else if (filters.requesterId) {
-          conditions.push(eq(tickets.requesterId, filters.requesterId));
-        } else if (filters.assigneeId) {
-          conditions.push(eq(tickets.assigneeId, filters.assigneeId));
-        }
+        const conditions = ticketFilterConditions(filters);
         if (conditions.length > 0) {
           return await baseQuery.where(and(...conditions));
         }
