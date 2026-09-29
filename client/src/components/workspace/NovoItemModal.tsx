@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSupportGroups } from "@/hooks/use-support-groups";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -170,6 +171,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
 
   // Chamado chip state
   const [categoriaChamado, setCategoriaChamado] = useState("");
+  const { groups: supportGroups } = useSupportGroups();
   const [tipoChamado, setTipoChamado] = useState("");
   const [prioridadeChamado, setPrioridadeChamado] = useState("media");
   const [applicationKeyChamado, setApplicationKeyChamado] = useState<string | null>(null);
@@ -359,7 +361,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
       return;
     }
     if (type === "chamado" && !categoriaChamado) {
-      toast({ title: "Selecione a categoria", variant: "destructive" });
+      toast({ title: "Selecione o grupo de atendimento", variant: "destructive" });
       return;
     }
     if (type === "chamado" && !tipoChamado) {
@@ -593,15 +595,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
               <ChipSelect
                 value={categoriaChamado}
                 onValueChange={setCategoriaChamado}
-                placeholder="Categoria *"
-                options={[
-                  { value: "ti-sistemas", label: "TI/Sistemas" },
-                  { value: "comercial", label: "Comercial" },
-                  { value: "logistica", label: "Logística" },
-                  { value: "financeiro", label: "Financeiro" },
-                  { value: "operacoes", label: "Operações" },
-                  { value: "rh", label: "RH" },
-                ]}
+                placeholder="Grupo de atendimento *"
+                options={supportGroups.map(g => ({ value: g.key, label: g.name }))}
               />
               <ChipSelect
                 value={tipoChamado}

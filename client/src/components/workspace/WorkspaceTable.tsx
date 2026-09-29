@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSupportGroups } from "@/hooks/use-support-groups";
 import { Badge } from "@/components/ui/badge";
 import { getApplicationLabel } from "@shared/applications";
 import {
@@ -516,6 +517,7 @@ function ChamadoItemRow({ item, colTemplate, onRowClick, onDelete, onStatusChang
   onStatusChange?: (item: ChamadoItem, s: string) => void;
   onPriorityChange?: (item: ChamadoItem, p: string) => void;
 }) {
+  const { groupName } = useSupportGroups();
   const typeColor = typeColors[item.tipo?.toLowerCase()] || "bg-slate-500/10 text-slate-400";
   const prioColor = priorityColors[item.prioridade] || priorityColors.medium;
 
@@ -541,7 +543,7 @@ function ChamadoItemRow({ item, colTemplate, onRowClick, onDelete, onStatusChang
       </span>
       <div className="flex items-center gap-1.5 min-w-0 truncate">
         <span className="text-xs truncate" style={{ color: "var(--l2)" }}>
-          {item.categoria}
+          {groupName(item.categoria)}
         </span>
         <span style={{ color: "var(--l4)" }}>·</span>
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 border ${typeColor}`}>
