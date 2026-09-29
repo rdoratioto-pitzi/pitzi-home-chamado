@@ -107,6 +107,8 @@ export type AppEnv = {
   Variables: Variables;
 };
 
+import { activeRoutesMiddleware } from "./middleware/active-routes";
+
 const app = new Hono<AppEnv>();
 
 // Error handler
@@ -114,6 +116,7 @@ app.onError(errorHandler);
 
 // CORS
 app.use("*", createCorsMiddleware());
+app.use("*", activeRoutesMiddleware);
 
 // Per-request DB
 app.use("*", async (c, next) => {
