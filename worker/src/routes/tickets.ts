@@ -194,9 +194,11 @@ tickets.post("/api/tickets", async (c) => {
     data.requesterId = user.userId;
   }
 
-  if (!isValidApplicationKey(data.applicationKey)) {
-    return c.json({ error: "Aplicação é obrigatória e deve ser válida" }, 400);
+  // Aplicação é opcional: o formulário não pede mais; se vier, precisa ser válida.
+  if (data.applicationKey && !isValidApplicationKey(data.applicationKey)) {
+    return c.json({ error: "Aplicação inválida" }, 400);
   }
+  data.applicationKey = data.applicationKey || null;
 
   const validated = insertTicketSchema.parse(data);
 

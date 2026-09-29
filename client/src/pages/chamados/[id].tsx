@@ -52,7 +52,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
 import { useSupportGroups } from "@/hooks/use-support-groups";
-import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 import { getApplicationLabel } from "@shared/applications";
 
 const statusColors: Record<string, string> = {
@@ -149,7 +148,6 @@ const editFormSchema = z.object({
   description: z.string().max(5000, "Descrição deve ter no máximo 5.000 caracteres"),
   category: z.string().min(1, "Selecione o grupo de atendimento"),
   type: z.string().min(1, "Selecione um tipo"),
-  applicationKey: z.string().min(1, "Selecione a aplicação"),
   priority: z.string().min(1, "Selecione uma prioridade"),
   impact: z.string().min(1, "Selecione o impacto"),
   assigneeId: z.string().optional(),
@@ -250,7 +248,6 @@ export default function TicketDetailPage() {
       description: "",
       category: "",
       type: "",
-      applicationKey: "",
       priority: "medium",
       impact: "medio",
       assigneeId: "",
@@ -266,7 +263,6 @@ export default function TicketDetailPage() {
         description: ticket.description || "",
         category: ticket.category,
         type: ticket.type || "",
-        applicationKey: ticket.applicationKey || "",
         priority: ticket.priority,
         impact: ticket.impact || "medio",
         assigneeId: ticket.assigneeId || "",
@@ -519,23 +515,6 @@ export default function TicketDetailPage() {
                           </FormItem>
                         )}
                       />
-                      <FormField
-                        control={editForm.control}
-                        name="applicationKey"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Aplicação</FormLabel>
-                            <FormControl>
-                              <ApplicationSelect
-                                value={field.value || null}
-                                onChange={(v) => field.onChange(v ?? "")}
-                                required
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
@@ -665,7 +644,9 @@ export default function TicketDetailPage() {
                   <div className="flex flex-wrap gap-2 mb-4">
                     <Badge variant="outline">{categories.find(c => c.value === ticket.category)?.label || ticket.category}</Badge>
                     <Badge variant="outline">{typeLabels[ticket.type as keyof typeof typeLabels] || ticket.type}</Badge>
-                    <Badge variant="outline">{getApplicationLabel(ticket.applicationKey)}</Badge>
+                    {ticket.applicationKey && (
+                      <Badge variant="outline">{getApplicationLabel(ticket.applicationKey)}</Badge>
+                    )}
                     <Badge variant="outline">{priorityLabels[ticket.priority as keyof typeof priorityLabels]}</Badge>
                   </div>
                   <div className="prose prose-sm dark:prose-invert max-w-none">
