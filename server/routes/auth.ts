@@ -2,8 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { storage } from "../storage";
-import { generateTemporaryPassword, hashPassword, verifyPassword } from "@shared/password";
-import { sendPasswordResetEmail } from "../email-service";
+import { hashPassword, verifyPassword } from "@shared/password";
+import { passwordResetUrl, sendPasswordResetLinkEmail } from "../email-service";
 
 // Rate limiter para tentativas de login - protege contra força bruta
 const loginLimiter = rateLimit({
@@ -122,31 +122,23 @@ export function registerAuthRoutes(router: Router) {
   });
 
   router.post("/api/auth/forgot-password", forgotPasswordLimiter, async (req, res) => {
+    // Sempre a mesma resposta, para não revelar quais e-mails existem.
+    const successMsg = "Se o email estiver cadastrado, você receberá um link para redefinir a senha.";
     try {
       const validated = forgotPasswordSchema.parse(req.body);
-      const users = await storage.getUsers();
-      const user = users.find(u => u.email.toLowerCase() === validated.email.toLowerCase());
-
-      if (!user) {
-        return res.json({ success: true, message: "Se o email estiver cadastrado, você receberá uma nova senha temporária." });
+      const user = await storage.getUserByEmail(validated.email);
+      if (!user || user.status !== "active") {
+        return res.json({ success: true, message: successMsg });
       }
 
-      if (user.status !== "active") {
-        return res.json({ success: true, message: "Se o email estiver cadastrado, você receberá uma nova senha temporária." });
+      // Não altera a senha: gera um link de uso único. Acima do limite por hora, não envia.
+      const token = await storage.createPasswordResetToken(user.id);
+      if (token) {
+        sendPasswordResetLinkEmail(user, passwordResetUrl(token)).catch((error) =>
+          console.error("[auth] Failed to send password reset email:", error),
+        );
       }
-
-      const temporaryPassword = generateTemporaryPassword();
-
-      await storage.updateUser(user.id, { password: temporaryPassword });
-
-      try {
-        await sendPasswordResetEmail(user, temporaryPassword);
-      } catch (emailError) {
-        console.error(`[auth] Failed to send password reset email:`, emailError);
-        return res.status(500).json({ success: false, message: "Erro ao enviar o email. Tente novamente mais tarde." });
-      }
-
-      res.json({ success: true, message: "Se o email estiver cadastrado, você receberá uma nova senha temporária." });
+      res.json({ success: true, message: successMsg });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ success: false, message: "Email inválido" });
@@ -154,5 +146,22 @@ export function registerAuthRoutes(router: Router) {
       console.error("[auth] Password reset error:", error);
       res.status(500).json({ success: false, message: "Erro interno. Tente novamente mais tarde." });
     }
+  });
+
+  const resetPasswordSchema = z.object({
+    token: z.string().min(20),
+    password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres"),
+  });
+
+  router.post("/api/auth/reset-password", forgotPasswordLimiter, async (req, res) => {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, message: parsed.error.errors[0]?.message ?? "Dados inválidos" });
+    }
+    const ok = await storage.resetPasswordWithToken(parsed.data.token, parsed.data.password);
+    if (!ok) {
+      return res.status(400).json({ success: false, message: "Link inválido ou expirado. Solicite um novo." });
+    }
+    res.json({ success: true, message: "Senha redefinida. Entre com a nova senha." });
   });
 }

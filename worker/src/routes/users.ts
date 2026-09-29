@@ -2,6 +2,7 @@
 import { Hono } from "hono";
 import { insertUserSchema } from "../../../shared/schema";
 import { generateTemporaryPassword, withoutPassword } from "../../../shared/password";
+import { sameTenant } from "../../../shared/tenant";
 import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
@@ -12,7 +13,8 @@ const users = new Hono<AppEnv>();
 // GET /api/users (auth)
 users.get("/api/users", async (c) => {
   const storage = getStorage(c.get("db"));
-  const allUsers = await storage.getUsers();
+  const { tenantId } = c.get("user");
+  const allUsers = (await storage.getUsers()).filter((u) => sameTenant(u.tenantId, tenantId));
   allUsers.sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   const safeUsers = allUsers.map(({ password, ...user }) => user);
   return c.json(safeUsers);
@@ -22,7 +24,7 @@ users.get("/api/users", async (c) => {
 users.get("/api/users/:id", requireAdmin, async (c) => {
   const storage = getStorage(c.get("db"));
   const user = await storage.getUser(c.req.param("id"));
-  if (!user) return c.json({ error: "User not found" }, 404);
+  if (!user || !sameTenant(user.tenantId, c.get("user").tenantId)) return c.json({ error: "User not found" }, 404);
   const { password, ...safeUser } = user;
   return c.json(safeUser);
 });
@@ -31,7 +33,8 @@ users.get("/api/users/:id", requireAdmin, async (c) => {
 users.post("/api/users", requireAdmin, async (c) => {
   const storage = getStorage(c.get("db"));
   const validated = insertUserSchema.parse(await c.req.json());
-  const user = await storage.createUser(validated);
+  // Admin cria usuários no próprio tenant.
+  const user = await storage.createUser({ ...validated, tenantId: c.get("user").tenantId });
 
   if (validated.password) {
     const emailResult = await sendWelcomeEmail(c.env, user, validated.password);
@@ -46,8 +49,10 @@ users.post("/api/users", requireAdmin, async (c) => {
 // PATCH /api/users/:id (admin)
 users.patch("/api/users/:id", requireAdmin, async (c) => {
   const storage = getStorage(c.get("db"));
-  const validated = insertUserSchema.partial().parse(await c.req.json());
-  const user = await storage.updateUser(c.req.param("id"), validated);
+  const target = await storage.getUser(c.req.param("id"));
+  if (!target || !sameTenant(target.tenantId, c.get("user").tenantId)) return c.json({ error: "User not found" }, 404);
+  const { tenantId: _tenantId, ...validated } = insertUserSchema.partial().parse(await c.req.json());
+  const user = await storage.updateUser(target.id, validated);
   if (!user) return c.json({ error: "User not found" }, 404);
   return c.json(withoutPassword(user));
 });
@@ -56,7 +61,7 @@ users.patch("/api/users/:id", requireAdmin, async (c) => {
 users.post("/api/users/:id/reset-password", requireAdmin, async (c) => {
   const storage = getStorage(c.get("db"));
   const user = await storage.getUser(c.req.param("id"));
-  if (!user) return c.json({ error: "User not found" }, 404);
+  if (!user || !sameTenant(user.tenantId, c.get("user").tenantId)) return c.json({ error: "User not found" }, 404);
 
   const temporaryPassword = generateTemporaryPassword();
 

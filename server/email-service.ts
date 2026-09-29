@@ -40,6 +40,10 @@ function getBaseUrl(): string {
 
 const BASE_URL = getBaseUrl();
 
+export function passwordResetUrl(token: string): string {
+  return `${BASE_URL}/redefinir-senha?token=${encodeURIComponent(token)}`;
+}
+
 function smtpConfigured(): boolean {
   return !!(process.env.SMTP_USER && process.env.SMTP_PASS);
 }
@@ -116,6 +120,32 @@ export async function sendPasswordResetEmail(
     console.error("[EMAIL] Falha ao enviar redefinição de senha:", error);
     throw error;
   }
+}
+
+/** Link de redefinição de senha (fluxo público). A senha só muda quando o link é usado. */
+export async function sendPasswordResetLinkEmail(user: User, resetUrl: string): Promise<void> {
+  if (!smtpConfigured()) {
+    logEmailSkipped("password_reset_link", "SMTP não configurado");
+    return;
+  }
+  const html = emailTemplate({
+    title: "Redefinição de Senha",
+    greeting: `Olá ${user.name},`,
+    body: `
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Recebemos uma solicitação para redefinir sua senha no Pitzi Home.</p>
+      <p style="color:#334155;font-size:14px;line-height:1.6;">Clique no botão abaixo para escolher uma nova senha. O link vale por 30 minutos e só pode ser usado uma vez.</p>
+      <p style="margin-top:24px;font-size:12px;color:#94a3b8;">Se você não solicitou esta redefinição, ignore este e-mail: sua senha atual continua valendo.</p>
+    `,
+    ctaText: "Redefinir senha",
+    ctaUrl: resetUrl,
+  });
+  await transporter.sendMail({
+    from: getFromAddress(),
+    to: user.email,
+    subject: "Pitzi Home - Redefinição de Senha",
+    html,
+  });
+  logEmailSent("password_reset_link", [user.email]);
 }
 
 export async function sendWelcomeEmail(

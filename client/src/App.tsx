@@ -20,6 +20,7 @@ const ProtectedRoute = lazy(() => import("@/components/protected-route").then(m 
 const NotFound                         = lazy(() => import("@/pages/not-found"));
 const Home                             = lazy(() => import("@/pages/home"));
 const LoginPage                        = lazy(() => import("@/pages/login"));
+const RedefinirSenhaPage               = lazy(() => import("@/pages/redefinir-senha"));
 const ChatIAPage                       = lazy(() => import("@/pages/macgyver-ia/index"));
 const ChamadosPage                     = lazy(() => import("@/pages/chamados/index"));
 const CSATAnalytics                    = lazy(() => import("@/pages/chamados/csat-analytics"));
@@ -462,6 +463,9 @@ function Router() {
       <Route path="/login">
         <LoginPage />
       </Route>
+      <Route path="/redefinir-senha">
+        <RedefinirSenhaPage />
+      </Route>
       <Route path="/configuracoes">
         <ProtectedRoute requiredPermission="configuracoes">
           <ConfiguracoesPage />
@@ -544,7 +548,8 @@ function Router() {
 
 function AppContent() {
   const [location] = useLocation();
-  const isLoginPage = location === "/login";
+  // Telas públicas, sem sidebar nem verificação de sessão.
+  const isLoginPage = location === "/login" || location === "/redefinir-senha";
 
   // Hook para sincronização de autenticação entre abas
   useAuthSync();
