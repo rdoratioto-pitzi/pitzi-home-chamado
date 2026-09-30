@@ -4,6 +4,8 @@ import {
   type TicketResponsavel, type InsertTicketResponsavel,
   type SupportGroup, type SupportGroupWithMembers,
   type TicketCustomField, type InsertTicketCustomField,
+  type CannedResponse, type InsertCannedResponse,
+  type AutomationRule, type InsertAutomationRule,
   type TicketComment, type InsertTicketComment,
   type TicketCommentWithUser,
   type KanbanCommentWithUser,
@@ -68,7 +70,7 @@ import {
   type ClaudeCodeUsageReport, type InsertClaudeCodeUsage,
   type KanbanLabel, type InsertKanbanLabel,
   type KanbanCardDependency, type InsertKanbanCardDependency,
-  users, tickets, ticketResponsaveis, supportGroups, supportGroupMembers, ticketCustomFields, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
+  users, tickets, ticketResponsaveis, supportGroups, supportGroupMembers, ticketCustomFields, cannedResponses, automationRules, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   kanbanLabels, kanbanCardDependencies,
   objectives, keyResults, keyResultUpdates, initiatives, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
@@ -151,6 +153,20 @@ import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../
   createTicketCustomField(data: InsertTicketCustomField): Promise<TicketCustomField>;
   updateTicketCustomField(id: string, data: Partial<InsertTicketCustomField>): Promise<TicketCustomField | undefined>;
   deleteTicketCustomField(id: string): Promise<boolean>;
+
+  // Respostas prontas e automações (shared/automations.ts)
+  getCannedResponses(): Promise<CannedResponse[]>;
+  getCannedResponse(id: string): Promise<CannedResponse | undefined>;
+  createCannedResponse(data: InsertCannedResponse): Promise<CannedResponse>;
+  updateCannedResponse(id: string, data: Partial<InsertCannedResponse>): Promise<CannedResponse | undefined>;
+  deleteCannedResponse(id: string): Promise<boolean>;
+  getAutomationRules(trigger?: string): Promise<AutomationRule[]>;
+  getAutomationRule(id: string): Promise<AutomationRule | undefined>;
+  createAutomationRule(data: InsertAutomationRule): Promise<AutomationRule>;
+  updateAutomationRule(id: string, data: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined>;
+  deleteAutomationRule(id: string): Promise<boolean>;
+  /** Chamados em "Aguardando solicitante" há pelo menos `days` dias corridos. */
+  getTicketsWaitingRequesterSince(days: number): Promise<Ticket[]>;
 
   // Ticket Comments
   getTicketComments(ticketId: string): Promise<TicketCommentWithUser[]>;
@@ -877,6 +893,74 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) throw new Error("Database not connected");
     const result = await this.db.delete(ticketCustomFields).where(eq(ticketCustomFields.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getCannedResponses(): Promise<CannedResponse[]> {
+    if (!this.db) throw new Error("Database not connected");
+    return await this.db.select().from(cannedResponses)
+      .orderBy(asc(cannedResponses.sortOrder), asc(cannedResponses.title));
+  }
+  async getCannedResponse(id: string): Promise<CannedResponse | undefined> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.select().from(cannedResponses).where(eq(cannedResponses.id, id));
+    return row;
+  }
+  async createCannedResponse(data: InsertCannedResponse): Promise<CannedResponse> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.insert(cannedResponses).values(data).returning();
+    return row;
+  }
+  async updateCannedResponse(id: string, data: Partial<InsertCannedResponse>): Promise<CannedResponse | undefined> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.update(cannedResponses)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(cannedResponses.id, id))
+      .returning();
+    return row;
+  }
+  async deleteCannedResponse(id: string): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+    const result = await this.db.delete(cannedResponses).where(eq(cannedResponses.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getAutomationRules(trigger?: string): Promise<AutomationRule[]> {
+    if (!this.db) throw new Error("Database not connected");
+    const base = this.db.select().from(automationRules);
+    const query = trigger ? base.where(eq(automationRules.trigger, trigger)) : base;
+    return await query.orderBy(asc(automationRules.sortOrder), asc(automationRules.name));
+  }
+  async getAutomationRule(id: string): Promise<AutomationRule | undefined> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.select().from(automationRules).where(eq(automationRules.id, id));
+    return row;
+  }
+  async createAutomationRule(data: InsertAutomationRule): Promise<AutomationRule> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.insert(automationRules).values(data).returning();
+    return row;
+  }
+  async updateAutomationRule(id: string, data: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.update(automationRules)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(automationRules.id, id))
+      .returning();
+    return row;
+  }
+  async deleteAutomationRule(id: string): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+    const result = await this.db.delete(automationRules).where(eq(automationRules.id, id)).returning();
+    return result.length > 0;
+  }
+  async getTicketsWaitingRequesterSince(days: number): Promise<Ticket[]> {
+    if (!this.db) throw new Error("Database not connected");
+    // Comparação feita no banco (now() e as colunas no mesmo relógio): evita o desvio de
+    // fuso ao ler colunas timestamp sem fuso pelo driver.
+    return await this.db.select().from(tickets).where(and(
+      eq(tickets.status, "waiting_requester"),
+      sql`coalesce(${tickets.slaPausadoEm}, ${tickets.updatedAt}) <= now() - make_interval(days => ${days})`,
+    ));
   }
 
   async setSupportGroupMembers(groupId: string, userIds: string[], tenantId: string | null): Promise<void> {
