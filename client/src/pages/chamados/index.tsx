@@ -127,55 +127,16 @@ const getTypeColor = (type: string): string => {
   return "bg-slate-500/10 text-slate-600 dark:text-slate-400";
 };
 
-import { format, addHours, isWeekend, isBefore, addDays, getHours, setHours, setMinutes, setSeconds, addBusinessDays, isAfter, subHours } from "date-fns";
-import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import { format } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { getApplicationLabel } from "@shared/applications";
+import { getSlaForTicket } from "@shared/sla";
+import { OPEN_TICKET_STATUSES } from "@shared/ticket-options";
 
 const TIMEZONE = "America/Sao_Paulo";
 const WORK_START_HOUR = 8;
 const WORK_HOURS_PER_DAY = 8;
 
-function calculateBusinessSLADeadline(createdAt: Date, slaHours: number): Date {
-  // Use UTC base for calculations to avoid local JS timezone offsets
-  const zonedCreated = toZonedTime(createdAt, TIMEZONE);
-  let current = new Date(zonedCreated);
-
-  // If created before 08:00, move to 08:00 of the same day
-  if (getHours(current) < WORK_START_HOUR) {
-    current = setHours(setMinutes(setSeconds(current, 0), 0), WORK_START_HOUR);
-  }
-
-  // If created after 16:00 (WORK_START_HOUR + WORK_HOURS_PER_DAY), move to next business day at 08:00
-  if (getHours(current) >= WORK_START_HOUR + WORK_HOURS_PER_DAY) {
-    current = addBusinessDays(setHours(setMinutes(setSeconds(current, 0), 0), WORK_START_HOUR), 1);
-  }
-
-  // Ensure we are not on a weekend
-  if (isWeekend(current)) {
-    current = addBusinessDays(current, 1);
-    current = setHours(setMinutes(setSeconds(current, 0), 0), WORK_START_HOUR);
-  }
-
-  const fullDays = Math.floor(slaHours / WORK_HOURS_PER_DAY);
-  const remainingHours = slaHours % WORK_HOURS_PER_DAY;
-
-  // Add full business days
-  let deadline = addBusinessDays(current, fullDays);
-
-  // Calculate hours remaining in the current business day
-  const currentHour = getHours(deadline);
-  const hoursLeftInDay = (WORK_START_HOUR + WORK_HOURS_PER_DAY) - currentHour;
-
-  if (remainingHours <= hoursLeftInDay) {
-    deadline = addHours(deadline, remainingHours);
-  } else {
-    // Move to next business day and add the spillover hours
-    deadline = addBusinessDays(setHours(setMinutes(setSeconds(deadline, 0), 0), WORK_START_HOUR), 1);
-    deadline = addHours(deadline, remainingHours - hoursLeftInDay);
-  }
-
-  return deadline;
-}
 
 // Helper function to format date for display in PT-BR accounting for timezone
 const formatDisplayDate = (date: Date | string | null): string => {
@@ -267,45 +228,6 @@ const calculateTimeOpen = (createdAt: Date | string | null): { text: string; col
   return { text, colorClass };
 };
 
-// Helper function to get SLA for a ticket
-const getSlaForTicket = (
-  ticket: TicketListing | Ticket,
-  slaRules: SlaRule[]
-): { slaHoras: number | null; status: "dentro_prazo" | "em_atraso" | null } => {
-  const tipo = ticket.type?.toLowerCase();
-  
-  // Buscar regra de SLA para qualquer tipo de ticket que tenha regra correspondente
-  const rule = slaRules.find(
-    r => r.tipo.toLowerCase() === tipo && r.prioridade === ticket.priority && r.ativo
-  );
-
-  if (!rule || !rule.slaHoras) {
-    return { slaHoras: null, status: null };
-  }
-
-  const slaHoras = parseFloat(rule.slaHoras.toString());
-  const createdAt = ticket.dataAbertura ? new Date(ticket.dataAbertura) : ticket.createdAt ? new Date(ticket.createdAt) : null;
-
-  if (!createdAt) {
-    return { slaHoras, status: null };
-  }
-
-  const deadline = calculateBusinessSLADeadline(createdAt, slaHoras);
-
-  if (ticket.status === "closed" || ticket.status === "resolved") {
-    if (ticket.dataResolucao) {
-      const resolutionDate = new Date(ticket.dataResolucao);
-      return isAfter(resolutionDate, deadline) ? { slaHoras, status: "em_atraso" } : { slaHoras, status: "dentro_prazo" };
-    }
-    return { slaHoras, status: "dentro_prazo" };
-  }
-
-  const now = new Date();
-  return {
-    slaHoras,
-    status: isAfter(now, deadline) ? "em_atraso" : "dentro_prazo",
-  };
-};
 
 type SortField = "code" | "title" | "category" | "priority" | "status" | "createdAt" | "requesterId";
 type SortOrder = "asc" | "desc";
@@ -415,8 +337,8 @@ export default function ChamadosPage() {
 
       let matchesSla = true;
       if (slaFilter === "dentro_prazo" || slaFilter === "em_atraso") {
-        // Só filtra SLA para chamados abertos ou em andamento
-        if (ticket.status !== "open" && ticket.status !== "in_progress") {
+        // Só filtra SLA para chamados que ainda estão com a equipe
+        if (!OPEN_TICKET_STATUSES.includes(ticket.status)) {
           matchesSla = false;
         } else {
           const sla = getSlaForTicket(ticket, slaRules);
@@ -459,7 +381,7 @@ export default function ChamadosPage() {
       return sla.status === "dentro_prazo";
     }).length,
     emAtraso: periodTickets.filter(t => {
-      if (t.status !== "open" && t.status !== "in_progress") return false;
+      if (!OPEN_TICKET_STATUSES.includes(t.status)) return false;
       const sla = getSlaForTicket(t, slaRules);
       return sla.status === "em_atraso";
     }).length,
@@ -551,6 +473,8 @@ export default function ChamadosPage() {
         "Tempo Aberto": timeOpen.text,
         "SLA": slaInfo.slaHoras !== null ? `${slaInfo.slaHoras}h` : "—",
         "Status SLA": slaInfo.status === "dentro_prazo" ? "Dentro do Prazo" : slaInfo.status === "em_atraso" ? "Em Atraso" : "—",
+        "SLA 1ª Resposta": slaInfo.primeiraResposta.horas !== null ? `${slaInfo.primeiraResposta.horas}h` : "—",
+        "Status 1ª Resposta": slaInfo.primeiraResposta.status === "dentro_prazo" ? "Dentro do Prazo" : slaInfo.primeiraResposta.status === "em_atraso" ? "Em Atraso" : "—",
       };
     });
 
@@ -1142,9 +1066,14 @@ export default function ChamadosPage() {
                                 return <span className="text-[12px] text-muted-foreground">—</span>;
                               }
                               return (
-                                <span className="text-[12px] font-medium">
-                                  {slaInfo.slaHoras}h
-                                </span>
+                                <div className="flex flex-col">
+                                  <span className="text-[12px] font-medium">{slaInfo.slaHoras}h</span>
+                                  {slaInfo.primeiraResposta.horas !== null && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      1ª resp. {slaInfo.primeiraResposta.horas}h
+                                    </span>
+                                  )}
+                                </div>
                               );
                             })()}
                           </TableCell>
@@ -1154,7 +1083,11 @@ export default function ChamadosPage() {
                               if (slaInfo.status === null) {
                                 return <span className="text-[12px] text-muted-foreground">—</span>;
                               }
-                              return slaInfo.status === "dentro_prazo" ? (
+                              const badge = slaInfo.pausado && slaInfo.status === "dentro_prazo" ? (
+                                <Badge variant="outline" className="bg-muted text-muted-foreground text-[10px] font-semibold uppercase tracking-wide" title="Relógio parado enquanto aguarda o solicitante">
+                                  Pausado
+                                </Badge>
+                              ) : slaInfo.status === "dentro_prazo" ? (
                                 <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 text-[10px] font-semibold uppercase tracking-wide">
                                   Dentro do Prazo
                                 </Badge>
@@ -1162,6 +1095,15 @@ export default function ChamadosPage() {
                                 <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 text-[10px] font-semibold uppercase tracking-wide">
                                   Em Atraso
                                 </Badge>
+                              );
+                              if (slaInfo.primeiraResposta.status !== "em_atraso") return badge;
+                              return (
+                                <div className="flex flex-col items-start gap-1">
+                                  {badge}
+                                  <span className="text-[10px] font-medium text-red-600 dark:text-red-400">
+                                    1ª resposta atrasada
+                                  </span>
+                                </div>
                               );
                             })()}
                           </TableCell>

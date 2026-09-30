@@ -722,6 +722,10 @@ export class DatabaseStorage implements IStorage {
           dueDate: tickets.dueDate,
           dataAbertura: tickets.dataAbertura,
           dataResolucao: tickets.dataResolucao,
+          impact: tickets.impact,
+          dataPrimeiraResposta: tickets.dataPrimeiraResposta,
+          slaPausadoEm: tickets.slaPausadoEm,
+          slaPausaMinutos: tickets.slaPausaMinutos,
           requesterName: requester.name,
           assigneeName: assignee.name,
         })
@@ -766,6 +770,9 @@ export class DatabaseStorage implements IStorage {
           dataAbertura: tickets.dataAbertura,
           dataResolucao: tickets.dataResolucao,
           impact: tickets.impact,
+          dataPrimeiraResposta: tickets.dataPrimeiraResposta,
+          slaPausadoEm: tickets.slaPausadoEm,
+          slaPausaMinutos: tickets.slaPausaMinutos,
           attachments: tickets.attachments,
         })
         .from(tickets);
