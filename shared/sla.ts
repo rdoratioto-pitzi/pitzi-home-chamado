@@ -69,10 +69,36 @@ export function addBusinessHours(start: Date, hours: number): Date {
   }
 }
 
+/** Minutos úteis (seg–sex, 9h–18h de Brasília) entre dois instantes; 0 se `end` <= `start`. */
+export function businessMinutesBetween(start: Date, end: Date): number {
+  let wall = new Date(start.getTime() + BRASILIA_OFFSET_MS);
+  const endWall = new Date(end.getTime() + BRASILIA_OFFSET_MS);
+  let total = 0;
+
+  while (wall < endWall) {
+    if (isWeekend(wall)) {
+      wall = nextBusinessMorning(wall);
+      continue;
+    }
+    const open = atHour(wall, BUSINESS_START_HOUR);
+    const close = atHour(wall, BUSINESS_END_HOUR);
+    if (wall < open) wall = open;
+    if (wall >= close) {
+      wall = nextBusinessMorning(wall);
+      continue;
+    }
+    const until = endWall < close ? endWall : close;
+    if (until > wall) total += (until.getTime() - wall.getTime()) / MINUTE_MS;
+    wall = nextBusinessMorning(wall);
+  }
+  return Math.round(total);
+}
+
 export interface SlaRuleLike {
   tipo: string;
   prioridade: string;
   slaHoras: string | number | null;
+  primeiraRespostaHoras?: string | number | null;
   ativo: boolean | null;
 }
 
@@ -83,29 +109,103 @@ export interface SlaTicketLike {
   status?: string | null;
   dataAbertura?: Date | string | null;
   createdAt?: Date | string | null;
+  dataPrimeiraResposta?: Date | string | null;
   dataResolucao?: Date | string | null;
+  slaPausadoEm?: Date | string | null;
+  slaPausaMinutos?: number | null;
 }
 
 export type SlaStatus = "dentro_prazo" | "em_atraso" | null;
+
+export interface SlaResult {
+  slaHoras: number | null;
+  status: SlaStatus;
+  prazo: Date | null;
+  /** O relógio de resolução está parado (chamado aguardando o solicitante). */
+  pausado: boolean;
+  primeiraResposta: { horas: number | null; status: SlaStatus; prazo: Date | null };
+}
+
+/** Status em que o relógio de resolução fica parado. */
+export const SLA_PAUSED_STATUSES: readonly string[] = ["waiting_requester"];
+
+const CLOSED_STATUSES = ["closed", "resolved"];
+
+function toHours(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const n = parseFloat(value.toString());
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Minutos úteis pausados até `now`: pausas encerradas + a pausa em andamento. */
+export function slaPausedMinutes(ticket: SlaTicketLike, now: Date = new Date()): number {
+  const closed = ticket.slaPausaMinutos ?? 0;
+  if (!ticket.slaPausadoEm) return closed;
+  return closed + businessMinutesBetween(new Date(ticket.slaPausadoEm), now);
+}
+
+/**
+ * Campos a gravar quando o status muda: entrar em "Aguardando solicitante" inicia a pausa;
+ * sair dele soma o tempo útil parado e encerra a pausa. Sem mudança relevante devolve {}.
+ */
+export function slaPauseUpdate(
+  ticket: Pick<SlaTicketLike, "slaPausadoEm" | "slaPausaMinutos">,
+  newStatus: string,
+  now: Date = new Date(),
+): { slaPausadoEm?: Date | null; slaPausaMinutos?: number } {
+  const pausing = SLA_PAUSED_STATUSES.includes(newStatus);
+  if (pausing && !ticket.slaPausadoEm) return { slaPausadoEm: now };
+  if (!pausing && ticket.slaPausadoEm) {
+    return { slaPausadoEm: null, slaPausaMinutos: slaPausedMinutes(ticket, now) };
+  }
+  return {};
+}
+
+function compare(done: Date | string | null | undefined, prazo: Date, now: Date): SlaStatus {
+  const at = done ? new Date(done) : now;
+  return at > prazo ? "em_atraso" : "dentro_prazo";
+}
 
 export function getSlaForTicket(
   ticket: SlaTicketLike,
   rules: readonly SlaRuleLike[],
   now: Date = new Date(),
-): { slaHoras: number | null; status: SlaStatus; prazo: Date | null } {
+): SlaResult {
   const tipo = ticket.type?.toLowerCase();
   const severity = slaSeverityOf(ticket);
   const rule = rules.find((r) => r.ativo && r.tipo.toLowerCase() === tipo && r.prioridade === severity);
-  if (!rule || !rule.slaHoras) return { slaHoras: null, status: null, prazo: null };
+  const pausado = !!ticket.slaPausadoEm && !CLOSED_STATUSES.includes(ticket.status ?? "");
+  const none = { horas: null, status: null, prazo: null };
+  if (!rule) return { slaHoras: null, status: null, prazo: null, pausado, primeiraResposta: none };
 
-  const slaHoras = parseFloat(rule.slaHoras.toString());
+  const slaHoras = toHours(rule.slaHoras);
+  const respostaHoras = toHours(rule.primeiraRespostaHoras);
   const openedAt = ticket.dataAbertura ?? ticket.createdAt;
-  if (!openedAt) return { slaHoras, status: null, prazo: null };
-
-  const prazo = addBusinessHours(new Date(openedAt), slaHoras);
-  if (ticket.status === "closed" || ticket.status === "resolved") {
-    if (!ticket.dataResolucao) return { slaHoras, status: "dentro_prazo", prazo };
-    return { slaHoras, status: new Date(ticket.dataResolucao) > prazo ? "em_atraso" : "dentro_prazo", prazo };
+  if (!openedAt) {
+    return { slaHoras, status: null, prazo: null, pausado, primeiraResposta: { ...none, horas: respostaHoras } };
   }
-  return { slaHoras, status: now > prazo ? "em_atraso" : "dentro_prazo", prazo };
+  const opened = new Date(openedAt);
+  const isClosed = CLOSED_STATUSES.includes(ticket.status ?? "");
+
+  // Primeira resposta: não pausa (a pausa só existe depois de a equipe falar com o solicitante).
+  let primeiraResposta: SlaResult["primeiraResposta"] = { ...none, horas: respostaHoras };
+  if (respostaHoras) {
+    const prazo = addBusinessHours(opened, respostaHoras);
+    // Fechado sem resposta registrada: a resolução conta como resposta.
+    const respondedAt = ticket.dataPrimeiraResposta ?? (isClosed ? ticket.dataResolucao : null);
+    const status = isClosed && !respondedAt ? "dentro_prazo" : compare(respondedAt, prazo, now);
+    primeiraResposta = { horas: respostaHoras, status, prazo };
+  }
+
+  if (!slaHoras) return { slaHoras: null, status: null, prazo: null, pausado, primeiraResposta };
+
+  // Resolução: o tempo útil pausado empurra o prazo. Com a pausa em andamento o prazo
+  // anda junto com o relógio, então o chamado não entra em atraso enquanto aguarda.
+  const pausa = slaPausedMinutes(ticket, isClosed && ticket.dataResolucao ? new Date(ticket.dataResolucao) : now);
+  const prazo = addBusinessHours(opened, slaHoras + pausa / 60);
+  if (isClosed) {
+    if (!ticket.dataResolucao) return { slaHoras, status: "dentro_prazo", prazo, pausado, primeiraResposta };
+    return { slaHoras, status: compare(ticket.dataResolucao, prazo, now), prazo, pausado, primeiraResposta };
+  }
+  return { slaHoras, status: compare(null, prazo, now), prazo, pausado, primeiraResposta };
 }
