@@ -22,6 +22,7 @@ import {
   sendCardCommentEmail,
   sendMentionNotificationEmail,
 } from "../lib/email";
+import { mailContext } from "../lib/mailer";
 
 const projects = new Hono<AppEnv>();
 
@@ -494,7 +495,7 @@ projects.post("/api/cards/:id/comments", async (c) => {
 
       if (mentionedUser && card && author) {
         sendMentionNotificationEmail(
-          c.env, storage, mentionedUser, author.name, card.title, card.id, validated.content
+          mailContext(c), storage, mentionedUser, author.name, card.title, card.id, validated.content
         ).catch(console.error);
         storage
           .createNotification({

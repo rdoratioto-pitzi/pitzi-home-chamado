@@ -231,6 +231,32 @@ export type CannedResponse = typeof cannedResponses.$inferSelect;
 export type InsertCannedResponse = typeof cannedResponses.$inferInsert;
 
 // Regras em shared/automations.ts.
+// ============== EMAIL OUTBOX (migration 0029) ==============
+// Fila dos e-mails automáticos: gravados antes do envio, reenviados pelo cron do Worker.
+export const emailOutbox = pgTable("email_outbox", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  event: text("event").notNull(),
+  ticketId: varchar("ticket_id"),
+  toEmail: text("to_email").notNull().default(""),
+  toUserId: varchar("to_user_id"),
+  subject: text("subject").notNull(),
+  html: text("html").notNull(),
+  text: text("text").notNull().default(""),
+  status: text("status").notNull().default("pending"), // pending | sending | sent | failed | skipped
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at").notNull().defaultNow(),
+  lastError: text("last_error"),
+  provider: text("provider"),
+  providerMessageId: text("provider_message_id"),
+  messageIdHeader: text("message_id_header"),
+  threadRootId: text("thread_root_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  sentAt: timestamp("sent_at"),
+});
+export type EmailOutboxRow = typeof emailOutbox.$inferSelect;
+export type InsertEmailOutbox = typeof emailOutbox.$inferInsert;
+
 export const automationRules = pgTable("automation_rules", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id"),

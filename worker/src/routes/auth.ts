@@ -18,6 +18,7 @@ import { setCookie } from "hono/cookie";
 import type { AppEnv, AuthUser } from "../index";
 import { endSession } from "../lib/sessions";
 import { sendPasswordResetLinkEmail } from "../lib/email";
+import { mailContext } from "../lib/mailer";
 import { getStorage } from "../lib/storage";
 
 const auth = new Hono<AppEnv>();
@@ -234,7 +235,7 @@ auth.post("/api/auth/forgot-password", async (c) => {
   const token = await getStorage(db).createPasswordResetToken(user.id);
   if (token) {
     const resetUrl = `${c.env.APP_URL}/redefinir-senha?token=${encodeURIComponent(token)}`;
-    await sendPasswordResetLinkEmail(c.env, user, resetUrl).catch((err) =>
+    await sendPasswordResetLinkEmail(mailContext(c), user, resetUrl).catch((err) =>
       console.error("[AUTH] Falha ao enviar email de reset:", err)
     );
   }

@@ -25,6 +25,7 @@ import { supportGroups } from "./routes/support-groups";
 import { ticketQueue } from "./routes/ticket-queue";
 import { ticketFields } from "./routes/ticket-fields";
 import { automations } from "./routes/automations";
+import { emailSettings } from "./routes/email-settings";
 import { getStorage } from "./lib/storage";
 import { runWaitingRequesterTimeouts } from "../../server/services/automations.service";
 import { gitAnalytics } from "./routes/git-analytics";
@@ -80,6 +81,12 @@ type Bindings = {
   SENDPULSE_CLIENT_SECRET: string;
   SENDPULSE_FROM_EMAIL: string;
   SENDPULSE_FROM_NAME: string;
+  // Gmail (e-mails dos chamados). GMAIL_SENDER é var; as credenciais da conta de serviço com
+  // delegação no domínio são segredos (docs/emails-gmail-setup.md). Sem elas, a fila registra
+  // os e-mails como "not_configured".
+  GMAIL_SENDER?: string;
+  GOOGLE_SA_CLIENT_EMAIL?: string;
+  GOOGLE_SA_PRIVATE_KEY?: string;
   VENUS_API_KEY: string;
   DEV_TOOLS_TOKEN: string;
   // Token das APIs em dash.pitzi.com.br (estoque, triagem, logística, avaliações).
@@ -117,6 +124,7 @@ export type AppEnv = {
 
 import { activeRoutesMiddleware } from "./middleware/active-routes";
 import { configureRsApiToken } from "./lib/rs-token";
+import { processPendingEmails } from "./lib/mailer";
 
 const app = new Hono<AppEnv>();
 
@@ -206,6 +214,7 @@ app.route("/", supportGroups);
 app.route("/", ticketQueue);
 app.route("/", ticketFields);
 app.route("/", automations);
+app.route("/", emailSettings);
 app.route("/", gitAnalytics);
 app.route("/", pricing);
 app.route("/", omie);
@@ -223,10 +232,19 @@ app.route("/", serviceAccounts);
 app.route("/", hermes);
 
 // Cron (wrangler.toml [triggers]): automações "X dias aguardando o solicitante".
-async function scheduled(_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
+async function scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
+  const db = createDb(env.DATABASE_URL);
+  // Fila de e-mails: a cada execução (5 em 5 minutos).
+  ctx.waitUntil((async () => {
+    const result = await processPendingEmails(env, db, { releaseStuck: true, limit: 50 });
+    if (result.sent || result.failed || result.retrying) console.log("[cron] e-mails:", result);
+  })());
+  // Automações por tempo: só na execução do início de cada hora, para uma regra que não muda o
+  // status não repetir a nota a cada 5 minutos (mesma cadência de antes do cron de e-mails).
+  if (new Date(event.scheduledTime).getUTCMinutes() >= 5) return;
   ctx.waitUntil((async () => {
     try {
-      const touched = await runWaitingRequesterTimeouts(getStorage(createDb(env.DATABASE_URL)));
+      const touched = await runWaitingRequesterTimeouts(getStorage(db));
       if (touched) console.log(`[cron] automações por tempo aplicadas em ${touched} chamado(s)`);
     } catch (error) {
       console.error("[cron] falha nas automações por tempo:", error);
