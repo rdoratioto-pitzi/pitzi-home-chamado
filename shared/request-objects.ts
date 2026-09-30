@@ -139,15 +139,24 @@ export const REQUEST_OBJECTS: readonly RequestObject[] = [
   { label: "Outros", actions: [] },
 ];
 
-export function requestActionsFor(object: string | null | undefined): readonly RequestAction[] {
-  return REQUEST_OBJECTS.find((o) => o.label === object)?.actions ?? [];
+/** Chave em `settings` onde fica a árvore editada em Configurações → Campos do chamado. */
+export const REQUEST_OBJECTS_SETTING_KEY = "request_objects";
+
+export type RequestObjectTree = readonly RequestObject[];
+
+export function requestActionsFor(
+  object: string | null | undefined,
+  tree: RequestObjectTree = REQUEST_OBJECTS,
+): readonly RequestAction[] {
+  return tree.find((o) => o.label === object)?.actions ?? [];
 }
 
 export function requestDetailsFor(
   object: string | null | undefined,
   action: string | null | undefined,
+  tree: RequestObjectTree = REQUEST_OBJECTS,
 ): readonly string[] {
-  return requestActionsFor(object).find((a) => a.label === action)?.details ?? [];
+  return requestActionsFor(object, tree).find((a) => a.label === action)?.details ?? [];
 }
 
 export interface RequestSelection {
@@ -160,9 +169,12 @@ export interface RequestSelection {
  * Confere se a combinação existe na árvore. Tudo vazio é válido (o campo é opcional);
  * um nível só pode vir preenchido se o anterior vier e se ele existir na lista.
  */
-export function isValidRequestSelection({ requestObject, requestAction, requestDetail }: RequestSelection): boolean {
+export function isValidRequestSelection(
+  { requestObject, requestAction, requestDetail }: RequestSelection,
+  tree: RequestObjectTree = REQUEST_OBJECTS,
+): boolean {
   if (!requestObject) return !requestAction && !requestDetail;
-  const object = REQUEST_OBJECTS.find((o) => o.label === requestObject);
+  const object = tree.find((o) => o.label === requestObject);
   if (!object) return false;
   if (!requestAction) return !requestDetail;
   const action = object.actions.find((a) => a.label === requestAction);
@@ -177,4 +189,59 @@ export function normalizeRequestSelection<T extends RequestSelection>(data: T): 
     if (data[key] === "") data[key] = null;
   }
   return data;
+}
+
+/** A seleção mudou em relação ao que o chamado já tinha? (valores antigos seguem válidos) */
+export function requestSelectionChanged(next: RequestSelection, previous: RequestSelection): boolean {
+  return (["requestObject", "requestAction", "requestDetail"] as const).some(
+    (k) => (next[k] ?? null) !== (previous[k] ?? null),
+  );
+}
+
+const MAX_LABEL = 120;
+const MAX_ITEMS = 500;
+
+function cleanLabels(raw: unknown, where: string): string[] {
+  if (!Array.isArray(raw)) throw new Error(`${where}: lista inválida`);
+  if (raw.length > MAX_ITEMS) throw new Error(`${where}: itens demais`);
+  const seen = new Set<string>();
+  return raw.map((item) => {
+    if (typeof item !== "string") throw new Error(`${where}: valor inválido`);
+    const label = item.trim();
+    if (!label) throw new Error(`${where}: há um item sem nome`);
+    if (label.length > MAX_LABEL) throw new Error(`${where}: "${label.slice(0, 30)}…" é longo demais`);
+    if (seen.has(label)) throw new Error(`${where}: "${label}" está repetido`);
+    seen.add(label);
+    return label;
+  });
+}
+
+/**
+ * Valida e normaliza uma árvore vinda da tela (ou do banco): nomes sem espaços nas pontas,
+ * não vazios e sem repetição dentro do mesmo nível. Lança Error com a mensagem para o usuário.
+ */
+export function parseRequestObjectTree(raw: unknown): RequestObject[] {
+  if (!Array.isArray(raw)) throw new Error("A lista de objetos é inválida");
+  const objectLabels = cleanLabels(raw.map((o: any) => o?.label), "Objetos");
+  return raw.map((o: any, i) => {
+    const actions = Array.isArray(o?.actions) ? o.actions : [];
+    const actionLabels = cleanLabels(actions.map((a: any) => a?.label), `Ações de "${objectLabels[i]}"`);
+    return {
+      label: objectLabels[i],
+      actions: actions.map((a: any, j: number) => ({
+        label: actionLabels[j],
+        details: cleanLabels(Array.isArray(a?.details) ? a.details : [], `Valores de "${objectLabels[i]} › ${actionLabels[j]}"`),
+      })),
+    };
+  });
+}
+
+/** Árvore gravada em settings; sem registro (ou registro inválido) vale a lista padrão do Freshdesk. */
+export function requestObjectTreeFromSetting(value: string | null | undefined): RequestObjectTree {
+  if (!value) return REQUEST_OBJECTS;
+  try {
+    return parseRequestObjectTree(JSON.parse(value));
+  } catch {
+    return REQUEST_OBJECTS;
+  }
 }

@@ -54,6 +54,7 @@ import { Label } from "@/components/ui/label";
 const MODULES = [
   { key: "chamados", label: "Chamados" },
   { key: "configuracoes", label: "Configurações" },
+  { key: "campos_chamado", label: "Gerenciar campos dos chamados" },
 ] as const;
 
 const PERFIS_ACESSO = [
@@ -89,6 +90,7 @@ const formSchema = z.object({
     comercial: z.boolean().default(true),
     apoio_vendas: z.boolean().default(false),
     configuracoes: z.boolean(),
+    campos_chamado: z.boolean().default(false),
   }),
 });
 
@@ -197,6 +199,7 @@ export function UsersSettings() {
         apis: false,
         comercial: true,
         configuracoes: false,
+        campos_chamado: false,
       },
     },
   });
@@ -263,6 +266,7 @@ export function UsersSettings() {
       conhecimento: true,
       apis: false,
       configuracoes: false,
+      campos_chamado: false,
     };
 
     try {
@@ -311,6 +315,7 @@ export function UsersSettings() {
         apis: false,
         comercial: true,
         configuracoes: false,
+        campos_chamado: false,
       },
     });
     setIsDialogOpen(true);

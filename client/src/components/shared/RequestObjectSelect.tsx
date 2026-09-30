@@ -1,6 +1,7 @@
-// Três selects em cascata para o "Objeto da Requisição" (objeto → ação → detalhe),
-// com as listas do Freshdesk em shared/request-objects.ts. O segundo e o terceiro nível
-// só aparecem quando o nível anterior tem opções.
+// Três selects em cascata para o "Objeto da Requisição" (objeto → ação → detalhe).
+// A lista vem de Configurações → Campos do chamado (padrão: a do Freshdesk, em
+// shared/request-objects.ts). O segundo e o terceiro nível só aparecem quando o nível
+// anterior tem opções. Um valor antigo que saiu da lista continua aparecendo selecionado.
 import {
   Select,
   SelectContent,
@@ -13,10 +14,10 @@ import {
   REQUEST_ACTION_LABEL,
   REQUEST_DETAIL_LABEL,
   REQUEST_OBJECT_LABEL,
-  REQUEST_OBJECTS,
   requestActionsFor,
   requestDetailsFor,
 } from "@shared/request-objects";
+import { useRequestObjectTree } from "@/hooks/use-ticket-fields";
 
 export interface RequestObjectValue {
   requestObject: string | null;
@@ -33,9 +34,16 @@ interface RequestObjectSelectProps {
 // O Radix Select não aceita value="", então "nenhum" usa um marcador próprio.
 const NONE = "__none__";
 
+/** Opções da lista mais o valor atual, se ele não estiver mais nela. */
+function withCurrent(options: readonly string[], current: string | null): string[] {
+  return current && !options.includes(current) ? [...options, current] : [...options];
+}
+
 export function RequestObjectSelect({ value, onChange, disabled }: RequestObjectSelectProps) {
-  const actions = requestActionsFor(value.requestObject);
-  const details = requestDetailsFor(value.requestObject, value.requestAction);
+  const tree = useRequestObjectTree();
+  const objects = withCurrent(tree.map((o) => o.label), value.requestObject);
+  const actions = withCurrent(requestActionsFor(value.requestObject, tree).map((a) => a.label), value.requestAction);
+  const details = withCurrent(requestDetailsFor(value.requestObject, value.requestAction, tree), value.requestDetail);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -53,8 +61,8 @@ export function RequestObjectSelect({ value, onChange, disabled }: RequestObject
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={NONE}>Nenhum</SelectItem>
-            {REQUEST_OBJECTS.map((o) => (
-              <SelectItem key={o.label} value={o.label}>{o.label}</SelectItem>
+            {objects.map((o) => (
+              <SelectItem key={o} value={o}>{o}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -76,7 +84,7 @@ export function RequestObjectSelect({ value, onChange, disabled }: RequestObject
             <SelectContent>
               <SelectItem value={NONE}>Nenhum</SelectItem>
               {actions.map((a) => (
-                <SelectItem key={a.label} value={a.label}>{a.label}</SelectItem>
+                <SelectItem key={a} value={a}>{a}</SelectItem>
               ))}
             </SelectContent>
           </Select>

@@ -50,7 +50,7 @@ function Router() {
         <ProtectedRoute><MarkdownPage /></ProtectedRoute>
       </Route>
       <Route path="/configuracoes">
-        <ProtectedRoute requiredPermission="configuracoes"><ConfiguracoesPage /></ProtectedRoute>
+        <ProtectedRoute requiredPermission={["configuracoes", "campos_chamado"]}><ConfiguracoesPage /></ProtectedRoute>
       </Route>
       {/* URLs antigas do workspace e de módulos desativados levam ao início. */}
       <Route><Redirect to="/" /></Route>
