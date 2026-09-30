@@ -19,7 +19,7 @@ export function AppSidebar() {
     { title: "Chamados", url: "/chamados", icon: Ticket, visible: true },
     { title: "Novo chamado", url: "/chamados/novo", icon: Plus, visible: permissions.chamados },
     { title: "Markdown", url: "/markdown", icon: FileText, visible: true },
-    { title: "Configurações", url: "/configuracoes", icon: Settings, visible: permissions.configuracoes },
+    { title: "Configurações", url: "/configuracoes", icon: Settings, visible: permissions.configuracoes || permissions.campos_chamado },
   ];
   return (
     <Sidebar>

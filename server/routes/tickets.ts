@@ -20,7 +20,8 @@ import {
 } from "../email-service";
 import { ticketStatusLabel } from "@shared/ticket-options";
 import { slaPauseUpdate } from "@shared/sla";
-import { isValidRequestSelection, normalizeRequestSelection } from "@shared/request-objects";
+import { normalizeRequestSelection } from "@shared/request-objects";
+import { checkRequestSelection, resolveCustomFieldValues } from "../services/ticket-fields.service";
 import { claimTicket, isTicketGroupMember, transferTicket } from "../services/ticket-queue.service";
 
 export function registerTicketRoutes(router: Router) {
@@ -75,11 +76,18 @@ export function registerTicketRoutes(router: Router) {
       data.applicationKey = data.applicationKey || null;
 
       normalizeRequestSelection(data);
-      if (!isValidRequestSelection(data)) {
+      if (!(await checkRequestSelection(storage, data))) {
         return res.status(400).json({ error: "Objeto da Requisição inválido" });
       }
 
       const validated = insertTicketSchema.parse(data);
+
+      // Campos personalizados do grupo (obrigatórios exigidos na abertura).
+      const custom = await resolveCustomFieldValues(storage, {
+        incoming: req.body?.customFields, groupKey: validated.category, isCreate: true,
+      });
+      if (!custom.ok) return res.status(custom.status).json({ error: custom.error });
+      validated.customFields = custom.values ?? null;
 
       if (!validated.assigneeId && validated.category && validated.type) {
         const autoAssignee = await storage.findResponsavelForTicket(validated.category, validated.type);
@@ -146,7 +154,8 @@ export function registerTicketRoutes(router: Router) {
           requestAction: updateData.requestAction !== undefined ? updateData.requestAction : oldTicket.requestAction,
           requestDetail: updateData.requestDetail !== undefined ? updateData.requestDetail : oldTicket.requestDetail,
         };
-        if (!isValidRequestSelection(merged)) {
+        // Só valida quando muda: valores antigos seguem válidos depois de a lista ser editada.
+        if (!(await checkRequestSelection(storage, merged, oldTicket))) {
           return res.status(400).json({ error: "Objeto da Requisição inválido" });
         }
       }
@@ -154,7 +163,7 @@ export function registerTicketRoutes(router: Router) {
       if (!isAdmin) {
         const allowedFields = [
           "status", "title", "description", "attachments", "applicationKey", "impact", "dueDate",
-          "requestObject", "requestAction", "requestDetail",
+          "requestObject", "requestAction", "requestDetail", "customFields",
         ];
         const filteredData: any = {};
         allowedFields.forEach(field => {
@@ -163,6 +172,20 @@ export function registerTicketRoutes(router: Router) {
           }
         });
         updateData = filteredData;
+      }
+
+      // Campos personalizados: mescla com o que já estava gravado; obrigatórios só se o grupo mudar.
+      {
+        const groupKey = updateData.category ?? oldTicket.category;
+        const custom = await resolveCustomFieldValues(storage, {
+          incoming: updateData.customFields,
+          groupKey,
+          previous: oldTicket.customFields,
+          groupChanged: groupKey !== oldTicket.category,
+        });
+        if (!custom.ok) return res.status(custom.status).json({ error: custom.error });
+        if (custom.values !== undefined) updateData.customFields = custom.values;
+        else delete updateData.customFields;
       }
 
       if (req.body.status && req.body.status !== oldTicket.status) {

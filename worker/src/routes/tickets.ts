@@ -23,7 +23,8 @@ import {
 } from "../lib/email";
 import { ticketStatusLabel } from "../../../shared/ticket-options";
 import { slaPauseUpdate } from "../../../shared/sla";
-import { isValidRequestSelection, normalizeRequestSelection } from "../../../shared/request-objects";
+import { normalizeRequestSelection } from "../../../shared/request-objects";
+import { checkRequestSelection, resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
 import { isTicketGroupMember } from "../../../server/services/ticket-queue.service";
 
 const tickets = new Hono<AppEnv>();
@@ -206,7 +207,7 @@ tickets.post("/api/tickets", async (c) => {
   data.applicationKey = data.applicationKey || null;
 
   normalizeRequestSelection(data);
-  if (!isValidRequestSelection(data)) {
+  if (!(await checkRequestSelection(storage, data))) {
     return c.json({ error: "Objeto da Requisição inválido" }, 400);
   }
 
@@ -215,6 +216,13 @@ tickets.post("/api/tickets", async (c) => {
   if (!(await storage.getActiveSupportGroupByKey(validated.category))) {
     return c.json({ error: "Grupo de atendimento é obrigatório e deve ser válido" }, 400);
   }
+
+  // Campos personalizados do grupo (obrigatórios exigidos na abertura).
+  const custom = await resolveCustomFieldValues(storage, {
+    incoming: body?.customFields, groupKey: validated.category, isCreate: true,
+  });
+  if (!custom.ok) return c.json({ error: custom.error }, custom.status);
+  validated.customFields = custom.values ?? null;
 
   // Auto-assignment
   if (!validated.assigneeId && validated.category && validated.type) {
@@ -302,7 +310,8 @@ tickets.patch("/api/tickets/:id", async (c) => {
       requestAction: updateData.requestAction !== undefined ? updateData.requestAction : oldTicket.requestAction,
       requestDetail: updateData.requestDetail !== undefined ? updateData.requestDetail : oldTicket.requestDetail,
     };
-    if (!isValidRequestSelection(merged)) {
+    // Só valida quando muda: valores antigos seguem válidos depois de a lista ser editada.
+    if (!(await checkRequestSelection(storage, merged, oldTicket))) {
       return c.json({ error: "Objeto da Requisição inválido" }, 400);
     }
   }
@@ -312,13 +321,27 @@ tickets.patch("/api/tickets/:id", async (c) => {
     const allowedFields = [
       "status", "title", "description", "attachments",
       "applicationKey", "impact", "dueDate",
-      "requestObject", "requestAction", "requestDetail",
+      "requestObject", "requestAction", "requestDetail", "customFields",
     ];
     const filteredData: any = {};
     allowedFields.forEach((field) => {
       if (updateData[field] !== undefined) filteredData[field] = updateData[field];
     });
     updateData = filteredData;
+  }
+
+  // Campos personalizados: mescla com o que já estava gravado; obrigatórios só se o grupo mudar.
+  {
+    const groupKey = updateData.category ?? oldTicket.category;
+    const custom = await resolveCustomFieldValues(storage, {
+      incoming: updateData.customFields,
+      groupKey,
+      previous: oldTicket.customFields,
+      groupChanged: groupKey !== oldTicket.category,
+    });
+    if (!custom.ok) return c.json({ error: custom.error }, custom.status);
+    if (custom.values !== undefined) updateData.customFields = custom.values;
+    else delete updateData.customFields;
   }
 
   // Status transitions

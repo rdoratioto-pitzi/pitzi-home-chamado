@@ -38,6 +38,9 @@ import { useAuth } from "@/contexts/auth-context";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { TICKET_TYPES } from "@shared/ticket-options";
 import { RequestObjectSelect } from "@/components/shared/RequestObjectSelect";
+import { CustomFieldInputs, missingRequiredField } from "@/components/shared/CustomFieldInputs";
+import { useCustomFields } from "@/hooks/use-ticket-fields";
+import { fieldsForGroup, type CustomFieldValues } from "@shared/custom-fields";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -73,6 +76,8 @@ export default function NovoChamadoPage() {
   const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
 
   const { groups: supportGroups } = useSupportGroups();
+  const { fields: customFields } = useCustomFields();
+  const [customValues, setCustomValues] = useState<CustomFieldValues>({});
 
   const { data: typesSetting } = useQuery<Setting>({
     queryKey: ["/api/settings", "ticket_types"],
@@ -117,6 +122,7 @@ export default function NovoChamadoPage() {
   });
 
   const descriptionValue = form.watch("description") || "";
+  const groupFields = fieldsForGroup(customFields, form.watch("category"));
   const titleValue = form.watch("title") || "";
 
   const mutation = useMutation({
@@ -130,6 +136,7 @@ export default function NovoChamadoPage() {
         requesterId: currentUser.id,
         status: "open",
         code: "",
+        customFields: customValues,
       };
       if (!data.assigneeId || data.assigneeId === "auto") {
         delete payload.assigneeId;
@@ -156,6 +163,11 @@ export default function NovoChamadoPage() {
   });
 
   const onSubmit = (data: FormData) => {
+    const missing = missingRequiredField(groupFields, customValues);
+    if (missing) {
+      toast({ title: "Campo obrigatório", description: `Preencha o campo "${missing}".`, variant: "destructive" });
+      return;
+    }
     mutation.mutate(data);
   };
 
@@ -163,6 +175,7 @@ export default function NovoChamadoPage() {
     setShowSuccess(false);
     setCreatedTicket(null);
     setAttachments([]);
+    setCustomValues({});
     form.reset();
   };
 
@@ -468,6 +481,8 @@ export default function NovoChamadoPage() {
                     form.setValue("requestDetail", v.requestDetail);
                   }}
                 />
+
+                <CustomFieldInputs fields={groupFields} values={customValues} onChange={setCustomValues} />
 
                 <div className="flex gap-3 pt-4">
                   <Button 

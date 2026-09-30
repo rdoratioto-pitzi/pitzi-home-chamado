@@ -23,3 +23,10 @@ export function hasModulePermission(
   const perms = parseModulePermissions(user.modulePermissions);
   return perms[key] === true;
 }
+
+/** Pode editar o Objeto da Requisição e os campos personalizados dos grupos. */
+export function canManageTicketFields(
+  user: { isAdmin?: boolean | null; modulePermissions?: unknown } | null | undefined,
+): boolean {
+  return hasModulePermission(user, "campos_chamado");
+}
