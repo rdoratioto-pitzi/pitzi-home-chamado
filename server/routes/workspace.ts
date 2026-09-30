@@ -22,7 +22,7 @@ import { OPEN_TICKET_STATUSES } from "@shared/ticket-options";
 import { getSlaForTicket, slaPauseUpdate } from "@shared/sla";
 import { resolveCustomFieldValues } from "../services/ticket-fields.service";
 import { isInQueue } from "@shared/ticket-queue";
-import { getQueueViewer } from "../services/ticket-queue.service";
+import { canViewTicket, getQueueViewer } from "../services/ticket-queue.service";
 
 /**
  * Slack notifier env (Express runtime). Apenas as variáveis necessárias —
@@ -1535,7 +1535,10 @@ export function registerWorkspaceRoutes(router: Router) {
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
       const { id } = req.params;
-      const { userId: _userId } = getSessionUser(req);
+      const { userId, isAdmin } = getSessionUser(req);
+      if (!(await canViewTicket(storage, { userId, isAdmin }, await storage.getTicket(String(id))))) {
+        return res.status(404).json({ error: "Chamado não encontrado" });
+      }
 
       const comentarios = await db
         .select()
@@ -1571,7 +1574,10 @@ export function registerWorkspaceRoutes(router: Router) {
     try {
       if (!db) return res.status(500).json({ error: "Database not available" });
       const { id } = req.params;
-      const { userId } = getSessionUser(req);
+      const { userId, isAdmin } = getSessionUser(req);
+      if (!(await canViewTicket(storage, { userId, isAdmin }, await storage.getTicket(String(id))))) {
+        return res.status(404).json({ error: "Chamado não encontrado" });
+      }
       const { texto } = req.body as { texto?: string; mencionados?: string[] };
 
       if (!texto?.trim()) {

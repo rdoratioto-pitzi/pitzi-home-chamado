@@ -144,3 +144,19 @@ export async function isTicketGroupMember(
 ): Promise<boolean> {
   return isGroupMember(await getQueueViewer(storage, actor), ticket);
 }
+
+/**
+ * Mesma regra de GET /api/tickets/:id: admin, solicitante, responsável ou membro do grupo
+ * do chamado, sempre no mesmo tenant. Usado por rotas que expõem dados do chamado por id.
+ */
+export async function canViewTicket(
+  storage: IStorage,
+  actor: QueueActor,
+  ticket: Pick<Ticket, "tenantId" | "requesterId" | "assigneeId" | "category"> | null | undefined,
+): Promise<boolean> {
+  if (!ticket) return false;
+  if (actor.tenantId !== undefined && !sameTenant(ticket.tenantId, actor.tenantId)) return false;
+  if (actor.isAdmin) return true;
+  if (ticket.requesterId === actor.userId || ticket.assigneeId === actor.userId) return true;
+  return isTicketGroupMember(storage, actor, ticket);
+}
