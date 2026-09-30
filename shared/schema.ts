@@ -150,6 +150,9 @@ export const tickets = pgTable("tickets", {
   dataPrimeiraResposta: timestamp("data_primeira_resposta"),
   dataResolucao: timestamp("data_resolucao"),
   dataFechamento: timestamp("data_fechamento"),
+  // Pausa do SLA em "Aguardando solicitante" (shared/sla.ts, migration 0026)
+  slaPausadoEm: timestamp("sla_pausado_em"),
+  slaPausaMinutos: integer("sla_pausa_minutos").notNull().default(0),
   // Audit log for description edits
   descriptionLastEditedBy: varchar("description_last_edited_by"),
   descriptionLastEditedAt: timestamp("description_last_edited_at"),
@@ -167,7 +170,8 @@ export type InsertTicket = z.infer<typeof insertTicketSchema>;
 export type Ticket = typeof tickets.$inferSelect;
 export type TicketListing = Pick<Ticket,
   "id" | "code" | "title" | "category" | "type" | "applicationKey" | "priority" | "status" |
-  "requesterId" | "assigneeId" | "createdAt" | "dueDate" | "dataAbertura" | "dataResolucao"
+  "requesterId" | "assigneeId" | "createdAt" | "dueDate" | "dataAbertura" | "dataResolucao" |
+  "impact" | "dataPrimeiraResposta" | "slaPausadoEm" | "slaPausaMinutos"
 > & { requesterName: string | null; assigneeName: string | null };
 
 // ============== TICKET RESPONSAVEIS (Assignment Rules) ==============
@@ -810,6 +814,7 @@ export const slaRules = pgTable("sla_rules", {
   tipo: text("tipo").notNull(), // bug, melhoria
   prioridade: text("prioridade").notNull(), // low, medium, high, critical
   slaHoras: decimal("sla_horas").notNull(), // SLA in hours
+  primeiraRespostaHoras: decimal("primeira_resposta_horas"), // meta de 1ª resposta (horas úteis), opcional
   ativo: boolean("ativo").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

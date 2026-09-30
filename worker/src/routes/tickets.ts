@@ -22,6 +22,7 @@ import {
   sendCSATReceivedEmail,
 } from "../lib/email";
 import { ticketStatusLabel } from "../../../shared/ticket-options";
+import { slaPauseUpdate } from "../../../shared/sla";
 import { isValidRequestSelection, normalizeRequestSelection } from "../../../shared/request-objects";
 import { isTicketGroupMember } from "../../../server/services/ticket-queue.service";
 
@@ -344,6 +345,8 @@ tickets.patch("/api/tickets/:id", async (c) => {
     if (body.status === "closed" && !oldTicket.dataFechamento) {
       updateData.dataFechamento = new Date();
     }
+    // "Aguardando solicitante" para o relógio de resolução do SLA.
+    Object.assign(updateData, slaPauseUpdate(oldTicket, body.status));
   }
 
   if (updateData.descriptionLastEditedAt) {
@@ -462,11 +465,10 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
   const comment = await storage.createTicketComment(validated);
   const isInternal = comment.isInternal === true;
 
-  // First response tracking — nota interna não conta como primeira resposta ao solicitante.
+  // Primeira resposta: comentário público de quem não é o solicitante (nota interna não conta).
   if (
     !isInternal &&
-    ticket.assigneeId &&
-    comment.userId === ticket.assigneeId &&
+    comment.userId !== ticket.requesterId &&
     !ticket.dataPrimeiraResposta
   ) {
     await storage.updateTicket(ticket.id, { dataPrimeiraResposta: new Date() });

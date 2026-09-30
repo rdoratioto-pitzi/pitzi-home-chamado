@@ -28,7 +28,7 @@ import {
 } from "../../../server/services/slack-notifier.service";
 import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 import { OPEN_TICKET_STATUSES } from "../../../shared/ticket-options";
-import { getSlaForTicket } from "../../../shared/sla";
+import { getSlaForTicket, slaPauseUpdate } from "../../../shared/sla";
 import { isInQueue } from "../../../shared/ticket-queue";
 import { getQueueViewer } from "../../../server/services/ticket-queue.service";
 
@@ -952,6 +952,12 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
 
     const updateData: Partial<Ticket> = {};
     if (status !== undefined) updateData.status = status;
+    // Datas e pausa do SLA seguem a mesma regra de PATCH /api/tickets/:id.
+    if (status !== undefined && previous && status !== previous.status) {
+      if (status === "resolved" && !previous.dataResolucao) updateData.dataResolucao = new Date();
+      if (status === "closed" && !previous.dataFechamento) updateData.dataFechamento = new Date();
+      Object.assign(updateData, slaPauseUpdate(previous, status));
+    }
     if (prioridade !== undefined) updateData.priority = prioridadeMap[prioridade] || prioridade;
     if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
     if (titulo !== undefined) updateData.title = titulo.trim();
