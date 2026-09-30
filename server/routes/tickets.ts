@@ -290,7 +290,9 @@ export function registerTicketRoutes(router: Router) {
       }
 
       const comments = await storage.getTicketComments(getId(req));
-      res.json(filterVisibleComments(comments, { userId, isAdmin }, ticket));
+      const isGroupMember = !isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId &&
+        (await isTicketGroupMember(storage, { userId, isAdmin }, ticket));
+      res.json(filterVisibleComments(comments, { userId, isAdmin, isGroupMember }, ticket));
     } catch (error: any) {
       const status = error.status || 500;
       res.status(status).json({ error: error.message });
@@ -303,7 +305,9 @@ export function registerTicketRoutes(router: Router) {
       const ticket = await storage.getTicket(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
 
-      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+      const isGroupMember = !isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId &&
+        (await isTicketGroupMember(storage, { userId, isAdmin }, ticket));
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId && !isGroupMember) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -311,7 +315,7 @@ export function registerTicketRoutes(router: Router) {
         ...req.body,
         ticketId: getId(req),
         userId: userId,
-        isInternal: resolveIsInternal(req.body?.isInternal, { userId, isAdmin }, ticket),
+        isInternal: resolveIsInternal(req.body?.isInternal, { userId, isAdmin, isGroupMember }, ticket),
         mentions: extractMentions(req.body?.content),
       });
       const comment = await storage.createTicketComment(validated);
