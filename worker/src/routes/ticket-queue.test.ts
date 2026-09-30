@@ -208,4 +208,22 @@ describe.skipIf(!url)("fila do grupo", () => {
     const inexistente = "/api/workspace/chamados/00000000-0000-0000-0000-000000000000/comentarios";
     expect((await send(app(ids.admin, "admin"), "POST", inexistente, { texto: "x" })).status).toBe(404);
   });
+
+  it("membro do grupo comenta e escreve nota interna; o solicitante não vê a nota", async () => {
+    const id = await ticket("sap");
+    const route = `/api/tickets/${id}/comments`;
+    expect((await send(app(ids.outsider), "POST", route, { content: "x" })).status).toBe(403);
+
+    const nota = await send(app(ids.sapA), "POST", route, { content: "nota da equipe", isInternal: true });
+    expect(nota.status).toBe(201);
+    expect((await json(nota)).isInternal).toBe(true);
+    expect((await send(app(ids.sapB), "POST", route, { content: "resposta pública" })).status).toBe(201);
+    // Solicitante tenta marcar como interno: vira público.
+    await send(app(ids.requester), "POST", route, { content: "do solicitante", isInternal: true });
+
+    const doSolicitante = (await json(await send(app(ids.requester), "GET", route))).map((c: any) => c.content).sort();
+    expect(doSolicitante).toEqual(["do solicitante", "resposta pública"]);
+    const doMembro = (await json(await send(app(ids.sapB), "GET", route))).map((c: any) => c.content).sort();
+    expect(doMembro).toEqual(["do solicitante", "nota da equipe", "resposta pública"]);
+  });
 });

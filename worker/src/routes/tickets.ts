@@ -456,16 +456,20 @@ tickets.get("/api/tickets/:id/comments", async (c) => {
   const id = c.req.param("id");
   const ticket = await storage.getTicket(id);
   if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
+  // Só consulta os grupos para quem não é admin, solicitante nem responsável.
+  const isGroupMember =
+    user.role !== "admin" && ticket.requesterId !== user.userId && ticket.assigneeId !== user.userId &&
+    (await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket));
   if (
     user.role !== "admin" &&
     ticket.requesterId !== user.userId &&
     ticket.assigneeId !== user.userId &&
-    !(await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket))
+    !isGroupMember
   ) {
     return c.json({ error: "Access denied" }, 403);
   }
   const comments = await storage.getTicketComments(id);
-  const viewer = { userId: user.userId, isAdmin: user.role === "admin" };
+  const viewer = { userId: user.userId, isAdmin: user.role === "admin", isGroupMember };
   return c.json(filterVisibleComments(comments, viewer, ticket));
 });
 
@@ -478,16 +482,22 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
   const ticket = await storage.getTicket(id);
   if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
 
+  // Membros do grupo também comentam (fila do grupo), inclusive notas internas.
+  // Só consulta os grupos para quem não é admin, solicitante nem responsável.
+  const isGroupMember =
+    user.role !== "admin" && ticket.requesterId !== user.userId && ticket.assigneeId !== user.userId &&
+    (await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket));
   if (
     user.role !== "admin" &&
     ticket.requesterId !== user.userId &&
-    ticket.assigneeId !== user.userId
+    ticket.assigneeId !== user.userId &&
+    !isGroupMember
   ) {
     return c.json({ error: "Access denied" }, 403);
   }
 
   const body = await c.req.json();
-  const viewer = { userId: user.userId, isAdmin: user.role === "admin" };
+  const viewer = { userId: user.userId, isAdmin: user.role === "admin", isGroupMember };
   const validated = insertTicketCommentSchema.parse({
     ...body,
     ticketId: id,
