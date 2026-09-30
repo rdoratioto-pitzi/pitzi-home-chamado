@@ -260,6 +260,8 @@ export function registerWorkspaceRoutes(router: Router) {
           prioridade: t.priority,
           sla: sla.slaHoras,
           statusSla: sla.status,
+          slaPausado: sla.pausado,
+          statusPrimeiraResposta: sla.primeiraResposta.status,
           abertura: t.dataAbertura || t.createdAt,
           solicitante: requester?.name || null,
           anexos: parseAnexos((t as any).attachments),
@@ -381,6 +383,8 @@ export function registerWorkspaceRoutes(router: Router) {
         applicationKey: (ticket as any).applicationKey ?? null,
         sla: sla.slaHoras,
         statusSla: sla.status,
+        slaPausado: sla.pausado,
+        statusPrimeiraResposta: sla.primeiraResposta.status,
         criadoEm: (ticket.dataAbertura || ticket.createdAt || "").toString(),
       });
     } catch (error: any) {
@@ -844,6 +848,8 @@ export function registerWorkspaceRoutes(router: Router) {
           applicationKey: (t as any).applicationKey ?? null,
           sla: sla.slaHoras,
           statusSla: sla.status,
+          slaPausado: sla.pausado,
+          statusPrimeiraResposta: sla.primeiraResposta.status,
           criadoEm: (t.dataAbertura || t.createdAt || "").toString(),
         };
       });
@@ -1115,6 +1121,8 @@ export function registerWorkspaceRoutes(router: Router) {
         applicationKey: (ticket as any).applicationKey ?? null,
         sla: sla.slaHoras,
         statusSla: sla.status,
+        slaPausado: sla.pausado,
+        statusPrimeiraResposta: sla.primeiraResposta.status,
         abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
         solicitante: requester?.name || null,
         responsavelId: ticket.assigneeId ?? null,
