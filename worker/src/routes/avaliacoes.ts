@@ -9,6 +9,7 @@ import {
   curadoriaAvaliacoes,
   curadoriaConfiguracoes,
 } from "../../../shared/schema";
+import { rsApiToken } from "../lib/rs-token";
 
 // ─── Constants & helpers (duplicados do service para isolamento do worker) ────
 
@@ -427,7 +428,7 @@ avaliacoes.get("/api/avaliacoes/trade-ins", async (c) => {
   try {
     const { data_inicio, data_fim, categoria, page = "1", limit = "50" } = c.req.query();
     const db = c.get("db");
-    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+    const token = rsApiToken(c.env.RENOVSMART_API_TOKEN);
 
     // Default date range: last 30 days if not provided
     const today = new Date();
@@ -462,7 +463,7 @@ avaliacoes.get("/api/avaliacoes/trade-ins/:tradeInId", async (c) => {
   try {
     const tradeInId = c.req.param("tradeInId");
     const db = c.get("db");
-    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+    const token = rsApiToken(c.env.RENOVSMART_API_TOKEN);
 
     let item: TradeInItem | null = null;
     try {
@@ -540,7 +541,7 @@ avaliacoes.post("/api/avaliacoes/curadoria", async (c) => {
 avaliacoes.get("/api/avaliacoes/curadoria/pendentes", async (c) => {
   try {
     const db = c.get("db");
-    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+    const token = rsApiToken(c.env.RENOVSMART_API_TOKEN);
     const configs = await db.select().from(curadoriaConfiguracoes).catch(() => []);
     const percentual = parseFloat((configs[0] as any)?.percentualAmostragem ?? "15") || 15;
 
@@ -1030,7 +1031,7 @@ avaliacoes.get("/api/avaliacoes/metricas/impacto-financeiro", async (c) => {
   try {
     const { data_inicio, data_fim } = c.req.query();
     const db = c.get("db");
-    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+    const token = rsApiToken(c.env.RENOVSMART_API_TOKEN);
 
     const conditions = [];
     if (data_inicio) { const s = parseDate(data_inicio); if (s) conditions.push(gte(curadoriaAvaliacoes.dataCuradoria, s)); }
@@ -1109,7 +1110,7 @@ avaliacoes.get("/api/avaliacoes/metricas/ranking-avaliadores-completo", async (c
   try {
     const { data_inicio, data_fim } = c.req.query();
     const db = c.get("db");
-    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+    const token = rsApiToken(c.env.RENOVSMART_API_TOKEN);
 
     const conditions = [];
     if (data_inicio) { const s = parseDate(data_inicio); if (s) conditions.push(gte(curadoriaAvaliacoes.dataCuradoria, s)); }
@@ -1202,7 +1203,7 @@ avaliacoes.get("/api/avaliacoes/metricas/avaliadores-evolucao", async (c) => {
   try {
     const { data_inicio, data_fim, granularidade = "dia" } = c.req.query();
     const db = c.get("db");
-    const token = c.env.RENOVSMART_API_TOKEN || "Renov123";
+    const token = rsApiToken(c.env.RENOVSMART_API_TOKEN);
 
     const conditions = [];
     if (data_inicio) { const s = parseDate(data_inicio); if (s) conditions.push(gte(curadoriaAvaliacoes.dataCuradoria, s)); }

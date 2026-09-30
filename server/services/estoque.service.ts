@@ -10,16 +10,16 @@
 
 import { getCachedPosEstoque, type PosEstoqueEntry } from "./estoque-pos.service";
 import { getCachedProdutos } from "./estoque-cache.service";
+import { rsApiToken } from "../lib/rs-token";
 
 // ─── Helpers internos ──────────────────────────────────────────────────────────
 
 const PIPELINE_BASE = "https://dash.pitzi.com.br/api";
-const PIPELINE_TOKEN = "Renov123";
 
 async function fetchPipeline(path: string): Promise<any[]> {
   try {
     const res = await fetch(`${PIPELINE_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${PIPELINE_TOKEN}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
     });
     if (!res.ok) return [];
     const data = await res.json() as any;

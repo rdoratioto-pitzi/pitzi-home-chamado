@@ -5,9 +5,10 @@ import { getSessionUser, requireAuth } from "../middleware/auth";
 const DASHBOARD_RH_BASE_URL =
   process.env.DASHBOARD_PRICING_RH_BASE_URL ||
   "http://localhost:2060/api/dashboard_pricing_rh";
-const DASHBOARD_RH_TOKEN = process.env.DASHBOARD_PRICING_RH_TOKEN || "Renov123";
+const DASHBOARD_RH_TOKEN = process.env.DASHBOARD_PRICING_RH_TOKEN;
 
 async function fetchDashboardRh(path: string, init?: RequestInit) {
+  if (!DASHBOARD_RH_TOKEN) throw new Error("DASHBOARD_PRICING_RH_TOKEN não configurado");
   const response = await fetch(`${DASHBOARD_RH_BASE_URL}${path}`, {
     ...init,
     headers: {
