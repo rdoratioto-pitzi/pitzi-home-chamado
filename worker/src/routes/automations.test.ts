@@ -73,18 +73,18 @@ describe("respostas prontas", () => {
     expect((await fin.json() as any[]).map((r) => r.id)).toEqual(["r1", "r2"]);
   });
 
-  it("quem gerencia pode ver também as desativadas", async () => {
-    const res = await send(buildApp(manager), "GET", "/api/canned-responses?all=1");
+  it("admin pode ver também as desativadas", async () => {
+    const res = await send(buildApp(admin), "GET", "/api/canned-responses?all=1");
     expect((await res.json() as any[]).map((r) => r.id)).toEqual(["r1", "r2", "r3"]);
   });
 
-  it("criar exige admin ou a permissão campos_chamado", async () => {
+  it("criar exige admin (a permissão avulsa antiga não vale)", async () => {
     const body = { title: "Recebido", body: "Olá {{solicitante}}" };
     expect((await send(buildApp(plain), "POST", "/api/canned-responses", body)).status).toBe(403);
+    expect((await send(buildApp(manager), "POST", "/api/canned-responses", body)).status).toBe(403);
     expect(storage.createCannedResponse).not.toHaveBeenCalled();
-    expect((await send(buildApp(manager), "POST", "/api/canned-responses", body)).status).toBe(201);
     expect((await send(buildApp(admin), "POST", "/api/canned-responses", body)).status).toBe(201);
-    expect(storage.createCannedResponse.mock.calls[0][0]).toMatchObject({ title: "Recebido", groupKey: null, createdBy: "u2" });
+    expect(storage.createCannedResponse.mock.calls[0][0]).toMatchObject({ title: "Recebido", groupKey: null, createdBy: "a1" });
   });
 
   it("valida título e grupo", async () => {
@@ -97,12 +97,13 @@ describe("respostas prontas", () => {
 describe("automações — cadastro", () => {
   const rule = { name: "Bug crítico", trigger: "ticket_created", conditions: { types: ["bug"] }, actions: [{ type: "set_impact", value: "critico" }] };
 
-  it("listar e criar exigem admin ou campos_chamado", async () => {
+  it("listar e criar exigem admin", async () => {
     storage.getAutomationRules.mockResolvedValue([]);
     expect((await send(buildApp(plain), "GET", "/api/automations")).status).toBe(403);
     expect((await send(buildApp(plain), "POST", "/api/automations", rule)).status).toBe(403);
-    expect((await send(buildApp(manager), "GET", "/api/automations")).status).toBe(200);
-    expect((await send(buildApp(manager), "POST", "/api/automations", rule)).status).toBe(201);
+    expect((await send(buildApp(manager), "GET", "/api/automations")).status).toBe(403);
+    expect((await send(buildApp(admin), "GET", "/api/automations")).status).toBe(200);
+    expect((await send(buildApp(admin), "POST", "/api/automations", rule)).status).toBe(201);
   });
 
   it("rejeita regra inválida e usuário inexistente na ação", async () => {

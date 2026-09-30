@@ -39,8 +39,10 @@ describe("rotas de e-mail", () => {
     expect(storage.setSetting).not.toHaveBeenCalled();
   });
 
-  it("quem tem a permissão de campos dos chamados lê os padrões e salva", async () => {
-    const a = app("user", JSON.stringify({ campos_chamado: true }));
+  it("só admin lê os padrões e salva; a permissão avulsa antiga não vale", async () => {
+    const antigo = app("user", JSON.stringify({ campos_chamado: true }));
+    expect((await antigo.request("/api/email/settings", {}, env)).status).toBe(403);
+    const a = app("admin");
     const res = await a.request("/api/email/settings", {}, env);
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;

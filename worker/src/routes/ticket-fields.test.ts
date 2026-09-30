@@ -86,8 +86,9 @@ describe("permissão para gerenciar os campos", () => {
     expect(storage.createTicketCustomField).not.toHaveBeenCalled();
   });
 
-  it("com a permissão campos_chamado (ou admin) altera", async () => {
-    const res = await send(buildApp(manager), "PUT", "/api/ticket-fields/request-objects", [{ label: " Users ", actions: [] }]);
+  it("só admin altera (a permissão avulsa antiga não vale)", async () => {
+    expect((await send(buildApp(manager), "PUT", "/api/ticket-fields/request-objects", TREE)).status).toBe(403);
+    const res = await send(buildApp(admin), "PUT", "/api/ticket-fields/request-objects", [{ label: " Users ", actions: [] }]);
     expect(res.status).toBe(200);
     expect(storage.setSetting).toHaveBeenCalledWith("request_objects", JSON.stringify([{ label: "Users", actions: [] }]));
 
