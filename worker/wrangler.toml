@@ -6,6 +6,10 @@ compatibility_flags = ["nodejs_compat"]
 
 workers_dev = true
 
+# Automações "X dias aguardando o solicitante" (server/services/automations.service.ts).
+[triggers]
+crons = ["0 * * * *"]
+
 [placement]
 mode = "smart"
 

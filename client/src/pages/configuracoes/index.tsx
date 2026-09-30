@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Key, Bell, Palette, Settings, UserCheck, UsersRound, ListTree } from "lucide-react";
+import { Users, Key, Bell, Palette, Settings, UserCheck, UsersRound, ListTree, MessageSquareText, Workflow } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { getUserPermissions } from "@/lib/permissions";
 import { UsersSettings } from "./users-settings";
@@ -11,11 +11,13 @@ import { FieldsSettings } from "./fields-settings";
 import { ResponsaveisSettings } from "./responsaveis-settings";
 import { SupportGroupsSettings } from "./support-groups-settings";
 import { TicketFieldsSettings } from "./ticket-fields-settings";
+import { AutomationsSettings, CannedResponsesSettings } from "./automations-settings";
 
 export default function ConfiguracoesPage() {
   const { user } = useAuth();
   const permissions = getUserPermissions(user);
-  // Quem tem só "Gerenciar campos dos chamados" (sem "Configurações") vê apenas essa aba.
+  // Quem tem só "Gerenciar campos dos chamados" (sem "Configurações") vê apenas as abas de
+  // campos, respostas prontas e automações.
   const full = permissions.configuracoes;
 
   return (
@@ -28,7 +30,7 @@ export default function ConfiguracoesPage() {
       <main className="flex-1 p-6">
         <Tabs defaultValue={full ? "users" : "campos-chamado"} className="space-y-6">
           {full ? (
-          <TabsList className="grid w-full max-w-5xl grid-cols-8">
+          <TabsList className="grid w-full max-w-6xl grid-cols-10">
             <TabsTrigger value="users" className="flex items-center gap-2" data-testid="tab-users">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Usuários</span>
@@ -49,6 +51,14 @@ export default function ConfiguracoesPage() {
               <ListTree className="h-4 w-4" />
               <span className="hidden sm:inline">Campos do chamado</span>
             </TabsTrigger>
+            <TabsTrigger value="respostas" className="flex items-center gap-2" data-testid="tab-respostas">
+              <MessageSquareText className="h-4 w-4" />
+              <span className="hidden sm:inline">Respostas prontas</span>
+            </TabsTrigger>
+            <TabsTrigger value="automacoes" className="flex items-center gap-2" data-testid="tab-automacoes">
+              <Workflow className="h-4 w-4" />
+              <span className="hidden sm:inline">Automações</span>
+            </TabsTrigger>
             <TabsTrigger value="auth" className="flex items-center gap-2" data-testid="tab-auth">
               <Key className="h-4 w-4" />
               <span className="hidden sm:inline">Autenticação</span>
@@ -68,11 +78,27 @@ export default function ConfiguracoesPage() {
               <ListTree className="h-4 w-4" />
               <span>Campos do chamado</span>
             </TabsTrigger>
+            <TabsTrigger value="respostas" className="flex items-center gap-2" data-testid="tab-respostas">
+              <MessageSquareText className="h-4 w-4" />
+              <span>Respostas prontas</span>
+            </TabsTrigger>
+            <TabsTrigger value="automacoes" className="flex items-center gap-2" data-testid="tab-automacoes">
+              <Workflow className="h-4 w-4" />
+              <span>Automações</span>
+            </TabsTrigger>
           </TabsList>
           )}
 
           <TabsContent value="campos-chamado">
             <TicketFieldsSettings />
+          </TabsContent>
+
+          <TabsContent value="respostas">
+            <CannedResponsesSettings />
+          </TabsContent>
+
+          <TabsContent value="automacoes">
+            <AutomationsSettings />
           </TabsContent>
 
           {full && (

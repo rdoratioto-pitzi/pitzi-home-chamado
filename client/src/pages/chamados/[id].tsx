@@ -28,6 +28,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { RichTextarea } from "@/components/rich-textarea";
+import { CannedResponsePicker } from "@/components/canned-response-picker";
 import { RichContent } from "@/components/rich-content";
 import { useMentionableUsers } from "@/hooks/use-mentionable-users";
 import { UserSelect } from "@/components/ui/user-select";
@@ -870,8 +871,9 @@ export default function TicketDetailPage() {
                   mentionableUsers={mentionableUsersForComment}
                   data-testid="chamado-novo-comentario"
                 />
-                <Button 
-                  onClick={handleAddComment} 
+                <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={handleAddComment}
                   disabled={!comment.trim() || commentMutation.isPending}
                 >
                   {commentMutation.isPending ? (
@@ -881,6 +883,13 @@ export default function TicketDetailPage() {
                   )}
                   Enviar Comentário
                 </Button>
+                <CannedResponsePicker
+                  size="default"
+                  groupKey={ticket.category}
+                  ticket={{ solicitante: ticket.requesterName, codigo: ticket.code, titulo: ticket.title }}
+                  onInsert={(html) => setComment((prev) => (prev ? prev + html : html))}
+                />
+                </div>
               </div>
             </CardContent>
           </Card>

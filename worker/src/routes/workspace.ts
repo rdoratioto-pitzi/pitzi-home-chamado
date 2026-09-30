@@ -30,6 +30,7 @@ import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 import { OPEN_TICKET_STATUSES } from "../../../shared/ticket-options";
 import { getSlaForTicket, slaPauseUpdate } from "../../../shared/sla";
 import { resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
+import { runTicketAutomations } from "../../../server/services/automations.service";
 import { isInQueue } from "../../../shared/ticket-queue";
 import { canViewTicket, getQueueViewer } from "../../../server/services/ticket-queue.service";
 
@@ -351,7 +352,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
     const prioridadeMap: Record<string, string> = { baixa: "low", media: "medium", alta: "high", critica: "critical" };
     const mappedPriority = prioridade ? (prioridadeMap[prioridade] || prioridade) : "medium";
 
-    const ticket = await storage.createTicket({
+    const created = await storage.createTicket({
       title: titulo.trim(),
       description: descricao || "",
       category: categoria,
@@ -366,6 +367,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
       customFields: custom.values ?? null,
       tenantId,
     } as any);
+    const ticket = await runTicketAutomations(storage, "ticket_created", created, { actorId: userId });
 
     // Slack: notifica criação no canal #devs-renov (fire-and-forget via waitUntil).
     fireSlack(c, () =>
@@ -979,8 +981,11 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
       return c.json({ error: "Nenhum campo para atualizar" }, 400);
     }
 
-    const ticket = await storage.updateTicket(String(id), updateData);
-    if (!ticket) return c.json({ error: "Chamado não encontrado" }, 404);
+    const saved = await storage.updateTicket(String(id), updateData);
+    if (!saved) return c.json({ error: "Chamado não encontrado" }, 404);
+    const ticket = status !== undefined && status !== previous.status
+      ? await runTicketAutomations(storage, "status_changed", saved, { actorId, newStatus: status })
+      : saved;
 
     // Slack: dispara hooks por transição (apenas o que mudou).
     const oldAssignee = previous?.assigneeId || null;

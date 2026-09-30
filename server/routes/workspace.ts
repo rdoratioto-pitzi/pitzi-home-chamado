@@ -21,6 +21,7 @@ import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 import { OPEN_TICKET_STATUSES } from "@shared/ticket-options";
 import { getSlaForTicket, slaPauseUpdate } from "@shared/sla";
 import { resolveCustomFieldValues } from "../services/ticket-fields.service";
+import { runTicketAutomations } from "../services/automations.service";
 import { isInQueue } from "@shared/ticket-queue";
 import { canViewTicket, getQueueViewer } from "../services/ticket-queue.service";
 
@@ -319,7 +320,7 @@ export function registerWorkspaceRoutes(router: Router) {
       const custom = await resolveCustomFieldValues(storage, { incoming: req.body?.customFields, groupKey: categoria || "geral", isCreate: true });
       if (!custom.ok) return res.status(custom.status).json({ error: custom.error });
 
-      const ticket = await storage.createTicket({
+      const created = await storage.createTicket({
         title: titulo.trim(),
         description: descricao || "",
         category: categoria || "geral",
@@ -334,6 +335,7 @@ export function registerWorkspaceRoutes(router: Router) {
         tenantId: null,
         attachments: attachments || null,
       } as InsertTicket);
+      const ticket = await runTicketAutomations(storage, "ticket_created", created, { actorId: userId });
 
       // Slack: notifica criação no canal #devs-renov (fire-and-forget).
       if (db) {
@@ -1081,8 +1083,11 @@ export function registerWorkspaceRoutes(router: Router) {
         return res.status(400).json({ error: "Nenhum campo para atualizar" });
       }
 
-      const ticket = await storage.updateTicket(String(id), updateData);
-      if (!ticket) return res.status(404).json({ error: "Chamado não encontrado" });
+      const saved = await storage.updateTicket(String(id), updateData);
+      if (!saved) return res.status(404).json({ error: "Chamado não encontrado" });
+      const ticket = status !== undefined && previous && status !== previous.status
+        ? await runTicketAutomations(storage, "status_changed", saved, { actorId, newStatus: status })
+        : saved;
 
       // Slack: dispara hooks por transição (apenas o que mudou).
       if (db) {
