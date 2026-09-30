@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Edit, Trash2, ChevronRight } from "lucide-react";
+import { MoreHorizontal, Edit, Trash2, ChevronRight, UserCheck, ArrowRightLeft } from "lucide-react";
 import {
   statusOptionsForKind,
   priorityOptionsForKind,
@@ -34,6 +34,8 @@ export interface ChamadoItem {
   requestObject?: string | null;
   requestAction?: string | null;
   requestDetail?: string | null;
+  /** Id do responsável; null quando o chamado está na fila do grupo sem ninguém. */
+  responsavelId?: string | null;
   anexos: Array<{ name: string; url: string }>;
 }
 
@@ -70,6 +72,10 @@ type WorkspaceTableProps =
       onDelete?: (item: ChamadoItem) => void;
       onStatusChange?: (item: ChamadoItem, newStatus: string) => void;
       onPriorityChange?: (item: ChamadoItem, newPriority: string) => void;
+      /** Fila do grupo: devolve se o item pode ser assumido/transferido pelo usuário. */
+      onClaim?: (item: ChamadoItem) => void;
+      canClaim?: (item: ChamadoItem) => boolean;
+      onTransfer?: (item: ChamadoItem) => void;
     }
   | {
       variant: "todos";
@@ -326,6 +332,9 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
   const onDelete = "onDelete" in props ? props.onDelete : undefined;
   const onStatusChange = "onStatusChange" in props ? props.onStatusChange : undefined;
   const onPriorityChange = "onPriorityChange" in props ? props.onPriorityChange : undefined;
+  const onClaim = "onClaim" in props ? props.onClaim : undefined;
+  const canClaim = "canClaim" in props ? props.canClaim : undefined;
+  const onTransfer = "onTransfer" in props ? props.onTransfer : undefined;
 
   const COL_TEMPLATE = variant === "todos" ? COL_TEMPLATE_TODOS : COL_TEMPLATE_CHAMADOS;
   const headers = variant === "todos"
@@ -415,6 +424,8 @@ export function WorkspaceTable(props: WorkspaceTableProps) {
                         colTemplate={COL_TEMPLATE}
                         onRowClick={onRowClick as ((item: ChamadoItem) => void) | undefined}
                         onDelete={onDelete}
+                        onClaim={onClaim && (!canClaim || canClaim(item as ChamadoItem)) ? onClaim : undefined}
+                        onTransfer={onTransfer}
                         onStatusChange={onStatusChange as ((item: ChamadoItem, s: string) => void) | undefined}
                         onPriorityChange={onPriorityChange as ((item: ChamadoItem, p: string) => void) | undefined}
                       />
@@ -520,11 +531,13 @@ function InlineSelectChip({
   );
 }
 
-function ChamadoItemRow({ item, colTemplate, onRowClick, onDelete, onStatusChange, onPriorityChange }: {
+function ChamadoItemRow({ item, colTemplate, onRowClick, onDelete, onClaim, onTransfer, onStatusChange, onPriorityChange }: {
   item: ChamadoItem;
   colTemplate: string;
   onRowClick?: (item: ChamadoItem) => void;
   onDelete?: (item: ChamadoItem) => void;
+  onClaim?: (item: ChamadoItem) => void;
+  onTransfer?: (item: ChamadoItem) => void;
   onStatusChange?: (item: ChamadoItem, s: string) => void;
   onPriorityChange?: (item: ChamadoItem, p: string) => void;
 }) {
@@ -587,6 +600,8 @@ function ChamadoItemRow({ item, colTemplate, onRowClick, onDelete, onStatusChang
       <ActionsMenu
         onEdit={() => { window.location.href = `/chamados/${item.id}`; }}
         onDelete={onDelete ? () => onDelete(item) : undefined}
+        onClaim={onClaim ? () => onClaim(item) : undefined}
+        onTransfer={onTransfer ? () => onTransfer(item) : undefined}
       />
     </div>
   );
@@ -745,7 +760,12 @@ function SlaStatusCell({ statusSla, className }: { statusSla: "dentro_prazo" | "
   );
 }
 
-function ActionsMenu({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) {
+function ActionsMenu({ onEdit, onDelete, onClaim, onTransfer }: {
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onClaim?: () => void;
+  onTransfer?: () => void;
+}) {
   return (
     <div className="opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
@@ -755,6 +775,18 @@ function ActionsMenu({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () 
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          {onClaim && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onClaim(); }}>
+              <UserCheck className="h-3.5 w-3.5 mr-2" />
+              Assumir
+            </DropdownMenuItem>
+          )}
+          {onTransfer && (
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTransfer(); }}>
+              <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
+              Transferir
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(); }}>
             <Edit className="h-3.5 w-3.5 mr-2" />
             Editar

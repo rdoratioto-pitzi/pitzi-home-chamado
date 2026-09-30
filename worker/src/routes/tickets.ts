@@ -23,6 +23,7 @@ import {
 } from "../lib/email";
 import { ticketStatusLabel } from "../../../shared/ticket-options";
 import { isValidRequestSelection, normalizeRequestSelection } from "../../../shared/request-objects";
+import { isTicketGroupMember } from "../../../server/services/ticket-queue.service";
 
 const tickets = new Hono<AppEnv>();
 
@@ -177,7 +178,8 @@ tickets.get("/api/tickets/:id", async (c) => {
   if (
     user.role !== "admin" &&
     ticket.requesterId !== user.userId &&
-    ticket.assigneeId !== user.userId
+    ticket.assigneeId !== user.userId &&
+    !(await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket))
   ) {
     return c.json({ error: "Ticket not found" }, 404);
   }
@@ -420,7 +422,8 @@ tickets.get("/api/tickets/:id/comments", async (c) => {
   if (
     user.role !== "admin" &&
     ticket.requesterId !== user.userId &&
-    ticket.assigneeId !== user.userId
+    ticket.assigneeId !== user.userId &&
+    !(await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket))
   ) {
     return c.json({ error: "Access denied" }, 403);
   }
