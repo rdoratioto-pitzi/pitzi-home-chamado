@@ -50,6 +50,7 @@ describe.skipIf(!url)("fila do grupo", () => {
 
   async function cleanup() {
     await pool.query("DELETE FROM ticket_comments WHERE ticket_id IN (SELECT id FROM tickets WHERE title LIKE 'queue-test%')");
+    await pool.query("DELETE FROM workspace_comentarios WHERE chamado_id IN (SELECT id FROM tickets WHERE title LIKE 'queue-test%')");
     await pool.query("DELETE FROM notifications WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@queue-test.local')");
     await pool.query("DELETE FROM tickets WHERE title LIKE 'queue-test%'");
     await pool.query("DELETE FROM support_group_members WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@queue-test.local')");
@@ -186,5 +187,25 @@ describe.skipIf(!url)("fila do grupo", () => {
     // "dev" está desativado (0023): não recebe chamados.
     expect((await send(app(ids.admin, "admin"), "POST", `/api/tickets/${id}/transferir`, { category: "dev" })).status).toBe(400);
     expect((await send(app(ids.sapB), "POST", `/api/tickets/${id}/transferir`, {})).status).toBe(400);
+  });
+
+  it("comentários do workspace seguem a regra de acesso do chamado", async () => {
+    const id = await ticket("sap");
+    const route = `/api/workspace/chamados/${id}/comentarios`;
+
+    // Quem não é solicitante, responsável, membro do grupo nem admin não lê nem comenta.
+    expect((await send(app(ids.outsider), "GET", route)).status).toBe(404);
+    expect((await send(app(ids.dadosA), "POST", route, { texto: "invasor" })).status).toBe(404);
+    // Outro tenant também não, mesmo sendo admin.
+    expect((await send(app(ids.admin, "admin", "tenant-outro"), "GET", route)).status).toBe(404);
+
+    expect((await send(app(ids.sapA), "POST", route, { texto: "olhando" })).status).toBe(201);
+    expect((await send(app(ids.requester), "POST", route, { texto: "obrigado" })).status).toBe(201);
+    const lista = await json(await send(app(ids.admin, "admin"), "GET", route));
+    expect(lista.comentarios.map((c: any) => c.texto)).toEqual(["olhando", "obrigado"]);
+
+    // Chamado inexistente responde 404 em vez de gravar comentário solto.
+    const inexistente = "/api/workspace/chamados/00000000-0000-0000-0000-000000000000/comentarios";
+    expect((await send(app(ids.admin, "admin"), "POST", inexistente, { texto: "x" })).status).toBe(404);
   });
 });
