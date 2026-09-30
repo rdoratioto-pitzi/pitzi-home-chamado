@@ -5,6 +5,7 @@ import {
   type SupportGroup, type SupportGroupWithMembers,
   type TicketCustomField, type InsertTicketCustomField,
   type CannedResponse, type InsertCannedResponse,
+  type KnowledgeArticle, type InsertKnowledgeArticle, type KnowledgeArticleWithAuthor,
   type AutomationRule, type InsertAutomationRule,
   type TicketComment, type InsertTicketComment,
   type TicketCommentWithUser,
@@ -70,7 +71,7 @@ import {
   type ClaudeCodeUsageReport, type InsertClaudeCodeUsage,
   type KanbanLabel, type InsertKanbanLabel,
   type KanbanCardDependency, type InsertKanbanCardDependency,
-  users, tickets, ticketResponsaveis, supportGroups, supportGroupMembers, ticketCustomFields, cannedResponses, automationRules, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
+  users, tickets, ticketResponsaveis, supportGroups, supportGroupMembers, ticketCustomFields, cannedResponses, knowledgeArticles, automationRules, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   kanbanLabels, kanbanCardDependencies,
   objectives, keyResults, keyResultUpdates, initiatives, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
@@ -90,7 +91,7 @@ import {
   passwordResetTokens,
  } from "@shared/schema";
  import { db as defaultDb, type Database } from "./db";
- import { eq, and, or, sql, asc, desc, gt, isNull, type SQL } from "drizzle-orm";
+ import { eq, and, or, sql, asc, desc, gt, isNull, ilike, type SQL } from "drizzle-orm";
 import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../shared/password";
  import { alias } from "drizzle-orm/pg-core";
  
@@ -115,7 +116,18 @@ import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../
    | "okr_update"
    | "shipment_update";
  
- export interface IStorage {
+ export interface KnowledgeSearchOptions {
+  /** undefined = sem isolamento de tenant (Express local). */
+  tenantId?: string | null;
+  q?: string;
+  groupKey?: string;
+  viewer: { userId: string; isAdmin: boolean };
+  /** Só publicados, mesmo para admin/autor (sugestões na abertura do chamado). */
+  publishedOnly?: boolean;
+  limit?: number;
+}
+
+export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
@@ -160,6 +172,14 @@ import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../
   createCannedResponse(data: InsertCannedResponse): Promise<CannedResponse>;
   updateCannedResponse(id: string, data: Partial<InsertCannedResponse>): Promise<CannedResponse | undefined>;
   deleteCannedResponse(id: string): Promise<boolean>;
+  // Base de Conhecimento (regras em shared/knowledge.ts)
+  searchKnowledgeArticles(opts: KnowledgeSearchOptions): Promise<KnowledgeArticleWithAuthor[]>;
+  getKnowledgeArticle(id: string): Promise<KnowledgeArticleWithAuthor | undefined>;
+  getKnowledgeArticleBySourceTicket(ticketId: string): Promise<KnowledgeArticle | undefined>;
+  createKnowledgeArticle(data: InsertKnowledgeArticle): Promise<KnowledgeArticle>;
+  updateKnowledgeArticle(id: string, data: Partial<InsertKnowledgeArticle>): Promise<KnowledgeArticle | undefined>;
+  deleteKnowledgeArticle(id: string): Promise<boolean>;
+  incrementKnowledgeArticleViews(id: string): Promise<void>;
   getAutomationRules(trigger?: string): Promise<AutomationRule[]>;
   getAutomationRule(id: string): Promise<AutomationRule | undefined>;
   createAutomationRule(data: InsertAutomationRule): Promise<AutomationRule>;
@@ -922,6 +942,82 @@ export class DatabaseStorage implements IStorage {
     if (!this.db) throw new Error("Database not connected");
     const result = await this.db.delete(cannedResponses).where(eq(cannedResponses.id, id)).returning();
     return result.length > 0;
+  }
+
+  private knowledgeArticleSelect() {
+    return {
+      id: knowledgeArticles.id,
+      tenantId: knowledgeArticles.tenantId,
+      title: knowledgeArticles.title,
+      content: knowledgeArticles.content,
+      groupKey: knowledgeArticles.groupKey,
+      status: knowledgeArticles.status,
+      sourceTicketId: knowledgeArticles.sourceTicketId,
+      authorId: knowledgeArticles.authorId,
+      updatedBy: knowledgeArticles.updatedBy,
+      views: knowledgeArticles.views,
+      createdAt: knowledgeArticles.createdAt,
+      updatedAt: knowledgeArticles.updatedAt,
+      authorName: users.name,
+    };
+  }
+  async searchKnowledgeArticles(opts: KnowledgeSearchOptions): Promise<KnowledgeArticleWithAuthor[]> {
+    if (!this.db) throw new Error("Database not connected");
+    const conditions: SQL[] = [];
+    if (opts.tenantId !== undefined) {
+      conditions.push(opts.tenantId === null ? isNull(knowledgeArticles.tenantId) : eq(knowledgeArticles.tenantId, opts.tenantId));
+    }
+    if (opts.publishedOnly) {
+      conditions.push(eq(knowledgeArticles.status, "publicado"));
+    } else if (!opts.viewer.isAdmin) {
+      conditions.push(or(eq(knowledgeArticles.status, "publicado"), eq(knowledgeArticles.authorId, opts.viewer.userId))!);
+    }
+    if (opts.groupKey) conditions.push(eq(knowledgeArticles.groupKey, opts.groupKey));
+    const q = opts.q?.trim();
+    if (q) {
+      const pattern = `%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`;
+      conditions.push(or(ilike(knowledgeArticles.title, pattern), ilike(knowledgeArticles.content, pattern))!);
+    }
+    const base = this.db.select(this.knowledgeArticleSelect()).from(knowledgeArticles)
+      .leftJoin(users, eq(users.id, knowledgeArticles.authorId));
+    const filtered = conditions.length ? base.where(and(...conditions)) : base;
+    return await filtered.orderBy(desc(knowledgeArticles.updatedAt)).limit(Math.min(opts.limit ?? 100, 200));
+  }
+  async getKnowledgeArticle(id: string): Promise<KnowledgeArticleWithAuthor | undefined> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.select(this.knowledgeArticleSelect()).from(knowledgeArticles)
+      .leftJoin(users, eq(users.id, knowledgeArticles.authorId))
+      .where(eq(knowledgeArticles.id, id));
+    return row;
+  }
+  async getKnowledgeArticleBySourceTicket(ticketId: string): Promise<KnowledgeArticle | undefined> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.select().from(knowledgeArticles).where(eq(knowledgeArticles.sourceTicketId, ticketId));
+    return row;
+  }
+  async createKnowledgeArticle(data: InsertKnowledgeArticle): Promise<KnowledgeArticle> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.insert(knowledgeArticles).values(data).returning();
+    return row;
+  }
+  async updateKnowledgeArticle(id: string, data: Partial<InsertKnowledgeArticle>): Promise<KnowledgeArticle | undefined> {
+    if (!this.db) throw new Error("Database not connected");
+    const [row] = await this.db.update(knowledgeArticles)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(knowledgeArticles.id, id))
+      .returning();
+    return row;
+  }
+  async deleteKnowledgeArticle(id: string): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+    const result = await this.db.delete(knowledgeArticles).where(eq(knowledgeArticles.id, id)).returning();
+    return result.length > 0;
+  }
+  async incrementKnowledgeArticleViews(id: string): Promise<void> {
+    if (!this.db) throw new Error("Database not connected");
+    await this.db.update(knowledgeArticles)
+      .set({ views: sql`${knowledgeArticles.views} + 1` })
+      .where(eq(knowledgeArticles.id, id));
   }
 
   async getAutomationRules(trigger?: string): Promise<AutomationRule[]> {
