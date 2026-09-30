@@ -112,8 +112,12 @@ export function UsersSettings() {
   const { data: users = [], isLoading } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
+  // Desativados ficam escondidos por padrão (contas antigas continuam no cadastro).
+  const [showInactive, setShowInactive] = useState(false);
+  const inactiveCount = users.filter((u) => u.status !== "active").length;
+  const visibleUsers = showInactive ? users : users.filter((u) => u.status === "active");
 
-  const sortedUsers = [...users].sort((a, b) => {
+  const sortedUsers = [...visibleUsers].sort((a, b) => {
     // Primary sort by sortConfig.key
     if (sortConfig.key === "status") {
       // Custom order for status: active first, then inactive
@@ -374,6 +378,17 @@ export function UsersSettings() {
           <CardDescription>
             Gerencie os usuários que têm acesso ao sistema
           </CardDescription>
+          {inactiveCount > 0 && (
+            <label className="mt-2 flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showInactive}
+                onChange={(e) => setShowInactive(e.target.checked)}
+                data-testid="checkbox-show-inactive-users"
+              />
+              Mostrar desativados ({inactiveCount})
+            </label>
+          )}
         </div>
         {currentUserIsAdmin && (
           <Button onClick={handleNewUser} data-testid="button-new-user">
