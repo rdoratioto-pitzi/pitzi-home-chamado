@@ -27,6 +27,8 @@ import {
   type SlackDb,
 } from "../../../server/services/slack-notifier.service";
 import { fireFor as fireHermes } from "../services/hermes-trigger.service";
+import { sendTicketAssignedEmail, sendTicketStatusChangedEmail } from "../lib/email";
+import { mailContext } from "../lib/mailer";
 import { OPEN_TICKET_STATUSES } from "../../../shared/ticket-options";
 import { getSlaForTicket, slaPauseUpdate } from "../../../shared/sla";
 import { resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
@@ -994,6 +996,21 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
       fireSlack(c, () =>
         notifyChamadoAtribuido({ db: db as SlackDb, env: slackEnv(c.env) }, ticket.id, newAssignee),
       );
+    }
+
+    // E-mails: mesma regra de PATCH /api/tickets/:id (a gaveta e a lista usam esta rota).
+    if (ticket.status !== previous.status) {
+      const requester = await storage.getUser(ticket.requesterId);
+      const assigneeUser = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
+      if (requester) {
+        sendTicketStatusChangedEmail(
+          mailContext(c), storage, ticket, previous.status, ticket.status, requester, assigneeUser || null,
+        ).catch(console.error);
+      }
+    }
+    if (newAssignee && newAssignee !== oldAssignee && newAssignee !== actorId) {
+      const assigneeUser = await storage.getUser(newAssignee);
+      if (assigneeUser) sendTicketAssignedEmail(mailContext(c), storage, ticket, assigneeUser).catch(console.error);
     }
     const wasOpen = previous && !STATUS_FECHADO.has(previous.status);
     const isClosed = STATUS_FECHADO.has(ticket.status);

@@ -32,6 +32,16 @@ export interface MailContext {
 }
 
 /** Monta o contexto a partir do Hono. executionCtx não existe em alguns testes: segue sem ele. */
+/**
+ * Mantém o Worker vivo até o e-mail entrar na fila. As rotas disparam os e-mails sem
+ * await (para não atrasar a resposta); sem waitUntil a Cloudflare encerra a execução
+ * assim que a resposta sai e a gravação na fila se perde.
+ */
+export function keepAlive<T>(ctx: MailContext, promise: Promise<T>): Promise<T> {
+  ctx.waitUntil?.(promise.catch(() => undefined));
+  return promise;
+}
+
 export function mailContext(c: { env: unknown; get: (key: "db") => unknown; executionCtx?: unknown }): MailContext {
   let waitUntil: MailContext["waitUntil"];
   try {

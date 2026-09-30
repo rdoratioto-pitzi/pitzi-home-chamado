@@ -38,7 +38,7 @@ import {
   commentBox,
   ctaButton,
 } from "../../../server/email-templates";
-import { loadEmailSettings, queueEmails, sendDirect, type MailContext, type MailEnv } from "./mailer";
+import { keepAlive, loadEmailSettings, queueEmails, sendDirect, type MailContext, type MailEnv } from "./mailer";
 
 // ============== TYPES ==============
 
@@ -143,7 +143,7 @@ async function queueSingle(
 
 // ============== 1. sendPasswordResetEmail ==============
 
-export async function sendPasswordResetEmail(
+async function sendPasswordResetEmailNow(
   ctx: MailContext,
   user: User,
   temporaryPassword: string
@@ -169,7 +169,7 @@ export async function sendPasswordResetEmail(
 }
 
 /** Link de redefinição de senha (fluxo público). A senha só muda quando o link é usado. Sempre ativo. */
-export async function sendPasswordResetLinkEmail(ctx: MailContext, user: User, resetUrl: string): Promise<void> {
+async function sendPasswordResetLinkEmailNow(ctx: MailContext, user: User, resetUrl: string): Promise<void> {
   const html = emailTemplate({
     title: "Redefinição de Senha",
     greeting: `Olá ${escapeHtml(user.name)},`,
@@ -186,7 +186,7 @@ export async function sendPasswordResetLinkEmail(ctx: MailContext, user: User, r
 
 // ============== 2. sendWelcomeEmail ==============
 
-export async function sendWelcomeEmail(
+async function sendWelcomeEmailNow(
   ctx: MailContext,
   user: User,
   initialPassword: string
@@ -359,7 +359,7 @@ export async function queueTicketEmail(
 
 // ============== 3. sendTicketCreatedEmail ==============
 
-export async function sendTicketCreatedEmail(
+async function sendTicketCreatedEmailNow(
   ctx: MailContext,
   storage: IStorage,
   ticket: Ticket,
@@ -371,7 +371,7 @@ export async function sendTicketCreatedEmail(
 
 // ============== 4. sendTicketAssignedEmail ==============
 
-export async function sendTicketAssignedEmail(
+async function sendTicketAssignedEmailNow(
   ctx: MailContext,
   storage: IStorage,
   ticket: Ticket,
@@ -383,7 +383,7 @@ export async function sendTicketAssignedEmail(
 
 // ============== 5. sendTicketStatusChangedEmail ==============
 
-export async function sendTicketStatusChangedEmail(
+async function sendTicketStatusChangedEmailNow(
   ctx: MailContext,
   storage: IStorage,
   ticket: Ticket,
@@ -398,7 +398,7 @@ export async function sendTicketStatusChangedEmail(
 
 // ============== 6. sendTicketCommentEmail ==============
 
-export async function sendTicketCommentEmail(
+async function sendTicketCommentEmailNow(
   ctx: MailContext,
   storage: IStorage,
   ticket: Ticket,
@@ -421,7 +421,7 @@ export async function sendTicketCommentEmail(
 
 // ============== 7. sendCSATReceivedEmail ==============
 
-export async function sendCSATReceivedEmail(
+async function sendCSATReceivedEmailNow(
   ctx: MailContext,
   _storage: IStorage,
   ticket: Ticket,
@@ -878,7 +878,7 @@ export async function sendMeetingUpdatedEmail(
 
 // ============== 14. sendMentionNotificationEmail ==============
 
-export async function sendMentionNotificationEmail(
+async function sendMentionNotificationEmailNow(
   ctx: MailContext,
   storage: IStorage,
   mentionedUser: User,
@@ -950,3 +950,15 @@ export async function sendSharedAreaInviteEmail(
     console.error("[EMAIL] Falha ao enviar shared_area_invite:", error);
   }
 }
+
+// ============== EXPORTS COM keepAlive ==============
+// Cada envio registra waitUntil no momento da chamada (ver keepAlive em mailer.ts).
+export const sendPasswordResetEmail: typeof sendPasswordResetEmailNow = (...args) => keepAlive(args[0], sendPasswordResetEmailNow(...args));
+export const sendPasswordResetLinkEmail: typeof sendPasswordResetLinkEmailNow = (...args) => keepAlive(args[0], sendPasswordResetLinkEmailNow(...args));
+export const sendWelcomeEmail: typeof sendWelcomeEmailNow = (...args) => keepAlive(args[0], sendWelcomeEmailNow(...args));
+export const sendTicketCreatedEmail: typeof sendTicketCreatedEmailNow = (...args) => keepAlive(args[0], sendTicketCreatedEmailNow(...args));
+export const sendTicketAssignedEmail: typeof sendTicketAssignedEmailNow = (...args) => keepAlive(args[0], sendTicketAssignedEmailNow(...args));
+export const sendTicketStatusChangedEmail: typeof sendTicketStatusChangedEmailNow = (...args) => keepAlive(args[0], sendTicketStatusChangedEmailNow(...args));
+export const sendTicketCommentEmail: typeof sendTicketCommentEmailNow = (...args) => keepAlive(args[0], sendTicketCommentEmailNow(...args));
+export const sendCSATReceivedEmail: typeof sendCSATReceivedEmailNow = (...args) => keepAlive(args[0], sendCSATReceivedEmailNow(...args));
+export const sendMentionNotificationEmail: typeof sendMentionNotificationEmailNow = (...args) => keepAlive(args[0], sendMentionNotificationEmailNow(...args));
