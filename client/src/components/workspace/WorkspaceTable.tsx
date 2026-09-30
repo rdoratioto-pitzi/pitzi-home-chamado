@@ -39,6 +39,8 @@ export interface ChamadoItem {
   requestDetail?: string | null;
   /** Id do responsável; null quando o chamado está na fila do grupo sem ninguém. */
   responsavelId?: string | null;
+  /** Id de quem abriu o chamado (esconde a opção de nota interna para ele). */
+  solicitanteId?: string | null;
   anexos: Array<{ name: string; url: string }>;
 }
 

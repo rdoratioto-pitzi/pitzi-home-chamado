@@ -272,6 +272,7 @@ export function registerWorkspaceRoutes(router: Router) {
           requestAction: t.requestAction ?? null,
           requestDetail: t.requestDetail ?? null,
           responsavelId: t.assigneeId ?? null,
+          solicitanteId: t.requesterId ?? null,
         };
       });
 
@@ -1137,6 +1138,7 @@ export function registerWorkspaceRoutes(router: Router) {
         abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
         solicitante: requester?.name || null,
         responsavelId: ticket.assigneeId ?? null,
+        solicitanteId: ticket.requesterId ?? null,
       });
     } catch (error: any) {
       return res.status(error.status || 500).json({ error: error.message });
