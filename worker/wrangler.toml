@@ -6,9 +6,10 @@ compatibility_flags = ["nodejs_compat"]
 
 workers_dev = true
 
-# Automações "X dias aguardando o solicitante" (server/services/automations.service.ts).
+# A cada 5 minutos: fila de e-mails (novas tentativas). As automações "X dias aguardando
+# o solicitante" rodam só na execução do início de cada hora (worker/src/index.ts).
 [triggers]
-crons = ["0 * * * *"]
+crons = ["*/5 * * * *"]
 
 [placement]
 mode = "smart"
@@ -19,6 +20,9 @@ CORS_ORIGIN = "https://rdoratioto-pitzi.github.io"
 API_URL = "https://pitzi-home-api.rodrigo-doratioto.workers.dev"
 SENDPULSE_FROM_EMAIL = "noreply@pitzi.com.br"
 SENDPULSE_FROM_NAME = "Pitzi Home"
+# Caixa que envia os e-mails dos chamados (docs/emails-gmail-setup.md). As credenciais da conta
+# de serviço são segredos: GOOGLE_SA_CLIENT_EMAIL e GOOGLE_SA_PRIVATE_KEY.
+GMAIL_SENDER = "chamados@pitzi.com.br"
 
 [env.dev]
 name = "pitzi-home-api-dev"

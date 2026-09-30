@@ -7,6 +7,7 @@ import { requireAdmin } from "../middleware/auth";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import { sendWelcomeEmail, sendPasswordResetEmail } from "../lib/email";
+import { mailContext } from "../lib/mailer";
 
 const users = new Hono<AppEnv>();
 
@@ -37,7 +38,7 @@ users.post("/api/users", requireAdmin, async (c) => {
   const user = await storage.createUser({ ...validated, tenantId: c.get("user").tenantId });
 
   if (validated.password) {
-    const emailResult = await sendWelcomeEmail(c.env, user, validated.password);
+    const emailResult = await sendWelcomeEmail(mailContext(c), user, validated.password);
     if (!emailResult.success) {
       console.error("Failed to send welcome email:", emailResult.error);
     }
@@ -68,7 +69,7 @@ users.post("/api/users/:id/reset-password", requireAdmin, async (c) => {
   await storage.updateUser(user.id, { password: temporaryPassword });
 
   try {
-    await sendPasswordResetEmail(c.env, user, temporaryPassword);
+    await sendPasswordResetEmail(mailContext(c), user, temporaryPassword);
   } catch (emailError) {
     console.error("[users] Failed to send password reset email:", emailError);
   }
