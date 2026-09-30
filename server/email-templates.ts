@@ -1,7 +1,7 @@
 /**
  * Sistema de Templates de E-mail — Pitzi Home
  *
- * Template base reutilizável com identidade visual Renov,
+ * Template base reutilizável com identidade visual Pitzi,
  * usado por todas as funções de envio de e-mail do sistema.
  */
 
@@ -13,9 +13,9 @@ const TIMEZONE = "America/Sao_Paulo";
 
 // ============== CORES DA MARCA ==============
 const BRAND = {
-  green: "#00A137",
-  greenDark: "#008A2E",
-  greenLight: "#E8F5E9",
+  primary: "#3B42DE",
+  primaryDark: "#2B31B8",
+  primaryLight: "#EEF0FD",
   dark: "#1a1a2e",
   gray: "#64748b",
   grayLight: "#f1f5f9",
@@ -88,6 +88,10 @@ export function getProjectUrl(projectId: string): string {
   return `${getBaseUrl()}/projetos/${projectId}`;
 }
 
+export function getLogoUrl(): string {
+  return `${getBaseUrl()}/brand/pitzi-logo-email.png`;
+}
+
 export function getSettingsUrl(): string {
   return `${getBaseUrl()}/configuracoes`;
 }
@@ -126,7 +130,7 @@ export function statusTransition(oldStatus: string, newStatus: string): string {
 export function userAvatar(name: string): string {
   const initials = getUserInitials(name);
   return `
-    <div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:${BRAND.green};color:white;font-size:14px;font-weight:700;letter-spacing:0.5px;">${initials}</div>
+    <div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:${BRAND.primary};color:white;font-size:14px;font-weight:700;letter-spacing:0.5px;">${initials}</div>
   `;
 }
 
@@ -167,7 +171,7 @@ export function infoTable(rows: Array<{ label: string; value: string }>): string
 export function ctaButton(text: string, url: string): string {
   return `
     <div style="text-align:center;margin:28px 0;">
-      <a href="${url}" style="display:inline-block;background:${BRAND.green};color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;letter-spacing:0.3px;box-shadow:0 2px 8px rgba(0,161,55,0.3);">
+      <a href="${url}" style="display:inline-block;background:${BRAND.primary};color:white;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;letter-spacing:0.3px;box-shadow:0 2px 8px rgba(59,66,222,0.3);">
         ${text}
       </a>
     </div>
@@ -186,7 +190,7 @@ export function sectionCard(content: string, title?: string): string {
 export function commentBox(content: string, authorName?: string): string {
   const preview = content.length > 300 ? content.substring(0, 300) + "..." : content;
   return `
-    <div style="background:white;border-left:4px solid ${BRAND.green};border-radius:0 8px 8px 0;padding:16px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+    <div style="background:white;border-left:4px solid ${BRAND.primary};border-radius:0 8px 8px 0;padding:16px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
       ${authorName ? `<div style="font-weight:600;color:${BRAND.text};font-size:13px;margin-bottom:8px;">${authorName}</div>` : ""}
       <div style="color:${BRAND.gray};font-size:13px;line-height:1.6;">${preview}</div>
     </div>
@@ -235,8 +239,6 @@ export function emailTemplate(options: EmailTemplateOptions): string {
     postCta,
   } = options;
 
-  const settingsUrl = getSettingsUrl();
-
   return `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -268,15 +270,12 @@ export function emailTemplate(options: EmailTemplateOptions): string {
 
           <!-- Header -->
           <tr>
-            <td style="background:linear-gradient(135deg, ${BRAND.green} 0%, ${BRAND.greenDark} 100%);padding:32px 40px;text-align:center;">
-              <!-- Logo / Brand Name -->
+            <td style="background-color:${BRAND.primary};background:linear-gradient(135deg, ${BRAND.primary} 0%, ${BRAND.primaryDark} 100%);padding:28px 40px;text-align:center;">
+              <!-- Logo Pitzi (PNG: Gmail não exibe SVG) -->
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td align="center">
-                    <div style="display:inline-block;background:rgba(255,255,255,0.15);border-radius:12px;padding:8px 20px;margin-bottom:16px;">
-                      <span style="color:white;font-size:20px;font-weight:700;letter-spacing:1px;">RENOV</span>
-                      <span style="color:rgba(255,255,255,0.8);font-size:20px;font-weight:400;letter-spacing:1px;"> HOME</span>
-                    </div>
+                  <td align="center" style="padding-bottom:14px;">
+                    <img src="${getLogoUrl()}" width="140" height="45" alt="Pitzi" style="display:block;margin:0 auto;border:0;outline:none;text-decoration:none;height:45px;width:140px;color:#ffffff;font-size:24px;font-weight:700;">
                   </td>
                 </tr>
                 <tr>
@@ -314,15 +313,10 @@ export function emailTemplate(options: EmailTemplateOptions): string {
                 <tr>
                   <td align="center">
                     <p style="color:${BRAND.textLight};font-size:12px;margin:0 0 8px;line-height:1.5;">
-                      <strong style="color:${BRAND.gray};">Pitzi Home</strong> — Sistema de Gest\u00e3o Interna
+                      <strong style="color:${BRAND.gray};">Central de Chamados Pitzi</strong>
                     </p>
-                    <p style="color:${BRAND.textLight};font-size:11px;margin:0 0 12px;line-height:1.5;">
+                    <p style="color:${BRAND.textLight};font-size:11px;margin:0;line-height:1.5;">
                       Este \u00e9 um e-mail autom\u00e1tico. N\u00e3o responda diretamente.
-                    </p>
-                    <p style="margin:0;">
-                      <a href="${settingsUrl}" style="color:${BRAND.green};font-size:11px;text-decoration:none;font-weight:500;">
-                        Gerenciar prefer\u00eancias de notifica\u00e7\u00e3o
-                      </a>
                     </p>
                   </td>
                 </tr>

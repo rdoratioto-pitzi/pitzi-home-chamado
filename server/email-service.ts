@@ -168,10 +168,10 @@ export async function sendWelcomeEmail(
     title: "Bem-vindo ao Pitzi Home",
     greeting: `Olá <strong>${user.name}</strong>,`,
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Você foi cadastrado na plataforma interna de gestão da Renov. Abaixo estão suas informações de acesso:</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Você foi cadastrado na plataforma interna de gestão da Pitzi. Abaixo estão suas informações de acesso:</p>
       ${sectionCard(`
         ${infoTable([
-          { label: "Link", value: `<a href="https://rdoratioto-pitzi.github.io/pitzi-home-chamado/" style="color:#00A137;font-weight:600;">rdoratioto-pitzi.github.io/pitzi-home-chamado</a>` },
+          { label: "Link", value: `<a href="https://rdoratioto-pitzi.github.io/pitzi-home-chamado/" style="color:#3B42DE;font-weight:600;">rdoratioto-pitzi.github.io/pitzi-home-chamado</a>` },
           { label: "E-mail", value: user.email },
           { label: "Senha inicial", value: `<code style="background:#e8f5e9;padding:4px 8px;border-radius:4px;font-weight:600;">${initialPassword}</code>` },
         ])}
@@ -479,7 +479,7 @@ export async function sendCSATReceivedEmail(
           <span style="font-size:32px;">${stars}${emptyStars}</span>
           <p style="color:#64748b;font-size:14px;margin:8px 0 0;">${rating} de 5 estrelas</p>
         </div>
-        ${comment ? `<div style="margin-top:16px;padding:12px;background:white;border-radius:8px;border-left:4px solid #00A137;"><p style="color:#64748b;font-size:13px;font-style:italic;margin:0;">"${comment}"</p></div>` : ""}
+        ${comment ? `<div style="margin-top:16px;padding:12px;background:white;border-radius:8px;border-left:4px solid #3B42DE;"><p style="color:#64748b;font-size:13px;font-style:italic;margin:0;">"${comment}"</p></div>` : ""}
         ${infoTable([
           { label: "Avaliado em", value: formatDateTime(new Date()) },
         ])}
@@ -781,7 +781,7 @@ function generateICSContent(
   },
   attendees: { name: string; email: string }[]
 ): string {
-  const uid = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@renovhome.com.br`;
+  const uid = `meeting-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@pitzi.com.br`;
   const now = new Date();
 
   const [year, month, day] = meeting.date.split("-").map(Number);
