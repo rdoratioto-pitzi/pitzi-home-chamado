@@ -230,6 +230,34 @@ export const cannedResponses = pgTable("canned_responses", {
 export type CannedResponse = typeof cannedResponses.$inferSelect;
 export type InsertCannedResponse = typeof cannedResponses.$inferInsert;
 
+// ============== BASE DE CONHECIMENTO ==============
+// Artigos para consulta de todos os usuários (regras em shared/knowledge.ts). Podem nascer
+// de um chamado encerrado (source_ticket_id). Tabela nova: a antiga knowledge_documents é a
+// biblioteca de documentos do projeto de origem e fica como está.
+export const knowledgeArticles = pgTable("knowledge_articles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  title: text("title").notNull(),
+  content: text("content").notNull(), // HTML sanitizado no backend
+  groupKey: text("group_key"), // grupo de atendimento (categoria); null = geral
+  status: text("status").notNull().default("publicado"), // publicado | rascunho
+  sourceTicketId: varchar("source_ticket_id"),
+  authorId: varchar("author_id").notNull(),
+  updatedBy: varchar("updated_by"),
+  views: integer("views").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  // Criados por migrations/0031_base_conhecimento.sql — não remover (db:push apagaria os índices).
+  sourceTicketUnique: uniqueIndex("knowledge_articles_source_ticket_unique")
+    .on(table.sourceTicketId).where(sql`source_ticket_id IS NOT NULL`),
+  statusIdx: index("knowledge_articles_status_idx").on(table.status),
+}));
+
+export type KnowledgeArticle = typeof knowledgeArticles.$inferSelect;
+export type InsertKnowledgeArticle = typeof knowledgeArticles.$inferInsert;
+export type KnowledgeArticleWithAuthor = KnowledgeArticle & { authorName: string | null };
+
 // Regras em shared/automations.ts.
 // ============== EMAIL OUTBOX (migration 0029) ==============
 // Fila dos e-mails automáticos: gravados antes do envio, reenviados pelo cron do Worker.

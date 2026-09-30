@@ -41,6 +41,7 @@ import { RequestObjectSelect } from "@/components/shared/RequestObjectSelect";
 import { CustomFieldInputs, missingRequiredField } from "@/components/shared/CustomFieldInputs";
 import { useCustomFields } from "@/hooks/use-ticket-fields";
 import { fieldsForGroup, type CustomFieldValues } from "@shared/custom-fields";
+import { RelatedArticles } from "@/components/knowledge/related-articles";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -280,6 +281,7 @@ export default function NovoChamadoPage() {
                           {titleValue.length}/10 caracteres
                         </span>
                       </div>
+                      <RelatedArticles title={titleValue} />
                     </FormItem>
                   )}
                 />
