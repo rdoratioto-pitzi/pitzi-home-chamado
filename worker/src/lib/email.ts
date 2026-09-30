@@ -1,15 +1,27 @@
 /**
- * Email service for Cloudflare Workers — Pitzi Home
+ * E-mails do Pitzi Home (Cloudflare Workers).
  *
- * Replaces server/email-service.ts (nodemailer/SMTP) with SendPulse REST API.
- * All 15 exported email functions are faithfully reproduced.
+ * Chamados: cada evento vira linhas na fila email_outbox (lib/mailer.ts), com o texto dos
+ * modelos de Configurações → E-mail (shared/email-settings.ts), e é enviado em segundo plano
+ * pelo Gmail. Os módulos legados (projetos, tarefas, reuniões) usam o envio direto.
  */
 
 import { format } from "date-fns-tz";
 import { generateICSContent } from "./ics";
-import type { Ticket, User, TicketComment, Task, KanbanCard, Project } from "../../../shared/schema";
-import { getApplicationLabel } from "../../../shared/applications";
+import type { Ticket, User, TicketComment, Task, KanbanCard, Project, InsertEmailOutbox } from "../../../shared/schema";
 import type { IStorage, EmailNotificationType } from "../../../server/storage";
+import {
+  EMAIL_EVENT_META,
+  escapeHtml,
+  renderSubject,
+  renderTemplateHtml,
+  renderTemplateText,
+  type EmailEvent,
+  type EmailRecipient,
+  type EmailVariables,
+} from "../../../shared/email-settings";
+import { emailDomain, newMessageId, ticketThreadRootId } from "../../../shared/email-mime";
+import { ticketStatusLabel, ticketTypeLabel } from "../../../shared/ticket-options";
 import {
   emailTemplate,
   getTicketUrl,
@@ -26,16 +38,12 @@ import {
   commentBox,
   ctaButton,
 } from "../../../server/email-templates";
+import { loadEmailSettings, queueEmails, sendDirect, type MailContext, type MailEnv } from "./mailer";
 
 // ============== TYPES ==============
 
-export interface EmailEnv {
-  SENDPULSE_CLIENT_ID: string;
-  SENDPULSE_CLIENT_SECRET: string;
-  SENDPULSE_FROM_NAME: string;
-  SENDPULSE_FROM_EMAIL: string;
-  APP_URL: string;
-}
+export type EmailEnv = MailEnv;
+export type { MailContext };
 
 interface SendPulseRecipient {
   name: string;
@@ -49,72 +57,9 @@ interface SendMailOptions {
   attachments_binary?: Record<string, string>;
 }
 
-// ============== SENDPULSE TRANSPORT ==============
-
-// In Workers, global state persists across requests within the same isolate but
-// is NOT shared between isolates or guaranteed to survive eviction. This means
-// the cache reduces redundant token fetches within a warm isolate but will
-// gracefully re-fetch when the isolate is cold-started.
-let tokenCache: { token: string; expiresAt: number } | null = null;
-
-async function getSendPulseToken(env: EmailEnv): Promise<string> {
-  if (tokenCache && Date.now() < tokenCache.expiresAt) {
-    return tokenCache.token;
-  }
-
-  const res = await fetch("https://api.sendpulse.com/oauth/access_token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      grant_type: "client_credentials",
-      client_id: env.SENDPULSE_CLIENT_ID,
-      client_secret: env.SENDPULSE_CLIENT_SECRET,
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error(`SendPulse auth failed: ${res.status} ${await res.text()}`);
-  }
-
-  const data = (await res.json()) as { access_token: string; expires_in: number };
-  tokenCache = {
-    token: data.access_token,
-    expiresAt: Date.now() + (data.expires_in - 60) * 1000,
-  };
-  return tokenCache.token;
-}
-
+/** Envio direto (sem fila) dos módulos legados. */
 async function sendMail(env: EmailEnv, options: SendMailOptions): Promise<void> {
-  const token = await getSendPulseToken(env);
-
-  const payload: Record<string, unknown> = {
-    email: {
-      subject: options.subject,
-      html: options.html,
-      from: {
-        name: env.SENDPULSE_FROM_NAME,
-        email: env.SENDPULSE_FROM_EMAIL,
-      },
-      to: options.to,
-    },
-  };
-
-  if (options.attachments_binary) {
-    (payload.email as Record<string, unknown>).attachments_binary = options.attachments_binary;
-  }
-
-  const res = await fetch("https://api.sendpulse.com/smtp/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    throw new Error(`SendPulse send failed: ${res.status} ${await res.text()}`);
-  }
+  await sendDirect(env, options);
 }
 
 // ============== PREFERENCE FILTER + LOGGING ==============
@@ -145,49 +90,89 @@ function logEmailSkipped(type: string, reason: string, userId?: string) {
   console.log(`[EMAIL] ${type} ignorado: ${reason}`, { userId });
 }
 
+// ============== FILA: e-mails avulsos (senha, boas-vindas, avaliação, menção) ==============
+
+function senderDomain(env: MailEnv): string {
+  return emailDomain(env.GMAIL_SENDER || env.SENDPULSE_FROM_EMAIL || "chamados@pitzi.com.br");
+}
+
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n\s*\n+/g, "\n\n")
+    .trim();
+}
+
+/** Grava um e-mail avulso na fila. Destinatário inativo ou sem e-mail vira `skipped`. */
+async function queueSingle(
+  ctx: MailContext,
+  event: string,
+  user: Pick<User, "id" | "email" | "status" | "tenantId">,
+  subject: string,
+  html: string,
+  ticket?: Pick<Ticket, "id"> | null,
+): Promise<void> {
+  const skipReason = !user.email ? "Destinatário sem e-mail" : user.status !== "active" ? "Usuário inativo" : null;
+  const domain = senderDomain(ctx.env);
+  await queueEmails(ctx, [{
+    tenantId: user.tenantId ?? null,
+    event,
+    ticketId: ticket?.id ?? null,
+    toEmail: user.email || "",
+    toUserId: user.id,
+    subject,
+    html,
+    text: htmlToText(html),
+    status: skipReason ? "skipped" : "pending",
+    lastError: skipReason,
+    messageIdHeader: newMessageId(domain),
+    threadRootId: ticket ? ticketThreadRootId(ticket.id, domain) : null,
+  }]);
+  if (!skipReason) logEmailSent(event, [user.email], ticket?.id);
+}
+
 // ============== 1. sendPasswordResetEmail ==============
 
 export async function sendPasswordResetEmail(
-  env: EmailEnv,
+  ctx: MailContext,
   user: User,
   temporaryPassword: string
 ): Promise<void> {
   const html = emailTemplate({
-    title: "Redefinicao de Senha",
-    greeting: `Ola ${user.name},`,
+    title: "Redefinição de Senha",
+    greeting: `Olá ${escapeHtml(user.name)},`,
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Recebemos uma solicitacao para redefinir sua senha no Pitzi Home.</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Recebemos uma solicitação para redefinir sua senha no Pitzi Home.</p>
       ${sectionCard(`
         <div style="text-align:center;">
-          <p style="color:#64748b;font-size:13px;margin:0 0 8px;">Sua nova senha temporaria</p>
-          <p style="font-size:24px;font-weight:700;letter-spacing:3px;color:#1a1a2e;margin:0;padding:12px;background:white;border-radius:8px;">${temporaryPassword}</p>
+          <p style="color:#64748b;font-size:13px;margin:0 0 8px;">Sua nova senha temporária</p>
+          <p style="font-size:24px;font-weight:700;letter-spacing:3px;color:#1a1a2e;margin:0;padding:12px;background:white;border-radius:8px;">${escapeHtml(temporaryPassword)}</p>
         </div>
       `)}
-      <p style="color:#334155;font-size:14px;line-height:1.6;">Use esta senha para acessar o sistema. Recomendamos que voce altere sua senha apos o primeiro acesso.</p>
-      <p style="margin-top:24px;font-size:12px;color:#94a3b8;">Se voce nao solicitou esta redefinicao, entre em contato com o administrador do sistema imediatamente.</p>
+      <p style="color:#334155;font-size:14px;line-height:1.6;">Use esta senha para acessar o sistema. Recomendamos que você altere sua senha após o primeiro acesso.</p>
+      <p style="margin-top:24px;font-size:12px;color:#94a3b8;">Se você não solicitou esta redefinição, entre em contato com o administrador do sistema imediatamente.</p>
     `,
     ctaText: "Acessar o Sistema",
-    ctaUrl: `${env.APP_URL}/login`,
+    ctaUrl: `${ctx.env.APP_URL}/login`,
   });
-
-  try {
-    await sendMail(env, {
-      to: [{ name: user.name, email: user.email }],
-      subject: "Pitzi Home - Redefinicao de Senha",
-      html,
-    });
-    logEmailSent("password_reset", [user.email]);
-  } catch (error) {
-    console.error("[EMAIL] Falha ao enviar redefinicao de senha:", error);
-    throw error;
-  }
+  await queueSingle(ctx, "password_reset", user, "Pitzi Home - Redefinição de Senha", html);
 }
 
-/** Link de redefinição de senha (fluxo público). A senha só muda quando o link é usado. */
-export async function sendPasswordResetLinkEmail(env: EmailEnv, user: User, resetUrl: string): Promise<void> {
+/** Link de redefinição de senha (fluxo público). A senha só muda quando o link é usado. Sempre ativo. */
+export async function sendPasswordResetLinkEmail(ctx: MailContext, user: User, resetUrl: string): Promise<void> {
   const html = emailTemplate({
     title: "Redefinição de Senha",
-    greeting: `Olá ${user.name},`,
+    greeting: `Olá ${escapeHtml(user.name)},`,
     body: `
       <p style="color:#334155;font-size:15px;line-height:1.6;">Recebemos uma solicitação para redefinir sua senha no Pitzi Home.</p>
       <p style="color:#334155;font-size:14px;line-height:1.6;">Clique no botão abaixo para escolher uma nova senha. O link vale por 30 minutos e só pode ser usado uma vez.</p>
@@ -196,180 +181,210 @@ export async function sendPasswordResetLinkEmail(env: EmailEnv, user: User, rese
     ctaText: "Redefinir senha",
     ctaUrl: resetUrl,
   });
-  await sendMail(env, {
-    to: [{ name: user.name, email: user.email }],
-    subject: "Pitzi Home - Redefinição de Senha",
-    html,
-  });
-  logEmailSent("password_reset_link", [user.email]);
+  await queueSingle(ctx, "password_reset_link", user, "Pitzi Home - Redefinição de Senha", html);
 }
 
 // ============== 2. sendWelcomeEmail ==============
 
 export async function sendWelcomeEmail(
-  env: EmailEnv,
+  ctx: MailContext,
   user: User,
   initialPassword: string
 ): Promise<{ success: boolean; error?: string }> {
   const html = emailTemplate({
     title: "Bem-vindo ao Pitzi Home",
-    greeting: `Ola <strong>${user.name}</strong>,`,
+    greeting: `Olá <strong>${escapeHtml(user.name)}</strong>,`,
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Voce foi cadastrado na plataforma interna de gestao da Renov. Abaixo estao suas informacoes de acesso:</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">Você foi cadastrado na central de chamados da Pitzi. Abaixo estão suas informações de acesso:</p>
       ${sectionCard(`
         ${infoTable([
-          { label: "Link", value: `<a href="https://rdoratioto-pitzi.github.io/pitzi-home-chamado/" style="color:#00A137;font-weight:600;">rdoratioto-pitzi.github.io/pitzi-home-chamado</a>` },
-          { label: "E-mail", value: user.email },
-          { label: "Senha inicial", value: `<code style="background:#e8f5e9;padding:4px 8px;border-radius:4px;font-weight:600;">${initialPassword}</code>` },
+          { label: "Link", value: `<a href="${escapeHtml(ctx.env.APP_URL)}" style="color:#00A137;font-weight:600;">${escapeHtml(ctx.env.APP_URL.replace(/^https?:\/\//, ""))}</a>` },
+          { label: "E-mail", value: escapeHtml(user.email) },
+          { label: "Senha inicial", value: `<code style="background:#e8f5e9;padding:4px 8px;border-radius:4px;font-weight:600;">${escapeHtml(initialPassword)}</code>` },
         ])}
       `)}
-      <p style="color:#334155;font-size:14px;line-height:1.6;">Recomendamos que voce altere sua senha apos o primeiro acesso.</p>
+      <p style="color:#334155;font-size:14px;line-height:1.6;">Recomendamos que você altere sua senha após o primeiro acesso.</p>
     `,
     ctaText: "Acessar o Sistema",
-    ctaUrl: `${env.APP_URL}/login`,
+    ctaUrl: `${ctx.env.APP_URL}/login`,
   });
 
   try {
-    await sendMail(env, {
-      to: [{ name: user.name, email: user.email }],
-      subject: "Bem-vindo ao Pitzi Home - Acesso ao Sistema",
-      html,
-    });
-    logEmailSent("welcome", [user.email]);
+    await queueSingle(ctx, "welcome", user, "Bem-vindo ao Pitzi Home - Acesso ao Sistema", html);
     return { success: true };
   } catch (error) {
-    const errorMessage = `Falha ao enviar e-mail de boas-vindas para ${user.email}: ${error instanceof Error ? error.message : String(error)}`;
+    const errorMessage = `Falha ao registrar e-mail de boas-vindas para ${user.email}: ${error instanceof Error ? error.message : String(error)}`;
     console.error("[EMAIL]", errorMessage);
     return { success: false, error: errorMessage };
   }
 }
 
+// ============== 3–6. EVENTOS DE CHAMADO (configuráveis) ==============
+
+/** Tipo de preferência pessoal (Minhas notificações) respeitada por cada evento. */
+const EVENT_PREFERENCE: Record<EmailEvent, EmailNotificationType> = {
+  ticket_created: "ticket_new",
+  ticket_assigned: "ticket_assigned",
+  agent_reply: "ticket_comment",
+  requester_reply: "ticket_comment",
+  status_changed: "ticket_status",
+  ticket_closed: "ticket_status",
+};
+
+export interface TicketEmailInput {
+  requester: User | null | undefined;
+  assignee: User | null | undefined;
+  /** Autor da ação (quem comentou); nunca recebe o próprio e-mail. */
+  actor?: User | null;
+  comment?: string | null;
+  newStatus?: string | null;
+  oldStatus?: string | null;
+}
+
+export function ticketLink(env: MailEnv, ticket: Pick<Ticket, "id">): string {
+  return `${env.APP_URL}/chamados/${ticket.id}`;
+}
+
+export function ticketVariables(env: MailEnv, ticket: Ticket, input: TicketEmailInput): EmailVariables {
+  return {
+    codigo: ticket.code,
+    titulo: ticket.title,
+    solicitante: input.requester?.name ?? "",
+    responsavel: input.assignee?.name ?? input.actor?.name ?? "",
+    status: ticketStatusLabel(input.newStatus ?? ticket.status),
+    link: ticketLink(env, ticket),
+    comentario: input.comment ?? "",
+  };
+}
+
+function ticketDetailsCard(ticket: Ticket, input: TicketEmailInput): string {
+  const e = (v: string | null | undefined) => escapeHtml(v ?? "");
+  return sectionCard(`
+    <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:12px;">${e(ticket.code)} — ${e(ticket.title)}</div>
+    ${input.oldStatus && input.newStatus && input.oldStatus !== input.newStatus ? statusTransition(input.oldStatus, input.newStatus) : ""}
+    ${infoTable([
+      { label: "Grupo", value: e(ticket.category) },
+      { label: "Tipo", value: e(ticketTypeLabel(ticket.type)) },
+      ...(ticket.requestObject ? [{ label: "Objeto da Requisição", value: e([ticket.requestObject, ticket.requestAction, ticket.requestDetail].filter(Boolean).join(" › ")) }] : []),
+      { label: "Status", value: statusBadge(input.newStatus ?? ticket.status) },
+      ...(input.requester ? [{ label: "Solicitante", value: e(input.requester.name) }] : []),
+      ...(input.assignee ? [{ label: "Responsável", value: e(input.assignee.name) }] : []),
+    ])}
+  `, "Detalhes do chamado");
+}
+
+/** Monta as linhas da fila de um evento de chamado, conforme Configurações → E-mail. */
+export async function buildTicketEmailRows(
+  ctx: MailContext,
+  storage: IStorage,
+  event: EmailEvent,
+  ticket: Ticket,
+  input: TicketEmailInput,
+): Promise<InsertEmailOutbox[]> {
+  const settings = await loadEmailSettings(ctx.db);
+  const config = settings.events[event];
+  if (!config.enabled) {
+    logEmailSkipped(event, "Evento desativado em Configurações → E-mail");
+    return [];
+  }
+
+  const byRole: Record<EmailRecipient, User | null | undefined> = {
+    solicitante: input.requester,
+    responsavel: input.assignee,
+  };
+  const recipients = new Map<string, User>();
+  for (const role of config.recipients) {
+    const user = byRole[role];
+    if (!user || (input.actor && user.id === input.actor.id)) continue;
+    recipients.set(user.id, user);
+  }
+  if (recipients.size === 0) return [];
+
+  const meta = EMAIL_EVENT_META[event];
+  const vars = ticketVariables(ctx.env, ticket, input);
+  const subject = renderSubject(config.subject, vars);
+  const link = vars.link!;
+  const html = emailTemplate({
+    title: meta.heading,
+    subtitle: escapeHtml(`${ticket.code} - ${ticket.title}`),
+    breadcrumbParts: ["Chamados", escapeHtml(ticket.code)],
+    greeting: "",
+    body: `${renderTemplateHtml(config.body, vars)}${ticketDetailsCard(ticket, input)}`,
+    ctaText: meta.cta,
+    ctaUrl: link,
+  });
+  const text = `${renderTemplateText(config.body, vars)}\n\n${meta.cta}: ${link}`;
+  const domain = senderDomain(ctx.env);
+  const rootId = ticketThreadRootId(ticket.id, domain);
+
+  const rows: InsertEmailOutbox[] = [];
+  for (const user of recipients.values()) {
+    const base = {
+      tenantId: ticket.tenantId ?? null,
+      event,
+      ticketId: ticket.id,
+      toEmail: user.email || "",
+      toUserId: user.id,
+      subject,
+      html,
+      text,
+      messageIdHeader: newMessageId(domain, "chamado"),
+      threadRootId: rootId,
+    };
+    if (!user.email || user.status !== "active") {
+      rows.push({ ...base, status: "skipped", lastError: !user.email ? "Destinatário sem e-mail" : "Usuário inativo" });
+      continue;
+    }
+    if (!(await storage.shouldSendEmail(user.id, EVENT_PREFERENCE[event]))) {
+      logEmailSkipped(event, "Desabilitado pelo usuário", user.id);
+      continue;
+    }
+    rows.push({ ...base, status: "pending" });
+  }
+  return rows;
+}
+
+export async function queueTicketEmail(
+  ctx: MailContext,
+  storage: IStorage,
+  event: EmailEvent,
+  ticket: Ticket,
+  input: TicketEmailInput,
+): Promise<void> {
+  const rows = await buildTicketEmailRows(ctx, storage, event, ticket, input);
+  if (rows.length === 0) return;
+  await queueEmails(ctx, rows);
+  logEmailSent(event, rows.filter((r) => r.status === "pending").map((r) => r.toEmail ?? ""), ticket.code);
+}
+
 // ============== 3. sendTicketCreatedEmail ==============
 
 export async function sendTicketCreatedEmail(
-  env: EmailEnv,
+  ctx: MailContext,
   storage: IStorage,
   ticket: Ticket,
   requester: User,
   assignee: User | null
 ): Promise<void> {
-  const userIds = [requester.id];
-  if (assignee && assignee.id !== requester.id) userIds.push(assignee.id);
-  const allowedIds = await filterRecipientsByPreference(storage, userIds, "ticket_new");
-  if (allowedIds.length === 0) {
-    logEmailSkipped("ticket_new", "Todos os destinatarios desabilitaram esta notificacao");
-    return;
-  }
-
-  const recipientEmails: SendPulseRecipient[] = [];
-  if (allowedIds.includes(requester.id)) recipientEmails.push({ name: requester.name, email: requester.email });
-  if (assignee && allowedIds.includes(assignee.id) && !recipientEmails.some((r) => r.email === assignee.email)) {
-    recipientEmails.push({ name: assignee.name, email: assignee.email });
-  }
-
-  const ticketUrl = getTicketUrl(ticket.code);
-  const descriptionPreview = ticket.description
-    ? (ticket.description.length > 300 ? ticket.description.substring(0, 300) + "..." : ticket.description)
-    : "Sem descricao";
-
-  const html = emailTemplate({
-    title: "Novo Chamado Criado",
-    subtitle: `${ticket.code} - ${ticket.title}`,
-    breadcrumbParts: ["Chamados", ticket.code, "Criado"],
-    body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Um novo chamado foi aberto no Pitzi Home:</p>
-      ${actionBy(requester.name, "abriu este chamado", ticket.dataAbertura || new Date())}
-      ${sectionCard(`
-        <div style="font-weight:700;font-size:16px;color:#1a1a2e;margin-bottom:16px;">${ticket.code} — ${ticket.title}</div>
-        ${infoTable([
-          { label: "Categoria", value: ticket.category },
-          { label: "Tipo", value: ticket.type },
-          ...(ticket.applicationKey ? [{ label: "Aplicação", value: getApplicationLabel(ticket.applicationKey) }] : []),
-          ...(ticket.requestObject ? [{ label: "Objeto da Requisição", value: [ticket.requestObject, ticket.requestAction, ticket.requestDetail].filter(Boolean).join(" › ") }] : []),
-          { label: "Prioridade", value: priorityBadge(ticket.priority) },
-          { label: "Solicitante", value: requester.name },
-          ...(assignee ? [{ label: "Responsavel", value: assignee.name }] : []),
-          { label: "Status", value: statusBadge(ticket.status) },
-        ])}
-      `, "Detalhes do Chamado")}
-      ${sectionCard(`<div style="color:#64748b;font-size:13px;line-height:1.6;white-space:pre-wrap;">${descriptionPreview}</div>`, "Descricao")}
-    `,
-    ctaText: "Ver Chamado",
-    ctaUrl: ticketUrl,
-  });
-
-  try {
-    await sendMail(env, {
-      to: recipientEmails,
-      subject: `[${ticket.code}] Novo Chamado: ${ticket.title}`,
-      html,
-    });
-    logEmailSent("ticket_new", recipientEmails.map((r) => r.email), ticket.code);
-  } catch (error) {
-    console.error("[EMAIL] Falha ao enviar ticket_new:", error);
-  }
+  await queueTicketEmail(ctx, storage, "ticket_created", ticket, { requester, assignee });
 }
 
 // ============== 4. sendTicketAssignedEmail ==============
 
 export async function sendTicketAssignedEmail(
-  env: EmailEnv,
+  ctx: MailContext,
   storage: IStorage,
   ticket: Ticket,
   assignee: User
 ): Promise<void> {
-  if (!assignee.email || assignee.status !== "active") {
-    logEmailSkipped("ticket_assigned", "Destinatario sem e-mail ou inativo", assignee.id);
-    return;
-  }
-
-  const shouldSend = await storage.shouldSendEmail(assignee.id, "ticket_assigned");
-  if (!shouldSend) {
-    logEmailSkipped("ticket_assigned", "Desabilitado pelo usuario", assignee.id);
-    return;
-  }
-
-  const ticketUrl = getTicketUrl(ticket.code);
-  const html = emailTemplate({
-    title: "Chamado Atribuido a Voce",
-    subtitle: `${ticket.code} - ${ticket.title}`,
-    breadcrumbParts: ["Chamados", ticket.code, "Atribuicao"],
-    greeting: `Ola ${assignee.name},`,
-    body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">Um chamado foi atribuido a voce no Pitzi Home:</p>
-      ${sectionCard(`
-        <div style="font-weight:700;font-size:16px;color:#1a1a2e;margin-bottom:16px;">${ticket.code} — ${ticket.title}</div>
-        ${infoTable([
-          { label: "Categoria", value: ticket.category },
-          { label: "Tipo", value: ticket.type },
-          ...(ticket.applicationKey ? [{ label: "Aplicação", value: getApplicationLabel(ticket.applicationKey) }] : []),
-          ...(ticket.requestObject ? [{ label: "Objeto da Requisição", value: [ticket.requestObject, ticket.requestAction, ticket.requestDetail].filter(Boolean).join(" › ") }] : []),
-          { label: "Prioridade", value: priorityBadge(ticket.priority) },
-          { label: "Status", value: statusBadge(ticket.status) },
-        ])}
-      `)}
-      ${ticket.description ? sectionCard(`<div style="color:#64748b;font-size:13px;line-height:1.6;white-space:pre-wrap;">${ticket.description.substring(0, 300)}${ticket.description.length > 300 ? "..." : ""}</div>`, "Descricao") : ""}
-    `,
-    ctaText: "Ver Chamado",
-    ctaUrl: ticketUrl,
-  });
-
-  try {
-    await sendMail(env, {
-      to: [{ name: assignee.name, email: assignee.email }],
-      subject: `[${ticket.code}] Chamado Atribuido: ${ticket.title}`,
-      html,
-    });
-    logEmailSent("ticket_assigned", [assignee.email], ticket.code);
-  } catch (error) {
-    console.error("[EMAIL] Falha ao enviar ticket_assigned:", error);
-  }
+  const requester = await storage.getUser(ticket.requesterId);
+  await queueTicketEmail(ctx, storage, "ticket_assigned", ticket, { requester, assignee });
 }
 
 // ============== 5. sendTicketStatusChangedEmail ==============
 
 export async function sendTicketStatusChangedEmail(
-  env: EmailEnv,
+  ctx: MailContext,
   storage: IStorage,
   ticket: Ticket,
   oldStatus: string,
@@ -377,57 +392,14 @@ export async function sendTicketStatusChangedEmail(
   requester: User,
   assignee: User | null
 ): Promise<void> {
-  const userIds = [requester.id];
-  if (assignee && assignee.id !== requester.id) userIds.push(assignee.id);
-  const allowedIds = await filterRecipientsByPreference(storage, userIds, "ticket_status");
-  if (allowedIds.length === 0) {
-    logEmailSkipped("ticket_status", "Todos os destinatarios desabilitaram esta notificacao");
-    return;
-  }
-
-  const recipientEmails: SendPulseRecipient[] = [];
-  if (allowedIds.includes(requester.id)) recipientEmails.push({ name: requester.name, email: requester.email });
-  if (assignee && allowedIds.includes(assignee.id) && !recipientEmails.some((r) => r.email === assignee.email)) {
-    recipientEmails.push({ name: assignee.name, email: assignee.email });
-  }
-
-  const ticketUrl = getTicketUrl(ticket.code);
-  const html = emailTemplate({
-    title: "Status do Chamado Alterado",
-    subtitle: `${ticket.code} - ${ticket.title}`,
-    breadcrumbParts: ["Chamados", ticket.code, "Status alterado"],
-    body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">O status do chamado foi atualizado:</p>
-      ${sectionCard(`
-        <div style="font-weight:700;font-size:16px;color:#1a1a2e;margin-bottom:16px;">${ticket.code} — ${ticket.title}</div>
-        ${statusTransition(oldStatus, newStatus)}
-        ${infoTable([
-          { label: "Prioridade", value: priorityBadge(ticket.priority) },
-          ...(assignee ? [{ label: "Responsavel", value: assignee.name }] : []),
-          { label: "Atualizado em", value: formatDateTime(new Date()) },
-        ])}
-      `)}
-    `,
-    ctaText: "Ver Chamado",
-    ctaUrl: ticketUrl,
-  });
-
-  try {
-    await sendMail(env, {
-      to: recipientEmails,
-      subject: `[${ticket.code}] Status: ${getStatusLabel(oldStatus)} → ${getStatusLabel(newStatus)}`,
-      html,
-    });
-    logEmailSent("ticket_status", recipientEmails.map((r) => r.email), ticket.code);
-  } catch (error) {
-    console.error("[EMAIL] Falha ao enviar ticket_status:", error);
-  }
+  const event: EmailEvent = newStatus === "resolved" || newStatus === "closed" ? "ticket_closed" : "status_changed";
+  await queueTicketEmail(ctx, storage, event, ticket, { requester, assignee, oldStatus, newStatus });
 }
 
 // ============== 6. sendTicketCommentEmail ==============
 
 export async function sendTicketCommentEmail(
-  env: EmailEnv,
+  ctx: MailContext,
   storage: IStorage,
   ticket: Ticket,
   comment: TicketComment,
@@ -435,102 +407,52 @@ export async function sendTicketCommentEmail(
   requester: User,
   assignee: User | null
 ): Promise<void> {
+  // Nota interna nunca sai por e-mail.
   if (comment.isInternal) return;
-
-  const userIds: string[] = [];
-  if (requester.id !== commenter.id) userIds.push(requester.id);
-  if (assignee && assignee.id !== commenter.id && assignee.id !== requester.id) userIds.push(assignee.id);
-  if (userIds.length === 0) return;
-
-  const allowedIds = await filterRecipientsByPreference(storage, userIds, "ticket_comment");
-  if (allowedIds.length === 0) {
-    logEmailSkipped("ticket_comment", "Todos os destinatarios desabilitaram esta notificacao");
-    return;
-  }
-
-  const recipientEmails: SendPulseRecipient[] = [];
-  if (allowedIds.includes(requester.id)) recipientEmails.push({ name: requester.name, email: requester.email });
-  if (assignee && allowedIds.includes(assignee.id) && !recipientEmails.some((r) => r.email === assignee.email)) {
-    recipientEmails.push({ name: assignee.name, email: assignee.email });
-  }
-  if (recipientEmails.length === 0) return;
-
-  const ticketUrl = getTicketUrl(ticket.code);
-  const html = emailTemplate({
-    title: "Novo Comentario no Chamado",
-    subtitle: `${ticket.code} - ${ticket.title}`,
-    breadcrumbParts: ["Chamados", ticket.code, "Comentario"],
-    body: `
-      ${actionBy(commenter.name, "adicionou um comentario", comment.createdAt)}
-      ${sectionCard(`
-        <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:12px;">${ticket.code} — ${ticket.title}</div>
-      `)}
-      ${commentBox(comment.content, commenter.name)}
-    `,
-    ctaText: "Ver Chamado",
-    ctaUrl: ticketUrl,
+  const event: EmailEvent = commenter.id === requester.id ? "requester_reply" : "agent_reply";
+  await queueTicketEmail(ctx, storage, event, ticket, {
+    requester,
+    // Na resposta da equipe sem responsável, {{responsavel}} é quem respondeu.
+    assignee: event === "agent_reply" && !assignee ? commenter : assignee,
+    actor: commenter,
+    comment: comment.content,
   });
-
-  try {
-    await sendMail(env, {
-      to: recipientEmails,
-      subject: `[${ticket.code}] Novo Comentario: ${ticket.title}`,
-      html,
-    });
-    logEmailSent("ticket_comment", recipientEmails.map((r) => r.email), ticket.code);
-  } catch (error) {
-    console.error("[EMAIL] Falha ao enviar ticket_comment:", error);
-  }
 }
 
 // ============== 7. sendCSATReceivedEmail ==============
 
 export async function sendCSATReceivedEmail(
-  env: EmailEnv,
+  ctx: MailContext,
+  _storage: IStorage,
   ticket: Ticket,
   rating: number,
   comment: string | null,
   assignee: User
 ): Promise<void> {
-  if (!assignee.email || assignee.status !== "active") return;
-
-  const ticketUrl = getTicketUrl(ticket.code || ticket.id);
-  const stars = "\u2B50".repeat(rating);
-  const emptyStars = "\u2606".repeat(5 - rating);
+  const stars = "⭐".repeat(rating);
+  const emptyStars = "☆".repeat(5 - rating);
 
   const html = emailTemplate({
-    title: "Avaliacao de Chamado Recebida",
+    title: "Avaliação de Chamado Recebida",
     subtitle: `${stars} ${rating}/5`,
-    breadcrumbParts: ["Chamados", ticket.code, "Avaliacao CSAT"],
-    greeting: `Ola ${assignee.name},`,
+    breadcrumbParts: ["Chamados", escapeHtml(ticket.code), "Avaliação"],
+    greeting: `Olá ${escapeHtml(assignee.name)},`,
     body: `
-      <p style="color:#334155;font-size:15px;line-height:1.6;">O chamado que voce atendeu recebeu uma avaliacao de satisfacao:</p>
+      <p style="color:#334155;font-size:15px;line-height:1.6;">O chamado que você atendeu recebeu uma avaliação de satisfação:</p>
       ${sectionCard(`
-        <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:16px;">${ticket.code} — ${ticket.title}</div>
+        <div style="font-weight:700;font-size:15px;color:#1a1a2e;margin-bottom:16px;">${escapeHtml(ticket.code)} — ${escapeHtml(ticket.title)}</div>
         <div style="text-align:center;margin:16px 0;">
           <span style="font-size:32px;">${stars}${emptyStars}</span>
           <p style="color:#64748b;font-size:14px;margin:8px 0 0;">${rating} de 5 estrelas</p>
         </div>
-        ${comment ? `<div style="margin-top:16px;padding:12px;background:white;border-radius:8px;border-left:4px solid #00A137;"><p style="color:#64748b;font-size:13px;font-style:italic;margin:0;">"${comment}"</p></div>` : ""}
-        ${infoTable([
-          { label: "Avaliado em", value: formatDateTime(new Date()) },
-        ])}
+        ${comment ? `<div style="margin-top:16px;padding:12px;background:white;border-radius:8px;border-left:4px solid #00A137;"><p style="color:#64748b;font-size:13px;font-style:italic;margin:0;">"${escapeHtml(comment)}"</p></div>` : ""}
+        ${infoTable([{ label: "Avaliado em", value: formatDateTime(new Date()) }])}
       `)}
     `,
     ctaText: "Ver Chamado Completo",
-    ctaUrl: ticketUrl,
+    ctaUrl: ticketLink(ctx.env, ticket),
   });
-
-  try {
-    await sendMail(env, {
-      to: [{ name: assignee.name, email: assignee.email }],
-      subject: `[${ticket.code}] Avaliacao Recebida - ${stars}`,
-      html,
-    });
-    logEmailSent("csat", [assignee.email], ticket.code);
-  } catch (error) {
-    console.error("[EMAIL] Falha ao enviar csat:", error);
-  }
+  await queueSingle(ctx, "csat_received", assignee, `[${ticket.code}] Avaliação recebida - ${stars}`, html, ticket);
 }
 
 // ============== 8. sendCardStatusChangedEmail ==============
@@ -957,13 +879,14 @@ export async function sendMeetingUpdatedEmail(
 // ============== 14. sendMentionNotificationEmail ==============
 
 export async function sendMentionNotificationEmail(
-  env: EmailEnv,
+  ctx: MailContext,
   storage: IStorage,
   mentionedUser: User,
   mentionerName: string,
   taskTitle: string,
-  taskId: string,
-  commentContent: string
+  _taskId: string,
+  commentContent: string,
+  ticket?: Pick<Ticket, "id" | "code"> | null
 ): Promise<void> {
   if (!mentionedUser.email || mentionedUser.status !== "active") return;
 
@@ -974,29 +897,20 @@ export async function sendMentionNotificationEmail(
   }
 
   const html = emailTemplate({
-    title: "Voce foi mencionado",
-    subtitle: taskTitle,
-    breadcrumbParts: ["Mencao", taskTitle],
-    greeting: `Ola ${mentionedUser.name},`,
+    title: "Você foi mencionado",
+    subtitle: escapeHtml(taskTitle),
+    breadcrumbParts: ["Menção", escapeHtml(taskTitle)],
+    greeting: `Olá ${escapeHtml(mentionedUser.name)},`,
     body: `
-      ${actionBy(mentionerName, "mencionou voce em um comentario")}
-      ${sectionCard(`<div style="font-weight:700;font-size:15px;color:#1a1a2e;">${taskTitle}</div>`)}
-      ${commentBox(commentContent, mentionerName)}
+      ${actionBy(escapeHtml(mentionerName), "mencionou você em um comentário")}
+      ${sectionCard(`<div style="font-weight:700;font-size:15px;color:#1a1a2e;">${escapeHtml(taskTitle)}</div>`)}
+      ${commentBox(escapeHtml(commentContent), escapeHtml(mentionerName))}
     `,
-    ctaText: "Ver Tarefa",
-    ctaUrl: `${env.APP_URL}/tarefas`,
+    ctaText: ticket ? "Ver chamado" : "Ver Tarefa",
+    ctaUrl: ticket ? ticketLink(ctx.env, ticket) : `${ctx.env.APP_URL}/tarefas`,
   });
-
-  try {
-    await sendMail(env, {
-      to: [{ name: mentionedUser.name, email: mentionedUser.email }],
-      subject: `Voce foi mencionado em: ${taskTitle}`,
-      html,
-    });
-    logEmailSent("mention", [mentionedUser.email], taskId);
-  } catch (error) {
-    console.error("[EMAIL] Falha ao enviar mention:", error);
-  }
+  const subject = ticket ? `[${ticket.code}] Você foi mencionado: ${taskTitle}` : `Você foi mencionado em: ${taskTitle}`;
+  await queueSingle(ctx, "mention", mentionedUser, subject, html, ticket ? { id: ticket.id } : null);
 }
 
 // ============== 15. sendSharedAreaInviteEmail ==============

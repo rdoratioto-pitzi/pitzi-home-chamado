@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Key, Bell, Palette, Settings, UserCheck, UsersRound, ListTree, MessageSquareText, Workflow } from "lucide-react";
+import { Users, Key, Bell, Palette, Settings, UserCheck, UsersRound, ListTree, MessageSquareText, Workflow, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { getUserPermissions } from "@/lib/permissions";
 import { UsersSettings } from "./users-settings";
@@ -12,12 +12,13 @@ import { ResponsaveisSettings } from "./responsaveis-settings";
 import { SupportGroupsSettings } from "./support-groups-settings";
 import { TicketFieldsSettings } from "./ticket-fields-settings";
 import { AutomationsSettings, CannedResponsesSettings } from "./automations-settings";
+import { EmailSettingsPanel } from "./email-settings";
 
 export default function ConfiguracoesPage() {
   const { user } = useAuth();
   const permissions = getUserPermissions(user);
   // Quem tem só "Gerenciar campos dos chamados" (sem "Configurações") vê apenas as abas de
-  // campos, respostas prontas e automações.
+  // campos, respostas prontas, automações e e-mail.
   const full = permissions.configuracoes;
 
   return (
@@ -30,7 +31,7 @@ export default function ConfiguracoesPage() {
       <main className="flex-1 p-6">
         <Tabs defaultValue={full ? "users" : "campos-chamado"} className="space-y-6">
           {full ? (
-          <TabsList className="grid w-full max-w-6xl grid-cols-10">
+          <TabsList className="grid w-full max-w-6xl grid-cols-11">
             <TabsTrigger value="users" className="flex items-center gap-2" data-testid="tab-users">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Usuários</span>
@@ -59,6 +60,10 @@ export default function ConfiguracoesPage() {
               <Workflow className="h-4 w-4" />
               <span className="hidden sm:inline">Automações</span>
             </TabsTrigger>
+            <TabsTrigger value="email" className="flex items-center gap-2" data-testid="tab-email">
+              <Mail className="h-4 w-4" />
+              <span className="hidden sm:inline">E-mail</span>
+            </TabsTrigger>
             <TabsTrigger value="auth" className="flex items-center gap-2" data-testid="tab-auth">
               <Key className="h-4 w-4" />
               <span className="hidden sm:inline">Autenticação</span>
@@ -86,6 +91,10 @@ export default function ConfiguracoesPage() {
               <Workflow className="h-4 w-4" />
               <span>Automações</span>
             </TabsTrigger>
+            <TabsTrigger value="email" className="flex items-center gap-2" data-testid="tab-email">
+              <Mail className="h-4 w-4" />
+              <span>E-mail</span>
+            </TabsTrigger>
           </TabsList>
           )}
 
@@ -99,6 +108,10 @@ export default function ConfiguracoesPage() {
 
           <TabsContent value="automacoes">
             <AutomationsSettings />
+          </TabsContent>
+
+          <TabsContent value="email">
+            <EmailSettingsPanel />
           </TabsContent>
 
           {full && (

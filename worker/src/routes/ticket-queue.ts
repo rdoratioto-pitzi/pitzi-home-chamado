@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import { sendTicketAssignedEmail } from "../lib/email";
+import { mailContext } from "../lib/mailer";
 import { claimTicket, transferTicket, type QueueActor } from "../../../server/services/ticket-queue.service";
 
 export const ticketQueue = new Hono<AppEnv>();
@@ -27,7 +28,7 @@ ticketQueue.post("/api/tickets/:id/transferir", async (c) => {
   const result = await transferTicket(storage, actorOf(c.get("user")), c.req.param("id"), body);
   if (!result.ok) return c.json({ error: result.error }, result.status);
   if (result.newAssignee) {
-    sendTicketAssignedEmail(c.env, storage, result.ticket, result.newAssignee).catch(console.error);
+    sendTicketAssignedEmail(mailContext(c), storage, result.ticket, result.newAssignee).catch(console.error);
   }
   return c.json(result.ticket);
 });

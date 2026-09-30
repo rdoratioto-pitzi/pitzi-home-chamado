@@ -25,6 +25,7 @@ import {
   sendSharedAreaInviteEmail,
   sendMentionNotificationEmail,
 } from "../lib/email";
+import { mailContext } from "../lib/mailer";
 
 const tasksRouter = new Hono<AppEnv>();
 
@@ -910,7 +911,7 @@ tasksRouter.post("/api/tasks/:id/comments", async (c) => {
 
         if (mentionedUser && task && author) {
           sendMentionNotificationEmail(
-            c.env, storage, mentionedUser, author.name, task.title, task.id, validated.content
+            mailContext(c), storage, mentionedUser, author.name, task.title, task.id, validated.content
           ).catch(console.error);
 
           storage
