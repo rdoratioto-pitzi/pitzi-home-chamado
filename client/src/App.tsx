@@ -23,6 +23,9 @@ const TicketDetailPage = lazy(() => import("@/pages/chamados/[id]"));
 const CSATAnalytics = lazy(() => import("@/pages/chamados/csat-analytics"));
 const ConfiguracoesPage = lazy(() => import("@/pages/configuracoes/index"));
 const MarkdownPage = lazy(() => import("@/pages/markdown"));
+const ConhecimentoPage = lazy(() => import("@/pages/conhecimento/index"));
+const ArtigoPage = lazy(() => import("@/pages/conhecimento/artigo"));
+const NovoArtigoPage = lazy(() => import("@/pages/conhecimento/artigo").then(m => ({ default: m.NovoArtigoPage })));
 
 function Router() {
   return (
@@ -48,6 +51,16 @@ function Router() {
       </Route>
       <Route path="/markdown">
         <ProtectedRoute><MarkdownPage /></ProtectedRoute>
+      </Route>
+      {/* Base de Conhecimento: todo usuário ativo lê; criar e editar é validado na API. */}
+      <Route path="/conhecimento">
+        <ProtectedRoute><ConhecimentoPage /></ProtectedRoute>
+      </Route>
+      <Route path="/conhecimento/novo">
+        <ProtectedRoute><NovoArtigoPage /></ProtectedRoute>
+      </Route>
+      <Route path="/conhecimento/:id">
+        <ProtectedRoute><ArtigoPage /></ProtectedRoute>
       </Route>
       <Route path="/configuracoes">
         <ProtectedRoute requiredPermission="configuracoes"><ConfiguracoesPage /></ProtectedRoute>

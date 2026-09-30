@@ -29,6 +29,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { RichTextarea } from "@/components/rich-textarea";
 import { CannedResponsePicker } from "@/components/canned-response-picker";
+import { useKnowledgePrompt } from "@/components/knowledge/knowledge-prompt";
 import { RichContent } from "@/components/rich-content";
 import { useMentionableUsers } from "@/hooks/use-mentionable-users";
 import { UserSelect } from "@/components/ui/user-select";
@@ -293,13 +294,19 @@ export default function TicketDetailPage() {
   // Error handling for media preview
   const [mediaError, setMediaError] = useState<Record<number, boolean>>({});
 
+  // Popup "virar artigo" ao resolver/fechar (components/knowledge/knowledge-prompt.tsx).
+  const knowledgePrompt = useKnowledgePrompt();
+
   // Mutations
   const updateMutation = useMutation({
     mutationFn: async (data: Partial<Ticket>) => {
       const res = await apiRequest("PATCH", `/api/tickets/${id}`, data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_saved: unknown, data: Partial<Ticket>) => {
+      if (ticket && data.status) {
+        knowledgePrompt.maybeAsk(ticket.id, ticket.requesterId, ticket.status, data.status);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/tickets", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
       toast({ title: "Chamado atualizado com sucesso!" });
@@ -415,6 +422,7 @@ export default function TicketDetailPage() {
 
   return (
     <div className="flex-1 overflow-auto p-6 space-y-6" data-testid="page-ticket-detail">
+      {knowledgePrompt.dialog}
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => setLocation("/chamados")}>
           <ArrowLeft className="h-5 w-5" />

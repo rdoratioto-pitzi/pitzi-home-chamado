@@ -27,6 +27,7 @@ import { claimDenial, type QueueViewer } from "@shared/ticket-queue";
 import { useAuth } from "@/contexts/auth-context";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { TransferirChamadoDialog } from "@/components/workspace/TransferirChamadoDialog";
+import { useKnowledgePrompt } from "@/components/knowledge/knowledge-prompt";
 
 type Periodo = "este-ano" | "mes-vigente" | "mes-anterior" | "em-tratativa";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
@@ -65,6 +66,8 @@ const viewIcons: Record<ViewMode, React.ReactNode> = {
 
 export function ChamadosView() {
   const { toast } = useToast();
+  // Popup "virar artigo" ao resolver/fechar (lista, kanban e gaveta).
+  const knowledgePrompt = useKnowledgePrompt();
   const { user } = useAuth();
   const { groups } = useSupportGroups();
   const [loading, setLoading] = useState(true);
@@ -333,6 +336,7 @@ export function ChamadosView() {
               if (!res.ok) throw new Error("Erro ao atualizar status");
               const updated: ChamadoItem = await res.json();
               setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+              knowledgePrompt.maybeAsk(updated.id, updated.solicitanteId, item.status, updated.status);
             } catch (err) {
               const msg = err instanceof Error ? err.message : "Erro desconhecido";
               toast({ title: "Erro ao atualizar status", description: msg, variant: "destructive" });
@@ -384,7 +388,9 @@ export function ChamadosView() {
               });
               if (!res.ok) throw new Error("Erro ao atualizar");
               const updated: ChamadoItem = await res.json();
+              const before = items.find((i) => i.id === itemId);
               setItems((prev) => prev.map((i) => i.id === updated.id ? updated : i));
+              knowledgePrompt.maybeAsk(updated.id, updated.solicitanteId, before?.status, updated.status);
             } catch {
               toast({ title: "Erro ao mover chamado", variant: "destructive" });
             }
@@ -398,14 +404,17 @@ export function ChamadosView() {
           onClose={() => setDrawerOpen(false)}
           onUpdate={(updated) => {
             const ch = updated as ChamadoItem;
+            const before = items.find((i) => i.id === ch.id);
             setItems((prev) => prev.map((i) => (i.id === ch.id ? ch : i)));
             setSelectedItem(ch);
+            knowledgePrompt.maybeAsk(ch.id, ch.solicitanteId, before?.status, ch.status);
           }}
           onDelete={(id) => {
             setItems((prev) => prev.filter((i) => i.id !== id));
           }}
         />
       )}
+      {knowledgePrompt.dialog}
       <TransferirChamadoDialog
         item={transferItem}
         onClose={() => setTransferItem(null)}
