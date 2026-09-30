@@ -99,7 +99,8 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
 
   try {
     const perms = JSON.parse(user.modulePermissions);
-    return { ...defaultPerms, ...perms };
+    // Configurações é exclusiva de administradores, mesmo que o cadastro antigo marque o módulo.
+    return { ...defaultPerms, ...perms, configuracoes: false, campos_chamado: false };
   } catch {
     return defaultPerms;
   }

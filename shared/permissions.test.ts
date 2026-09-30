@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { canManageTicketFields, hasModulePermission, parseModulePermissions } from "./permissions";
 
 describe("canManageTicketFields", () => {
-  it("admin ou quem tem campos_chamado; Configurações sozinha não basta", () => {
+  it("só administradores; permissões avulsas antigas não valem", () => {
     expect(canManageTicketFields({ isAdmin: true })).toBe(true);
-    expect(canManageTicketFields({ isAdmin: false, modulePermissions: '{"campos_chamado":true}' })).toBe(true);
+    expect(canManageTicketFields({ isAdmin: false, modulePermissions: '{"campos_chamado":true}' })).toBe(false);
     expect(canManageTicketFields({ isAdmin: false, modulePermissions: '{"configuracoes":true}' })).toBe(false);
     expect(canManageTicketFields(null)).toBe(false);
   });
