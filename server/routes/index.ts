@@ -31,6 +31,7 @@ import { registerPricingDashboardRoutes } from "./pricing-dashboard";
 import { registerServiceAccountRoutes } from "./service-accounts";
 import { registerHermesRoutes } from "./hermes";
 import { registerTicketFieldRoutes } from "./ticket-fields";
+import { registerAutomationRoutes } from "./automations";
 
 export function registerModularRoutes(app: Router) {
   const router = Router();
@@ -67,6 +68,7 @@ export function registerModularRoutes(app: Router) {
   registerServiceAccountRoutes(router);
   registerHermesRoutes(router);
   registerTicketFieldRoutes(router);
+  registerAutomationRoutes(router);
 
   app.use(router);
 }

@@ -10,7 +10,7 @@ import {
   updateCustomField,
 } from "../services/ticket-fields.service";
 
-async function requireTicketFieldsManager(req: Request, res: Response, next: NextFunction) {
+export async function requireTicketFieldsManager(req: Request, res: Response, next: NextFunction) {
   try {
     const { userId, isAdmin } = getSessionUser(req);
     const user = isAdmin ? null : await storage.getUser(userId);

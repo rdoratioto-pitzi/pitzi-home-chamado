@@ -19,6 +19,7 @@ import type { ChamadoItem, UnifiedItem } from "./WorkspaceTable";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { RichContent } from "@/components/rich-content";
 import { RichTextarea } from "@/components/rich-textarea";
+import { CannedResponsePicker } from "@/components/canned-response-picker";
 import { useMentionableUsers } from "@/hooks/use-mentionable-users";
 import { SubtaskList, type Subtask } from "@/components/shared/SubtaskList";
 import { useToast } from "@/hooks/use-toast";
@@ -1104,6 +1105,19 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                         <Send className="h-4 w-4" />
                       </button>
                     </div>
+                    {isChamado && (
+                      <div className="mt-2">
+                        <CannedResponsePicker
+                          groupKey={(item as ChamadoItem).categoria}
+                          ticket={{
+                            solicitante: (item as ChamadoItem).solicitante,
+                            codigo: item.codigo,
+                            titulo: item.titulo,
+                          }}
+                          onInsert={(html) => setNovoComentario((prev) => (prev ? prev + html : html))}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </>

@@ -25,6 +25,7 @@ import { ticketStatusLabel } from "../../../shared/ticket-options";
 import { slaPauseUpdate } from "../../../shared/sla";
 import { normalizeRequestSelection } from "../../../shared/request-objects";
 import { checkRequestSelection, resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
+import { runTicketAutomations } from "../../../server/services/automations.service";
 import { isTicketGroupMember } from "../../../server/services/ticket-queue.service";
 
 const tickets = new Hono<AppEnv>();
@@ -234,7 +235,12 @@ tickets.post("/api/tickets", async (c) => {
     if (autoAssignee) validated.assigneeId = autoAssignee;
   }
 
-  const ticket = await storage.createTicket({ ...validated, tenantId: user.tenantId });
+  const created = await storage.createTicket({ ...validated, tenantId: user.tenantId });
+  // Automações de abertura rodam depois do responsável automático; e-mails e avisos abaixo
+  // já usam o resultado final.
+  const ticket = await runTicketAutomations(storage, "ticket_created", created, {
+    actorId: user.userId, notifyAssignee: false,
+  });
   const requester = await storage.getUser(ticket.requesterId);
   const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
 
@@ -376,8 +382,12 @@ tickets.patch("/api/tickets/:id", async (c) => {
     updateData.descriptionLastEditedAt = new Date(updateData.descriptionLastEditedAt);
   }
 
-  const ticket = await storage.updateTicket(id, updateData);
-  if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
+  const saved = await storage.updateTicket(id, updateData);
+  if (!saved || !sameTenant(saved.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
+  const statusChanged = !!body.status && body.status !== oldTicket.status;
+  const ticket = statusChanged
+    ? await runTicketAutomations(storage, "status_changed", saved, { actorId: user.userId, newStatus: body.status })
+    : saved;
 
   // Status change email + notification
   if (body.status && body.status !== oldTicket.status) {

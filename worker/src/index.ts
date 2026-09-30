@@ -24,6 +24,9 @@ import { tickets } from "./routes/tickets";
 import { supportGroups } from "./routes/support-groups";
 import { ticketQueue } from "./routes/ticket-queue";
 import { ticketFields } from "./routes/ticket-fields";
+import { automations } from "./routes/automations";
+import { getStorage } from "./lib/storage";
+import { runWaitingRequesterTimeouts } from "../../server/services/automations.service";
 import { gitAnalytics } from "./routes/git-analytics";
 import { pricing } from "./routes/pricing";
 import { omie } from "./routes/omie";
@@ -202,6 +205,7 @@ app.route("/", tickets);
 app.route("/", supportGroups);
 app.route("/", ticketQueue);
 app.route("/", ticketFields);
+app.route("/", automations);
 app.route("/", gitAnalytics);
 app.route("/", pricing);
 app.route("/", omie);
@@ -218,4 +222,17 @@ app.route("/", external);
 app.route("/", serviceAccounts);
 app.route("/", hermes);
 
-export default app;
+// Cron (wrangler.toml [triggers]): automações "X dias aguardando o solicitante".
+async function scheduled(_event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
+  ctx.waitUntil((async () => {
+    try {
+      const touched = await runWaitingRequesterTimeouts(getStorage(createDb(env.DATABASE_URL)));
+      if (touched) console.log(`[cron] automações por tempo aplicadas em ${touched} chamado(s)`);
+    } catch (error) {
+      console.error("[cron] falha nas automações por tempo:", error);
+    }
+  })());
+}
+
+export { app };
+export default { fetch: app.fetch, scheduled };

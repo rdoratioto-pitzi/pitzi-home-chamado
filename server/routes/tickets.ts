@@ -22,6 +22,7 @@ import { ticketStatusLabel } from "@shared/ticket-options";
 import { slaPauseUpdate } from "@shared/sla";
 import { normalizeRequestSelection } from "@shared/request-objects";
 import { checkRequestSelection, resolveCustomFieldValues } from "../services/ticket-fields.service";
+import { runTicketAutomations } from "../services/automations.service";
 import { claimTicket, isTicketGroupMember, transferTicket } from "../services/ticket-queue.service";
 
 export function registerTicketRoutes(router: Router) {
@@ -96,7 +97,11 @@ export function registerTicketRoutes(router: Router) {
         }
       }
 
-      const ticket = await storage.createTicket(validated);
+      const created = await storage.createTicket(validated);
+      // Automações de abertura rodam depois do responsável automático.
+      const ticket = await runTicketAutomations(storage, "ticket_created", created, {
+        actorId: getSessionUser(req).userId, notifyAssignee: false,
+      });
 
       const requester = await storage.getUser(ticket.requesterId);
       const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
@@ -213,8 +218,13 @@ export function registerTicketRoutes(router: Router) {
         updateData.descriptionLastEditedAt = new Date(updateData.descriptionLastEditedAt);
       }
 
-      const ticket = await storage.updateTicket(getId(req), updateData);
-      if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+      const saved = await storage.updateTicket(getId(req), updateData);
+      if (!saved) return res.status(404).json({ error: "Ticket not found" });
+      const ticket = req.body.status && req.body.status !== oldTicket.status
+        ? await runTicketAutomations(storage, "status_changed", saved, {
+            actorId: getSessionUser(req).userId, newStatus: req.body.status,
+          })
+        : saved;
 
       if (req.body.status && req.body.status !== oldTicket.status) {
         const requester = await storage.getUser(ticket.requesterId);
