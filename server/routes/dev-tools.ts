@@ -14,7 +14,10 @@ export function registerDevToolsRoutes(router: Router) {
 
       // Configuração baseada no sql_api.postman_collection.json
       const externalApiUrl = "https://dash.pitzi.com.br/api/sql/execute";
-      const token = "Renov123"; // Token de referência fornecido
+      const token = process.env.DEV_TOOLS_TOKEN;
+      if (!token) {
+        return res.status(500).json({ error: "DEV_TOOLS_TOKEN not configured" });
+      }
 
       const response = await axios.post(
         externalApiUrl,
@@ -55,7 +58,10 @@ export function registerDevToolsRoutes(router: Router) {
 
       // Configuração baseada no sql_api.postman_collection.json e no arquivo sql_api.py fornecido
       const externalApiUrl = "https://dash.pitzi.com.br/api/sql/export";
-      const token = "Renov123"; // Token de referência fornecido
+      const token = process.env.DEV_TOOLS_TOKEN;
+      if (!token) {
+        return res.status(500).json({ error: "DEV_TOOLS_TOKEN not configured" });
+      }
 
       const response = await axios.post(
         externalApiUrl,

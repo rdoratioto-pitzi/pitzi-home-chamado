@@ -5,17 +5,14 @@ import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import { insertLogisticaReversaEventoSchema } from "../../../shared/schema";
 import { secretMatches } from "../lib/crypto";
+import { rsApiToken } from "../lib/rs-token";
 
 const integrations = new Hono<AppEnv>();
 
 const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
 
 function getApiToken(c?: any): string {
-  try {
-    return c?.env?.RENOVSMART_API_TOKEN || "Renov123";
-  } catch {
-    return "Renov123";
-  }
+  return rsApiToken(c?.env?.RENOVSMART_API_TOKEN);
 }
 
 // ============== HELPERS ==============
@@ -33,7 +30,7 @@ async function fetchAiEvaluation(endpoint: string, query: Record<string, string 
 
   const url = `${RS_API_BASE_URL}/avaliacoes-ia/${endpoint}`;
   const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
-  const token = apiToken || "Renov123";
+  const token = apiToken || rsApiToken();
 
   const response = await fetch(fullUrl, {
     method: "GET",
@@ -71,7 +68,7 @@ async function fetchEstoque(query: Record<string, string | string[] | undefined>
 
   const url = `${RS_API_BASE_URL}/estoques`;
   const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
-  const token = apiToken || "Renov123";
+  const token = apiToken || rsApiToken();
 
   const response = await fetch(fullUrl, {
     method: "GET",
@@ -117,7 +114,7 @@ async function fetchApoioVendas(
 
   const url = `${RS_API_BASE_URL}/${endpoint}`;
   const fullUrl = params.toString() ? `${url}?${params.toString()}` : url;
-  const token = apiToken || "Renov123";
+  const token = apiToken || rsApiToken();
 
   const response = await fetch(fullUrl, {
     method: "GET",

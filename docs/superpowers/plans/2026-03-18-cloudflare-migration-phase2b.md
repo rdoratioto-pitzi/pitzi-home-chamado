@@ -865,7 +865,7 @@ git commit -m "feat(worker): migrate labels route (3 handlers, bwip-js barcode)"
 **Files:**
 - Create: `worker/src/routes/dev-tools.ts`
 
-**Note:** Express original has NO auth — spec says to add `requireAdmin`. Replaces `axios` with `fetch()`. Replaces `response.data.pipe(res)` with `response.body` passthrough (`ReadableStream`). Hardcoded token `"Renov123"` moved to env var `DEV_TOOLS_TOKEN`.
+**Note:** Express original has NO auth — spec says to add `requireAdmin`. Replaces `axios` with `fetch()`. Replaces `response.data.pipe(res)` with `response.body` passthrough (`ReadableStream`). Hardcoded token moved to env var `DEV_TOOLS_TOKEN`.
 
 - [ ] **Step 1: Create the dev-tools route file**
 
@@ -1365,7 +1365,7 @@ Do NOT add to `[vars]` in wrangler.toml (it's an auth token). Set via CLI:
 
 ```bash
 cd worker && npx wrangler secret put DEV_TOOLS_TOKEN
-# Enter value: Renov123 (or a stronger token)
+# Enter value: <SEU_TOKEN>
 ```
 
 For dev environment:
@@ -1375,7 +1375,7 @@ cd worker && npx wrangler secret put DEV_TOOLS_TOKEN --env dev
 
 For local development, add to `worker/.dev.vars`:
 ```
-DEV_TOOLS_TOKEN=Renov123
+DEV_TOOLS_TOKEN=<SEU_TOKEN>
 ```
 
 - [ ] **Step 3: Commit**
