@@ -21,6 +21,7 @@ import {
 import { ticketStatusLabel } from "@shared/ticket-options";
 import { slaPauseUpdate } from "@shared/sla";
 import { isValidRequestSelection, normalizeRequestSelection } from "@shared/request-objects";
+import { claimTicket, isTicketGroupMember, transferTicket } from "../services/ticket-queue.service";
 
 export function registerTicketRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
@@ -47,7 +48,8 @@ export function registerTicketRoutes(router: Router) {
       const { userId, isAdmin } = getSessionUser(req);
       const ticket = await storage.getTicketWithNames(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
-      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId &&
+          !(await isTicketGroupMember(storage, { userId, isAdmin }, ticket))) {
         return res.status(404).json({ error: "Ticket not found" });
       }
       res.json(ticket);
@@ -249,7 +251,8 @@ export function registerTicketRoutes(router: Router) {
       const { userId, isAdmin } = getSessionUser(req);
       const ticket = await storage.getTicket(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
-      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId) {
+      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId &&
+          !(await isTicketGroupMember(storage, { userId, isAdmin }, ticket))) {
         return res.status(403).json({ error: "Access denied" });
       }
 
@@ -596,6 +599,32 @@ export function registerTicketRoutes(router: Router) {
     } catch (error: any) {
       console.error("Error submitting satisfaction:", error);
       res.status(500).json({ error: "Failed to submit satisfaction rating" });
+    }
+  });
+
+  // Fila do grupo: assumir e transferir (regras em server/services/ticket-queue.service.ts).
+  router.post("/api/tickets/:id/assumir", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const result = await claimTicket(storage, { userId, isAdmin }, getId(req));
+      if (!result.ok) return res.status(result.status).json({ error: result.error });
+      res.json(result.ticket);
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message });
+    }
+  });
+
+  router.post("/api/tickets/:id/transferir", requireAuth, async (req, res) => {
+    try {
+      const { userId, isAdmin } = getSessionUser(req);
+      const result = await transferTicket(storage, { userId, isAdmin }, getId(req), req.body);
+      if (!result.ok) return res.status(result.status).json({ error: result.error });
+      if (result.newAssignee) {
+        sendTicketAssignedEmail(result.ticket, result.newAssignee).catch(console.error);
+      }
+      res.json(result.ticket);
+    } catch (error: any) {
+      res.status(error.status || 500).json({ error: error.message });
     }
   });
 }

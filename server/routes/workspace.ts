@@ -20,6 +20,8 @@ import {
 import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 import { OPEN_TICKET_STATUSES } from "@shared/ticket-options";
 import { getSlaForTicket, slaPauseUpdate } from "@shared/sla";
+import { isInQueue } from "@shared/ticket-queue";
+import { getQueueViewer } from "../services/ticket-queue.service";
 
 /**
  * Slack notifier env (Express runtime). Apenas as variáveis necessárias —
@@ -166,9 +168,13 @@ export function registerWorkspaceRoutes(router: Router) {
       const periodo = (req.query.periodo as string) || "este-ano";
 
       // Fetch tickets, users and SLA rules in parallel (avoid sequential DB roundtrips)
-      const ticketsPromise = isAdmin
-        ? storage.getTicketsForWorkspace()
-        : storage.getTicketsForWorkspace({ requesterId: userId, assigneeId: userId });
+      // escopo=fila: chamados em aberto dos grupos do usuário (shared/ticket-queue.ts).
+      const ticketsPromise = req.query.escopo === "fila"
+        ? Promise.all([storage.getTicketsForWorkspace(), getQueueViewer(storage, { userId, isAdmin })])
+            .then(([all, viewer]) => all.filter((t) => isInQueue(viewer, t)))
+        : isAdmin
+          ? storage.getTicketsForWorkspace()
+          : storage.getTicketsForWorkspace({ requesterId: userId, assigneeId: userId });
 
       const [allTickets, users, slaRules] = await Promise.all([
         ticketsPromise,
@@ -261,6 +267,7 @@ export function registerWorkspaceRoutes(router: Router) {
           requestObject: t.requestObject ?? null,
           requestAction: t.requestAction ?? null,
           requestDetail: t.requestDetail ?? null,
+          responsavelId: t.assigneeId ?? null,
         };
       });
 
@@ -1110,6 +1117,7 @@ export function registerWorkspaceRoutes(router: Router) {
         statusSla: sla.status,
         abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
         solicitante: requester?.name || null,
+        responsavelId: ticket.assigneeId ?? null,
       });
     } catch (error: any) {
       return res.status(error.status || 500).json({ error: error.message });
