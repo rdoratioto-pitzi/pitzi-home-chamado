@@ -23,9 +23,15 @@ import { KanbanView } from "@/components/workspace/KanbanView";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TICKET_STATUSES } from "@shared/ticket-options";
+import { claimDenial, type QueueViewer } from "@shared/ticket-queue";
+import { useAuth } from "@/contexts/auth-context";
+import { useSupportGroups } from "@/hooks/use-support-groups";
+import { TransferirChamadoDialog } from "@/components/workspace/TransferirChamadoDialog";
 
 type Periodo = "este-ano" | "mes-vigente" | "mes-anterior" | "em-tratativa";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
+type Escopo = "meus" | "fila";
+type FiltroFila = "sem-responsavel" | "todos";
 
 interface WorkspaceChamadosResponse {
   kpis: WorkspaceKpis;
@@ -39,6 +45,16 @@ const periodLabels: Record<Periodo, string> = {
   "em-tratativa": "Em Tratativa",
 };
 
+const escopoLabels: Record<Escopo, string> = {
+  meus: "Meus Chamados",
+  fila: "Fila do Grupo",
+};
+
+const filtroFilaLabels: Record<FiltroFila, string> = {
+  "sem-responsavel": "Sem Responsável",
+  todos: "Todos",
+};
+
 const viewIcons: Record<ViewMode, React.ReactNode> = {
   lista: <List className="h-4 w-4" />,
   kanban: <Trello className="h-4 w-4" />,
@@ -49,6 +65,8 @@ const viewIcons: Record<ViewMode, React.ReactNode> = {
 
 export function ChamadosView() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { groups } = useSupportGroups();
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<WorkspaceKpis>({
     total: 0,
@@ -68,12 +86,25 @@ export function ChamadosView() {
   const [selectedItem, setSelectedItem] = useState<ChamadoItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filtroKpi, setFiltroKpi] = useState<string | null>(null);
+  const [escopo, setEscopo] = useState<Escopo>("meus");
+  const [filtroFila, setFiltroFila] = useState<FiltroFila>("sem-responsavel");
+  const [transferItem, setTransferItem] = useState<ChamadoItem | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const queueViewer: QueueViewer = {
+    userId: user?.id ?? "",
+    isAdmin: user?.isAdmin === true,
+    groupKeys: groups.filter((g) => user && g.memberIds.includes(user.id)).map((g) => g.key),
+  };
+  const canClaim = (item: ChamadoItem) =>
+    claimDenial(queueViewer, { category: item.categoria, assigneeId: item.responsavelId ?? null, status: item.status }) === null;
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
 
-    fetchWithAuth(`/api/workspace/chamados?periodo=${periodo}`)
+    const escopoParam = escopo === "fila" ? "&escopo=fila" : "";
+    fetchWithAuth(`/api/workspace/chamados?periodo=${periodo}${escopoParam}`)
       .then((res) => res.json())
       .then((data: WorkspaceChamadosResponse) => {
         if (cancelled) return;
@@ -93,7 +124,40 @@ export function ChamadosView() {
     return () => {
       cancelled = true;
     };
-  }, [periodo]);
+  }, [periodo, escopo, reloadKey]);
+
+  async function postQueueAction(url: string, body: unknown, erro: string): Promise<boolean> {
+    try {
+      const res = await fetchWithAuth(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: erro }));
+        throw new Error(err.error || erro);
+      }
+      setReloadKey((k) => k + 1);
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      toast({ title: erro, description: msg, variant: "destructive" });
+      return false;
+    }
+  }
+
+  async function handleClaim(item: ChamadoItem) {
+    if (await postQueueAction(`/api/tickets/${item.id}/assumir`, {}, "Erro ao assumir chamado")) {
+      toast({ title: `Chamado ${item.codigo} assumido` });
+    }
+  }
+
+  async function handleTransfer(item: ChamadoItem, category: string, assigneeId: string | null) {
+    if (await postQueueAction(`/api/tickets/${item.id}/transferir`, { category, assigneeId }, "Erro ao transferir chamado")) {
+      toast({ title: `Chamado ${item.codigo} transferido` });
+      setTransferItem(null);
+    }
+  }
 
   // KPI label → filter function
   function applyKpiFilter(item: ChamadoItem, kpi: string | null): boolean {
@@ -121,6 +185,7 @@ export function ChamadosView() {
         item.responsavel.toLowerCase().includes(q);
       if (!matches) return false;
     }
+    if (escopo === "fila" && filtroFila === "sem-responsavel" && item.responsavelId) return false;
     if (statusFilter !== "all" && item.status !== statusFilter) return false;
     if (responsavelFilter !== "all" && item.responsavel !== responsavelFilter) return false;
     return true;
@@ -152,6 +217,43 @@ export function ChamadosView() {
             className="pl-8 h-8 text-sm"
           />
         </div>
+
+        {/* Escopo: meus chamados ou fila dos grupos do usuário */}
+        <div className="flex items-center gap-0 border rounded-md overflow-hidden" style={{ borderColor: "var(--sep)" }}>
+          {(Object.keys(escopoLabels) as Escopo[]).map((e) => (
+            <button
+              key={e}
+              onClick={() => setEscopo(e)}
+              className="px-3 py-1.5 text-xs font-medium transition-colors"
+              data-testid={`button-escopo-${e}`}
+              style={{
+                background: escopo === e ? "rgba(59,66,222,0.15)" : "transparent",
+                color: escopo === e ? "#5B62EC" : "var(--l2)",
+              }}
+            >
+              {escopoLabels[e]}
+            </button>
+          ))}
+        </div>
+
+        {escopo === "fila" && (
+          <div className="flex items-center gap-0 border rounded-md overflow-hidden" style={{ borderColor: "var(--sep)" }}>
+            {(Object.keys(filtroFilaLabels) as FiltroFila[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFiltroFila(f)}
+                className="px-3 py-1.5 text-xs font-medium transition-colors"
+                data-testid={`button-fila-${f}`}
+                style={{
+                  background: filtroFila === f ? "rgba(59,66,222,0.15)" : "transparent",
+                  color: filtroFila === f ? "#5B62EC" : "var(--l2)",
+                }}
+              >
+                {filtroFilaLabels[f]}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Period toggle */}
         <div className="flex items-center gap-0 border rounded-md overflow-hidden" style={{ borderColor: "var(--sep)" }}>
@@ -218,6 +320,9 @@ export function ChamadosView() {
           items={filteredItems}
           loading={loading}
           onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
+          onClaim={escopo === "fila" ? handleClaim : undefined}
+          canClaim={canClaim}
+          onTransfer={escopo === "fila" ? setTransferItem : undefined}
           onStatusChange={async (item, newStatus) => {
             try {
               const res = await fetchWithAuth(`/api/workspace/chamados/${item.id}`, {
@@ -301,6 +406,11 @@ export function ChamadosView() {
           }}
         />
       )}
+      <TransferirChamadoDialog
+        item={transferItem}
+        onClose={() => setTransferItem(null)}
+        onConfirm={handleTransfer}
+      />
       {viewMode !== "lista" && viewMode !== "kanban" && (
         <div style={{ padding: "40px", textAlign: "center", color: "var(--l3)", fontSize: "14px" }}>
           Visualização {viewMode.charAt(0).toUpperCase() + viewMode.slice(1)} em desenvolvimento
