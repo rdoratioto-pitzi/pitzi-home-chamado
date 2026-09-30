@@ -10,9 +10,9 @@ import {
   getFilaTriagem,
   getDesvios,
 } from "../services/triagem.service";
+import { rsApiToken } from "../lib/rs-token";
 
 const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
-const RS_API_TOKEN = process.env.RENOVSMART_API_TOKEN || "Renov123";
 
 function buildSearchParams(query: Record<string, unknown>) {
   const params = new URLSearchParams();
@@ -45,7 +45,7 @@ export function registerTriagemRoutes(router: Router) {
       const response = await fetch(url, {
         method: "GET",
         headers: {
-          Authorization: `Bearer ${RS_API_TOKEN}`,
+          Authorization: `Bearer ${rsApiToken()}`,
           "Content-Type": "application/json",
         },
       });

@@ -25,9 +25,6 @@ interface GerarEstoqueResponse {
   total: number;
 }
 
-const DASH_ESTOQUE_EXTERNAL_URL = "https://dash.pitzi.com.br/api/dash_estoque/defeitos";
-const DASH_ESTOQUE_EXTERNAL_TOKEN = "Renov123";
-
 function normalizeImeis(values: unknown[]): string[] {
   const cleaned = values
     .map((item) => String(item ?? "").trim())
@@ -105,43 +102,12 @@ export function GerarEstoque() {
         body: JSON.stringify({ imeis: imeisInput }),
       });
 
+      // A API externa só é chamada pelo backend, que guarda o token.
       const internalPayload = await internalResponse.json().catch(() => ({}));
-      const internalError = String(internalPayload?.error || "");
-      const shouldFallbackExternal =
-        internalResponse.status === 404 || internalError.includes("Rota não encontrada");
-
-      if (!internalResponse.ok && !shouldFallbackExternal) {
+      if (!internalResponse.ok || !internalPayload?.success) {
         throw new Error(internalPayload?.error || `Erro ${internalResponse.status}`);
       }
-
-      if (internalResponse.ok && internalPayload?.success) {
-        return internalPayload.data as GerarEstoqueResponse;
-      }
-
-      const externalResponse = await fetch(DASH_ESTOQUE_EXTERNAL_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${DASH_ESTOQUE_EXTERNAL_TOKEN}`,
-        },
-        body: JSON.stringify({ imeis: imeisInput }),
-      });
-
-      const externalPayload = await externalResponse.json().catch(() => []);
-      if (!externalResponse.ok) {
-        const externalError = (externalPayload as any)?.error;
-        throw new Error(externalError || `Erro ${externalResponse.status} na API externa`);
-      }
-
-      const rows = Array.isArray(externalPayload)
-        ? externalPayload
-        : Array.isArray((externalPayload as any)?.data)
-          ? (externalPayload as any).data
-          : Array.isArray((externalPayload as any)?.results)
-            ? (externalPayload as any).results
-            : [];
-
-      return { rows, total: rows.length };
+      return internalPayload.data as GerarEstoqueResponse;
     },
     onMutate: (imeisInput) => {
       setParseError("");

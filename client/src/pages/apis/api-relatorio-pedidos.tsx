@@ -318,12 +318,12 @@ export default function ApiRelatorioPedidosPage() {
                       <div className="p-4 rounded-lg bg-muted/30 border border-border/40">
                         <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Header de Autenticação</Label>
                         <div className="mt-2 flex items-center justify-between">
-                          <code className="text-sm font-mono">Authorization: Bearer Renov123</code>
+                          <code className="text-sm font-mono">{"Authorization: Bearer <SEU_TOKEN>"}</code>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6"
-                            onClick={() => copyToClipboard("Authorization: Bearer Renov123")}
+                            onClick={() => copyToClipboard("Authorization: Bearer <SEU_TOKEN>")}
                           >
                             <Copy className="h-3 w-3" />
                           </Button>

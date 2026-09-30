@@ -11,6 +11,7 @@ import {
   insertCollectionRequestSchema,
   insertLogisticaReversaPedidoSchema,
 } from "@shared/schema";
+import { rsApiToken } from "../lib/rs-token";
 
 export function registerShipmentRoutes(router: Router) {
   // ============== SHIPMENTS ==============
@@ -432,7 +433,6 @@ export function registerShipmentRoutes(router: Router) {
 
   // ============== RS LOGISTICA API INTEGRATION ==============
   const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
-  const RS_API_TOKEN = "Renov123";
 
   const normalizeLogisticaKey = (rawKey: string): string => {
     let key = rawKey;
@@ -475,7 +475,7 @@ export function registerShipmentRoutes(router: Router) {
       const response = await fetch(`${RS_API_BASE_URL}/logistica/meus_dispositivos?imei=000000000000000`, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Authorization": `Bearer ${rsApiToken()}`,
           "Content-Type": "application/json",
         },
       });
@@ -505,7 +505,7 @@ export function registerShipmentRoutes(router: Router) {
       const response = await fetch(`${RS_API_BASE_URL}/logistica/meus_dispositivos?${params.toString()}`, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Authorization": `Bearer ${rsApiToken()}`,
           "Content-Type": "application/json",
         },
       });
@@ -537,7 +537,7 @@ export function registerShipmentRoutes(router: Router) {
       const response = await fetch(`${RS_API_BASE_URL}/logistica/meus-fechamentos?${params.toString()}`, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Authorization": `Bearer ${rsApiToken()}`,
           "Content-Type": "application/json",
         },
       });
@@ -562,7 +562,7 @@ export function registerShipmentRoutes(router: Router) {
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas?voucher_imei=000000000000000`, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Authorization": `Bearer ${rsApiToken()}`,
           "Content-Type": "application/json",
         },
       });
@@ -587,7 +587,7 @@ export function registerShipmentRoutes(router: Router) {
       });
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
@@ -609,7 +609,7 @@ export function registerShipmentRoutes(router: Router) {
 
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas/aggregates?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
 
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
@@ -631,11 +631,11 @@ export function registerShipmentRoutes(router: Router) {
       const [coletaResponse, ordersResponse] = await Promise.all([
         fetch(`${RS_API_BASE_URL}/adm_logistica/coletas?code=${encodeURIComponent(code)}`, {
           method: "GET",
-          headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+          headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
         }),
         fetch(`${RS_API_BASE_URL}/orders/advanced?coleta_code=${encodeURIComponent(code)}`, {
           method: "GET",
-          headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+          headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
         }),
       ]);
 
@@ -702,7 +702,7 @@ export function registerShipmentRoutes(router: Router) {
       });
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/recebimentos?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
@@ -723,7 +723,7 @@ export function registerShipmentRoutes(router: Router) {
       });
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/triagem?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
@@ -744,7 +744,7 @@ export function registerShipmentRoutes(router: Router) {
       });
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/bloqueados?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
@@ -762,7 +762,7 @@ export function registerShipmentRoutes(router: Router) {
       if (req.query.imei) params.append("imei", req.query.imei as string);
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/manutencao?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
@@ -780,7 +780,7 @@ export function registerShipmentRoutes(router: Router) {
       if (req.query.imei) params.append("imei", req.query.imei as string);
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/divergentes?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
@@ -808,7 +808,7 @@ export function registerShipmentRoutes(router: Router) {
 
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/dispositivos/aggregates?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
@@ -843,7 +843,7 @@ export function registerShipmentRoutes(router: Router) {
 
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/consulta/aggregates?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
@@ -868,7 +868,7 @@ export function registerShipmentRoutes(router: Router) {
 
       const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/fechamentos/aggregates?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
 
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
