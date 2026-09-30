@@ -24,9 +24,12 @@ export function hasModulePermission(
   return perms[key] === true;
 }
 
-/** Pode editar o Objeto da Requisição e os campos personalizados dos grupos. */
+/**
+ * Pode mexer em Configurações (campos, Objeto da Requisição, automações, respostas prontas,
+ * e-mail). Só administradores: a permissão avulsa "campos_chamado" deixou de valer.
+ */
 export function canManageTicketFields(
   user: { isAdmin?: boolean | null; modulePermissions?: unknown } | null | undefined,
 ): boolean {
-  return hasModulePermission(user, "campos_chamado");
+  return user?.isAdmin === true;
 }
