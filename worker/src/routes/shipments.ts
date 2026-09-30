@@ -12,6 +12,7 @@ import {
   insertLogisticaReversaPedidoSchema,
 } from "../../../shared/schema";
 import { getCorreiosService } from "../services/correios.service";
+import { rsApiToken } from "../lib/rs-token";
 
 const shipments = new Hono<AppEnv>();
 
@@ -394,7 +395,6 @@ shipments.get("/api/logistica-reversa/check-api-status", async (c) => {
 // ============== RS LOGISTICA API INTEGRATION ==============
 
 const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
-const RS_API_TOKEN = "Renov123";
 
 const normalizeLogisticaKey = (rawKey: string): string => {
   let key = rawKey;
@@ -437,7 +437,7 @@ shipments.post("/api/integrations/rs-logistica/test-connection", requireAdmin, a
     const response = await fetch(`${RS_API_BASE_URL}/logistica/meus_dispositivos?imei=000000000000000`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${RS_API_TOKEN}`,
+        Authorization: `Bearer ${rsApiToken()}`,
         "Content-Type": "application/json",
       },
     });
@@ -465,7 +465,7 @@ shipments.get("/api/integrations/rs-logistica/meus-dispositivos", async (c) => {
   const response = await fetch(`${RS_API_BASE_URL}/logistica/meus_dispositivos?${params.toString()}`, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${RS_API_TOKEN}`,
+      Authorization: `Bearer ${rsApiToken()}`,
       "Content-Type": "application/json",
     },
   });
@@ -491,7 +491,7 @@ shipments.get("/api/integrations/rs-logistica/meus-fechamentos", async (c) => {
   const response = await fetch(`${RS_API_BASE_URL}/logistica/meus-fechamentos?${params.toString()}`, {
     method: "GET",
     headers: {
-      Authorization: `Bearer ${RS_API_TOKEN}`,
+      Authorization: `Bearer ${rsApiToken()}`,
       "Content-Type": "application/json",
     },
   });
@@ -512,7 +512,7 @@ shipments.post("/api/integrations/adm-logistica/test-connection", requireAdmin, 
     const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas?voucher_imei=000000000000000`, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${RS_API_TOKEN}`,
+        Authorization: `Bearer ${rsApiToken()}`,
         "Content-Type": "application/json",
       },
     });
@@ -541,7 +541,7 @@ shipments.get("/api/integrations/adm-logistica/coletas", async (c) => {
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
   const data = await response.json();
@@ -558,11 +558,11 @@ shipments.get("/api/integrations/adm-logistica/coleta-detalhes", async (c) => {
   const [coletaResponse, ordersResponse] = await Promise.all([
     fetch(`${RS_API_BASE_URL}/adm_logistica/coletas?code=${encodeURIComponent(code)}`, {
       method: "GET",
-      headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
     }),
     fetch(`${RS_API_BASE_URL}/orders/advanced?coleta_code=${encodeURIComponent(code)}`, {
       method: "GET",
-      headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
     }),
   ]);
 
@@ -630,7 +630,7 @@ shipments.get("/api/integrations/adm-logistica/recebimentos", async (c) => {
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/recebimentos?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
   const data = await response.json();
@@ -661,7 +661,7 @@ shipments.get("/api/integrations/adm-logistica/triagem", async (c) => {
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/triagem?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
   const data = await response.json();
@@ -679,7 +679,7 @@ shipments.get("/api/integrations/adm-logistica/bloqueados", async (c) => {
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/bloqueados?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
   const data = await response.json();
@@ -694,7 +694,7 @@ shipments.get("/api/integrations/adm-logistica/manutencao", async (c) => {
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/manutencao?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
   const data = await response.json();
@@ -709,7 +709,7 @@ shipments.get("/api/integrations/adm-logistica/divergentes", async (c) => {
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/divergentes?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
   const data = await response.json();
@@ -743,7 +743,7 @@ shipments.get("/api/integrations/adm-logistica/dispositivos/aggregates", async (
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/dispositivos/aggregates?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
 
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
@@ -763,7 +763,7 @@ shipments.get("/api/integrations/adm-logistica/coletas/aggregates", async (c) =>
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/coletas/aggregates?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
 
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
@@ -782,7 +782,7 @@ shipments.get("/api/integrations/adm-logistica/consulta/aggregates", async (c) =
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/consulta/aggregates?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
 
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
@@ -801,7 +801,7 @@ shipments.get("/api/integrations/adm-logistica/fechamentos/aggregates", async (c
 
   const response = await fetch(`${RS_API_BASE_URL}/adm_logistica/fechamentos/aggregates?${params.toString()}`, {
     method: "GET",
-    headers: { Authorization: `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
 
   if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);

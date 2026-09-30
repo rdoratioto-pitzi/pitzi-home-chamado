@@ -3,11 +3,11 @@ import { insertLogisticaReversaEventoSchema } from "@shared/schema";
 import { storage } from "../storage";
 import { z } from "zod";
 import { requireAuth } from "../middleware/auth";
+import { rsApiToken } from "../lib/rs-token";
 
 export function registerIntegrationRoutes(router: Router) {
   console.log("Registering Integration Routes...");
   const RS_API_BASE_URL = "https://dash.pitzi.com.br/api";
-  const RS_API_TOKEN = process.env.RENOVSMART_API_TOKEN || "Renov123";
 
   const fetchApoioVendas = async (endpoint: string, query: any) => {
     const params = new URLSearchParams();
@@ -31,7 +31,7 @@ export function registerIntegrationRoutes(router: Router) {
     const response = await fetch(fullUrl, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${RS_API_TOKEN}`,
+        Authorization: `Bearer ${rsApiToken()}`,
         "Content-Type": "application/json",
       },
     });
@@ -57,7 +57,7 @@ export function registerIntegrationRoutes(router: Router) {
       const response = await fetch(`${RS_API_BASE_URL}/orders/advanced?imei=000000000000000`, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${RS_API_TOKEN}`,
+          "Authorization": `Bearer ${rsApiToken()}`,
           "Content-Type": "application/json",
         },
       });
@@ -82,7 +82,7 @@ export function registerIntegrationRoutes(router: Router) {
       });
       const response = await fetch(`${RS_API_BASE_URL}/orders/advanced?${params.toString()}`, {
         method: "GET",
-        headers: { "Authorization": `Bearer ${RS_API_TOKEN}`, "Content-Type": "application/json" },
+        headers: { "Authorization": `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
       });
       if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
       const data = await response.json();
@@ -134,7 +134,7 @@ export function registerIntegrationRoutes(router: Router) {
     const response = await fetch(fullUrl, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${RS_API_TOKEN}`,
+        "Authorization": `Bearer ${rsApiToken()}`,
         "Content-Type": "application/json"
       },
     });
@@ -324,7 +324,7 @@ export function registerIntegrationRoutes(router: Router) {
     const response = await fetch(fullUrl, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${RS_API_TOKEN}`,
+        "Authorization": `Bearer ${rsApiToken()}`,
         "Content-Type": "application/json"
       },
     });
