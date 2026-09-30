@@ -5,7 +5,8 @@ import { getUserPermissions, type UserPermissions } from "@/lib/permissions";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredPermission?: keyof UserPermissions;
+  /** Uma permissão ou uma lista (basta ter uma delas). */
+  requiredPermission?: keyof UserPermissions | ReadonlyArray<keyof UserPermissions>;
 }
 
 export function ProtectedRoute({ children, requiredPermission }: ProtectedRouteProps) {
@@ -32,7 +33,10 @@ export function ProtectedRoute({ children, requiredPermission }: ProtectedRouteP
     }
 
     const permissions = getUserPermissions(user);
-    if (permissions[requiredPermission]) {
+    const required: ReadonlyArray<keyof UserPermissions> = Array.isArray(requiredPermission)
+      ? requiredPermission
+      : [requiredPermission as keyof UserPermissions];
+    if (required.some((key) => permissions[key])) {
       setHasAccess(true);
     } else {
       setLocation("/");

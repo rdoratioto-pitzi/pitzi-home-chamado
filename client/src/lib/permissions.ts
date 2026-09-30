@@ -19,6 +19,7 @@ export interface UserPermissions {
   avaliacoes: boolean;
   comercial: boolean;
   apoio_vendas: boolean;
+  campos_chamado: boolean;
 }
 
 export interface CurrentUser {
@@ -63,6 +64,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
     avaliacoes: false,
     comercial: false,
     apoio_vendas: false,
+    campos_chamado: false,
   };
 
   if (!user) return defaultPerms;
@@ -89,6 +91,7 @@ export function getUserPermissions(user: CurrentUser | null): UserPermissions {
       avaliacoes: true,
       comercial: true,
       apoio_vendas: true,
+      campos_chamado: true,
     };
   }
 

@@ -19,6 +19,7 @@ vi.mock("../storage", () => ({
     getUsers: vi.fn().mockResolvedValue([]),
     getUser: vi.fn().mockResolvedValue(undefined),
     getSlaRules: vi.fn().mockResolvedValue([]),
+    getTicketCustomFields: vi.fn().mockResolvedValue([]),
     createTicket: vi.fn().mockResolvedValue({
       id: 1,
       code: "CHA-0001",

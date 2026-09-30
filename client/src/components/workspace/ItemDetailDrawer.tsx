@@ -35,6 +35,7 @@ import { ApplicationSelect } from "@/components/shared/ApplicationSelect";
 import { getApplicationLabel } from "@shared/applications";
 import { formatRequestObject } from "@/components/shared/RequestObjectSelect";
 import { REQUEST_OBJECT_LABEL } from "@shared/request-objects";
+import { CustomFieldsDrawerRows } from "./CustomFieldsDrawerRows";
 
 interface ItemDetailDrawerProps {
   open: boolean;
@@ -705,6 +706,14 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           {formatRequestObject(item as ChamadoItem)}
                         </span>
                       </div>
+                    )}
+
+                    {isChamado && (
+                      <CustomFieldsDrawerRows
+                        ticketId={item.id}
+                        groupKey={(item as ChamadoItem).categoria}
+                        labelStyle={ROW_LABEL_STYLE}
+                      />
                     )}
 
                     {/* Responsável */}

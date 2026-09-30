@@ -67,6 +67,8 @@ export type ModulePermissions = {
   avaliacoes: boolean;
   comercial: boolean;
   apoio_vendas: boolean;
+  /** Editar Objeto da Requisição e campos personalizados (Configurações → Campos do chamado). */
+  campos_chamado: boolean;
 };
 
 // ============== REFRESH TOKENS (JWT Auth) ==============
@@ -153,6 +155,8 @@ export const tickets = pgTable("tickets", {
   // Pausa do SLA em "Aguardando solicitante" (shared/sla.ts, migration 0026)
   slaPausadoEm: timestamp("sla_pausado_em"),
   slaPausaMinutos: integer("sla_pausa_minutos").notNull().default(0),
+  // Valores dos campos personalizados do grupo, por id do campo (shared/custom-fields.ts, migration 0027)
+  customFields: jsonb("custom_fields"),
   // Audit log for description edits
   descriptionLastEditedBy: varchar("description_last_edited_by"),
   descriptionLastEditedAt: timestamp("description_last_edited_at"),
@@ -189,6 +193,25 @@ export const ticketResponsaveis = pgTable("ticket_responsaveis", {
 export const insertTicketResponsavelSchema = createInsertSchema(ticketResponsaveis).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTicketResponsavel = z.infer<typeof insertTicketResponsavelSchema>;
 export type TicketResponsavel = typeof ticketResponsaveis.$inferSelect;
+
+// ============== TICKET CUSTOM FIELDS (campos personalizados por grupo) ==============
+// Criada por migrations/0027_campos_personalizados.sql. Regras em shared/custom-fields.ts.
+export const ticketCustomFields = pgTable("ticket_custom_fields", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  groupKey: text("group_key").notNull(), // support_groups.key (= tickets.category)
+  label: text("label").notNull(),
+  fieldType: text("field_type").notNull(), // text, textarea, number, date, select
+  options: jsonb("options").notNull().default([]), // opções do tipo select
+  required: boolean("required").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type TicketCustomField = typeof ticketCustomFields.$inferSelect;
+export type InsertTicketCustomField = typeof ticketCustomFields.$inferInsert;
 
 // ============== TICKET COMMENTS ==============
 export const ticketComments = pgTable("ticket_comments", {
