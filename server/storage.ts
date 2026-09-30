@@ -3,6 +3,7 @@ import {
   type Ticket, type InsertTicket,
   type TicketResponsavel, type InsertTicketResponsavel,
   type SupportGroup, type SupportGroupWithMembers,
+  type TicketCustomField, type InsertTicketCustomField,
   type TicketComment, type InsertTicketComment,
   type TicketCommentWithUser,
   type KanbanCommentWithUser,
@@ -67,7 +68,7 @@ import {
   type ClaudeCodeUsageReport, type InsertClaudeCodeUsage,
   type KanbanLabel, type InsertKanbanLabel,
   type KanbanCardDependency, type InsertKanbanCardDependency,
-  users, tickets, ticketResponsaveis, supportGroups, supportGroupMembers, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
+  users, tickets, ticketResponsaveis, supportGroups, supportGroupMembers, ticketCustomFields, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   kanbanLabels, kanbanCardDependencies,
   objectives, keyResults, keyResultUpdates, initiatives, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
@@ -143,6 +144,13 @@ import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../
   getSupportGroups(tenantId: string | null): Promise<SupportGroupWithMembers[]>;
   getActiveSupportGroupByKey(key: string): Promise<SupportGroup | undefined>;
   setSupportGroupMembers(groupId: string, userIds: string[], tenantId: string | null): Promise<void>;
+
+  // Campos personalizados por grupo (shared/custom-fields.ts)
+  getTicketCustomFields(): Promise<TicketCustomField[]>;
+  getTicketCustomField(id: string): Promise<TicketCustomField | undefined>;
+  createTicketCustomField(data: InsertTicketCustomField): Promise<TicketCustomField>;
+  updateTicketCustomField(id: string, data: Partial<InsertTicketCustomField>): Promise<TicketCustomField | undefined>;
+  deleteTicketCustomField(id: string): Promise<boolean>;
 
   // Ticket Comments
   getTicketComments(ticketId: string): Promise<TicketCommentWithUser[]>;
@@ -842,6 +850,35 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(supportGroups.key, key), eq(supportGroups.active, true)));
     return group;
   }
+  async getTicketCustomFields(): Promise<TicketCustomField[]> {
+    if (!this.db) return [];
+    return await this.db.select().from(ticketCustomFields)
+      .orderBy(asc(ticketCustomFields.groupKey), asc(ticketCustomFields.sortOrder), asc(ticketCustomFields.label));
+  }
+  async getTicketCustomField(id: string): Promise<TicketCustomField | undefined> {
+    if (!this.db) return undefined;
+    const [field] = await this.db.select().from(ticketCustomFields).where(eq(ticketCustomFields.id, id));
+    return field;
+  }
+  async createTicketCustomField(data: InsertTicketCustomField): Promise<TicketCustomField> {
+    if (!this.db) throw new Error("Database not connected");
+    const [field] = await this.db.insert(ticketCustomFields).values(data).returning();
+    return field;
+  }
+  async updateTicketCustomField(id: string, data: Partial<InsertTicketCustomField>): Promise<TicketCustomField | undefined> {
+    if (!this.db) throw new Error("Database not connected");
+    const [field] = await this.db.update(ticketCustomFields)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(ticketCustomFields.id, id))
+      .returning();
+    return field;
+  }
+  async deleteTicketCustomField(id: string): Promise<boolean> {
+    if (!this.db) throw new Error("Database not connected");
+    const result = await this.db.delete(ticketCustomFields).where(eq(ticketCustomFields.id, id)).returning();
+    return result.length > 0;
+  }
+
   async setSupportGroupMembers(groupId: string, userIds: string[], tenantId: string | null): Promise<void> {
     if (!this.db) throw new Error("Database not connected");
     const tenantCondition = tenantId == null ? isNull(supportGroupMembers.tenantId) : eq(supportGroupMembers.tenantId, tenantId);

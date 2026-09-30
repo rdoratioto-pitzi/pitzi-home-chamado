@@ -29,6 +29,7 @@ import {
 import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 import { OPEN_TICKET_STATUSES } from "../../../shared/ticket-options";
 import { getSlaForTicket, slaPauseUpdate } from "../../../shared/sla";
+import { resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
 import { isInQueue } from "../../../shared/ticket-queue";
 import { getQueueViewer } from "../../../server/services/ticket-queue.service";
 
@@ -341,6 +342,9 @@ workspace.post("/api/workspace/chamados", async (c) => {
     if (!categoria || !(await storage.getActiveSupportGroupByKey(categoria))) {
       return c.json({ error: "Grupo de atendimento é obrigatório e deve ser válido" }, 400);
     }
+    // Campos personalizados obrigatórios do grupo valem também nesta rota de abertura.
+    const custom = await resolveCustomFieldValues(storage, { incoming: (body as any).customFields, groupKey: categoria, isCreate: true });
+    if (!custom.ok) return c.json({ error: custom.error }, custom.status);
     const tipoChamado = tipo || "bug";
     const assigneeId = await storage.findResponsavelForTicket(categoria, tipoChamado, tenantId ?? null);
 
@@ -359,6 +363,7 @@ workspace.post("/api/workspace/chamados", async (c) => {
       impact: ({ baixa: "baixo", media: "medio", alta: "alto", critica: "critico" } as Record<string, string>)[prioridade ?? ""] ?? "medio",
       status: "open",
       requesterId: userId,
+      customFields: custom.values ?? null,
       tenantId,
     } as any);
 

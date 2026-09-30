@@ -55,6 +55,9 @@ import { useSupportGroups } from "@/hooks/use-support-groups";
 import { getApplicationLabel } from "@shared/applications";
 import { TICKET_STATUSES, TICKET_TYPES, ticketTypeLabel } from "@shared/ticket-options";
 import { RequestObjectSelect, formatRequestObject } from "@/components/shared/RequestObjectSelect";
+import { CustomFieldInputs, CustomFieldValuesList } from "@/components/shared/CustomFieldInputs";
+import { apiErrorMessage, useCustomFields } from "@/hooks/use-ticket-fields";
+import { fieldsForGroup, parseCustomFieldValues, type CustomFieldValues } from "@shared/custom-fields";
 
 const statusColors: Record<string, string> = {
   open: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
@@ -156,6 +159,8 @@ export default function TicketDetailPage() {
   const [comment, setComment] = useState("");
   const [commentImages, setCommentImages] = useState<string[]>([]);
   const [editedDescription, setEditedDescription] = useState("");
+  const [editedCustomValues, setEditedCustomValues] = useState<CustomFieldValues>({});
+  const { fields: customFields } = useCustomFields();
   const [editedAttachments, setEditedAttachments] = useState<{ name: string; url: string }[]>([]);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -262,6 +267,7 @@ export default function TicketDetailPage() {
         requestDetail: ticket.requestDetail ?? null,
       });
       setEditedDescription(ticket.description || "");
+      setEditedCustomValues(parseCustomFieldValues(ticket.customFields));
       try {
         const rawAttachments = ticket.attachments ? JSON.parse(ticket.attachments) : [];
         // Convert old format (string URLs) to new format, filtering out null entries
@@ -296,9 +302,8 @@ export default function TicketDetailPage() {
       toast({ title: "Chamado atualizado com sucesso!" });
       setIsEditing(false);
     },
-    onError: (error: { message?: string; error?: string }) => {
-      const errorMessage = error?.message || error?.error || "Erro ao atualizar chamado";
-      toast({ title: errorMessage, variant: "destructive" });
+    onError: (error: unknown) => {
+      toast({ title: apiErrorMessage(error, "Erro ao atualizar chamado"), variant: "destructive" });
     },
   });
 
@@ -338,6 +343,7 @@ export default function TicketDetailPage() {
       // Save details form
       updateMutation.mutate({
         ...data,
+        customFields: editedCustomValues,
         description: editedDescription,
         // editedAttachments is already an array of objects with name and url
         attachments: editedAttachments.length > 0 ? JSON.stringify(editedAttachments) : null,
@@ -612,6 +618,12 @@ export default function TicketDetailPage() {
                         editForm.setValue("requestDetail", v.requestDetail);
                       }}
                     />
+
+                    <CustomFieldInputs
+                      fields={fieldsForGroup(customFields, editForm.watch("category") || ticket.category)}
+                      values={editedCustomValues}
+                      onChange={setEditedCustomValues}
+                    />
                     
                     {/* Description and Attachments in Edit Mode */}
                     <div className="space-y-3 pt-4 border-t">
@@ -656,6 +668,14 @@ export default function TicketDetailPage() {
                     )}
                     <Badge variant="outline">{priorityLabels[ticket.priority as keyof typeof priorityLabels]}</Badge>
                   </div>
+                  {fieldsForGroup(customFields, ticket.category).length > 0 && (
+                    <div className="mb-4">
+                      <CustomFieldValuesList
+                        fields={fieldsForGroup(customFields, ticket.category)}
+                        values={parseCustomFieldValues(ticket.customFields)}
+                      />
+                    </div>
+                  )}
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <RichContent content={ticket.description || "Sem descrição"} />
                   </div>

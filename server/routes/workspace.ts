@@ -20,6 +20,7 @@ import {
 import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 import { OPEN_TICKET_STATUSES } from "@shared/ticket-options";
 import { getSlaForTicket, slaPauseUpdate } from "@shared/sla";
+import { resolveCustomFieldValues } from "../services/ticket-fields.service";
 import { isInQueue } from "@shared/ticket-queue";
 import { getQueueViewer } from "../services/ticket-queue.service";
 
@@ -314,6 +315,10 @@ export function registerWorkspaceRoutes(router: Router) {
       };
       const mappedPriority = prioridade ? (prioridadeMap[prioridade] || prioridade) : "medium";
 
+      // Campos personalizados obrigatórios do grupo valem também nesta rota de abertura.
+      const custom = await resolveCustomFieldValues(storage, { incoming: req.body?.customFields, groupKey: categoria || "geral", isCreate: true });
+      if (!custom.ok) return res.status(custom.status).json({ error: custom.error });
+
       const ticket = await storage.createTicket({
         title: titulo.trim(),
         description: descricao || "",
@@ -325,6 +330,7 @@ export function registerWorkspaceRoutes(router: Router) {
         impact: ({ baixa: "baixo", media: "medio", alta: "alto", critica: "critico" } as Record<string, string>)[prioridade ?? ""] ?? "medio",
         status: "open",
         requesterId: userId,
+        customFields: custom.values ?? null,
         tenantId: null,
         attachments: attachments || null,
       } as InsertTicket);
