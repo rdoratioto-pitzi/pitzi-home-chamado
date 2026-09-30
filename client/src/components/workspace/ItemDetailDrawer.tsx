@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSupportGroups } from "@/hooks/use-support-groups";
+import { useAuth } from "@/contexts/auth-context";
 import { X, Send, Paperclip, ExternalLink, Download, Maximize2, FileText, FileSpreadsheet, FileImage, File, FileArchive, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -79,6 +80,35 @@ interface Comentario {
   autorNome: string;
   autorInitials: string;
   criadoEm: string | null;
+  /** Só chamados: nota interna (a equipe vê; o solicitante não). */
+  interno?: boolean;
+}
+
+interface TicketCommentApi {
+  id: string;
+  content: string;
+  userId: string;
+  isInternal: boolean | null;
+  createdAt: string | null;
+  author?: { name?: string | null } | null;
+}
+
+function initialsOf(name: string): string {
+  return name.split(" ").filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
+}
+
+/** Comentário do chamado (/api/tickets/:id/comments) no formato da gaveta. */
+function fromTicketComment(c: TicketCommentApi): Comentario {
+  const autorNome = c.author?.name || "Usuário";
+  return {
+    id: c.id,
+    texto: c.content,
+    autorId: c.userId,
+    autorNome,
+    autorInitials: initialsOf(autorNome),
+    criadoEm: c.createdAt,
+    interno: c.isInternal === true,
+  };
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -153,6 +183,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [novoComentario, setNovoComentario] = useState("");
   const [enviandoComentario, setEnviandoComentario] = useState(false);
+  const [comentarioInterno, setComentarioInterno] = useState(false);
+  const { user: currentUser } = useAuth();
   const [editingField, setEditingField] = useState<string | null>(null);
   const [descricaoDraft, setDescricaoDraft] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
@@ -180,13 +212,19 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
   const isChamado = item !== null && "tipo" in item && typeof (item as ChamadoItem).categoria === "string";
   const kind: ItemKind = isChamado ? "chamado" : "tarefa";
 
-  // Comentários: chamados e tarefas têm endpoints separados, ambos suportados.
+  // Comentários: chamados usam o histórico do chamado (o mesmo da tela do chamado, com
+  // notas internas e e-mail ao solicitante); tarefas seguem com o endpoint do workspace.
   useEffect(() => {
     if (!item || !open) { setComentarios([]); return; }
-    const url = isChamado
-      ? `/api/workspace/chamados/${item.id}/comentarios`
-      : `/api/workspace/tarefas/${item.id}/comentarios`;
-    fetchWithAuth(url)
+    setComentarioInterno(false);
+    if (isChamado) {
+      fetchWithAuth(`/api/tickets/${item.id}/comments`)
+        .then((r) => r.json())
+        .then((data: TicketCommentApi[]) => setComentarios(Array.isArray(data) ? data.map(fromTicketComment) : []))
+        .catch(() => setComentarios([]));
+      return;
+    }
+    fetchWithAuth(`/api/workspace/tarefas/${item.id}/comentarios`)
       .then((r) => r.json())
       .then((data: { comentarios: Comentario[] }) => setComentarios(data.comentarios || []))
       .catch(() => setComentarios([]));
@@ -354,18 +392,28 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
     if (!item || !novoComentario.trim()) return;
     setEnviandoComentario(true);
     try {
-      const url = isChamado
-        ? `/api/workspace/chamados/${item.id}/comentarios`
-        : `/api/workspace/tarefas/${item.id}/comentarios`;
-      const r = await fetchWithAuth(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto: novoComentario.trim() }),
-      });
-      if (!r.ok) throw new Error("Erro ao comentar");
-      const novo: Comentario = await r.json();
+      let novo: Comentario;
+      if (isChamado) {
+        const r = await fetchWithAuth(`/api/tickets/${item.id}/comments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: novoComentario.trim(), isInternal: comentarioInterno }),
+        });
+        if (!r.ok) throw new Error("Erro ao comentar");
+        const criado: TicketCommentApi = await r.json();
+        novo = { ...fromTicketComment(criado), autorNome: currentUser?.name || "Você", autorInitials: initialsOf(currentUser?.name || "Você") };
+      } else {
+        const r = await fetchWithAuth(`/api/workspace/tarefas/${item.id}/comentarios`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texto: novoComentario.trim() }),
+        });
+        if (!r.ok) throw new Error("Erro ao comentar");
+        novo = await r.json();
+      }
       setComentarios((prev) => [...prev, novo]);
       setNovoComentario("");
+      setComentarioInterno(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
       toast({ title: "Erro ao comentar", description: msg, variant: "destructive" });
@@ -1068,6 +1116,11 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                                     {new Date(c.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                                   </span>
                                 )}
+                                {c.interno && (
+                                  <span className="text-[10px] font-medium px-1.5 rounded" style={{ color: "#f59e0b", background: "rgba(245,158,11,0.12)" }}>
+                                    Nota interna
+                                  </span>
+                                )}
                               </div>
                               <RichContent
                                 content={c.texto}
@@ -1105,6 +1158,17 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                         <Send className="h-4 w-4" />
                       </button>
                     </div>
+                    {isChamado && currentUser?.id !== (item as ChamadoItem).solicitanteId && (
+                      <label className="mt-2 flex items-center gap-2 text-xs cursor-pointer select-none" style={{ color: "rgba(255,255,255,0.55)" }}>
+                        <input
+                          type="checkbox"
+                          checked={comentarioInterno}
+                          onChange={(e) => setComentarioInterno(e.target.checked)}
+                          data-testid="item-detail-comentario-interno"
+                        />
+                        Nota interna (não vai para o solicitante)
+                      </label>
+                    )}
                     {isChamado && (
                       <div className="mt-2">
                         <CannedResponsePicker

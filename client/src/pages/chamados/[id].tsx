@@ -158,6 +158,8 @@ export default function TicketDetailPage() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
   const [comment, setComment] = useState("");
+  // Nota interna: só a equipe vê e não gera e-mail para o solicitante.
+  const [commentInternal, setCommentInternal] = useState(false);
   const [commentImages, setCommentImages] = useState<string[]>([]);
   const [editedDescription, setEditedDescription] = useState("");
   const [editedCustomValues, setEditedCustomValues] = useState<CustomFieldValues>({});
@@ -309,7 +311,7 @@ export default function TicketDetailPage() {
   });
 
   const commentMutation = useMutation({
-    mutationFn: async (data: { content: string; images?: string[] }) => {
+    mutationFn: async (data: { content: string; images?: string[]; isInternal?: boolean }) => {
       const res = await apiRequest("POST", `/api/tickets/${id}/comments`, {
         ...data,
         userId: currentUser?.id,
@@ -320,6 +322,7 @@ export default function TicketDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/tickets", id, "comments"] });
       setComment("");
       setCommentImages([]);
+      setCommentInternal(false);
       toast({ title: "Comentário adicionado!" });
     },
     onError: () => {
@@ -360,7 +363,7 @@ export default function TicketDetailPage() {
 
   const handleAddComment = () => {
     if (!comment.trim()) return;
-    commentMutation.mutate({ content: comment, images: commentImages });
+    commentMutation.mutate({ content: comment, images: commentImages, isInternal: commentInternal });
   };
 
   const getInitials = (name: string) => name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
@@ -837,7 +840,7 @@ export default function TicketDetailPage() {
               ) : (
                 comments.map((c) => {
                   return (
-                    <div key={c.id} className="flex gap-3 p-3 bg-muted/30 rounded-lg">
+                    <div key={c.id} className={`flex gap-3 p-3 rounded-lg ${c.isInternal ? "bg-amber-500/10 border border-amber-500/20" : "bg-muted/30"}`}>
                       <Avatar className="h-8 w-8">
                         <AvatarFallback className="text-xs">
                           {getInitials(c.author?.name || "U")}
@@ -849,6 +852,11 @@ export default function TicketDetailPage() {
                           <span className="text-xs text-muted-foreground">
                             {formatDateTime(c.createdAt)}
                           </span>
+                          {c.isInternal && (
+                            <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-600 dark:text-amber-400">
+                              Nota interna
+                            </Badge>
+                          )}
                         </div>
                         <div className="prose prose-sm dark:prose-invert">
                           <RichContent content={c.content} />
@@ -883,6 +891,17 @@ export default function TicketDetailPage() {
                   )}
                   Enviar Comentário
                 </Button>
+                {currentUser?.id !== ticket.requesterId && (
+                  <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={commentInternal}
+                      onChange={(e) => setCommentInternal(e.target.checked)}
+                      data-testid="chamado-comentario-interno"
+                    />
+                    Nota interna (não vai para o solicitante)
+                  </label>
+                )}
                 <CannedResponsePicker
                   size="default"
                   groupKey={ticket.category}
