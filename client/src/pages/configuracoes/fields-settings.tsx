@@ -226,8 +226,11 @@ function SlaManager() {
   const { toast } = useToast();
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [newRule, setNewRule] = useState({ tipo: "", prioridade: "", slaHoras: "" });
-  const [editRule, setEditRule] = useState({ tipo: "", prioridade: "", slaHoras: "" });
+  const emptyRule = { tipo: "", prioridade: "", slaHoras: "", primeiraRespostaHoras: "" };
+  const [newRule, setNewRule] = useState(emptyRule);
+  const [editRule, setEditRule] = useState(emptyRule);
+  // Meta de 1ª resposta é opcional: campo vazio grava NULL.
+  const toPayload = (rule: typeof emptyRule) => ({ ...rule, primeiraRespostaHoras: rule.primeiraRespostaHoras || null });
 
   const { data: slaRules = [], isLoading } = useQuery<SlaRule[]>({
     queryKey: ["/api/slas"],
@@ -254,13 +257,13 @@ function SlaManager() {
   ];
 
   const createMutation = useMutation({
-    mutationFn: async (data: { tipo: string; prioridade: string; slaHoras: string }) => {
-      return apiRequest("POST", "/api/slas", data);
+    mutationFn: async (data: typeof emptyRule) => {
+      return apiRequest("POST", "/api/slas", toPayload(data));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/slas"] });
       toast({ title: "Regra de SLA criada com sucesso!" });
-      setNewRule({ tipo: "", prioridade: "", slaHoras: "" });
+      setNewRule(emptyRule);
       setIsAdding(false);
     },
     onError: (error: any) => {
@@ -270,8 +273,8 @@ function SlaManager() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { tipo: string; prioridade: string; slaHoras: string } }) => {
-      return apiRequest("PUT", `/api/slas/${id}`, data);
+    mutationFn: async ({ id, data }: { id: string; data: typeof emptyRule }) => {
+      return apiRequest("PUT", `/api/slas/${id}`, toPayload(data));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/slas"] });
@@ -315,7 +318,8 @@ function SlaManager() {
     setEditRule({ 
       tipo: rule.tipo, 
       prioridade: rule.prioridade, 
-      slaHoras: rule.slaHoras?.toString() || "" 
+      slaHoras: rule.slaHoras?.toString() || "",
+      primeiraRespostaHoras: rule.primeiraRespostaHoras?.toString() || "",
     });
   };
 
@@ -327,7 +331,7 @@ function SlaManager() {
           <CardTitle className="text-lg">Regras de SLA</CardTitle>
         </div>
         <CardDescription>
-          Configure o tempo máximo (em horas) para resolução de chamados por tipo e prioridade
+          Configure, em horas úteis, os prazos de primeira resposta (opcional) e de resolução por tipo e gravidade. O prazo de resolução fica parado enquanto o chamado aguarda o solicitante.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -366,11 +370,20 @@ function SlaManager() {
 
             <Input
               type="number"
-              placeholder="SLA (horas)"
+              placeholder="Resolução (h)"
               value={newRule.slaHoras}
               onChange={(e) => setNewRule({ ...newRule, slaHoras: e.target.value })}
               className="w-[120px]"
               data-testid="input-new-sla-horas"
+            />
+
+            <Input
+              type="number"
+              placeholder="1ª resposta (h)"
+              value={newRule.primeiraRespostaHoras}
+              onChange={(e) => setNewRule({ ...newRule, primeiraRespostaHoras: e.target.value })}
+              className="w-[140px]"
+              data-testid="input-new-sla-primeira-resposta"
             />
 
             <Button onClick={handleAdd} disabled={createMutation.isPending} data-testid="button-save-new-sla">
@@ -430,6 +443,15 @@ function SlaManager() {
                       data-testid={`input-edit-sla-horas-${rule.id}`}
                     />
 
+                    <Input
+                      type="number"
+                      placeholder="1ª resposta (h)"
+                      value={editRule.primeiraRespostaHoras}
+                      onChange={(e) => setEditRule({ ...editRule, primeiraRespostaHoras: e.target.value })}
+                      className="w-[140px]"
+                      data-testid={`input-edit-sla-primeira-resposta-${rule.id}`}
+                    />
+
                     <Button size="icon" variant="ghost" onClick={handleUpdate} data-testid={`button-save-edit-sla-${rule.id}`}>
                       <Save className="h-4 w-4 text-green-600" />
                     </Button>
@@ -446,6 +468,9 @@ function SlaManager() {
                       {priorityLabels[rule.prioridade] || rule.prioridade}
                     </Badge>
                     <span className="font-semibold text-primary">{rule.slaHoras}h</span>
+                    {rule.primeiraRespostaHoras && (
+                      <span className="text-sm text-muted-foreground">1ª resposta em {rule.primeiraRespostaHoras}h</span>
+                    )}
                     <div className="flex-1" />
                     <Button 
                       size="icon" 
