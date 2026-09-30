@@ -53,8 +53,6 @@ import { Label } from "@/components/ui/label";
 
 const MODULES = [
   { key: "chamados", label: "Chamados" },
-  { key: "configuracoes", label: "Configurações" },
-  { key: "campos_chamado", label: "Gerenciar campos dos chamados" },
 ] as const;
 
 const PERFIS_ACESSO = [
