@@ -213,6 +213,42 @@ export const ticketCustomFields = pgTable("ticket_custom_fields", {
 export type TicketCustomField = typeof ticketCustomFields.$inferSelect;
 export type InsertTicketCustomField = typeof ticketCustomFields.$inferInsert;
 
+// ============== RESPOSTAS PRONTAS / AUTOMAÇÕES (migration 0028) ==============
+export const cannedResponses = pgTable("canned_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  groupKey: text("group_key"), // null = todos os grupos
+  active: boolean("active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type CannedResponse = typeof cannedResponses.$inferSelect;
+export type InsertCannedResponse = typeof cannedResponses.$inferInsert;
+
+// Regras em shared/automations.ts.
+export const automationRules = pgTable("automation_rules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  name: text("name").notNull(),
+  active: boolean("active").notNull().default(true),
+  trigger: text("trigger").notNull(), // ticket_created, status_changed, waiting_requester_timeout
+  conditions: jsonb("conditions").notNull().default({}),
+  actions: jsonb("actions").notNull().default([]),
+  timeoutDays: integer("timeout_days"), // só para waiting_requester_timeout (dias corridos)
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type AutomationRule = typeof automationRules.$inferSelect;
+export type InsertAutomationRule = typeof automationRules.$inferInsert;
+
 // ============== TICKET COMMENTS ==============
 export const ticketComments = pgTable("ticket_comments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
