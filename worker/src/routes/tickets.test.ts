@@ -94,3 +94,65 @@ describe("Worker POST /api/tickets/:id/comments", () => {
     expect(storage.createNotification.mock.calls.map((call) => call[0].userId)).not.toContain("req-1");
   });
 });
+
+describe("Worker primeira resposta", () => {
+  const post = (userId: string, role = "user") =>
+    buildApp(userId, role).request("/api/tickets/t1/comments", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "resposta" }),
+    });
+
+  it("comentário do solicitante não conta como primeira resposta", async () => {
+    await post("req-1");
+    expect(storage.updateTicket).not.toHaveBeenCalled();
+  });
+
+  it("comentário público de admin que não é o responsável conta como primeira resposta", async () => {
+    await post("admin-1", "admin");
+    expect(storage.updateTicket).toHaveBeenCalledWith("t1", { dataPrimeiraResposta: expect.any(Date) });
+  });
+
+  it("não sobrescreve uma primeira resposta já registrada", async () => {
+    storage.getTicket.mockResolvedValue({ ...TICKET, dataPrimeiraResposta: new Date("2026-09-29T13:00:00Z") });
+    await post("tech-1");
+    expect(storage.updateTicket).not.toHaveBeenCalled();
+  });
+});
+
+describe("Worker PATCH /api/tickets/:id — pausa do SLA", () => {
+  const patch = (body: unknown) =>
+    buildApp("tech-1").request("/api/tickets/t1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("entrar em Aguardando solicitante inicia a pausa", async () => {
+    storage.getTicket.mockResolvedValue({ ...TICKET, status: "in_progress", slaPausadoEm: null, slaPausaMinutos: 0 });
+    const res = await patch({ status: "waiting_requester" });
+    expect(res.status).toBe(200);
+    expect(storage.updateTicket).toHaveBeenCalledWith("t1", expect.objectContaining({
+      status: "waiting_requester",
+      slaPausadoEm: expect.any(Date),
+    }));
+  });
+
+  it("sair de Aguardando solicitante encerra a pausa e acumula os minutos", async () => {
+    storage.getTicket.mockResolvedValue({
+      ...TICKET, status: "waiting_requester", slaPausadoEm: new Date(Date.now() - 60_000), slaPausaMinutos: 45,
+    });
+    await patch({ status: "in_progress" });
+    const data = storage.updateTicket.mock.calls[0][1];
+    expect(data.slaPausadoEm).toBeNull();
+    expect(data.slaPausaMinutos).toBeGreaterThanOrEqual(45);
+  });
+
+  it("mudança entre status comuns não mexe na pausa", async () => {
+    storage.getTicket.mockResolvedValue({ ...TICKET, status: "open", slaPausadoEm: null, slaPausaMinutos: 0 });
+    await patch({ status: "in_progress" });
+    const data = storage.updateTicket.mock.calls[0][1];
+    expect(data).not.toHaveProperty("slaPausadoEm");
+    expect(data).not.toHaveProperty("slaPausaMinutos");
+  });
+});
