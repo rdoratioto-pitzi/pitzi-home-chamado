@@ -32,6 +32,7 @@ import { registerServiceAccountRoutes } from "./service-accounts";
 import { registerHermesRoutes } from "./hermes";
 import { registerTicketFieldRoutes } from "./ticket-fields";
 import { registerAutomationRoutes } from "./automations";
+import { registerKnowledgeArticleRoutes } from "./knowledge-base";
 import { registerEmailSettingsRoutes } from "./email-settings";
 
 export function registerModularRoutes(app: Router) {
@@ -70,6 +71,7 @@ export function registerModularRoutes(app: Router) {
   registerHermesRoutes(router);
   registerTicketFieldRoutes(router);
   registerAutomationRoutes(router);
+  registerKnowledgeArticleRoutes(router);
   registerEmailSettingsRoutes(router);
 
   app.use(router);
