@@ -9,6 +9,7 @@ vi.mock("./mailer", () => ({
   loadEmailSettings: vi.fn(async () => settings),
   queueEmails: vi.fn(async (_ctx: unknown, rows: any[]) => { queued.push(...rows); return rows; }),
   sendDirect: vi.fn(),
+  keepAlive: (ctx: any, p: Promise<unknown>) => { ctx.waitUntil?.(p.catch(() => undefined)); return p; },
 }));
 
 const email = await import("./email");
@@ -34,6 +35,15 @@ beforeEach(() => {
 });
 
 describe("e-mails de chamado", () => {
+  it("registra waitUntil na hora da chamada, para a fila não se perder quando a resposta sai", async () => {
+    const waitUntil = vi.fn();
+    // Sem await, como as rotas fazem: o waitUntil tem de ser registrado de imediato.
+    const pending = email.sendTicketCreatedEmail({ ...ctx, waitUntil }, storage, ticket, requester, assignee);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    await pending;
+    expect(queued).toHaveLength(1);
+  });
+
   it("abertura vai para o solicitante, com assunto [código] e thread do chamado", async () => {
     await email.sendTicketCreatedEmail(ctx, storage, ticket, requester, assignee);
     expect(queued).toHaveLength(1);
