@@ -28,6 +28,9 @@ export interface ChamadoItem {
   prioridade: string;
   sla: number | null;
   statusSla: "dentro_prazo" | "em_atraso" | null;
+  /** Relógio de resolução parado (aguardando o solicitante). */
+  slaPausado?: boolean;
+  statusPrimeiraResposta?: "dentro_prazo" | "em_atraso" | null;
   abertura: string | null;
   solicitante: string | null;
   applicationKey: string | null;
@@ -54,6 +57,9 @@ export interface UnifiedItem {
   prioridade: string;
   sla: number | null;
   statusSla: "dentro_prazo" | "em_atraso" | null;
+  /** Relógio de resolução parado (aguardando o solicitante). */
+  slaPausado?: boolean;
+  statusPrimeiraResposta?: "dentro_prazo" | "em_atraso" | null;
   criadoEm: string | null;
   descricao?: string | null;
   progresso?: number | null;
@@ -596,7 +602,7 @@ function ChamadoItemRow({ item, colTemplate, onRowClick, onDelete, onClaim, onTr
       <span className="ws-col-sla text-xs text-muted-foreground">
         {item.sla ? `${item.sla}h` : "—"}
       </span>
-      <SlaStatusCell statusSla={item.statusSla} className="ws-col-sla" />
+      <SlaStatusCell statusSla={item.statusSla} pausado={item.slaPausado} primeiraResposta={item.statusPrimeiraResposta} className="ws-col-sla" />
       <ActionsMenu
         onEdit={() => { window.location.href = `/chamados/${item.id}`; }}
         onDelete={onDelete ? () => onDelete(item) : undefined}
@@ -711,7 +717,7 @@ function UnifiedItemRow({ item, colTemplate, onRowClick, onStatusChange, onPrior
       <span className="ws-col-sla text-xs text-muted-foreground">
         {item.sla ? `${item.sla}h` : "—"}
       </span>
-      <SlaStatusCell statusSla={item.statusSla} className="ws-col-sla" />
+      <SlaStatusCell statusSla={item.statusSla} pausado={item.slaPausado} primeiraResposta={item.statusPrimeiraResposta} className="ws-col-sla" />
       <ActionsMenu />
     </div>
 
@@ -742,20 +748,31 @@ function ResponsavelCell({ initials, name }: { initials: string; name: string })
   );
 }
 
-function SlaStatusCell({ statusSla, className }: { statusSla: "dentro_prazo" | "em_atraso" | null; className?: string }) {
+function SlaStatusCell({ statusSla, pausado, primeiraResposta, className }: {
+  statusSla: "dentro_prazo" | "em_atraso" | null;
+  pausado?: boolean;
+  primeiraResposta?: "dentro_prazo" | "em_atraso" | null;
+  className?: string;
+}) {
+  const isPaused = pausado && statusSla === "dentro_prazo";
   return (
     <span
-      className={`text-xs font-medium${className ? ` ${className}` : ""}`}
+      className={`text-xs font-medium flex flex-col leading-tight${className ? ` ${className}` : ""}`}
       style={{
-        color:
-          statusSla === "dentro_prazo"
+        color: isPaused
+          ? "var(--l4)"
+          : statusSla === "dentro_prazo"
             ? "#5B62EC"
             : statusSla === "em_atraso"
               ? "#ff5050"
               : "var(--l4)",
       }}
+      title={isPaused ? "Relógio parado enquanto aguarda o solicitante" : undefined}
     >
-      {statusSla === "dentro_prazo" ? "No Prazo" : statusSla === "em_atraso" ? "Em Atraso" : "—"}
+      <span>{isPaused ? "Pausado" : statusSla === "dentro_prazo" ? "No Prazo" : statusSla === "em_atraso" ? "Em Atraso" : "—"}</span>
+      {primeiraResposta === "em_atraso" && (
+        <span className="text-[10px]" style={{ color: "#ff5050" }}>1ª resp. atrasada</span>
+      )}
     </span>
   );
 }
