@@ -22,6 +22,7 @@ import {
   sendCSATReceivedEmail,
 } from "../lib/email";
 import { ticketStatusLabel } from "../../../shared/ticket-options";
+import { mailContext } from "../lib/mailer";
 import { slaPauseUpdate } from "../../../shared/sla";
 import { normalizeRequestSelection } from "../../../shared/request-objects";
 import { checkRequestSelection, resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
@@ -246,12 +247,12 @@ tickets.post("/api/tickets", async (c) => {
 
   // Emails (fire-and-forget)
   if (requester) {
-    sendTicketCreatedEmail(env, storage, ticket, requester, assignee || null).catch(
+    sendTicketCreatedEmail(mailContext(c), storage, ticket, requester, assignee || null).catch(
       console.error
     );
   }
   if (assignee && assignee.id !== ticket.requesterId) {
-    sendTicketAssignedEmail(env, storage, ticket, assignee).catch(console.error);
+    sendTicketAssignedEmail(mailContext(c), storage, ticket, assignee).catch(console.error);
   }
 
   // Notification
@@ -395,7 +396,7 @@ tickets.patch("/api/tickets/:id", async (c) => {
     const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
     if (requester) {
       sendTicketStatusChangedEmail(
-        env, storage, ticket, oldTicket.status, body.status, requester, assignee || null
+        mailContext(c), storage, ticket, oldTicket.status, body.status, requester, assignee || null
       ).catch(console.error);
     }
     if (ticket.requesterId) {
@@ -414,7 +415,7 @@ tickets.patch("/api/tickets/:id", async (c) => {
   if (body.assigneeId && body.assigneeId !== oldTicket.assigneeId) {
     const assignee = await storage.getUser(body.assigneeId);
     if (assignee) {
-      sendTicketAssignedEmail(env, storage, ticket, assignee).catch(console.error);
+      sendTicketAssignedEmail(mailContext(c), storage, ticket, assignee).catch(console.error);
     }
     storage.createNotification({
       userId: body.assigneeId,
@@ -513,7 +514,7 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
 
   // Comment email
   if (commenter && requester) {
-    sendTicketCommentEmail(env, storage, ticket, comment, commenter, requester, assignee || null).catch(
+    sendTicketCommentEmail(mailContext(c), storage, ticket, comment, commenter, requester, assignee || null).catch(
       console.error
     );
   }
@@ -565,7 +566,7 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
         !(isInternal && mentionedUser.id === ticket.requesterId && mentionedUser.id !== ticket.assigneeId)
       ) {
         sendMentionNotificationEmail(
-          env, storage, mentionedUser, commenter.name, ticket.title, ticket.id, validated.content
+          mailContext(c), storage, mentionedUser, commenter.name, ticket.title, ticket.id, validated.content, ticket
         ).catch(console.error);
         storage.createNotification({
           userId: mentionedUser.id,
@@ -718,7 +719,7 @@ tickets.patch("/api/tickets/:id/satisfaction", async (c) => {
   if (updatedTicket.assigneeId) {
     const assignee = await storage.getUser(updatedTicket.assigneeId);
     if (assignee) {
-      sendCSATReceivedEmail(env, storage, updatedTicket, rating, comment || null, assignee).catch(
+      sendCSATReceivedEmail(mailContext(c), storage, updatedTicket, rating, comment || null, assignee).catch(
         console.error
       );
     }
