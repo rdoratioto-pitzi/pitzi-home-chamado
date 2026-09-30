@@ -31,7 +31,7 @@ import { OPEN_TICKET_STATUSES } from "../../../shared/ticket-options";
 import { getSlaForTicket, slaPauseUpdate } from "../../../shared/sla";
 import { resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
 import { isInQueue } from "../../../shared/ticket-queue";
-import { getQueueViewer } from "../../../server/services/ticket-queue.service";
+import { canViewTicket, getQueueViewer } from "../../../server/services/ticket-queue.service";
 
 /** Extrai env Slack do binding do Worker. */
 function slackEnv(envBindings: {
@@ -1561,6 +1561,11 @@ workspace.get("/api/workspace/chamados/:id/comentarios", async (c) => {
     const { id } = c.req.param() as { id: string };
     const db = c.get("db");
     const storage = getStorage(db);
+    const { userId, role, tenantId } = c.get("user");
+    const actor = { userId, isAdmin: role === "admin", tenantId: tenantId ?? null };
+    if (!(await canViewTicket(storage, actor, await storage.getTicket(String(id))))) {
+      return c.json({ error: "Chamado não encontrado" }, 404);
+    }
 
     const comentarios = await db
       .select()
@@ -1595,9 +1600,13 @@ workspace.get("/api/workspace/chamados/:id/comentarios", async (c) => {
 workspace.post("/api/workspace/chamados/:id/comentarios", async (c) => {
   try {
     const { id } = c.req.param() as { id: string };
-    const { userId } = c.get("user");
+    const { userId, role, tenantId } = c.get("user");
     const db = c.get("db");
     const storage = getStorage(db);
+    const actor = { userId, isAdmin: role === "admin", tenantId: tenantId ?? null };
+    if (!(await canViewTicket(storage, actor, await storage.getTicket(String(id))))) {
+      return c.json({ error: "Chamado não encontrado" }, 404);
+    }
     const { texto } = await c.req.json();
 
     if (!texto?.trim()) {
