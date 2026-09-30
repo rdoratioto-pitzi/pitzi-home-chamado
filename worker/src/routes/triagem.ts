@@ -4,17 +4,17 @@
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../index";
+import { rsApiToken } from "../lib/rs-token";
 
 // ─── Pipeline helpers (duplicado do server para isolamento do worker) ─────────
 
 const PIPELINE_RS_BASE = "https://dash.pitzi.com.br/api";
-const PIPELINE_RS_TOKEN = "Renov123";
 
 async function fetchPipelineApi(path: string, params: Record<string, string> = {}): Promise<any[]> {
   const qs = new URLSearchParams(params).toString();
   const url = `${PIPELINE_RS_BASE}${path}${qs ? "?" + qs : ""}`;
   const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${PIPELINE_RS_TOKEN}`, "Content-Type": "application/json" },
+    headers: { Authorization: `Bearer ${rsApiToken()}`, "Content-Type": "application/json" },
   });
   if (!response.ok) throw new Error(`API ${path} error: ${response.status}`);
   const data = await response.json() as any;
@@ -108,7 +108,7 @@ triagem.get("/api/triagem/consulta", async (c) => {
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${PIPELINE_RS_TOKEN}`,
+        Authorization: `Bearer ${rsApiToken()}`,
         "Content-Type": "application/json",
       },
     });
