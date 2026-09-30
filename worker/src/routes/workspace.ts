@@ -29,6 +29,8 @@ import {
 import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 import { OPEN_TICKET_STATUSES } from "../../../shared/ticket-options";
 import { getSlaForTicket } from "../../../shared/sla";
+import { isInQueue } from "../../../shared/ticket-queue";
+import { getQueueViewer } from "../../../server/services/ticket-queue.service";
 
 /** Extrai env Slack do binding do Worker. */
 function slackEnv(envBindings: {
@@ -189,9 +191,16 @@ workspace.get("/api/workspace/chamados", async (c) => {
     const periodo = c.req.query("periodo") || "este-ano";
     const storage = getStorage(c.get("db"));
 
-    const allTickets: Ticket[] = isAdmin
-      ? await storage.getTickets({ tenantId })
-      : await storage.getTickets({ requesterId: userId, assigneeId: userId, tenantId });
+    // escopo=fila: chamados em aberto dos grupos do usuário (shared/ticket-queue.ts).
+    let allTickets: Ticket[];
+    if (c.req.query("escopo") === "fila") {
+      const viewer = await getQueueViewer(storage, { userId, isAdmin, tenantId: tenantId ?? null });
+      allTickets = (await storage.getTickets({ tenantId })).filter((t) => isInQueue(viewer, t));
+    } else {
+      allTickets = isAdmin
+        ? await storage.getTickets({ tenantId })
+        : await storage.getTickets({ requesterId: userId, assigneeId: userId, tenantId });
+    }
 
     const allUsers = await storage.getUsers();
     const slaRules: SlaRule[] = await storage.getSlaRules();
@@ -287,6 +296,7 @@ workspace.get("/api/workspace/chamados", async (c) => {
         requestObject: t.requestObject ?? null,
         requestAction: t.requestAction ?? null,
         requestDetail: t.requestDetail ?? null,
+        responsavelId: t.assigneeId ?? null,
       };
     });
 
@@ -998,6 +1008,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
       statusSla: sla.status,
       abertura: (ticket.dataAbertura || ticket.createdAt || "").toString(),
       solicitante: requester?.name || null,
+      responsavelId: ticket.assigneeId ?? null,
     });
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
