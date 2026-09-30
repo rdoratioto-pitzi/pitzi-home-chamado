@@ -137,6 +137,7 @@ app.use(
 app.use(express.urlencoded({ limit: "50mb", extended: false }));
 
 import { sanitizeRichText } from "./lib/sanitize-rich-text";
+import { rsApiToken } from "./lib/rs-token";
 
 const RICH_TEXT_FIELDS = ["descricao", "description", "content", "comentario", "message", "texto"] as const;
 
@@ -267,7 +268,7 @@ app.post("/api/estoques/dashboard/gerar-estoque", async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: "Bearer Renov123",
+        Authorization: `Bearer ${rsApiToken()}`,
       },
       body: JSON.stringify({ imeis }),
     });

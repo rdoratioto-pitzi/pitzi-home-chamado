@@ -77,6 +77,8 @@ type Bindings = {
   SENDPULSE_FROM_NAME: string;
   VENUS_API_KEY: string;
   DEV_TOOLS_TOKEN: string;
+  // Token das APIs em dash.pitzi.com.br (estoque, triagem, logística, avaliações).
+  RENOVSMART_API_TOKEN?: string;
   APP_VERSION: string;
   // Hermes (Fase 2 — webhook outbound). Opcionais — service desabilita
   // silenciosamente se ausentes.
@@ -109,6 +111,7 @@ export type AppEnv = {
 };
 
 import { activeRoutesMiddleware } from "./middleware/active-routes";
+import { configureRsApiToken } from "./lib/rs-token";
 
 const app = new Hono<AppEnv>();
 
@@ -123,6 +126,7 @@ app.use("*", activeRoutesMiddleware);
 app.use("*", async (c, next) => {
   const db = createDb(c.env.DATABASE_URL);
   c.set("db", db);
+  configureRsApiToken(c.env.RENOVSMART_API_TOKEN);
   await next();
 });
 
