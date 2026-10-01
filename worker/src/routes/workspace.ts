@@ -27,6 +27,7 @@ import {
   type SlackDb,
 } from "../../../server/services/slack-notifier.service";
 import { fireFor as fireHermes } from "../services/hermes-trigger.service";
+import { REQUESTER_FORBIDDEN_CHANGE_ERROR } from "../../../shared/requester-view";
 import { sendTicketAssignedEmail, sendTicketStatusChangedEmail } from "../lib/email";
 import { mailContext } from "../lib/mailer";
 import { OPEN_TICKET_STATUSES } from "../../../shared/ticket-options";
@@ -968,6 +969,14 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
     }
     if (role !== "admin" && previous.requesterId !== actorId && previous.assigneeId !== actorId) {
       return c.json({ error: "Acesso negado" }, 403);
+    }
+    // Solicitante que não é técnico só ajusta título e descrição.
+    if (
+      role !== "admin" &&
+      [status, prioridade, responsavelId, applicationKey].some((v) => v !== undefined) &&
+      !(await isTechnicianUserId(storage, actorId))
+    ) {
+      return c.json({ error: REQUESTER_FORBIDDEN_CHANGE_ERROR }, 403);
     }
 
     const updateData: Partial<Ticket> = {};

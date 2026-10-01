@@ -26,6 +26,7 @@ import { runTicketAutomations } from "../services/automations.service";
 import { claimTicket, isTicketGroupMember, transferTicket } from "../services/ticket-queue.service";
 import { isTechnicianUserId } from "../services/user-type.service";
 import { TECHNICIAN_REQUIRED_ERROR } from "@shared/user-type";
+import { REQUESTER_EDITABLE_TICKET_FIELDS } from "@shared/requester-view";
 
 export function registerTicketRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
@@ -172,11 +173,14 @@ export function registerTicketRoutes(router: Router) {
         }
       }
 
+      // Solicitante que não é técnico só edita título, descrição e anexos.
       if (!isAdmin) {
-        const allowedFields = [
-          "status", "title", "description", "attachments", "applicationKey", "impact", "dueDate",
-          "requestObject", "requestAction", "requestDetail", "customFields",
-        ];
+        const allowedFields = (await isTechnicianUserId(storage, userId))
+          ? [
+              "status", "title", "description", "attachments", "applicationKey", "impact", "dueDate",
+              "requestObject", "requestAction", "requestDetail", "customFields",
+            ]
+          : [...REQUESTER_EDITABLE_TICKET_FIELDS];
         const filteredData: any = {};
         allowedFields.forEach(field => {
           if (updateData[field] !== undefined) {
@@ -209,25 +213,25 @@ export function registerTicketRoutes(router: Router) {
         return res.status(400).json({ error: TECHNICIAN_REQUIRED_ERROR });
       }
 
-      if (req.body.status && req.body.status !== oldTicket.status) {
+      if (updateData.status && updateData.status !== oldTicket.status) {
         // Validar que o ticket tem responsável antes de mudar para resolved, closed ou blocked
-        const finalAssigneeId = req.body.assigneeId || oldTicket.assigneeId;
-        if (!finalAssigneeId && ["resolved", "closed", "blocked"].includes(req.body.status)) {
+        const finalAssigneeId = updateData.assigneeId || oldTicket.assigneeId;
+        if (!finalAssigneeId && ["resolved", "closed", "blocked"].includes(updateData.status)) {
           return res.status(400).json({
             error: "Não é possível alterar o status para '" +
-              (req.body.status === "resolved" ? "Resolvido" : req.body.status === "closed" ? "Fechado" : "Bloqueado") +
+              (updateData.status === "resolved" ? "Resolvido" : updateData.status === "closed" ? "Fechado" : "Bloqueado") +
               "' sem um responsável atribuído ao chamado."
           });
         }
         
-        if (req.body.status === "resolved" && !oldTicket.dataResolucao) {
+        if (updateData.status === "resolved" && !oldTicket.dataResolucao) {
           updateData.dataResolucao = new Date();
         }
-        if (req.body.status === "closed" && !oldTicket.dataFechamento) {
+        if (updateData.status === "closed" && !oldTicket.dataFechamento) {
           updateData.dataFechamento = new Date();
         }
         // "Aguardando solicitante" para o relógio de resolução do SLA.
-        Object.assign(updateData, slaPauseUpdate(oldTicket, req.body.status));
+        Object.assign(updateData, slaPauseUpdate(oldTicket, updateData.status));
       }
 
       if (updateData.descriptionLastEditedAt) {
@@ -236,19 +240,19 @@ export function registerTicketRoutes(router: Router) {
 
       const saved = await storage.updateTicket(getId(req), updateData);
       if (!saved) return res.status(404).json({ error: "Ticket not found" });
-      const ticket = req.body.status && req.body.status !== oldTicket.status
+      const ticket = updateData.status && updateData.status !== oldTicket.status
         ? await runTicketAutomations(storage, "status_changed", saved, {
-            actorId: getSessionUser(req).userId, newStatus: req.body.status,
+            actorId: getSessionUser(req).userId, newStatus: updateData.status,
           })
         : saved;
 
-      if (req.body.status && req.body.status !== oldTicket.status) {
+      if (updateData.status && updateData.status !== oldTicket.status) {
         const requester = await storage.getUser(ticket.requesterId);
         const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
         if (requester) {
-          sendTicketStatusChangedEmail(ticket, oldTicket.status, req.body.status, requester, assignee || null).catch(console.error);
+          sendTicketStatusChangedEmail(ticket, oldTicket.status, updateData.status, requester, assignee || null).catch(console.error);
         }
-        const statusLabel = ticketStatusLabel(req.body.status);
+        const statusLabel = ticketStatusLabel(updateData.status);
         if (ticket.requesterId) {
           storage.createNotification({
             userId: ticket.requesterId,
@@ -261,13 +265,13 @@ export function registerTicketRoutes(router: Router) {
         }
       }
 
-      if (req.body.assigneeId && req.body.assigneeId !== oldTicket.assigneeId) {
-        const assignee = await storage.getUser(req.body.assigneeId);
+      if (updateData.assigneeId && updateData.assigneeId !== oldTicket.assigneeId) {
+        const assignee = await storage.getUser(updateData.assigneeId);
         if (assignee) {
           sendTicketAssignedEmail(ticket, assignee).catch(console.error);
         }
         storage.createNotification({
-          userId: req.body.assigneeId,
+          userId: updateData.assigneeId,
           title: "Chamado atribuído a você",
           message: `O chamado "${ticket.title}" (${ticket.code || ''}) foi atribuído a você`,
           module: "chamados",

@@ -13,6 +13,8 @@ import { WorkspaceErrorBoundary } from "@/components/workspace/WorkspaceErrorBou
 
 const AppSidebar    = lazy(() => import("@/components/app-sidebar").then(m => ({ default: m.AppSidebar })));
 const ProtectedRoute = lazy(() => import("@/components/protected-route").then(m => ({ default: m.ProtectedRoute })));
+const ByUserType = lazy(() => import("@/components/user-type-route").then(m => ({ default: m.ByUserType })));
+const TechnicianOnly = lazy(() => import("@/components/user-type-route").then(m => ({ default: m.TechnicianOnly })));
 
 const LoginPage = lazy(() => import("@/pages/login"));
 const HomePage = lazy(() => import("@/pages/home"));
@@ -20,6 +22,9 @@ const RedefinirSenhaPage = lazy(() => import("@/pages/redefinir-senha"));
 const ChamadosPage = lazy(() => import("@/pages/workspace/WorkspacePage"));
 const NovoChamadoPage = lazy(() => import("@/pages/chamados/novo"));
 const TicketDetailPage = lazy(() => import("@/pages/chamados/[id]"));
+// Versão simplificada para o solicitante ("Usuário", quem não é técnico).
+const MeusChamadosPage = lazy(() => import("@/pages/chamados/meus-chamados"));
+const RequesterTicketPage = lazy(() => import("@/pages/chamados/requester-ticket"));
 const CSATAnalytics = lazy(() => import("@/pages/chamados/csat-analytics"));
 const ConfiguracoesPage = lazy(() => import("@/pages/configuracoes/index"));
 const MarkdownPage = lazy(() => import("@/pages/markdown"));
@@ -33,34 +38,40 @@ function Router() {
       <Route path="/login"><LoginPage /></Route>
       <Route path="/redefinir-senha"><RedefinirSenhaPage /></Route>
       <Route path="/">
-        <ProtectedRoute><HomePage /></ProtectedRoute>
+        <ProtectedRoute><ByUserType technician={<HomePage />} requester={<Redirect to="/chamados" />} /></ProtectedRoute>
       </Route>
       <Route path="/chamados">
         <ProtectedRoute>
-          <WorkspaceErrorBoundary><ChamadosPage /></WorkspaceErrorBoundary>
+          <ByUserType
+            technician={<WorkspaceErrorBoundary><ChamadosPage /></WorkspaceErrorBoundary>}
+            requester={<MeusChamadosPage />}
+          />
         </ProtectedRoute>
       </Route>
       <Route path="/chamados/novo">
         <ProtectedRoute requiredPermission="chamados"><NovoChamadoPage /></ProtectedRoute>
       </Route>
       <Route path="/chamados/csat-analytics">
-        <ProtectedRoute requiredPermission="chamados"><CSATAnalytics /></ProtectedRoute>
+        <ProtectedRoute requiredPermission="chamados"><TechnicianOnly><CSATAnalytics /></TechnicianOnly></ProtectedRoute>
       </Route>
       <Route path="/chamados/:id">
-        <ProtectedRoute requiredPermission="chamados"><TicketDetailPage /></ProtectedRoute>
+        <ProtectedRoute requiredPermission="chamados">
+          <ByUserType technician={<TicketDetailPage />} requester={<RequesterTicketPage />} />
+        </ProtectedRoute>
       </Route>
       <Route path="/markdown">
-        <ProtectedRoute><MarkdownPage /></ProtectedRoute>
+        <ProtectedRoute><TechnicianOnly><MarkdownPage /></TechnicianOnly></ProtectedRoute>
       </Route>
-      {/* Base de Conhecimento: todo usuário ativo lê; criar e editar é validado na API. */}
+      {/* Base de Conhecimento: só para a equipe nas telas (o Usuário vai para os seus chamados);
+          criar e editar é validado na API. */}
       <Route path="/conhecimento">
-        <ProtectedRoute><ConhecimentoPage /></ProtectedRoute>
+        <ProtectedRoute><TechnicianOnly><ConhecimentoPage /></TechnicianOnly></ProtectedRoute>
       </Route>
       <Route path="/conhecimento/novo">
-        <ProtectedRoute><NovoArtigoPage /></ProtectedRoute>
+        <ProtectedRoute><TechnicianOnly><NovoArtigoPage /></TechnicianOnly></ProtectedRoute>
       </Route>
       <Route path="/conhecimento/:id">
-        <ProtectedRoute><ArtigoPage /></ProtectedRoute>
+        <ProtectedRoute><TechnicianOnly><ArtigoPage /></TechnicianOnly></ProtectedRoute>
       </Route>
       <Route path="/configuracoes">
         <ProtectedRoute requiredPermission="configuracoes"><ConfiguracoesPage /></ProtectedRoute>
