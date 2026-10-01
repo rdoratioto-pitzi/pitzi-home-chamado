@@ -5,6 +5,8 @@ import type { Ticket, User } from "../../shared/schema";
 import { sameTenant } from "../../shared/tenant";
 import { claimDenial, isGroupMember, transferDenial, type QueueViewer } from "../../shared/ticket-queue";
 import type { IStorage } from "../storage";
+import { TECHNICIAN_REQUIRED_ERROR } from "../../shared/user-type";
+import { isTechnicianUserId } from "./user-type.service";
 
 export interface QueueActor {
   userId: string;
@@ -74,6 +76,9 @@ export async function claimTicket(storage: IStorage, actor: QueueActor, id: stri
   const viewer = await getQueueViewer(storage, actor);
   const denial = claimDenial(viewer, ticket);
   if (denial) return { ok: false, status: 403, error: denial };
+  if (!(await isTechnicianUserId(storage, actor.userId))) {
+    return { ok: false, status: 403, error: "Só técnicos podem assumir chamados" };
+  }
 
   const updated = await storage.updateTicket(ticket.id, { assigneeId: actor.userId });
   if (!updated) return { ok: false, status: 404, error: "Chamado não encontrado" };
@@ -108,6 +113,9 @@ export async function transferTicket(
   if (parsed.data.assigneeId) {
     if (!target.memberIds.includes(parsed.data.assigneeId)) {
       return { ok: false, status: 400, error: "O responsável precisa ser membro do grupo de destino" };
+    }
+    if (parsed.data.assigneeId !== ticket.assigneeId && !(await isTechnicianUserId(storage, parsed.data.assigneeId))) {
+      return { ok: false, status: 400, error: TECHNICIAN_REQUIRED_ERROR };
     }
     assigneeId = parsed.data.assigneeId;
   } else {

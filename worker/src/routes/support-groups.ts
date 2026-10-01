@@ -6,6 +6,7 @@ import type { AppEnv } from "../index";
 import { getStorage } from "../lib/storage";
 import { requireAdmin } from "../middleware/auth";
 import { sameTenant } from "../../../shared/tenant";
+import { canBeAssignee, TECHNICIAN_MEMBER_ERROR } from "../../../shared/user-type";
 
 export const supportGroups = new Hono<AppEnv>();
 
@@ -34,6 +35,10 @@ supportGroups.put("/api/v1/support-groups/:id/members", requireAdmin, async (c) 
     const member = await storage.getUser(userId);
     if (!member || !sameTenant(member.tenantId, tenantId)) {
       return c.json({ error: "Usuário inválido na lista de membros" }, 400);
+    }
+    // Só técnicos entram; quem já era membro continua (mesmo que tenha mudado de tipo).
+    if (!group.memberIds.includes(userId) && !canBeAssignee(member)) {
+      return c.json({ error: TECHNICIAN_MEMBER_ERROR }, 400);
     }
   }
 

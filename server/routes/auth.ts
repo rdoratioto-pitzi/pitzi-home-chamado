@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { isTechnician } from "@shared/user-type";
 import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { storage } from "../storage";
@@ -73,6 +74,7 @@ export function registerAuthRoutes(router: Router) {
           email: user.email,
           modulePermissions: user.modulePermissions,
           isAdmin: user.isAdmin === true,
+          isTechnician: isTechnician(user),
           status: user.status,
         }
       });
@@ -102,6 +104,7 @@ export function registerAuthRoutes(router: Router) {
         email: user.email,
         modulePermissions: user.modulePermissions,
         isAdmin: user.isAdmin === true,
+        isTechnician: isTechnician(user),
         status: user.status,
       },
     });

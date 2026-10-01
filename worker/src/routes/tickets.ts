@@ -28,6 +28,8 @@ import { normalizeRequestSelection } from "../../../shared/request-objects";
 import { checkRequestSelection, resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
 import { runTicketAutomations } from "../../../server/services/automations.service";
 import { isTicketGroupMember } from "../../../server/services/ticket-queue.service";
+import { isTechnicianUserId } from "../../../server/services/user-type.service";
+import { canBeAssignee, TECHNICIAN_REQUIRED_ERROR } from "../../../shared/user-type";
 
 const tickets = new Hono<AppEnv>();
 
@@ -226,14 +228,19 @@ tickets.post("/api/tickets", async (c) => {
   if (!custom.ok) return c.json({ error: custom.error }, custom.status);
   validated.customFields = custom.values ?? null;
 
-  // Auto-assignment
+  // Responsável informado na abertura precisa ser técnico.
+  if (validated.assigneeId && !(await isTechnicianUserId(storage, validated.assigneeId))) {
+    return c.json({ error: TECHNICIAN_REQUIRED_ERROR }, 400);
+  }
+
+  // Auto-assignment (regra antiga cujo responsável deixou de ser técnico é ignorada)
   if (!validated.assigneeId && validated.category && validated.type) {
     const autoAssignee = await storage.findResponsavelForTicket(
       validated.category,
       validated.type,
       user.tenantId ?? null,
     );
-    if (autoAssignee) validated.assigneeId = autoAssignee;
+    if (autoAssignee && (await isTechnicianUserId(storage, autoAssignee))) validated.assigneeId = autoAssignee;
   }
 
   const created = await storage.createTicket({ ...validated, tenantId: user.tenantId });
@@ -349,6 +356,15 @@ tickets.patch("/api/tickets/:id", async (c) => {
     if (!custom.ok) return c.json({ error: custom.error }, custom.status);
     if (custom.values !== undefined) updateData.customFields = custom.values;
     else delete updateData.customFields;
+  }
+
+  // Novo responsável precisa ser técnico (o atual continua válido mesmo que tenha mudado de tipo).
+  if (
+    updateData.assigneeId &&
+    updateData.assigneeId !== oldTicket.assigneeId &&
+    !(await isTechnicianUserId(storage, updateData.assigneeId))
+  ) {
+    return c.json({ error: TECHNICIAN_REQUIRED_ERROR }, 400);
   }
 
   // Status transitions
@@ -613,7 +629,7 @@ async function isValidResponsavelRule(c: { get: (k: "user" | "db") => any }, dat
   if (data.categoria !== undefined && !(await storage.getActiveSupportGroupByKey(data.categoria))) return false;
   if (data.usuarioResponsavelId !== undefined) {
     const target = await storage.getUser(data.usuarioResponsavelId);
-    if (!target || !sameTenant(target.tenantId, c.get("user").tenantId)) return false;
+    if (!target || !sameTenant(target.tenantId, c.get("user").tenantId) || !canBeAssignee(target)) return false;
   }
   return true;
 }
@@ -632,7 +648,7 @@ tickets.post("/api/ticket-responsaveis", requireAdmin, async (c) => {
   const { tenantId: _tenantId, ...fields } = body ?? {};
   const validated = insertTicketResponsavelSchema.parse(fields);
   if (!(await isValidResponsavelRule(c, validated))) {
-    return c.json({ error: "Grupo ou responsável inválido" }, 400);
+    return c.json({ error: "Grupo inválido ou responsável não é técnico" }, 400);
   }
   const responsavel = await storage.createTicketResponsavel({ ...validated, tenantId: c.get("user").tenantId ?? null });
   return c.json(responsavel, 201);
@@ -648,7 +664,7 @@ tickets.patch("/api/ticket-responsaveis/:id", requireAdmin, async (c) => {
     return c.json({ error: "Responsavel not found" }, 404);
   }
   if (!(await isValidResponsavelRule(c, validated))) {
-    return c.json({ error: "Grupo ou responsável inválido" }, 400);
+    return c.json({ error: "Grupo inválido ou responsável não é técnico" }, 400);
   }
   const responsavel = await storage.updateTicketResponsavel(
     c.req.param("id"),

@@ -28,6 +28,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { TransferirChamadoDialog } from "@/components/workspace/TransferirChamadoDialog";
 import { useKnowledgePrompt } from "@/components/knowledge/knowledge-prompt";
+import { useIsTechnician } from "@/hooks/use-is-technician";
 
 type Periodo = "este-ano" | "mes-vigente" | "mes-anterior" | "em-tratativa";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
@@ -90,6 +91,8 @@ export function ChamadosView() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filtroKpi, setFiltroKpi] = useState<string | null>(null);
   const [escopo, setEscopo] = useState<Escopo>("meus");
+  // Fila do Grupo é de quem atende: só técnicos (e admins) veem o seletor.
+  const isTech = useIsTechnician();
   const [filtroFila, setFiltroFila] = useState<FiltroFila>("sem-responsavel");
   const [transferItem, setTransferItem] = useState<ChamadoItem | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -221,7 +224,8 @@ export function ChamadosView() {
           />
         </div>
 
-        {/* Escopo: meus chamados ou fila dos grupos do usuário */}
+        {/* Escopo: meus chamados ou fila dos grupos do usuário (só técnicos) */}
+        {isTech && (
         <div className="flex items-center gap-0 border rounded-md overflow-hidden" style={{ borderColor: "var(--sep)" }}>
           {(Object.keys(escopoLabels) as Escopo[]).map((e) => (
             <button
@@ -238,6 +242,7 @@ export function ChamadosView() {
             </button>
           ))}
         </div>
+        )}
 
         {escopo === "fila" && (
           <div className="flex items-center gap-0 border rounded-md overflow-hidden" style={{ borderColor: "var(--sep)" }}>

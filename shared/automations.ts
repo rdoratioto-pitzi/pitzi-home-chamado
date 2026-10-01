@@ -84,6 +84,8 @@ export interface AutomationContext {
   /** Para status_changed: o status que acabou de ser gravado. */
   newStatus?: string;
   now?: Date;
+  /** Ids dos usuários técnicos (ou admins) ativos; se informado, set_assignee só aceita técnicos. */
+  technicianIds?: readonly string[];
 }
 
 export interface AutomationPlan {
@@ -260,6 +262,10 @@ export function planAutomations(
           const group = groupOf(ctx, current.category);
           if (!group || !group.memberIds.includes(action.value)) {
             skipped.push("responsável não é membro do grupo do chamado");
+            break;
+          }
+          if (ctx.technicianIds && !ctx.technicianIds.includes(action.value)) {
+            skipped.push("responsável não é técnico");
             break;
           }
           set({ assigneeId: action.value });

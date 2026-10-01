@@ -53,6 +53,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
+import { useIsTechnician } from "@/hooks/use-is-technician";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { getApplicationLabel } from "@shared/applications";
 import { TICKET_STATUSES, TICKET_TYPES, ticketTypeLabel } from "@shared/ticket-options";
@@ -158,6 +159,8 @@ export default function TicketDetailPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
+  // Nota interna é da equipe: só técnicos (e admins) veem a opção.
+  const isTech = useIsTechnician();
   const [comment, setComment] = useState("");
   // Nota interna: só a equipe vê e não gera e-mail para o solicitante.
   const [commentInternal, setCommentInternal] = useState(false);
@@ -606,6 +609,7 @@ export default function TicketDetailPage() {
                             <FormLabel>Responsável</FormLabel>
                             <FormControl>
                               <UserSelect
+                                onlyTechnicians
                                 value={field.value}
                                 onValueChange={field.onChange}
                                 placeholder="Selecione..."
@@ -899,7 +903,7 @@ export default function TicketDetailPage() {
                   )}
                   Enviar Comentário
                 </Button>
-                {currentUser?.id !== ticket.requesterId && (
+                {isTech && currentUser?.id !== ticket.requesterId && (
                   <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
                     <input
                       type="checkbox"

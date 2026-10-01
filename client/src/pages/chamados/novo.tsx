@@ -458,6 +458,7 @@ export default function NovoChamadoPage() {
                         </FormLabel>
                         <FormControl>
                           <UserSelect
+                            onlyTechnicians
                             value={field.value}
                             onValueChange={field.onChange}
                             placeholder="Atribuição automática"

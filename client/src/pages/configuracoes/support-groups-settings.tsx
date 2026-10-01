@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isTechnician } from "@shared/user-type";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,8 @@ export function SupportGroupsSettings() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
 
-  const activeUsers = users.filter(u => u.status === "active");
+  // Só técnicos entram em grupos; quem já é membro continua na lista para poder ser removido.
+  const activeUsers = users.filter(u => u.status === "active" && (isTechnician(u) || editing?.memberIds.includes(u.id)));
   const userName = (id: string) => users.find(u => u.id === id)?.name ?? "Usuário removido";
 
   const saveMutation = useMutation({

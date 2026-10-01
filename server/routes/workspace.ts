@@ -24,6 +24,8 @@ import { resolveCustomFieldValues } from "../services/ticket-fields.service";
 import { runTicketAutomations } from "../services/automations.service";
 import { isInQueue } from "@shared/ticket-queue";
 import { canViewTicket, getQueueViewer } from "../services/ticket-queue.service";
+import { isTechnicianUserId } from "../services/user-type.service";
+import { TECHNICIAN_REQUIRED_ERROR } from "@shared/user-type";
 
 /**
  * Slack notifier env (Express runtime). Apenas as variáveis necessárias —
@@ -1075,7 +1077,13 @@ export function registerWorkspaceRoutes(router: Router) {
         Object.assign(updateData, slaPauseUpdate(previous, status));
       }
       if (prioridade !== undefined) updateData.priority = prioridadeMap[prioridade] || prioridade;
-      if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
+      if (responsavelId !== undefined) {
+        // Novo responsável precisa ser técnico; o atual continua válido.
+        if (responsavelId && responsavelId !== previous?.assigneeId && !(await isTechnicianUserId(storage, responsavelId))) {
+          return res.status(400).json({ error: TECHNICIAN_REQUIRED_ERROR });
+        }
+        updateData.assigneeId = responsavelId;
+      }
       if (titulo !== undefined) updateData.title = titulo.trim();
       if (descricao !== undefined) updateData.description = descricao;
       if (applicationKey !== undefined) updateData.applicationKey = applicationKey;

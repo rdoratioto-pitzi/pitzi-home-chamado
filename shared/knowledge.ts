@@ -16,6 +16,8 @@ export interface KnowledgeViewer {
   isAdmin: boolean;
   /** Chaves dos grupos de atendimento de que o usuário é membro. */
   groupKeys: readonly string[];
+  /** Usuário do tipo Técnico (shared/user-type.ts). */
+  isTechnician?: boolean;
 }
 
 export interface KnowledgeArticleLike {
@@ -23,9 +25,9 @@ export interface KnowledgeArticleLike {
   status: string;
 }
 
-/** "Equipe": admin ou membro de algum grupo de atendimento. */
+/** "Equipe": admin, técnico ou membro de algum grupo de atendimento. */
 export function isKnowledgeStaff(viewer: KnowledgeViewer): boolean {
-  return viewer.isAdmin || viewer.groupKeys.length > 0;
+  return viewer.isAdmin || viewer.isTechnician === true || viewer.groupKeys.length > 0;
 }
 
 export function canCreateArticle(viewer: KnowledgeViewer): boolean {
