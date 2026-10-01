@@ -86,6 +86,11 @@ type Bindings = {
   // delegação no domínio são segredos (docs/emails-gmail-setup.md). Sem elas, a fila registra
   // os e-mails como "not_configured".
   GMAIL_SENDER?: string;
+  // Login com Google (docs/login-google-setup.md). Vazio = ainda não configurado.
+  GOOGLE_LOGIN_CLIENT_ID?: string;
+  ALLOWED_GOOGLE_DOMAINS?: string;
+  /** Chave de emergência: "true" volta a aceitar senha, só para admins. */
+  PASSWORD_LOGIN_ENABLED?: string;
   GOOGLE_SA_CLIENT_EMAIL?: string;
   GOOGLE_SA_PRIVATE_KEY?: string;
   VENUS_API_KEY: string;

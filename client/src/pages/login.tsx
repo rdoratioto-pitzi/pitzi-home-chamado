@@ -2,7 +2,7 @@ import { PitziLogo as RenovLogo } from "@/components/renov-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -118,17 +118,51 @@ const LOGIN_TIMEOUT_MS = 20_000;
 
 class LoginTimeoutError extends Error {}
 
-async function fetchLoginWithTimeout(body: string): Promise<Response> {
+async function fetchLoginWithTimeout(body: string, path = "/api/auth/login"): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), LOGIN_TIMEOUT_MS);
   try {
-    return await fetchWithAuth("/api/auth/login", { method: "POST", body, signal: controller.signal });
+    return await fetchWithAuth(path, { method: "POST", body, signal: controller.signal });
   } catch (error) {
     if (controller.signal.aborted) throw new LoginTimeoutError();
     throw error;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** GET /api/auth/config: "all" = senha para todos (Google não configurado), "admins" = chave de
+ * emergência (senha só para admins), "off" = somente Google. */
+interface AuthConfig {
+  googleClientId: string | null;
+  allowedDomains: string[];
+  passwordLogin: "all" | "admins" | "off";
+}
+
+const FALLBACK_AUTH_CONFIG: AuthConfig = { googleClientId: null, allowedDomains: ["pitzi.com.br"], passwordLogin: "all" };
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
+
+let gisScriptPromise: Promise<void> | null = null;
+function loadGoogleIdentityScript(): Promise<void> {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  gisScriptPromise ??= new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => {
+      gisScriptPromise = null;
+      reject(new Error("Não foi possível carregar o login do Google"));
+    };
+    document.head.appendChild(script);
+  });
+  return gisScriptPromise;
 }
 
 export default function LoginPage() {
@@ -144,9 +178,18 @@ export default function LoginPage() {
   const [loginSuccess, setLoginSuccess] = useState(false);
   const [slowServer, setSlowServer] = useState(false);
 
-  // Acorda a API e o banco enquanto a pessoa digita a senha.
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
+  const [showEmergencyLogin, setShowEmergencyLogin] = useState(false);
+  const [googleError, setGoogleError] = useState<string | null>(null);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+
+  // Acorda a API e o banco; descobre como o login é feito (Google, senha ou os dois).
   useEffect(() => {
     fetch(`${API_BASE}/api/health`, { credentials: "include" }).catch(() => undefined);
+    fetch(`${API_BASE}/api/auth/config`, { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : FALLBACK_AUTH_CONFIG))
+      .then((cfg: AuthConfig) => setAuthConfig(cfg))
+      .catch(() => setAuthConfig(FALLBACK_AUTH_CONFIG));
   }, []);
   // Countdown timer for forgot password
   useEffect(() => {
@@ -173,6 +216,88 @@ export default function LoginPage() {
     },
   });
 
+  const handleLoginResult = (result: any) => {
+    if (result.success) {
+      if (result.accessToken) {
+        setStoredToken(result.accessToken);
+      }
+      setLoginSuccess(true);
+      auth.login(result.user);
+      setTimeout(() => {
+        toast({ title: "Login realizado com sucesso!" });
+        setLocation("/");
+      }, 800);
+    } else {
+      toast({
+        title: "Erro no login",
+        description: result.message || "Email ou senha incorretos",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Callback do botão do Google: manda o ID token para a API, que cria a sessão.
+  const handleGoogleCredential = useCallback(async (response: { credential?: string }) => {
+    if (!response?.credential) return;
+    setIsLoading(true);
+    setSlowServer(false);
+    const body = JSON.stringify({ credential: response.credential, rememberMe: form.getValues("rememberMe") });
+    try {
+      let res: Response;
+      try {
+        res = await fetchLoginWithTimeout(body, "/api/auth/google");
+      } catch {
+        setSlowServer(true);
+        res = await fetchLoginWithTimeout(body, "/api/auth/google");
+      }
+      handleLoginResult(await res.json());
+    } catch {
+      toast({
+        title: "O servidor demorou para responder",
+        description: "Tente de novo em alguns segundos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setSlowServer(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Botão oficial do Google Identity Services.
+  useEffect(() => {
+    const clientId = authConfig?.googleClientId;
+    if (!clientId || !googleButtonRef.current) return;
+    let cancelled = false;
+    loadGoogleIdentityScript()
+      .then(() => {
+        if (cancelled || !googleButtonRef.current) return;
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredential,
+          ux_mode: "popup",
+          hd: authConfig?.allowedDomains?.[0],
+        });
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          theme: "outline",
+          size: "large",
+          shape: "rectangular",
+          text: "signin_with",
+          locale: "pt-BR",
+          width: googleButtonRef.current.offsetWidth || 344,
+        });
+      })
+      .catch((err: Error) => setGoogleError(err.message));
+    return () => {
+      cancelled = true;
+    };
+  }, [authConfig, handleGoogleCredential]);
+
+  const passwordMode = authConfig?.passwordLogin ?? "all";
+  const googleEnabled = !!authConfig?.googleClientId;
+  const showPasswordForm =
+    authConfig !== null && (passwordMode === "all" || (passwordMode === "admins" && showEmergencyLogin));
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     setSlowServer(false);
@@ -186,25 +311,7 @@ export default function LoginPage() {
         setSlowServer(true);
         response = await fetchLoginWithTimeout(body);
       }
-      const result = await response.json();
-
-      if (result.success) {
-        if (result.accessToken) {
-          setStoredToken(result.accessToken);
-        }
-        setLoginSuccess(true);
-        auth.login(result.user);
-        setTimeout(() => {
-          toast({ title: "Login realizado com sucesso!" });
-          setLocation("/");
-        }, 800);
-      } else {
-        toast({
-          title: "Erro no login",
-          description: result.message || "Email ou senha incorretos",
-          variant: "destructive",
-        });
-      }
+      handleLoginResult(await response.json());
     } catch (error: any) {
       const timedOut = error instanceof LoginTimeoutError || error?.name === "TypeError";
       toast({
@@ -390,9 +497,47 @@ export default function LoginPage() {
             </p>
           </motion.div>
 
+          {/* Login com Google (padrão). Senha só na transição ou na chave de emergência. */}
+          {authConfig === null && (
+            <motion.div variants={itemVariants} className="flex justify-center py-6">
+              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+            </motion.div>
+          )}
+          {googleEnabled && (
+            <motion.div variants={itemVariants} className="space-y-3">
+              <div ref={googleButtonRef} className="w-full flex justify-center min-h-[44px]" data-testid="google-login-button" />
+              {isLoading && (
+                <p className="text-center text-xs" style={{ color: "rgba(0,0,0,0.5)" }}>
+                  {slowServer ? "Servidor lento, tentando de novo..." : "Entrando..."}
+                </p>
+              )}
+              {googleError && <p className="text-center text-xs text-red-600">{googleError}</p>}
+              <p className="text-center" style={{ fontSize: "12px", color: "rgba(0,0,0,0.45)" }}>
+                Use a sua conta {authConfig?.allowedDomains.map((d) => "@" + d).join(" ou ")}
+              </p>
+              {passwordMode === "admins" && !showEmergencyLogin && (
+                <button
+                  type="button"
+                  className="block mx-auto hover:underline underline-offset-4"
+                  style={{ fontSize: "11px", color: "rgba(0,0,0,0.45)" }}
+                  onClick={() => setShowEmergencyLogin(true)}
+                  data-testid="button-emergency-login"
+                >
+                  Acesso de emergência (administradores)
+                </button>
+              )}
+            </motion.div>
+          )}
+          {authConfig !== null && !googleEnabled && (
+            <motion.p variants={itemVariants} className="mb-4" style={{ fontSize: "12px", color: "rgba(0,0,0,0.45)" }}>
+              Login com Google ainda não configurado — entre com e-mail e senha.
+            </motion.p>
+          )}
+
           {/* Login form */}
+          {showPasswordForm && (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+            <form onSubmit={form.handleSubmit(onSubmit)} className={googleEnabled ? "space-y-5 mt-6" : "space-y-5"}>
 
               {/* Email */}
               <motion.div variants={itemVariants}>
@@ -461,7 +606,7 @@ export default function LoginPage() {
                         >
                           Senha
                         </FormLabel>
-                        <button
+                        {passwordMode === "all" && <button
                           type="button"
                           className="transition-colors duration-150 hover:underline underline-offset-4"
                           style={{ fontSize: "11px", color: "rgba(0,0,0,0.5)" }}
@@ -474,7 +619,7 @@ export default function LoginPage() {
                           }
                         >
                           Esqueceu a senha?
-                        </button>
+                        </button>}
                       </div>
                       <FormControl>
                         <div className="relative">
@@ -579,6 +724,7 @@ export default function LoginPage() {
               </motion.div>
             </form>
           </Form>
+          )}
 
           {/* Version / status footer — same component as sidebar */}
           <motion.div variants={itemVariants} className="mt-8 flex justify-center">

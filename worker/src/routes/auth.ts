@@ -21,8 +21,102 @@ import { endSession } from "../lib/sessions";
 import { sendPasswordResetLinkEmail } from "../lib/email";
 import { mailContext } from "../lib/mailer";
 import { getStorage } from "../lib/storage";
+import {
+  INACTIVE_ACCOUNT_MESSAGE,
+  USE_GOOGLE_MESSAGE,
+  allowedGoogleDomains,
+  canUsePasswordLogin,
+  googleLoginClientId,
+  passwordLoginMode,
+  publicAuthConfig,
+} from "../../../shared/auth-policy";
+import { GoogleTokenInvalid, verifyGoogleIdToken } from "../../../shared/google-id-token";
+import { findOrProvisionGoogleUser } from "../../../server/services/google-login.service";
+import type { User } from "../../../shared/schema";
+import type { Context } from "hono";
 
 const auth = new Hono<AppEnv>();
+
+// Cria a sessão (linha em refresh_tokens), os tokens e os cookies; mesma resposta para senha e Google.
+async function startSession(c: Context<AppEnv>, user: User, rememberMe: boolean) {
+  const db = c.get("db");
+  const refreshToken = await signRefreshToken(user.id, c.env.JWT_REFRESH_SECRET, rememberMe);
+
+  // Store refresh token hash in DB — a linha é a sessão; seu id vai no token de acesso.
+  const tokenHash = await sha256(refreshToken);
+  const expiresAt = new Date(Date.now() + (rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000));
+  const [session] = await db
+    .insert(refreshTokens)
+    .values({ userId: user.id, tokenHash, expiresAt })
+    .returning({ id: refreshTokens.id });
+
+  const authUser: AuthUser = {
+    userId: user.id,
+    tenantId: user.tenantId ?? null,
+    role: user.isAdmin ? "admin" : "user",
+    sessionId: session.id,
+  };
+  const accessToken = await signAccessToken(authUser, c.env.JWT_SECRET);
+
+  setAuthCookies(c, accessToken, refreshToken, rememberMe);
+
+  return c.json({
+    success: true,
+    accessToken,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      tenantId: user.tenantId,
+      role: user.isAdmin ? "admin" : "user",
+      isAdmin: user.isAdmin === true,
+      isTechnician: isTechnician(user),
+      modulePermissions: user.modulePermissions,
+      status: user.status,
+    },
+  });
+}
+
+// ─── GET /api/auth/config ───────────────────────────────────────
+// Pública: diz à tela de login se mostra o botão do Google e/ou o formulário de senha.
+auth.get("/api/auth/config", (c) => c.json(publicAuthConfig(c.env)));
+
+// ─── POST /api/auth/google ──────────────────────────────────────
+// Recebe o ID token do Google Identity Services; cria o usuário no primeiro acesso.
+const googleLoginSchema = z.object({
+  credential: z.string().min(20),
+  rememberMe: z.boolean().optional().default(false),
+});
+
+auth.post("/api/auth/google", async (c) => {
+  const clientId = googleLoginClientId(c.env);
+  if (!clientId) {
+    return c.json({ success: false, message: "Login com Google ainda não configurado." }, 503);
+  }
+  const parsed = googleLoginSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ success: false, message: "Credencial do Google ausente." }, 400);
+
+  let identity;
+  try {
+    identity = await verifyGoogleIdToken(parsed.data.credential, {
+      clientId,
+      allowedDomains: allowedGoogleDomains(c.env),
+    });
+  } catch (error) {
+    if (error instanceof GoogleTokenInvalid) {
+      const message = error.reason === "domain_not_allowed"
+        ? `Use uma conta Google ${allowedGoogleDomains(c.env).map((d) => "@" + d).join(" ou ")}.`
+        : "Não foi possível validar o login com Google. Tente de novo.";
+      return c.json({ success: false, message, reason: error.reason }, 401);
+    }
+    console.error("[AUTH] Falha ao validar token do Google:", error);
+    return c.json({ success: false, message: "Não foi possível validar o login com Google. Tente de novo." }, 502);
+  }
+
+  const result = await findOrProvisionGoogleUser(c.get("db"), identity);
+  if (!result.ok) return c.json({ success: false, message: INACTIVE_ACCOUNT_MESSAGE }, 403);
+  return startSession(c, result.user, parsed.data.rememberMe);
+});
 
 // ─── POST /api/auth/login ───────────────────────────────────────
 const loginSchema = z.object({
@@ -32,6 +126,10 @@ const loginSchema = z.object({
 });
 
 auth.post("/api/auth/login", async (c) => {
+  // Com o Google configurado, senha só na chave de emergência (e só para admins).
+  if (passwordLoginMode(c.env) === "off") {
+    return c.json({ success: false, message: USE_GOOGLE_MESSAGE, code: "use_google" }, 403);
+  }
   const body = loginSchema.parse(await c.req.json());
   const db = c.get("db");
 
@@ -53,6 +151,9 @@ auth.post("/api/auth/login", async (c) => {
   if (!valid) {
     return c.json({ success: false, message: "Credenciais invalidas" }, 401);
   }
+  if (!canUsePasswordLogin(c.env, user)) {
+    return c.json({ success: false, message: USE_GOOGLE_MESSAGE, code: "use_google" }, 403);
+  }
 
   // Lazy migration: rehash plaintext password
   if (needsRehash) {
@@ -60,41 +161,7 @@ auth.post("/api/auth/login", async (c) => {
     await db.update(users).set({ password: hashed }).where(eq(users.id, user.id));
   }
 
-  const refreshToken = await signRefreshToken(user.id, c.env.JWT_REFRESH_SECRET, body.rememberMe);
-
-  // Store refresh token hash in DB — a linha é a sessão; seu id vai no token de acesso.
-  const tokenHash = await sha256(refreshToken);
-  const expiresAt = new Date(Date.now() + (body.rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000));
-  const [session] = await db
-    .insert(refreshTokens)
-    .values({ userId: user.id, tokenHash, expiresAt })
-    .returning({ id: refreshTokens.id });
-
-  const authUser: AuthUser = {
-    userId: user.id,
-    tenantId: user.tenantId ?? null,
-    role: user.isAdmin ? "admin" : "user",
-    sessionId: session.id,
-  };
-  const accessToken = await signAccessToken(authUser, c.env.JWT_SECRET);
-
-  setAuthCookies(c, accessToken, refreshToken, body.rememberMe);
-
-  return c.json({
-    success: true,
-    accessToken,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      tenantId: user.tenantId,
-      role: user.isAdmin ? "admin" : "user",
-      isAdmin: user.isAdmin === true,
-      isTechnician: isTechnician(user),
-      modulePermissions: user.modulePermissions,
-      status: user.status,
-    },
-  });
+  return startSession(c, user, body.rememberMe);
 });
 
 // ─── GET /api/auth/me ───────────────────────────────────────────
@@ -230,7 +297,8 @@ auth.post("/api/auth/forgot-password", async (c) => {
   // Sempre a mesma resposta, para não revelar quais e-mails existem.
   const successMsg = "Se o email estiver cadastrado, voce recebera um link para redefinir a senha.";
 
-  if (!user || user.status !== "active") {
+  // Sem login por senha para esta pessoa, não há senha a redefinir.
+  if (!user || user.status !== "active" || !canUsePasswordLogin(c.env, user)) {
     return c.json({ success: true, message: successMsg });
   }
 
@@ -253,6 +321,9 @@ const resetPasswordSchema = z.object({
 });
 
 auth.post("/api/auth/reset-password", async (c) => {
+  if (passwordLoginMode(c.env) === "off") {
+    return c.json({ success: false, message: USE_GOOGLE_MESSAGE }, 403);
+  }
   const parsed = resetPasswordSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) {
     return c.json({ success: false, message: parsed.error.errors[0]?.message ?? "Dados invalidos" }, 400);
