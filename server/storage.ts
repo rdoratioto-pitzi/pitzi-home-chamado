@@ -93,6 +93,7 @@ import {
  import { db as defaultDb, type Database } from "./db";
  import { eq, and, or, sql, asc, desc, gt, isNull, ilike, type SQL } from "drizzle-orm";
 import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../shared/password";
+import { completeModulePermissions } from "../shared/permissions";
  import { alias } from "drizzle-orm/pg-core";
  
  export type NotificationPreferences = {
@@ -640,13 +641,20 @@ export class DatabaseStorage implements IStorage {
   // Toda gravação de senha passa por aqui: nunca armazenar texto puro.
   async createUser(insertUser: InsertUser): Promise<User> {
     if (!this.db) throw new Error("Database not connected");
-    const values = { ...insertUser, password: await hashIfPlain(insertUser.password) };
+    const values = {
+      ...insertUser,
+      password: await hashIfPlain(insertUser.password),
+      modulePermissions: completeModulePermissions(insertUser.modulePermissions),
+    };
     const [user] = await this.db.insert(users).values(values).returning();
     return user;
   }
   async updateUser(id: string, data: Partial<User>): Promise<User | undefined> {
     if (!this.db) return undefined;
-    const values = data.password === undefined ? data : { ...data, password: await hashIfPlain(data.password) };
+    let values: Partial<User> = data.password === undefined ? data : { ...data, password: await hashIfPlain(data.password) };
+    if (data.modulePermissions !== undefined) {
+      values = { ...values, modulePermissions: completeModulePermissions(data.modulePermissions) };
+    }
     const [user] = await this.db.update(users).set(values).where(eq(users.id, id)).returning();
     // Senha nova (texto puro recebido) ou desativação encerram todas as sessões do usuário.
     // Um hash recebido é só a migração da mesma senha no login e não derruba sessões.
