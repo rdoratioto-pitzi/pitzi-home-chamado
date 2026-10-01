@@ -9,6 +9,8 @@ import { hasModulePermission } from "../../../shared/permissions";
 /** Routes that require NO authentication at all */
 const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "POST", path: "/api/auth/login" },
+  { method: "POST", path: "/api/auth/google" },
+  { method: "GET", path: "/api/auth/config" },
   { method: "POST", path: "/api/auth/forgot-password" },
   { method: "POST", path: "/api/auth/reset-password" },
   { method: "POST", path: "/api/auth/refresh" },

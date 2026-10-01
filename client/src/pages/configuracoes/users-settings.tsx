@@ -469,7 +469,7 @@ export function UsersSettings() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground capitalize">
-                    {user.authMethod}
+                    {user.authMethod === "google" ? "Google" : user.authMethod}
                   </TableCell>
                   <TableCell>
                     <Badge variant={user.status === "active" ? "outline" : "secondary"} 
