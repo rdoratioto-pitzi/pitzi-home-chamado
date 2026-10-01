@@ -66,6 +66,15 @@ describe("planAutomations", () => {
     expect(plan.notes[0]).toContain("não aplicou: responsável não é membro do grupo do chamado");
   });
 
+  it("não atribui a quem não é técnico, mesmo sendo membro do grupo", () => {
+    const actions = [{ type: "set_assignee" as const, value: "bia" }];
+    const skip = planAutomations([rule({ actions })], "ticket_created", ticket, { groups, now, technicianIds: ["ana"] });
+    expect(skip.patch).toEqual({});
+    expect(skip.notes[0]).toContain("não aplicou: responsável não é técnico");
+    const ok = planAutomations([rule({ actions })], "ticket_created", ticket, { groups, now, technicianIds: ["bia"] });
+    expect(ok.patch).toEqual({ assigneeId: "bia" });
+  });
+
   it("mudar de grupo tira o responsável que não é membro do novo grupo", () => {
     const plan = planAutomations([rule({ actions: [{ type: "set_group", value: "financeiro" }] })], "ticket_created",
       { ...ticket, assigneeId: "ana" }, { groups, now });

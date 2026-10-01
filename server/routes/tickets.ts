@@ -24,6 +24,8 @@ import { normalizeRequestSelection } from "@shared/request-objects";
 import { checkRequestSelection, resolveCustomFieldValues } from "../services/ticket-fields.service";
 import { runTicketAutomations } from "../services/automations.service";
 import { claimTicket, isTicketGroupMember, transferTicket } from "../services/ticket-queue.service";
+import { isTechnicianUserId } from "../services/user-type.service";
+import { TECHNICIAN_REQUIRED_ERROR } from "@shared/user-type";
 
 export function registerTicketRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
@@ -90,9 +92,14 @@ export function registerTicketRoutes(router: Router) {
       if (!custom.ok) return res.status(custom.status).json({ error: custom.error });
       validated.customFields = custom.values ?? null;
 
+      // Responsável informado na abertura precisa ser técnico.
+      if (validated.assigneeId && !(await isTechnicianUserId(storage, validated.assigneeId))) {
+        return res.status(400).json({ error: TECHNICIAN_REQUIRED_ERROR });
+      }
+
       if (!validated.assigneeId && validated.category && validated.type) {
         const autoAssignee = await storage.findResponsavelForTicket(validated.category, validated.type);
-        if (autoAssignee) {
+        if (autoAssignee && (await isTechnicianUserId(storage, autoAssignee))) {
           validated.assigneeId = autoAssignee;
         }
       }
@@ -191,6 +198,15 @@ export function registerTicketRoutes(router: Router) {
         if (!custom.ok) return res.status(custom.status).json({ error: custom.error });
         if (custom.values !== undefined) updateData.customFields = custom.values;
         else delete updateData.customFields;
+      }
+
+      // Novo responsável precisa ser técnico (o atual continua válido mesmo que tenha mudado de tipo).
+      if (
+        updateData.assigneeId &&
+        updateData.assigneeId !== oldTicket.assigneeId &&
+        !(await isTechnicianUserId(storage, updateData.assigneeId))
+      ) {
+        return res.status(400).json({ error: TECHNICIAN_REQUIRED_ERROR });
       }
 
       if (req.body.status && req.body.status !== oldTicket.status) {
@@ -414,6 +430,9 @@ export function registerTicketRoutes(router: Router) {
   router.post("/api/ticket-responsaveis", requireAdmin, async (req, res) => {
     try {
       const validated = insertTicketResponsavelSchema.parse(req.body);
+      if (!(await isTechnicianUserId(storage, validated.usuarioResponsavelId))) {
+        return res.status(400).json({ error: TECHNICIAN_REQUIRED_ERROR });
+      }
       const responsavel = await storage.createTicketResponsavel(validated);
       res.status(201).json(responsavel);
     } catch (error) {
@@ -428,6 +447,9 @@ export function registerTicketRoutes(router: Router) {
     try {
       const partialSchema = insertTicketResponsavelSchema.partial();
       const validated = partialSchema.parse(req.body);
+      if (validated.usuarioResponsavelId !== undefined && !(await isTechnicianUserId(storage, validated.usuarioResponsavelId))) {
+        return res.status(400).json({ error: TECHNICIAN_REQUIRED_ERROR });
+      }
       const responsavel = await storage.updateTicketResponsavel(getId(req), validated);
       if (!responsavel) return res.status(404).json({ error: "Responsavel not found" });
       res.json(responsavel);

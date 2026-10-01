@@ -30,6 +30,8 @@ export const users = pgTable("users", {
   authMethod: text("auth_method").notNull().default("email"),
   avatarUrl: text("avatar_url"),
   isAdmin: boolean("is_admin").default(false),
+  // Técnico atende chamados (pode ser responsável e membro de grupo). Admin conta como técnico.
+  isTechnician: boolean("is_technician").notNull().default(false),
   areaNegocio: text("area_negocio"), // LAB, RH, COM, FIN, MKT, OPS, TI
   perfilAcesso: text("perfil_acesso"), // assistente, analista, gestor, diretor
   // Module permissions as JSON

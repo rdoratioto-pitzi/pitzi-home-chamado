@@ -17,6 +17,7 @@ vi.mock("../lib/email", () => {
 const { tickets } = await import("./tickets");
 const { workspace } = await import("./workspace");
 const { ticketQueue } = await import("./ticket-queue");
+const { supportGroups } = await import("./support-groups");
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -36,6 +37,7 @@ describe.skipIf(!url)("fila do grupo", () => {
     a.route("/", tickets);
     a.route("/", workspace);
     a.route("/", ticketQueue);
+    a.route("/", supportGroups);
     return a;
   };
   const json = async (res: Response) => (await res.json()) as any;
@@ -76,7 +78,7 @@ describe.skipIf(!url)("fila do grupo", () => {
     await cleanup();
     for (const key of ["requester", "sapA", "sapB", "dadosA", "admin", "outsider"]) {
       const { rows } = await pool.query(
-        "INSERT INTO users (name, email, status, is_admin, tenant_id) VALUES ($1, $2, 'active', $3, 'tenant-q') RETURNING id",
+        "INSERT INTO users (name, email, status, is_admin, is_technician, tenant_id) VALUES ($1, $2, 'active', $3, $1 <> 'requester', 'tenant-q') RETURNING id",
         [key, `${key}@queue-test.local`, key === "admin"],
       );
       ids[key] = rows[0].id;
@@ -225,5 +227,57 @@ describe.skipIf(!url)("fila do grupo", () => {
     expect(doSolicitante).toEqual(["do solicitante", "resposta pública"]);
     const doMembro = (await json(await send(app(ids.sapB), "GET", route))).map((c: any) => c.content).sort();
     expect(doMembro).toEqual(["do solicitante", "nota da equipe", "resposta pública"]);
+  });
+
+  // "requester" é do tipo Usuário (não técnico) nos fixtures; os demais são técnicos.
+  it("responsável precisa ser técnico ao abrir, editar e pela gaveta", async () => {
+    const criar = await send(app(ids.admin, "admin"), "POST", "/api/tickets", {
+      code: "", title: "queue-test abertura", description: "d", category: "sap", type: "bug", assigneeId: ids.requester,
+    });
+    expect(criar.status).toBe(400);
+    expect((await json(criar)).error).toBe("Responsável precisa ser um técnico");
+
+    const id = await ticket("sap");
+    expect((await send(app(ids.admin, "admin"), "PATCH", `/api/tickets/${id}`, { assigneeId: ids.requester })).status).toBe(400);
+    expect((await send(app(ids.admin, "admin"), "PATCH", `/api/tickets/${id}`, { assigneeId: ids.sapA })).status).toBe(200);
+    const gaveta = await send(app(ids.admin, "admin"), "PATCH", `/api/workspace/chamados/${id}`, { responsavelId: ids.requester });
+    expect(gaveta.status).toBe(400);
+    // Manter o responsável atual não é revalidado.
+    expect((await send(app(ids.admin, "admin"), "PATCH", `/api/workspace/chamados/${id}`, { responsavelId: ids.sapA })).status).toBe(200);
+  });
+
+  it("assumir e transferir exigem técnico, mesmo para quem está no grupo", async () => {
+    // Simula um membro antigo que não é técnico.
+    await pool.query(
+      "INSERT INTO support_group_members (group_id, user_id, tenant_id) VALUES ($1, $2, 'tenant-q')",
+      [groupIds.dados, ids.requester],
+    );
+    const id = await ticket("dados", { status: "open" });
+    // O próprio solicitante não assume; outro chamado do grupo testa a regra de técnico.
+    const outro = (await pool.query(
+      `INSERT INTO tickets (code, title, description, category, type, status, requester_id, tenant_id)
+       VALUES ('queue-test-' || gen_random_uuid(), 'queue-test outro', 'd', 'dados', 'bug', 'open', $1, 'tenant-q') RETURNING id`,
+      [ids.dadosA],
+    )).rows[0].id;
+    const assumir = await send(app(ids.requester), "POST", `/api/tickets/${outro}/assumir`);
+    expect(assumir.status).toBe(403);
+    expect((await json(assumir)).error).toBe("Só técnicos podem assumir chamados");
+
+    const transf = await send(app(ids.dadosA), "POST", `/api/tickets/${id}/transferir`, { category: "dados", assigneeId: ids.requester });
+    expect(transf.status).toBe(400);
+    expect((await json(transf)).error).toBe("Responsável precisa ser um técnico");
+  });
+
+  it("grupo só recebe técnicos novos; membro antigo continua", async () => {
+    const route = `/api/v1/support-groups/${groupIds.sap}/members`;
+    const recusa = await send(app(ids.admin, "admin"), "PUT", route, { userIds: [ids.sapA, ids.requester] });
+    expect(recusa.status).toBe(400);
+    expect((await json(recusa)).error).toBe("Só técnicos podem ser membros de grupos de atendimento");
+
+    await pool.query(
+      "INSERT INTO support_group_members (group_id, user_id, tenant_id) VALUES ($1, $2, 'tenant-q')",
+      [groupIds.sap, ids.requester],
+    );
+    expect((await send(app(ids.admin, "admin"), "PUT", route, { userIds: [ids.sapA, ids.requester] })).status).toBe(200);
   });
 });

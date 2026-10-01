@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { AutomationRule, CannedResponse, Ticket } from "../../shared/schema";
 import { parseAutomationRule, planAutomations, type AutomationTrigger } from "../../shared/automations";
 import type { IStorage } from "../storage";
+import { isTechnicianUserId } from "./user-type.service";
 
 type Fail = { ok: false; status: 400 | 404; error: string };
 
@@ -81,6 +82,9 @@ async function checkRuleTargets(storage: IStorage, rule: ReturnType<typeof parse
       && !(await storage.getUser(action.value))) {
       return "Usuário inválido na ação";
     }
+    if (action.type === "set_assignee" && !(await isTechnicianUserId(storage, action.value))) {
+      return "Responsável da ação precisa ser um técnico";
+    }
   }
   return null;
 }
@@ -149,10 +153,18 @@ export async function runTicketAutomations(
     const rules = (opts.rules ?? await storage.getAutomationRules(trigger)).filter(r => r.active);
     if (rules.length === 0) return ticket;
     const groups = await storage.getSupportGroups(ticket.tenantId ?? null);
+    // set_assignee só aceita técnicos: confere os responsáveis citados nas regras.
+    const assigneeIds = Array.from(new Set(rules.flatMap(r =>
+      (r.actions as { type: string; value?: string }[] | null ?? [])
+        .filter(a => a.type === "set_assignee" && a.value)
+        .map(a => a.value as string))));
+    const technicianIds: string[] = [];
+    for (const id of assigneeIds) if (await isTechnicianUserId(storage, id)) technicianIds.push(id);
     const plan = planAutomations(rules, trigger, ticket, {
       groups: groups.map(g => ({ key: g.key, memberIds: g.memberIds })),
       newStatus: opts.newStatus,
       now: opts.now,
+      technicianIds,
     });
     if (plan.applied.length === 0) return ticket;
 
