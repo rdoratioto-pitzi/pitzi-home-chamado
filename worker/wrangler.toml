@@ -23,6 +23,12 @@ SENDPULSE_FROM_NAME = "Pitzi Home"
 # Caixa que envia os e-mails dos chamados (docs/emails-gmail-setup.md). As credenciais da conta
 # de serviço são segredos: GOOGLE_SA_CLIENT_EMAIL e GOOGLE_SA_PRIVATE_KEY.
 GMAIL_SENDER = "chamados@pitzi.com.br"
+# Login com Google (docs/login-google-setup.md). O client id não é segredo; enquanto estiver
+# vazio, o login por senha continua valendo para todos. Com ele preenchido, o login é só Google.
+GOOGLE_LOGIN_CLIENT_ID = ""
+ALLOWED_GOOGLE_DOMAINS = "pitzi.com.br"
+# Chave de emergência: "true" volta a aceitar senha, só para administradores.
+PASSWORD_LOGIN_ENABLED = "false"
 
 [env.dev]
 name = "pitzi-home-api-dev"
@@ -33,3 +39,6 @@ CORS_ORIGIN = "http://localhost:5050"
 API_URL = "http://localhost:8787"
 SENDPULSE_FROM_EMAIL = "noreply@pitzi.com.br"
 SENDPULSE_FROM_NAME = "Pitzi Home (Dev)"
+GOOGLE_LOGIN_CLIENT_ID = ""
+ALLOWED_GOOGLE_DOMAINS = "pitzi.com.br"
+PASSWORD_LOGIN_ENABLED = "false"
