@@ -280,4 +280,27 @@ describe.skipIf(!url)("fila do grupo", () => {
     );
     expect((await send(app(ids.admin, "admin"), "PUT", route, { userIds: [ids.sapA, ids.requester] })).status).toBe(200);
   });
+
+  it("solicitante do tipo Usuário: só os próprios chamados e sem mudar status/responsável pela gaveta", async () => {
+    const meu = await ticket("sap");
+    const { rows } = await pool.query(
+      `INSERT INTO tickets (code, title, description, category, type, status, requester_id, tenant_id)
+       VALUES ('queue-test-' || gen_random_uuid(), 'queue-test de outra pessoa', 'd', 'sap', 'bug', 'open', $1, 'tenant-q') RETURNING id`,
+      [ids.outsider],
+    );
+    const deOutro = rows[0].id as string;
+
+    const lista = await json(await send(app(ids.requester), "GET", "/api/workspace/chamados?periodo=em-tratativa"));
+    const vistos = lista.items.map((i: any) => i.id);
+    expect(vistos).toContain(meu);
+    expect(vistos).not.toContain(deOutro);
+    expect((await json(await send(app(ids.requester), "GET", "/api/workspace/chamados?periodo=em-tratativa&escopo=fila"))).items).toEqual([]);
+
+    const route = `/api/workspace/chamados/${meu}`;
+    expect((await send(app(ids.requester), "PATCH", route, { status: "resolved" })).status).toBe(403);
+    expect((await send(app(ids.requester), "PATCH", route, { responsavelId: ids.sapA })).status).toBe(403);
+    expect((await send(app(ids.requester), "PATCH", route, { titulo: "queue-test sap (novo título)" })).status).toBe(200);
+    const { rows: [t] } = await pool.query("SELECT status, assignee_id, title FROM tickets WHERE id = $1", [meu]);
+    expect(t).toMatchObject({ status: "open", assignee_id: null, title: "queue-test sap (novo título)" });
+  });
 });

@@ -9,11 +9,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { getUserPermissions } from "@/lib/permissions";
+import { useIsTechnician } from "@/hooks/use-is-technician";
 
 export function AppSidebar() {
   const [location] = useLocation();
   const { user } = useAuth();
   const permissions = getUserPermissions(user);
+  const isTech = useIsTechnician();
+  if (!isTech) return <RequesterSidebar location={location} />;
   const items = [
     { title: "Início", url: "/", icon: Home, visible: true },
     { title: "Chamados", url: "/chamados", icon: Ticket, visible: true },
@@ -40,6 +43,40 @@ export function AppSidebar() {
             </SidebarMenuItem>
           ))}
         </SidebarMenu></SidebarGroupContent></SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="p-0 border-t border-border/40"><VersionBadge /></SidebarFooter>
+    </Sidebar>
+  );
+}
+
+/** Menu do solicitante ("Usuário"): só os seus chamados e o botão de abrir chamado. */
+function RequesterSidebar({ location }: { location: string }) {
+  return (
+    <Sidebar>
+      <SidebarHeader className="p-4 border-b border-border/40">
+        <Link href="/chamados" aria-label="Pitzi — Meus chamados"><PitziLogo size="md" /></Link>
+        <span className="text-xs text-muted-foreground">Central de chamados</span>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup><SidebarGroupContent className="flex flex-col gap-3">
+          <Link
+            href="/chamados/novo"
+            className="flex items-center justify-center gap-2 h-10 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            style={{ background: "#3B42DE" }}
+            data-testid="link-abrir-chamado"
+          >
+            <Plus className="h-4 w-4" /> Abrir chamado
+          </Link>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={location === "/chamados"} className="h-9 px-3">
+                <Link href="/chamados" data-testid="link-meus-chamados">
+                  <Ticket className="h-5 w-5" /><span>Meus chamados</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent></SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-0 border-t border-border/40"><VersionBadge /></SidebarFooter>
     </Sidebar>

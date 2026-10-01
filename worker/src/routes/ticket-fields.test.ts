@@ -149,6 +149,8 @@ describe("abertura e edição de chamados com os campos editáveis", () => {
   });
 
   it("na edição mescla os valores e não exige obrigatório se o grupo não muda", async () => {
+    // Quem edita campos do atendimento é técnico (Usuário só edita título, descrição e anexos).
+    storage.getUser.mockImplementation(async (id: string) => ({ id, name: id, status: "active", isTechnician: true }));
     storage.getTicket.mockResolvedValue({
       id: "t1", tenantId: null, requesterId: "u1", assigneeId: null, category: "financeiro", customFields: { f1: "1", velho: "x" },
     });

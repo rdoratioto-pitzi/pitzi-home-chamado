@@ -26,6 +26,7 @@ import { isInQueue } from "@shared/ticket-queue";
 import { canViewTicket, getQueueViewer } from "../services/ticket-queue.service";
 import { isTechnicianUserId } from "../services/user-type.service";
 import { TECHNICIAN_REQUIRED_ERROR } from "@shared/user-type";
+import { REQUESTER_FORBIDDEN_CHANGE_ERROR } from "@shared/requester-view";
 
 /**
  * Slack notifier env (Express runtime). Apenas as variáveis necessárias —
@@ -1038,7 +1039,7 @@ export function registerWorkspaceRoutes(router: Router) {
   router.patch("/api/workspace/chamados/:id", requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
-      const { userId: actorId } = getSessionUser(req);
+      const { userId: actorId, isAdmin } = getSessionUser(req);
       const { status, prioridade, responsavelId, titulo, descricao, applicationKey } = req.body as {
         status?: string;
         prioridade?: string;
@@ -1067,6 +1068,19 @@ export function registerWorkspaceRoutes(router: Router) {
 
       // Captura estado anterior para detectar transições (atribuição, fechamento).
       const previous = await storage.getTicket(String(id));
+      // Mesma regra do Worker: admin, solicitante ou responsável; quem não é técnico só
+      // ajusta título e descrição.
+      if (!previous) return res.status(404).json({ error: "Chamado não encontrado" });
+      if (!isAdmin && previous.requesterId !== actorId && previous.assigneeId !== actorId) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+      if (
+        !isAdmin &&
+        [status, prioridade, responsavelId, applicationKey].some((v) => v !== undefined) &&
+        !(await isTechnicianUserId(storage, actorId))
+      ) {
+        return res.status(403).json({ error: REQUESTER_FORBIDDEN_CHANGE_ERROR });
+      }
 
       const updateData: Partial<Ticket> = {};
       if (status !== undefined) updateData.status = status;
