@@ -42,6 +42,7 @@ import { CustomFieldInputs, missingRequiredField } from "@/components/shared/Cus
 import { useCustomFields } from "@/hooks/use-ticket-fields";
 import { fieldsForGroup, type CustomFieldValues } from "@shared/custom-fields";
 import { RelatedArticles } from "@/components/knowledge/related-articles";
+import { useIsTechnician } from "@/hooks/use-is-technician";
 
 const formSchema = z.object({
   title: z.string().min(10, "Título deve ter no mínimo 10 caracteres"),
@@ -72,6 +73,8 @@ export default function NovoChamadoPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
+  // Sugestões da Base de Conhecimento só para a equipe (o Usuário não vê a base).
+  const isTech = useIsTechnician();
   const [showSuccess, setShowSuccess] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<Ticket | null>(null);
   const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([]);
@@ -281,7 +284,7 @@ export default function NovoChamadoPage() {
                           {titleValue.length}/10 caracteres
                         </span>
                       </div>
-                      <RelatedArticles title={titleValue} />
+                      {isTech && <RelatedArticles title={titleValue} />}
                     </FormItem>
                   )}
                 />

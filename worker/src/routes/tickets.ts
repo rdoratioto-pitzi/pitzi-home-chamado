@@ -30,6 +30,7 @@ import { runTicketAutomations } from "../../../server/services/automations.servi
 import { isTicketGroupMember } from "../../../server/services/ticket-queue.service";
 import { isTechnicianUserId } from "../../../server/services/user-type.service";
 import { canBeAssignee, TECHNICIAN_REQUIRED_ERROR } from "../../../shared/user-type";
+import { REQUESTER_EDITABLE_TICKET_FIELDS } from "../../../shared/requester-view";
 
 const tickets = new Hono<AppEnv>();
 
@@ -330,13 +331,16 @@ tickets.patch("/api/tickets/:id", async (c) => {
     }
   }
 
-  // Non-admin field restriction
+  // Non-admin field restriction. Quem não é técnico (solicitante "Usuário") só edita
+  // título, descrição e anexos: status, gravidade, grupo e campos do atendimento ficam com a equipe.
   if (user.role !== "admin") {
-    const allowedFields = [
-      "status", "title", "description", "attachments",
-      "applicationKey", "impact", "dueDate",
-      "requestObject", "requestAction", "requestDetail", "customFields",
-    ];
+    const allowedFields = (await isTechnicianUserId(storage, user.userId))
+      ? [
+          "status", "title", "description", "attachments",
+          "applicationKey", "impact", "dueDate",
+          "requestObject", "requestAction", "requestDetail", "customFields",
+        ]
+      : [...REQUESTER_EDITABLE_TICKET_FIELDS];
     const filteredData: any = {};
     allowedFields.forEach((field) => {
       if (updateData[field] !== undefined) filteredData[field] = updateData[field];
@@ -368,16 +372,16 @@ tickets.patch("/api/tickets/:id", async (c) => {
   }
 
   // Status transitions
-  if (body.status && body.status !== oldTicket.status) {
-    const finalAssigneeId = body.assigneeId || oldTicket.assigneeId;
-    if (!finalAssigneeId && ["resolved", "closed", "blocked"].includes(body.status)) {
+  if (updateData.status && updateData.status !== oldTicket.status) {
+    const finalAssigneeId = updateData.assigneeId || oldTicket.assigneeId;
+    if (!finalAssigneeId && ["resolved", "closed", "blocked"].includes(updateData.status)) {
       return c.json(
         {
           error:
             "Não é possível alterar o status para '" +
-            (body.status === "resolved"
+            (updateData.status === "resolved"
               ? "Resolvido"
-              : body.status === "closed"
+              : updateData.status === "closed"
                 ? "Fechado"
                 : "Bloqueado") +
             "' sem um responsável atribuído ao chamado.",
@@ -385,14 +389,14 @@ tickets.patch("/api/tickets/:id", async (c) => {
         400
       );
     }
-    if (body.status === "resolved" && !oldTicket.dataResolucao) {
+    if (updateData.status === "resolved" && !oldTicket.dataResolucao) {
       updateData.dataResolucao = new Date();
     }
-    if (body.status === "closed" && !oldTicket.dataFechamento) {
+    if (updateData.status === "closed" && !oldTicket.dataFechamento) {
       updateData.dataFechamento = new Date();
     }
     // "Aguardando solicitante" para o relógio de resolução do SLA.
-    Object.assign(updateData, slaPauseUpdate(oldTicket, body.status));
+    Object.assign(updateData, slaPauseUpdate(oldTicket, updateData.status));
   }
 
   if (updateData.descriptionLastEditedAt) {
@@ -401,25 +405,25 @@ tickets.patch("/api/tickets/:id", async (c) => {
 
   const saved = await storage.updateTicket(id, updateData);
   if (!saved || !sameTenant(saved.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
-  const statusChanged = !!body.status && body.status !== oldTicket.status;
+  const statusChanged = !!updateData.status && updateData.status !== oldTicket.status;
   const ticket = statusChanged
-    ? await runTicketAutomations(storage, "status_changed", saved, { actorId: user.userId, newStatus: body.status })
+    ? await runTicketAutomations(storage, "status_changed", saved, { actorId: user.userId, newStatus: updateData.status })
     : saved;
 
   // Status change email + notification
-  if (body.status && body.status !== oldTicket.status) {
+  if (updateData.status && updateData.status !== oldTicket.status) {
     const requester = await storage.getUser(ticket.requesterId);
     const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
     if (requester) {
       sendTicketStatusChangedEmail(
-        mailContext(c), storage, ticket, oldTicket.status, body.status, requester, assignee || null
+        mailContext(c), storage, ticket, oldTicket.status, updateData.status, requester, assignee || null
       ).catch(console.error);
     }
     if (ticket.requesterId) {
       storage.createNotification({
         userId: ticket.requesterId,
         title: "Status do chamado alterado",
-        message: `O chamado "${ticket.title}" (${ticket.code || ""}) mudou para "${ticketStatusLabel(body.status)}"`,
+        message: `O chamado "${ticket.title}" (${ticket.code || ""}) mudou para "${ticketStatusLabel(updateData.status)}"`,
         module: "chamados",
         entityId: ticket.id,
         linkUrl: `/chamados?ticket=${ticket.id}`,
@@ -428,13 +432,13 @@ tickets.patch("/api/tickets/:id", async (c) => {
   }
 
   // Assignee change email + notification
-  if (body.assigneeId && body.assigneeId !== oldTicket.assigneeId) {
-    const assignee = await storage.getUser(body.assigneeId);
+  if (updateData.assigneeId && updateData.assigneeId !== oldTicket.assigneeId) {
+    const assignee = await storage.getUser(updateData.assigneeId);
     if (assignee) {
       sendTicketAssignedEmail(mailContext(c), storage, ticket, assignee).catch(console.error);
     }
     storage.createNotification({
-      userId: body.assigneeId,
+      userId: updateData.assigneeId,
       title: "Chamado atribuído a você",
       message: `O chamado "${ticket.title}" (${ticket.code || ""}) foi atribuído a você`,
       module: "chamados",
