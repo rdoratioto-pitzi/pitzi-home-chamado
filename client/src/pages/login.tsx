@@ -1,4 +1,3 @@
-import { PitziLogo as RenovLogo } from "@/components/renov-logo";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -28,6 +27,10 @@ import { useAuth } from "@/contexts/auth-context";
 import { fetchWithAuth, API_BASE, setStoredToken } from "@/lib/queryClient";
 import { Loader2, Eye, EyeOff, Mail, CheckCircle2 } from "lucide-react";
 import { VersionBadge } from "@/components/version-badge";
+
+// Identidade nova da Pitzi (logo em PNG transparente, cor do fundo da arte oficial).
+const PITZI_BLUE = "#1933FC";
+const PITZI_LOGO_URL = `${import.meta.env.BASE_URL}brand/pitzi-logo-2026-white.png`;
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -77,36 +80,6 @@ const leftPanelVariants = {
 };
 
 // Decorative recycling arrows for green panel
-function PhonePatternIcon({ className, style, size = 60, rotate = 0 }: {
-  className?: string;
-  style?: React.CSSProperties;
-  size?: number;
-  rotate?: number;
-}) {
-  return (
-    <svg
-      className={className}
-      style={style}
-      width={size}
-      height={Math.round(size * 1.5)}
-      viewBox="0 0 60 90"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <g transform={`rotate(${rotate}, 30, 45)`}>
-        <rect x="4" y="2" width="52" height="86" rx="12" stroke="white" strokeWidth="3.5"/>
-        <circle cx="30" cy="18" r="6" stroke="white" strokeWidth="3"/>
-        <circle cx="18" cy="68" r="4.5" fill="white"/>
-        <circle cx="30" cy="68" r="4.5" fill="white"/>
-        <circle cx="42" cy="68" r="4.5" fill="white"/>
-        <circle cx="18" cy="80" r="4.5" fill="white"/>
-        <circle cx="30" cy="80" r="4.5" fill="white"/>
-        <circle cx="42" cy="80" r="4.5" fill="white"/>
-      </g>
-    </svg>
-  );
-}
-
 // Dark input classes — always dark regardless of app theme
 const darkInputClass =
   "h-[52px] bg-black/[0.05] border-black/[0.10] rounded-xl text-gray-900 placeholder:text-black/30 focus-visible:ring-1 focus-visible:ring-[#3B42DE] focus-visible:border-[#3B42DE] text-sm";
@@ -415,19 +388,8 @@ export default function LoginPage() {
         initial="hidden"
         animate="visible"
         className="hidden md:flex relative flex-col items-center justify-center overflow-hidden"
-        style={{ width: "50%", minHeight: "100vh", background: "#3B42DE" }}
+        style={{ width: "50%", minHeight: "100vh", background: PITZI_BLUE }}
       >
-        {/* Phone pattern background */}
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "4%",    left: "6%",   opacity: 0.10 }} size={54} rotate={-18} />
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "2%",    left: "28%",  opacity: 0.08 }} size={46} rotate={25}  />
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "8%",    left: "54%",  opacity: 0.11 }} size={50} rotate={-10} />
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "3%",    right: "8%",  opacity: 0.09 }} size={48} rotate={20}  />
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "38%",   left: "2%",   opacity: 0.08 }} size={52} rotate={30}  />
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ top: "42%",   right: "4%",  opacity: 0.10 }} size={56} rotate={-22} />
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ bottom: "22%",left: "8%",   opacity: 0.10 }} size={50} rotate={-15} />
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ bottom: "20%",left: "30%",  opacity: 0.07 }} size={44} rotate={20}  />
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ bottom: "8%", right: "12%", opacity: 0.09 }} size={52} rotate={15}  />
-        <PhonePatternIcon className="absolute pointer-events-none" style={{ bottom: "5%", left: "55%",  opacity: 0.08 }} size={48} rotate={-25} />
 
         {/* Center logo */}
         <div className="relative z-10 flex items-center justify-center">
@@ -436,19 +398,7 @@ export default function LoginPage() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
           >
-            <svg viewBox="0 0 280 90" width="280" height="90" xmlns="http://www.w3.org/2000/svg">
-              <g transform="translate(42, 45) rotate(-12) translate(-27, -40)">
-                <rect x="2" y="2" width="50" height="76" rx="11" fill="none" stroke="white" strokeWidth="4"/>
-                <circle cx="27" cy="16" r="5.5" stroke="white" strokeWidth="3" fill="none"/>
-                <circle cx="15" cy="58" r="4" fill="white"/>
-                <circle cx="27" cy="58" r="4" fill="white"/>
-                <circle cx="39" cy="58" r="4" fill="white"/>
-                <circle cx="15" cy="69" r="4" fill="white"/>
-                <circle cx="27" cy="69" r="4" fill="white"/>
-                <circle cx="39" cy="69" r="4" fill="white"/>
-              </g>
-              <text x="88" y="62" fontFamily="Montserrat, sans-serif" fontWeight="800" fontSize="56" fill="white" letterSpacing="-2">pitzi</text>
-            </svg>
+            <img src={PITZI_LOGO_URL} alt="Pitzi" width={300} style={{ display: "block", width: 300, height: "auto" }} />
           </motion.div>
         </div>
       </motion.div>
@@ -468,9 +418,9 @@ export default function LoginPage() {
           <motion.div variants={itemVariants} className="flex justify-center mb-8 md:hidden">
             <div
               className="inline-flex items-center justify-center rounded-2xl px-6 py-3"
-              style={{ background: "#3B42DE" }}
+              style={{ background: PITZI_BLUE }}
             >
-              <RenovLogo variant="white" size="md" />
+              <img src={PITZI_LOGO_URL} alt="Pitzi" style={{ display: "block", width: 120, height: "auto" }} />
             </div>
           </motion.div>
 
