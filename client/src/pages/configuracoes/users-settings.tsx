@@ -67,23 +67,23 @@ const formSchema = z.object({
   areaNegocio: z.string().optional(),
   perfilAcesso: z.string().optional(),
   modulePermissions: z.object({
-    chamados: z.boolean(),
-    projetos: z.boolean(),
-    tarefas: z.boolean(),
+    chamados: z.boolean().default(false),
+    projetos: z.boolean().default(false),
+    tarefas: z.boolean().default(false),
     reunioes: z.boolean().default(true),
     fluxogramas: z.boolean().default(true),
     metas: z.boolean().default(true),
-    okrs: z.boolean(),
-    logistica: z.boolean(),
-    triagem: z.boolean(),
+    okrs: z.boolean().default(false),
+    logistica: z.boolean().default(false),
+    triagem: z.boolean().default(false),
     avaliacoes: z.boolean().default(true),
     estoques: z.boolean().default(true),
     pricing: z.boolean().default(true),
     conhecimento: z.boolean().default(true),
-    apis: z.boolean(),
+    apis: z.boolean().default(false),
     comercial: z.boolean().default(true),
     apoio_vendas: z.boolean().default(false),
-    configuracoes: z.boolean(),
+    configuracoes: z.boolean().default(false),
     campos_chamado: z.boolean().default(false),
   }),
 });
@@ -271,7 +271,8 @@ export function UsersSettings() {
 
     try {
       if (user.modulePermissions) {
-        perms = JSON.parse(user.modulePermissions);
+        // Mescla com os padrões: contas criadas pelo login com Google só gravam "chamados".
+        perms = { ...perms, ...JSON.parse(user.modulePermissions) };
       }
     } catch (e) {
       console.error("Error parsing permissions", e);
@@ -536,7 +537,21 @@ export function UsersSettings() {
           </DialogHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit((data) => mutation.mutate(data))} className="space-y-4 pb-4">
+            <form
+              onSubmit={form.handleSubmit(
+                (data) => mutation.mutate(data),
+                (errors) => {
+                  // Antes, um campo inválido escondido deixava o botão "Salvar" sem resposta.
+                  const first = Object.values(errors)[0] as { message?: string } | undefined;
+                  toast({
+                    title: "Não foi possível salvar",
+                    description: first?.message || "Confira os campos do formulário.",
+                    variant: "destructive",
+                  });
+                },
+              )}
+              className="space-y-4 pb-4"
+            >
               <FormField
                 control={form.control}
                 name="name"
