@@ -9,6 +9,8 @@ const storage = {
   getUser: vi.fn(),
   getUsers: vi.fn(),
   createNotification: vi.fn(),
+  getActiveSupportGroupByKey: vi.fn(async (key: string) => ({ key, active: true })),
+  getTicketCustomFields: vi.fn(async () => []),
 };
 
 vi.mock("../lib/storage", () => ({ getStorage: () => storage }));
@@ -52,7 +54,8 @@ beforeEach(() => {
   storage.getTicket.mockResolvedValue(TICKET);
   storage.getTicketComments.mockResolvedValue(COMMENTS);
   storage.createTicketComment.mockImplementation(async (data: any) => ({ id: "new", ...data }));
-  storage.getUser.mockImplementation(async (id: string) => ({ id, name: id }));
+  // "tech-*" são técnicos; os demais ("req-*") são solicitantes do tipo Usuário.
+  storage.getUser.mockImplementation(async (id: string) => ({ id, name: id, status: "active", isTechnician: id.startsWith("tech") }));
   storage.getUsers.mockResolvedValue([]);
   storage.createNotification.mockResolvedValue(undefined);
   storage.updateTicket.mockResolvedValue(TICKET);
@@ -154,5 +157,34 @@ describe("Worker PATCH /api/tickets/:id — pausa do SLA", () => {
     const data = storage.updateTicket.mock.calls[0][1];
     expect(data).not.toHaveProperty("slaPausadoEm");
     expect(data).not.toHaveProperty("slaPausaMinutos");
+  });
+});
+
+describe("Worker PATCH /api/tickets/:id — solicitante do tipo Usuário", () => {
+  const patch = (userId: string, body: unknown) =>
+    buildApp(userId).request("/api/tickets/t1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  it("não muda status, gravidade, grupo nem responsável; título e descrição sim", async () => {
+    storage.getTicket.mockResolvedValue({ ...TICKET, status: "open", impact: "baixo", category: "sap", slaPausadoEm: null, slaPausaMinutos: 0 });
+    const res = await patch("req-1", {
+      status: "resolved", impact: "critico", category: "dados", assigneeId: "tech-1",
+      customFields: { f1: "x" }, title: "Notebook não liga (atualizado)", description: "mais detalhes",
+    });
+    expect(res.status).toBe(200);
+    const data = storage.updateTicket.mock.calls[0][1];
+    expect(data).toMatchObject({ title: "Notebook não liga (atualizado)", description: "mais detalhes" });
+    for (const k of ["status", "impact", "category", "assigneeId", "customFields", "dataResolucao"]) {
+      expect(data).not.toHaveProperty(k);
+    }
+  });
+
+  it("o técnico responsável continua mudando o status", async () => {
+    storage.getTicket.mockResolvedValue({ ...TICKET, status: "open", slaPausadoEm: null, slaPausaMinutos: 0 });
+    await patch("tech-1", { status: "in_progress" });
+    expect(storage.updateTicket.mock.calls[0][1]).toMatchObject({ status: "in_progress" });
   });
 });
