@@ -65,7 +65,7 @@ describe.skipIf(!url)("grupos de atendimento", () => {
     await cleanup();
     for (const [key, tenant] of [["adminA", "tenant-a"], ["userA", "tenant-a"], ["agentA", "tenant-a"], ["adminB", "tenant-b"]] as const) {
       const { rows } = await pool.query(
-        "INSERT INTO users (name, email, status, is_admin, tenant_id) VALUES ($1, $2, 'active', $3, $4) RETURNING id",
+        "INSERT INTO users (name, email, status, is_admin, is_technician, tenant_id) VALUES ($1, $2, 'active', $3, true, $4) RETURNING id",
         [key, `${key}@group-test.local`, key.startsWith("admin"), tenant],
       );
       ids[key] = rows[0].id;

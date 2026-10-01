@@ -48,6 +48,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { User } from "@shared/schema";
+import { USER_TYPES, isTechnician } from "@shared/user-type";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 
@@ -55,19 +56,14 @@ const MODULES = [
   { key: "chamados", label: "Chamados" },
 ] as const;
 
-const PERFIS_ACESSO = [
-  { value: "usuario_normal", label: "Usuário Normal" },
-  { value: "assistente", label: "Assistente" },
-  { value: "analista", label: "Analista" },
-  { value: "gestor", label: "Gestor" },
-  { value: "diretor", label: "Diretor" },
-];
 
 const formSchema = z.object({
   name: z.string().min(2, "Nome deve ter no mínimo 2 caracteres"),
   email: z.string().email("Email inválido"),
   password: z.string().optional(),
   isAdmin: z.boolean().default(false),
+  // Técnico atende chamados; Usuário só abre e acompanha os seus (shared/user-type.ts).
+  tipo: z.enum(["tecnico", "usuario"]).default("usuario"),
   areaNegocio: z.string().optional(),
   perfilAcesso: z.string().optional(),
   modulePermissions: z.object({
@@ -182,6 +178,7 @@ export function UsersSettings() {
       email: "",
       password: "",
       isAdmin: false,
+      tipo: "usuario",
       areaNegocio: "",
       perfilAcesso: "",
       modulePermissions: {
@@ -213,6 +210,7 @@ export function UsersSettings() {
         email: data.email,
         ...(data.password ? { password: data.password } : {}),
         isAdmin: data.isAdmin,
+        isTechnician: data.tipo === "tecnico",
         areaNegocio: data.areaNegocio || null,
         perfilAcesso: data.perfilAcesso || null,
         status: editingUser?.status || "active",
@@ -284,6 +282,7 @@ export function UsersSettings() {
       email: user.email,
       password: "",
       isAdmin: user.isAdmin || false,
+      tipo: user.isTechnician ? "tecnico" : "usuario",
       areaNegocio: user.areaNegocio || "",
       perfilAcesso: user.perfilAcesso || "",
       modulePermissions: perms,
@@ -298,6 +297,7 @@ export function UsersSettings() {
       email: "",
       password: "",
       isAdmin: false,
+      tipo: "usuario",
       areaNegocio: "",
       perfilAcesso: "",
       modulePermissions: {
@@ -417,6 +417,11 @@ export function UsersSettings() {
                     Usuário <SortIcon column="name" />
                   </div>
                 </TableHead>
+                <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort("isTechnician")}>
+                  <div className="flex items-center">
+                    Tipo <SortIcon column="isTechnician" />
+                  </div>
+                </TableHead>
                 <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort("isAdmin")}>
                   <div className="flex items-center">
                     Acesso <SortIcon column="isAdmin" />
@@ -450,6 +455,13 @@ export function UsersSettings() {
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                       </div>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {isTechnician(user) ? (
+                      <Badge variant="outline" className="border-primary/40 text-primary" data-testid={`badge-tipo-${user.id}`}>Técnico</Badge>
+                    ) : (
+                      <Badge variant="secondary" data-testid={`badge-tipo-${user.id}`}>Usuário</Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge variant={user.isAdmin ? "default" : "secondary"} className={user.isAdmin ? "bg-primary text-white" : ""}>
@@ -613,22 +625,25 @@ export function UsersSettings() {
 
                 <FormField
                   control={form.control}
-                  name="perfilAcesso"
+                  name="tipo"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Perfil de Acesso</FormLabel>
-                      <Select value={field.value || ""} onValueChange={field.onChange}>
+                      <FormLabel>Tipo</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-perfil-acesso">
-                            <SelectValue placeholder="Selecione o perfil" />
+                          <SelectTrigger data-testid="select-tipo-usuario">
+                            <SelectValue placeholder="Selecione o tipo" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {PERFIS_ACESSO.map(perfil => (
-                            <SelectItem key={perfil.value} value={perfil.value}>{perfil.label}</SelectItem>
+                          {USER_TYPES.map((t) => (
+                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormDescription>
+                        Técnicos atendem chamados. Usuários só abrem e acompanham os seus. Admin conta como técnico.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { useAuth } from "@/contexts/auth-context";
+import { onlyTechnicians, useIsTechnician } from "@/hooks/use-is-technician";
 import { X, Send, Paperclip, ExternalLink, Download, Maximize2, FileText, FileSpreadsheet, FileImage, File, FileArchive, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -185,13 +186,14 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
   const [enviandoComentario, setEnviandoComentario] = useState(false);
   const [comentarioInterno, setComentarioInterno] = useState(false);
   const { user: currentUser } = useAuth();
+  const isTech = useIsTechnician();
   const [editingField, setEditingField] = useState<string | null>(null);
   const [descricaoDraft, setDescricaoDraft] = useState<string>("");
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subtasksLoading, setSubtasksLoading] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [availableUsers, setAvailableUsers] = useState<Array<{id: string; name: string}>>([]);
+  const [availableUsers, setAvailableUsers] = useState<Array<{id: string; name: string; status?: string | null; isAdmin?: boolean | null; isTechnician?: boolean | null}>>([]);
   const [availableProjetos, setAvailableProjetos] = useState<ProjetoOption[]>([]);
   const [tarefaExtras, setTarefaExtras] = useState<TarefaDetailExtras>({ projetoId: null, responsavelId: null, applicationKey: null });
   const [isPatching, setIsPatching] = useState(false);
@@ -283,7 +285,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
     if (!open) return;
     fetchWithAuth("/api/users")
       .then((r) => r.json())
-      .then((data: Array<{id: string; name: string}>) => setAvailableUsers(data || []))
+      .then((data: typeof availableUsers) => setAvailableUsers(data || []))
       .catch(() => {});
   }, [open]);
 
@@ -778,7 +780,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           style={{ background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
                         >
                           {isChamado && <option value="">Manter atual</option>}
-                          {availableUsers.map((u) => (
+                          {(isChamado ? onlyTechnicians(availableUsers) : availableUsers).map((u) => (
                             <option key={u.id} value={u.id}>{u.name}</option>
                           ))}
                         </select>
@@ -1158,7 +1160,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                         <Send className="h-4 w-4" />
                       </button>
                     </div>
-                    {isChamado && currentUser?.id !== (item as ChamadoItem).solicitanteId && (
+                    {isChamado && isTech && currentUser?.id !== (item as ChamadoItem).solicitanteId && (
                       <label className="mt-2 flex items-center gap-2 text-xs cursor-pointer select-none" style={{ color: "rgba(255,255,255,0.55)" }}>
                         <input
                           type="checkbox"

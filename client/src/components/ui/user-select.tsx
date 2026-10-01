@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Check, ChevronsUpDown, User, Bot } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { User as UserType } from "@shared/schema"
+import { isTechnician } from "@shared/user-type"
 
 interface UserSelectProps {
   value?: string
@@ -25,6 +26,8 @@ interface UserSelectProps {
   emptyMessage?: string
   disabled?: boolean
   showAutoOption?: boolean
+  /** Só técnicos (e admins): use nos campos de responsável. */
+  onlyTechnicians?: boolean
 }
 
 export function UserSelect({
@@ -34,6 +37,7 @@ export function UserSelect({
   emptyMessage = "Nenhum usuário encontrado",
   disabled = false,
   showAutoOption = false,
+  onlyTechnicians = false,
 }: UserSelectProps) {
   const [open, setOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
@@ -53,7 +57,7 @@ export function UserSelect({
 
   // Filter only active users and sort by name
   const activeUsers = filteredUsers
-    .filter((user) => user.status === "active")
+    .filter((user) => user.status === "active" && (!onlyTechnicians || isTechnician(user)))
     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
 
   // Find selected user

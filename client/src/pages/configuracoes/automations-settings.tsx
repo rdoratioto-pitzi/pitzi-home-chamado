@@ -1,6 +1,7 @@
 // Configurações → Respostas prontas e Automações. Mesma regra de acesso de "Campos do chamado":
 // admins e quem tem a permissão "Gerenciar campos dos chamados".
 import { useState } from "react";
+import { isTechnician } from "@shared/user-type";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -424,7 +425,9 @@ export function AutomationsSettings() {
                               <SelectItem value="requester">Solicitante</SelectItem>
                             </>
                           )}
-                          {(action.type === "set_assignee" || action.type === "notify_user") &&
+                          {action.type === "set_assignee" &&
+                            activeUsers.filter(isTechnician).map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
+                          {action.type === "notify_user" &&
                             activeUsers.map((u) => <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}
                         </SelectContent>
                       </Select>

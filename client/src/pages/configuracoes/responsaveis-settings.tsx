@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { isTechnician } from "@shared/user-type";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -302,7 +303,7 @@ export function ResponsaveisSettings() {
                   <SelectValue placeholder="Selecione o responsável" />
                 </SelectTrigger>
                 <SelectContent>
-                  {users.filter(u => u.status === "active").sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((user) => (
+                  {users.filter(u => u.status === "active" && isTechnician(u)).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       {user.name}
                     </SelectItem>

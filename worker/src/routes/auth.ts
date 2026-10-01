@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { isTechnician } from "../../../shared/user-type";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { users, refreshTokens } from "../../../shared/schema";
@@ -89,6 +90,7 @@ auth.post("/api/auth/login", async (c) => {
       tenantId: user.tenantId,
       role: user.isAdmin ? "admin" : "user",
       isAdmin: user.isAdmin === true,
+      isTechnician: isTechnician(user),
       modulePermissions: user.modulePermissions,
       status: user.status,
     },
@@ -123,6 +125,7 @@ auth.get("/api/auth/me", async (c) => {
       tenantId: user.tenantId,
       role: user.isAdmin ? "admin" : "user",
       isAdmin: user.isAdmin === true,
+      isTechnician: isTechnician(user),
       modulePermissions: user.modulePermissions,
       status: user.status,
     },
