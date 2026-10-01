@@ -1,1 +1,0 @@
-import{k as u}from"./index-BwSK1Sag.js";function a(){const o=u({queryKey:["/api/v1/support-groups"],queryFn:async()=>{const r=await fetch("/api/v1/support-groups");if(!r.ok)throw new Error("Erro ao carregar grupos de atendimento");return r.json()},staleTime:3e5}),e=o.data??[];return{...o,groups:e,groupName:r=>e.find(s=>s.key===r)?.name??r??""}}export{a as u};
