@@ -35,6 +35,8 @@ import { resolveCustomFieldValues } from "../../../server/services/ticket-fields
 import { runTicketAutomations } from "../../../server/services/automations.service";
 import { isInQueue } from "../../../shared/ticket-queue";
 import { canViewTicket, getQueueViewer } from "../../../server/services/ticket-queue.service";
+import { isTechnicianUserId } from "../../../server/services/user-type.service";
+import { TECHNICIAN_REQUIRED_ERROR } from "../../../shared/user-type";
 
 /** Extrai env Slack do binding do Worker. */
 function slackEnv(envBindings: {
@@ -350,7 +352,9 @@ workspace.post("/api/workspace/chamados", async (c) => {
     const custom = await resolveCustomFieldValues(storage, { incoming: (body as any).customFields, groupKey: categoria, isCreate: true });
     if (!custom.ok) return c.json({ error: custom.error }, custom.status);
     const tipoChamado = tipo || "bug";
-    const assigneeId = await storage.findResponsavelForTicket(categoria, tipoChamado, tenantId ?? null);
+    const autoAssignee = await storage.findResponsavelForTicket(categoria, tipoChamado, tenantId ?? null);
+    // Regra antiga cujo responsável deixou de ser técnico é ignorada.
+    const assigneeId = autoAssignee && (await isTechnicianUserId(storage, autoAssignee)) ? autoAssignee : null;
 
     const prioridadeMap: Record<string, string> = { baixa: "low", media: "medium", alta: "high", critica: "critical" };
     const mappedPriority = prioridade ? (prioridadeMap[prioridade] || prioridade) : "medium";
@@ -975,7 +979,13 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
       Object.assign(updateData, slaPauseUpdate(previous, status));
     }
     if (prioridade !== undefined) updateData.priority = prioridadeMap[prioridade] || prioridade;
-    if (responsavelId !== undefined) updateData.assigneeId = responsavelId;
+    if (responsavelId !== undefined) {
+      // Novo responsável precisa ser técnico; o atual continua válido.
+      if (responsavelId && responsavelId !== previous.assigneeId && !(await isTechnicianUserId(storage, responsavelId))) {
+        return c.json({ error: TECHNICIAN_REQUIRED_ERROR }, 400);
+      }
+      updateData.assigneeId = responsavelId;
+    }
     if (titulo !== undefined) updateData.title = titulo.trim();
     if (descricao !== undefined) updateData.description = descricao;
     if (applicationKey !== undefined) updateData.applicationKey = applicationKey;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isTechnician } from "@shared/user-type";
 import { useQuery } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 import {
@@ -45,7 +46,7 @@ export function TransferirChamadoDialog({ item, onClose, onConfirm }: Transferir
 
   const target = groups.find(g => g.key === category);
   const members = users
-    .filter(u => target?.memberIds.includes(u.id) && u.status === "active")
+    .filter(u => target?.memberIds.includes(u.id) && u.status === "active" && isTechnician(u))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const confirm = async () => {

@@ -15,14 +15,15 @@ import {
 } from "../../shared/knowledge";
 import type { IStorage } from "../storage";
 import { canViewTicket, getQueueViewer, type QueueActor } from "./ticket-queue.service";
+import { isTechnician } from "../../shared/user-type";
 
 export type KnowledgeActor = QueueActor;
 
 type Fail = { ok: false; status: 400 | 403 | 404 | 409; error: string; articleId?: string };
 
 export async function getKnowledgeViewer(storage: IStorage, actor: KnowledgeActor): Promise<KnowledgeViewer> {
-  const queue = await getQueueViewer(storage, actor);
-  return { userId: actor.userId, isAdmin: actor.isAdmin, groupKeys: queue.groupKeys };
+  const [queue, user] = await Promise.all([getQueueViewer(storage, actor), storage.getUser(actor.userId)]);
+  return { userId: actor.userId, isAdmin: actor.isAdmin, groupKeys: queue.groupKeys, isTechnician: isTechnician(user) };
 }
 
 function inTenant(actor: KnowledgeActor, article: { tenantId: string | null }): boolean {

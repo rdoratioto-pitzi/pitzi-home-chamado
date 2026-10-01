@@ -60,7 +60,7 @@ beforeEach(() => {
   storage.getActiveSupportGroupByKey.mockResolvedValue({ key: "financeiro" });
   storage.createCannedResponse.mockImplementation(async (d: any) => ({ id: "new", ...d }));
   storage.createAutomationRule.mockImplementation(async (d: any) => ({ id: "rule", ...d }));
-  storage.getUser.mockImplementation(async (id: string) => ({ id }));
+  storage.getUser.mockImplementation(async (id: string) => ({ id, status: "active", isTechnician: true }));
   storage.createTicketComment.mockResolvedValue({});
   storage.createNotification.mockResolvedValue({});
 });
