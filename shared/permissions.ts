@@ -2,6 +2,28 @@ import type { ModulePermissions } from "./schema";
 
 export type ModulePermissionKey = keyof ModulePermissions;
 
+/**
+ * Todas as chaves de permissão de módulo que o cadastro guarda. Um cadastro incompleto
+ * (ex.: conta criada pelo login com Google, que só tinha "chamados") quebrava o formulário
+ * de edição em Configurações; por isso todo usuário é gravado com a lista completa.
+ */
+export const MODULE_PERMISSION_KEYS = [
+  "chamados", "projetos", "tarefas", "reunioes", "okrs", "metas", "fluxogramas", "diagramas",
+  "logistica", "triagem", "pricing", "conhecimento", "apis", "configuracoes", "updates",
+  "estoques", "avaliacoes", "comercial", "apoio_vendas", "campos_chamado",
+] as const;
+
+/** Lista completa: mantém o que já está gravado; o que faltar vale false (chamados: true). */
+export function completeModulePermissions(raw: unknown): string {
+  const current = parseModulePermissions(raw) as Record<string, unknown>;
+  const full: Record<string, boolean> = {};
+  for (const key of MODULE_PERMISSION_KEYS) {
+    const value = current[key];
+    full[key] = typeof value === "boolean" ? value : key === "chamados";
+  }
+  return JSON.stringify(full);
+}
+
 export function parseModulePermissions(raw: unknown): Partial<ModulePermissions> {
   if (!raw) return {};
   if (typeof raw === "object") return raw as Partial<ModulePermissions>;

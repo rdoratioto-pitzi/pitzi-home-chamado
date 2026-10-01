@@ -96,7 +96,11 @@ describe.skipIf(!url)("login com Google", () => {
     expect(body.user).toMatchObject({ email: "gtest.nova@pitzi.com.br", isAdmin: false, isTechnician: false });
     const row = await userRow("gtest.nova@pitzi.com.br");
     expect(row).toMatchObject({ name: "Nova Pessoa", status: "active", auth_method: "google", is_admin: false, is_technician: false });
-    expect(JSON.parse(row.module_permissions)).toEqual({ chamados: true });
+    // Lista completa de módulos, só "chamados" ligado (o formulário de edição exige todas).
+    const perms = JSON.parse(row.module_permissions);
+    expect(perms.chamados).toBe(true);
+    expect(Object.entries(perms).filter(([, v]) => v).map(([k]) => k)).toEqual(["chamados"]);
+    expect(Object.keys(perms)).toHaveLength(20);
     // Segundo acesso reaproveita o mesmo cadastro.
     await post("/api/auth/google", { credential: await token() });
     expect((await pool.query("SELECT count(*)::int n FROM users WHERE email = 'gtest.nova@pitzi.com.br'")).rows[0].n).toBe(1);

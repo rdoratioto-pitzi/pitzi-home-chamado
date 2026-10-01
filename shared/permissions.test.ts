@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canManageTicketFields, hasModulePermission, parseModulePermissions } from "./permissions";
+import { MODULE_PERMISSION_KEYS, canManageTicketFields, completeModulePermissions, hasModulePermission, parseModulePermissions } from "./permissions";
 
 describe("canManageTicketFields", () => {
   it("só administradores; permissões avulsas antigas não valem", () => {
@@ -68,5 +68,22 @@ describe("hasModulePermission", () => {
     const user = { isAdmin: false, modulePermissions: '{"metas":true}' };
     expect(hasModulePermission(user, "okrs")).toBe(false);
     expect(hasModulePermission(user, "metas")).toBe(true);
+  });
+});
+
+describe("completeModulePermissions", () => {
+  it("completa as chaves ausentes e mantém o que já estava gravado", () => {
+    const full = JSON.parse(completeModulePermissions('{"chamados":true,"projetos":true}'));
+    expect(Object.keys(full).sort()).toEqual([...MODULE_PERMISSION_KEYS].sort());
+    expect(full.projetos).toBe(true);
+    expect(full.configuracoes).toBe(false);
+  });
+
+  it("cadastro vazio ou inválido vira só chamados", () => {
+    for (const raw of [null, "", "não é json"]) {
+      const full = JSON.parse(completeModulePermissions(raw));
+      expect(full.chamados).toBe(true);
+      expect(Object.values(full).filter(Boolean)).toHaveLength(1);
+    }
   });
 });
