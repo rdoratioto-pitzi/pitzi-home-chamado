@@ -5,6 +5,20 @@ import rateLimit from "express-rate-limit";
 import { storage } from "../storage";
 import { hashPassword, verifyPassword } from "@shared/password";
 import { passwordResetUrl, sendPasswordResetLinkEmail } from "../email-service";
+import { db } from "../db";
+import {
+  INACTIVE_ACCOUNT_MESSAGE,
+  USE_GOOGLE_MESSAGE,
+  allowedGoogleDomains,
+  canUsePasswordLogin,
+  googleLoginClientId,
+  passwordLoginMode,
+  publicAuthConfig,
+  type AuthPolicyEnv,
+} from "@shared/auth-policy";
+import { GoogleTokenInvalid, verifyGoogleIdToken } from "@shared/google-id-token";
+import { findOrProvisionGoogleUser } from "../services/google-login.service";
+import type { User } from "@shared/schema";
 
 // Rate limiter para tentativas de login - protege contra força bruta
 const loginLimiter = rateLimit({
@@ -24,8 +38,58 @@ const forgotPasswordLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// process.env é lido a cada chamada (mesmo objeto), então mudanças no .env valem após reiniciar.
+const authEnv = process.env as AuthPolicyEnv;
+
+// Mesmo contrato do Worker (worker/src/routes/auth.ts); política em shared/auth-policy.ts.
+function sessionResponse(req: any, res: any, user: User, rememberMe: boolean) {
+  req.session.userId = user.id;
+  req.session.isAdmin = user.isAdmin === true;
+  req.session.cookie.maxAge = rememberMe ? 7 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  res.json({
+    success: true,
+    token: `renov_${req.sessionID}_${Date.now()}`,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      modulePermissions: user.modulePermissions,
+      isAdmin: user.isAdmin === true,
+      isTechnician: isTechnician(user),
+      status: user.status,
+    },
+  });
+}
+
 export function registerAuthRoutes(router: Router) {
+  router.get("/api/auth/config", (_req, res) => {
+    res.json(publicAuthConfig(authEnv));
+  });
+
+  router.post("/api/auth/google", loginLimiter, async (req, res) => {
+    const clientId = googleLoginClientId(authEnv);
+    if (!clientId) return res.status(503).json({ success: false, message: "Login com Google ainda não configurado." });
+    if (!db) return res.status(500).json({ success: false, message: "Database not available" });
+    const credential = typeof req.body?.credential === "string" ? req.body.credential : "";
+    if (credential.length < 20) return res.status(400).json({ success: false, message: "Credencial do Google ausente." });
+    try {
+      const identity = await verifyGoogleIdToken(credential, { clientId, allowedDomains: allowedGoogleDomains(authEnv) });
+      const result = await findOrProvisionGoogleUser(db, identity);
+      if (!result.ok) return res.status(403).json({ success: false, message: INACTIVE_ACCOUNT_MESSAGE });
+      sessionResponse(req, res, result.user, req.body?.rememberMe === true);
+    } catch (error) {
+      if (error instanceof GoogleTokenInvalid) {
+        return res.status(401).json({ success: false, message: "Não foi possível validar o login com Google.", reason: error.reason });
+      }
+      console.error("[auth] Google login error:", error);
+      res.status(502).json({ success: false, message: "Não foi possível validar o login com Google." });
+    }
+  });
+
   router.post("/api/auth/login", loginLimiter, async (req, res) => {
+    if (passwordLoginMode(authEnv) === "off") {
+      return res.status(403).json({ success: false, message: USE_GOOGLE_MESSAGE, code: "use_google" });
+    }
     try {
       const loginBodySchema = z.object({
         email: z.string().email("Email inválido"),
@@ -52,32 +116,11 @@ export function registerAuthRoutes(router: Router) {
       if (user.status !== "active") {
         return res.status(401).json({ success: false, message: "Sua conta está inativa. Entre em contato com o administrador." });
       }
-
-      req.session.userId = user.id;
-      req.session.isAdmin = user.isAdmin === true;
-
-      // Sessão com rememberMe reduzida para 7 dias (antes era 30)
-      if (validated.rememberMe) {
-        req.session.cookie.maxAge = 7 * 24 * 60 * 60 * 1000;
-      } else {
-        req.session.cookie.maxAge = 24 * 60 * 60 * 1000;
+      if (!canUsePasswordLogin(authEnv, user)) {
+        return res.status(403).json({ success: false, message: USE_GOOGLE_MESSAGE, code: "use_google" });
       }
 
-      const sessionToken = `renov_${req.sessionID}_${Date.now()}`;
-
-      res.json({
-        success: true,
-        token: sessionToken,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          modulePermissions: user.modulePermissions,
-          isAdmin: user.isAdmin === true,
-          isTechnician: isTechnician(user),
-          status: user.status,
-        }
-      });
+      sessionResponse(req, res, user, validated.rememberMe);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ success: false, message: "Dados inválidos", details: error.errors });
@@ -130,7 +173,7 @@ export function registerAuthRoutes(router: Router) {
     try {
       const validated = forgotPasswordSchema.parse(req.body);
       const user = await storage.getUserByEmail(validated.email);
-      if (!user || user.status !== "active") {
+      if (!user || user.status !== "active" || !canUsePasswordLogin(authEnv, user)) {
         return res.json({ success: true, message: successMsg });
       }
 
