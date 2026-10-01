@@ -2,7 +2,6 @@ import { Link, useLocation } from "wouter";
 import { Home, Ticket, Plus, FileText, Settings, User, LogOut, ChevronDown, BookOpen } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu,
   SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
-import { PitziLogo } from "./renov-logo";
 import { VersionBadge } from "./version-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -10,6 +9,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { getUserPermissions } from "@/lib/permissions";
 import { useIsTechnician } from "@/hooks/use-is-technician";
+
+// Logo do topo do menu: azul no tema claro, branco no escuro (troca pela classe "dark").
+const LOGO_BASE = `${import.meta.env.BASE_URL}brand/`;
+function MenuLogo() {
+  return (
+    <>
+      <img src={`${LOGO_BASE}pitzi-logo-menu.png`} alt="Pitzi" className="block h-9 w-auto dark:hidden" />
+      <img src={`${LOGO_BASE}pitzi-logo-menu-white.png`} alt="Pitzi" className="hidden h-9 w-auto dark:block" />
+    </>
+  );
+}
 
 export function AppSidebar() {
   const [location] = useLocation();
@@ -28,7 +38,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4 border-b border-border/40">
-        <Link href="/" aria-label="Pitzi — Início"><PitziLogo size="md" /></Link>
+        <Link href="/" aria-label="Pitzi — Início"><MenuLogo /></Link>
         <span className="text-xs text-muted-foreground">Central de chamados</span>
       </SidebarHeader>
       <SidebarContent>
@@ -54,7 +64,7 @@ function RequesterSidebar({ location }: { location: string }) {
   return (
     <Sidebar>
       <SidebarHeader className="p-4 border-b border-border/40">
-        <Link href="/chamados" aria-label="Pitzi — Meus chamados"><PitziLogo size="md" /></Link>
+        <Link href="/chamados" aria-label="Pitzi — Meus chamados"><MenuLogo /></Link>
         <span className="text-xs text-muted-foreground">Central de chamados</span>
       </SidebarHeader>
       <SidebarContent>
