@@ -111,6 +111,26 @@ function PhonePatternIcon({ className, style, size = 60, rotate = 0 }: {
 const darkInputClass =
   "h-[52px] bg-black/[0.05] border-black/[0.10] rounded-xl text-gray-900 placeholder:text-black/30 focus-visible:ring-1 focus-visible:ring-[#3B42DE] focus-visible:border-[#3B42DE] text-sm";
 
+// O banco (Neon) desliga quando fica parado e leva alguns segundos para voltar; sem limite,
+// o botão ficava em "Entrando..." para sempre. Cada tentativa tem LOGIN_TIMEOUT_MS e há uma
+// segunda tentativa automática.
+const LOGIN_TIMEOUT_MS = 20_000;
+
+class LoginTimeoutError extends Error {}
+
+async function fetchLoginWithTimeout(body: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LOGIN_TIMEOUT_MS);
+  try {
+    return await fetchWithAuth("/api/auth/login", { method: "POST", body, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new LoginTimeoutError();
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -122,6 +142,12 @@ export default function LoginPage() {
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [loginSuccess, setLoginSuccess] = useState(false);
+  const [slowServer, setSlowServer] = useState(false);
+
+  // Acorda a API e o banco enquanto a pessoa digita a senha.
+  useEffect(() => {
+    fetch(`${API_BASE}/api/health`, { credentials: "include" }).catch(() => undefined);
+  }, []);
   // Countdown timer for forgot password
   useEffect(() => {
     if (countdown > 0) {
@@ -149,11 +175,17 @@ export default function LoginPage() {
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
+    setSlowServer(false);
     try {
-      const response = await fetchWithAuth("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      const body = JSON.stringify(data);
+      let response: Response;
+      try {
+        response = await fetchLoginWithTimeout(body);
+      } catch (error) {
+        // Timeout ou queda de rede: tenta mais uma vez avisando que o servidor está lento.
+        setSlowServer(true);
+        response = await fetchLoginWithTimeout(body);
+      }
       const result = await response.json();
 
       if (result.success) {
@@ -174,13 +206,17 @@ export default function LoginPage() {
         });
       }
     } catch (error: any) {
+      const timedOut = error instanceof LoginTimeoutError || error?.name === "TypeError";
       toast({
-        title: "Erro no login",
-        description: error.message || "Email ou senha incorretos",
+        title: timedOut ? "O servidor demorou para responder" : "Erro no login",
+        description: timedOut
+          ? "Tente de novo em alguns segundos."
+          : error.message || "Email ou senha incorretos",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
+      setSlowServer(false);
     }
   };
 
@@ -534,7 +570,7 @@ export default function LoginPage() {
                       className="flex items-center justify-center gap-2"
                     >
                       <Loader2 className="h-4 w-4 animate-spin" />
-                      Entrando...
+                      {slowServer ? "Servidor lento, tentando de novo..." : "Entrando..."}
                     </motion.span>
                   ) : (
                     "Entrar"
