@@ -98,7 +98,7 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
     closed: "#4ade80",
     concluido: "#4ade80",
   };
-  const dotColor = statusColors[item.status] ?? "rgba(255,255,255,0.2)";
+  const dotColor = statusColors[item.status] ?? "hsl(var(--foreground) / 0.2)";
 
   return (
     <div
@@ -110,14 +110,14 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
       onClick={onClick}
       style={{
         background: "#111411",
-        border: "1px solid rgba(255,255,255,0.07)",
+        border: "1px solid hsl(var(--foreground) / 0.07)",
         borderRadius: 8,
         padding: "10px 12px",
         marginBottom: 8,
         cursor: onClick ? "pointer" : draggable ? "grab" : "default",
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "hsl(var(--foreground) / 0.15)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "hsl(var(--foreground) / 0.07)"; }}
     >
       {/* Top row: codigo + badge */}
       <div
@@ -133,7 +133,7 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
           style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 10,
-            color: "rgba(255,255,255,0.4)",
+            color: "hsl(var(--foreground) / 0.4)",
             flexShrink: 0,
           }}
         >
@@ -156,7 +156,7 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
           title={projetoNome}
           style={{
             fontSize: 10,
-            color: "rgba(255,255,255,0.45)",
+            color: "hsl(var(--foreground) / 0.45)",
             marginBottom: 4,
           }}
         >
@@ -169,7 +169,7 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
         className="line-clamp-2"
         style={{
           fontSize: 13,
-          color: "rgba(255,255,255,0.85)",
+          color: "hsl(var(--foreground) / 0.85)",
           marginBottom: 8,
           lineHeight: "1.4",
         }}
@@ -225,7 +225,7 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
             <span
               style={{
                 fontSize: 11,
-                color: "rgba(255,255,255,0.5)",
+                color: "hsl(var(--foreground) / 0.5)",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
@@ -241,7 +241,7 @@ function KanbanCard({ item, draggable, onClick }: { item: ChamadoItem | UnifiedI
         <span
           style={{
             fontSize: 10,
-            color: "rgba(255,255,255,0.3)",
+            color: "hsl(var(--foreground) / 0.3)",
             flexShrink: 0,
           }}
         >
@@ -278,7 +278,7 @@ function KanbanColumnHeader({ column, count }: { column: KanbanColumn; count: nu
           fontSize: 10,
           textTransform: "uppercase",
           letterSpacing: "0.05em",
-          color: "rgba(255,255,255,0.5)",
+          color: "hsl(var(--foreground) / 0.5)",
         }}
       >
         {column.label}
@@ -286,8 +286,8 @@ function KanbanColumnHeader({ column, count }: { column: KanbanColumn; count: nu
       <span
         style={{
           borderRadius: "9999px",
-          background: "rgba(255,255,255,0.06)",
-          color: "rgba(255,255,255,0.4)",
+          background: "hsl(var(--foreground) / 0.06)",
+          color: "hsl(var(--foreground) / 0.4)",
           fontSize: 10,
           padding: "1px 7px",
         }}
@@ -359,7 +359,7 @@ export function KanbanView({ items, onStatusChange, onItemClick }: KanbanViewPro
                   style={{
                     padding: "20px 0",
                     textAlign: "center",
-                    color: "rgba(255,255,255,0.15)",
+                    color: "hsl(var(--foreground) / 0.15)",
                     fontSize: 12,
                     fontStyle: "italic",
                   }}

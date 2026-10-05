@@ -16,9 +16,9 @@ import {
 import type { Ticket } from "@shared/schema";
 
 const INPUT_STYLE: CSSProperties = {
-  background: "#0f1124",
-  border: "1px solid rgba(255,255,255,0.15)",
-  color: "rgba(255,255,255,0.7)",
+  background: "hsl(var(--background))",
+  border: "1px solid hsl(var(--foreground) / 0.15)",
+  color: "hsl(var(--foreground) / 0.7)",
 };
 
 export function CustomFieldsDrawerRows({
@@ -105,7 +105,7 @@ export function CustomFieldsDrawerRows({
                 disabled={saving}
                 onClick={() => setEditing(field.id)}
                 className="text-xs text-left whitespace-pre-wrap break-words"
-                style={{ color: "rgba(255,255,255,0.65)", cursor: "pointer" }}
+                style={{ color: "hsl(var(--foreground) / 0.65)", cursor: "pointer" }}
                 data-testid={`drawer-custom-${field.id}`}
               >
                 {formatCustomFieldValue(field, value)}

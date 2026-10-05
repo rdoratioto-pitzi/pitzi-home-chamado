@@ -28,14 +28,15 @@ export function isInQueue(viewer: QueueViewer, ticket: QueueTicket): boolean {
 }
 
 /**
- * Assumir: membro do grupo pega um chamado sem responsável; admin pega qualquer um.
+ * Assumir: técnico pega um chamado sem responsável; admin pega qualquer um.
  * Devolve a mensagem de erro, ou null quando pode.
  */
 export function claimDenial(viewer: QueueViewer, ticket: QueueTicket): string | null {
   if (!OPEN_TICKET_STATUSES.includes(ticket.status)) return "Chamado já encerrado";
   if (ticket.assigneeId === viewer.userId) return "O chamado já está com você";
   if (viewer.isAdmin) return null;
-  if (!isGroupMember(viewer, ticket)) return "Apenas membros do grupo podem assumir este chamado";
+  // Qualquer técnico assume chamado sem responsável (a rota já exige técnico); quem já tem
+  // responsável só o admin reatribui pelo Assumir.
   if (ticket.assigneeId) return "O chamado já tem responsável";
   return null;
 }
