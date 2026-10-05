@@ -103,7 +103,7 @@ Quem administra o DNS do domínio deve conferir, uma única vez:
 
 - Cada evento (abertura, atribuição, respostas, status, encerramento; senha e menções) grava
   uma linha em `email_outbox` e tenta enviar logo em seguida, sem segurar a requisição.
-- O cron do Worker (a cada 5 minutos) repete as falhas com espera crescente (1, 4, 16 e 60
+- O cron do Worker (a cada minuto) repete as falhas com espera crescente (1, 4, 16 e 60
   minutos; máximo de 5 tentativas) e devolve à fila linhas presas em "enviando".
 - As mensagens de um chamado usam o assunto `[CHA-0001] Título` e o mesmo `References`
   (`<ticket-{id}@pitzi.com.br>`), para o Gmail agrupar a conversa; cada mensagem guarda o
