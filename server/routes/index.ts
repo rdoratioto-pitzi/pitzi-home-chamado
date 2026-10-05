@@ -34,11 +34,13 @@ import { registerTicketFieldRoutes } from "./ticket-fields";
 import { registerAutomationRoutes } from "./automations";
 import { registerKnowledgeArticleRoutes } from "./knowledge-base";
 import { registerEmailSettingsRoutes } from "./email-settings";
+import { registerSlackRoutes } from "./slack";
 
 export function registerModularRoutes(app: Router) {
   const router = Router();
 
   registerAuthRoutes(router);
+  registerSlackRoutes(router);
   registerUserRoutes(router);
   registerShipmentRoutes(router);
   registerTicketRoutes(router);

@@ -27,6 +27,7 @@ import { ticketFields } from "./routes/ticket-fields";
 import { automations } from "./routes/automations";
 import { knowledgeBase } from "./routes/knowledge-base";
 import { emailSettings } from "./routes/email-settings";
+import { slack } from "./routes/slack";
 import { getStorage } from "./lib/storage";
 import { runWaitingRequesterTimeouts } from "../../server/services/automations.service";
 import { gitAnalytics } from "./routes/git-analytics";
@@ -74,7 +75,7 @@ type Bindings = {
   // Slack (Fase 1 — outbound only). Todos opcionais — service desabilita
   // silenciosamente se SLACK_BOT_TOKEN ausente ou SLACK_INTEGRATION_ENABLED=false.
   SLACK_BOT_TOKEN?: string;
-  SLACK_SIGNING_SECRET?: string; // Reservado para Fase 2 (eventos inbound)
+  SLACK_SIGNING_SECRET?: string; // Assinatura das requisições do Slack (/chamado e atalhos)
   SLACK_CHANNEL_DEVS?: string;
   SLACK_INTEGRATION_ENABLED?: string;
   // SendPulse (Phase 2A — replaces nodemailer)
@@ -223,6 +224,7 @@ app.route("/", ticketFields);
 app.route("/", automations);
 app.route("/", knowledgeBase);
 app.route("/", emailSettings);
+app.route("/", slack);
 app.route("/", gitAnalytics);
 app.route("/", pricing);
 app.route("/", omie);
