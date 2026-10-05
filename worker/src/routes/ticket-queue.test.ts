@@ -324,4 +324,71 @@ describe.skipIf(!url)("fila do grupo", () => {
     const { rows: [t] } = await pool.query("SELECT status, assignee_id, title FROM tickets WHERE id = $1", [meu]);
     expect(t).toMatchObject({ status: "open", assignee_id: null, title: "queue-test sap (novo título)" });
   });
+
+  // ── Menções (@): quem é acionado ganha acesso e é avisado ──────────────────────
+  const mencao = (userId: string, nome: string) =>
+    `<p><span class="mention" data-user-id="${userId}" data-display-name="${nome}">\uFEFF<span>${nome}</span>\uFEFF</span> pode ajudar?</p>`;
+
+  it("técnico mencionado abre o chamado, vê notas internas e comenta; é avisado", async () => {
+    const id = await ticket("sap", { assignee: ids.sapA });
+    const route = `/api/tickets/${id}/comments`;
+    // dadosA é técnico, mas não é do grupo sap nem parte do chamado.
+    expect((await send(app(ids.dadosA), "GET", `/api/tickets/${id}`)).status).toBe(404);
+    await send(app(ids.sapA), "POST", route, { content: "nota da equipe", isInternal: true });
+
+    const res = await send(app(ids.sapA), "POST", route, { content: mencao(ids.dadosA, "dadosA") });
+    expect(res.status).toBe(201);
+    expect((await json(res)).mentions).toEqual([{ userId: ids.dadosA, displayName: "dadosA" }]);
+
+    expect((await send(app(ids.dadosA), "GET", `/api/tickets/${id}`)).status).toBe(200);
+    const vistos = (await json(await send(app(ids.dadosA), "GET", route))).map((c: any) => c.content);
+    expect(vistos).toContain("nota da equipe");
+    expect((await send(app(ids.dadosA), "POST", route, { content: "olhando" })).status).toBe(201);
+
+    const notif = await pool.query("SELECT title, link_url FROM notifications WHERE user_id = $1 AND entity_id = $2", [ids.dadosA, id]);
+    expect(notif.rows).toEqual([{ title: "Menção em chamado", link_url: `/chamados/${id}` }]);
+    // O autor da menção não é avisado da própria menção.
+    const doAutor = await pool.query("SELECT 1 FROM notifications WHERE user_id = $1 AND entity_id = $2 AND title = 'Menção em chamado'", [ids.sapA, id]);
+    expect(doAutor.rowCount).toBe(0);
+  });
+
+  it("menção sem data-user-id (comentário antigo) acha a pessoa pelo nome", async () => {
+    const id = await ticket("sap", { assignee: ids.sapA });
+    const semId = '<p><span class="mention">\uFEFF<span>dadosA</span>\uFEFF</span> veja</p>';
+    const res = await send(app(ids.sapA), "POST", `/api/tickets/${id}/comments`, { content: semId });
+    expect((await json(res)).mentions).toEqual([{ userId: ids.dadosA, displayName: "dadosA" }]);
+  });
+
+  it("Usuário mencionado vê o chamado e os públicos, nunca a nota interna; nota não o aciona", async () => {
+    const { rows: [u] } = await pool.query(
+      "INSERT INTO users (name, email, status, is_admin, is_technician, tenant_id) VALUES ('usuarioX', 'usuariox@queue-test.local', 'active', false, false, 'tenant-q') RETURNING id",
+    );
+    const id = await ticket("sap", { assignee: ids.sapA });
+    const route = `/api/tickets/${id}/comments`;
+
+    // Mencionado dentro de nota interna: não ganha acesso nem aviso.
+    await send(app(ids.sapA), "POST", route, { content: mencao(u.id, "usuarioX"), isInternal: true });
+    expect((await send(app(u.id), "GET", `/api/tickets/${id}`)).status).toBe(404);
+    const semAviso = await pool.query("SELECT 1 FROM notifications WHERE user_id = $1", [u.id]);
+    expect(semAviso.rowCount).toBe(0);
+
+    // Mencionado em comentário público: abre o chamado e vê só os públicos.
+    await send(app(ids.sapA), "POST", route, { content: mencao(u.id, "usuarioX") });
+    expect((await send(app(u.id), "GET", `/api/tickets/${id}`)).status).toBe(200);
+    const vistos = (await json(await send(app(u.id), "GET", route))) as any[];
+    expect(vistos.every((c) => c.isInternal !== true)).toBe(true);
+    expect(vistos).toHaveLength(1);
+    // Mesmo pedindo, o comentário dele não vira nota interna.
+    const dele = await send(app(u.id), "POST", route, { content: "obrigado", isInternal: true });
+    expect((await json(dele)).isInternal).toBe(false);
+  });
+
+  it("lista do técnico inclui os chamados em que ele foi mencionado", async () => {
+    const id = await ticket("sap", { assignee: ids.sapA });
+    const antes = await json(await send(app(ids.dadosA), "GET", "/api/workspace/chamados?periodo=em-tratativa"));
+    expect(antes.items.map((i: any) => i.id)).not.toContain(id);
+    await send(app(ids.sapA), "POST", `/api/tickets/${id}/comments`, { content: mencao(ids.dadosA, "dadosA") });
+    const depois = await json(await send(app(ids.dadosA), "GET", "/api/workspace/chamados?periodo=em-tratativa"));
+    expect(depois.items.map((i: any) => i.id)).toContain(id);
+  });
 });

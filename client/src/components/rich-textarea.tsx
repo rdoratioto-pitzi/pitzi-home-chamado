@@ -17,6 +17,12 @@ function patchMentionBlot() {
     const originalCreate = Mention.create.bind(Mention);
     Mention.create = function (data: any) {
       const node = originalCreate(data);
+      // Garante os atributos que o servidor usa para saber quem foi mencionado, mesmo se o
+      // quill-mention recusar os dados (ex.: sem "value").
+      if (node instanceof HTMLElement && data) {
+        if (typeof data.userId === 'string' && data.userId) node.dataset.userId = data.userId;
+        if (typeof data.displayName === 'string' && data.displayName) node.dataset.displayName = data.displayName;
+      }
       if (node instanceof HTMLElement && data && typeof data.displayName === 'string' && data.displayName.length > 0) {
         // Evita duplicar caso o blot já contenha o nome
         if (!node.textContent || !node.textContent.includes(data.displayName)) {
@@ -247,7 +253,11 @@ export function RichTextarea({
         allowedChars: /^[A-Za-z0-9_\-.\sÀ-ÿ]*$/,
         mentionDenotationChars: ['@'],
         spaceAfterInsert: true,
-        dataAttributes: ['userId', 'displayName', 'denotationChar', 'index'],
+        // O Quill mescla estas opções com os padrões do quill-mention usando lodash.merge,
+        // que junta arrays posição a posição: a lista precisa começar com os padrões
+        // ("id", "value", "denotationChar", "link", "target", "disabled"). Sem "value" o
+        // MentionBlot considera os dados inválidos e salva a menção sem data-user-id.
+        dataAttributes: ['id', 'value', 'denotationChar', 'link', 'target', 'disabled', 'userId', 'displayName', 'index'],
         source: function (
           searchTerm: string,
           renderList: (matches: any[], term: string) => void,

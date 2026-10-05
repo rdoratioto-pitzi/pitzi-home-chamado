@@ -928,7 +928,7 @@ async function sendMentionNotificationEmailNow(
     body: `
       ${actionBy(escapeHtml(mentionerName), "mencionou você em um comentário")}
       ${sectionCard(`<div style="font-weight:700;font-size:15px;color:#1a1a2e;">${escapeHtml(taskTitle)}</div>`)}
-      ${commentBox(escapeHtml(commentContent), escapeHtml(mentionerName))}
+      ${commentBox(escapeHtml(htmlToText(commentContent).replace(/\uFEFF/g, "").trim()), escapeHtml(mentionerName))}
     `,
     ctaText: ticket ? "Ver chamado" : "Ver Tarefa",
     ctaUrl: ticket ? ticketLink(ctx.env, ticket) : `${ctx.env.APP_URL}/tarefas`,

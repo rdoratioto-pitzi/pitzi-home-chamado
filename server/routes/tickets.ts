@@ -8,7 +8,6 @@ import {
 } from "@shared/schema";
 import { isValidApplicationKey } from "@shared/applications";
 import { filterVisibleComments, resolveIsInternal } from "@shared/ticket-comments";
-import { extractMentions } from "../lib/sanitize-rich-text";
 import { requireAuth, requireAdmin, getSessionUser } from "../middleware/auth";
 import {
   sendTicketCreatedEmail,
@@ -25,8 +24,25 @@ import { checkRequestSelection, resolveCustomFieldValues } from "../services/tic
 import { runTicketAutomations } from "../services/automations.service";
 import { claimTicket, isTicketGroupMember, transferTicket } from "../services/ticket-queue.service";
 import { isTechnicianUserId } from "../services/user-type.service";
-import { TECHNICIAN_REQUIRED_ERROR } from "@shared/user-type";
+import { isTechnician, TECHNICIAN_REQUIRED_ERROR } from "@shared/user-type";
+import { mentionRecipients, mentionsToStore, resolveMentions } from "../services/mentions.service";
+import type { Ticket } from "@shared/schema";
 import { REQUESTER_EDITABLE_TICKET_FIELDS } from "@shared/requester-view";
+
+/**
+ * Mesma regra do Worker: admin, solicitante, responsável, membro do grupo ou mencionado (@)
+ * em algum comentário. Técnico mencionado também vê notas internas.
+ */
+async function ticketCommentAccess(userId: string, isAdmin: boolean, ticket: Ticket) {
+  const isParty = ticket.requesterId === userId || ticket.assigneeId === userId;
+  const isGroupMember = !isAdmin && !isParty && (await isTicketGroupMember(storage, { userId, isAdmin }, ticket));
+  const isMentioned = !isAdmin && !isParty && !isGroupMember && (await storage.isUserMentionedInTicket(ticket.id, userId));
+  const isMentionedTechnician = isMentioned && isTechnician(await storage.getUser(userId));
+  return {
+    allowed: isAdmin || isParty || isGroupMember || isMentioned,
+    viewer: { userId, isAdmin, isGroupMember, isMentionedTechnician },
+  };
+}
 
 export function registerTicketRoutes(router: Router) {
   const getId = (req: any) => req.params.id as string;
@@ -53,8 +69,7 @@ export function registerTicketRoutes(router: Router) {
       const { userId, isAdmin } = getSessionUser(req);
       const ticket = await storage.getTicketWithNames(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
-      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId &&
-          !(await isTicketGroupMember(storage, { userId, isAdmin }, ticket))) {
+      if (!(await ticketCommentAccess(userId, isAdmin, ticket)).allowed) {
         return res.status(404).json({ error: "Ticket not found" });
       }
       res.json(ticket);
@@ -308,15 +323,11 @@ export function registerTicketRoutes(router: Router) {
       const { userId, isAdmin } = getSessionUser(req);
       const ticket = await storage.getTicket(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
-      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId &&
-          !(await isTicketGroupMember(storage, { userId, isAdmin }, ticket))) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+      const { allowed, viewer } = await ticketCommentAccess(userId, isAdmin, ticket);
+      if (!allowed) return res.status(403).json({ error: "Access denied" });
 
       const comments = await storage.getTicketComments(getId(req));
-      const isGroupMember = !isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId &&
-        (await isTicketGroupMember(storage, { userId, isAdmin }, ticket));
-      res.json(filterVisibleComments(comments, { userId, isAdmin, isGroupMember }, ticket));
+      res.json(filterVisibleComments(comments, viewer, ticket));
     } catch (error: any) {
       const status = error.status || 500;
       res.status(status).json({ error: error.message });
@@ -329,12 +340,13 @@ export function registerTicketRoutes(router: Router) {
       const ticket = await storage.getTicket(getId(req));
       if (!ticket) return res.status(404).json({ error: "Ticket not found" });
 
-      const isGroupMember = !isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId &&
-        (await isTicketGroupMember(storage, { userId, isAdmin }, ticket));
-      if (!isAdmin && ticket.requesterId !== userId && ticket.assigneeId !== userId && !isGroupMember) {
-        return res.status(403).json({ error: "Access denied" });
-      }
+      const { allowed, viewer } = await ticketCommentAccess(userId, isAdmin, ticket);
+      if (!allowed) return res.status(403).json({ error: "Access denied" });
 
+      const wantsInternal = resolveIsInternal(req.body?.isInternal, viewer, ticket);
+      const mentions = await mentionsToStore(
+        storage, await resolveMentions(storage, req.body?.content, ticket.tenantId), wantsInternal,
+      );
       const validated = insertTicketCommentSchema.parse({
         ...req.body,
         ticketId: getId(req),
@@ -342,8 +354,8 @@ export function registerTicketRoutes(router: Router) {
         // Origem e id do Gmail só são gravados pelo processador de respostas por e-mail (Worker).
         source: "app",
         inboundEmailId: null,
-        isInternal: resolveIsInternal(req.body?.isInternal, { userId, isAdmin, isGroupMember }, ticket),
-        mentions: extractMentions(req.body?.content),
+        isInternal: wantsInternal,
+        mentions,
       });
       const comment = await storage.createTicketComment(validated);
       const isInternal = comment.isInternal === true;
@@ -385,35 +397,19 @@ export function registerTicketRoutes(router: Router) {
           }).catch(console.error);
         }
 
-        const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
-        if (mentionMatches) {
-          const users = await storage.getUsers();
-
-          for (const mention of mentionMatches) {
-            const mentionedName = mention.slice(1).trim();
-            const mentionedUser = users.find(u =>
-              u.name.toLowerCase() === mentionedName.toLowerCase() && u.status === "active"
-            );
-
-            // Nota interna não é enviada ao solicitante, mesmo que ele seja mencionado.
-            if (mentionedUser && commenter && !(isInternal && mentionedUser.id === ticket.requesterId && mentionedUser.id !== ticket.assigneeId)) {
-              sendMentionNotificationEmail(
-                mentionedUser,
-                commenter.name,
-                ticket.title,
-                ticket.id,
-                validated.content
-              ).catch(console.error);
-              storage.createNotification({
-                userId: mentionedUser.id,
-                fromUserId: commenter.id,
-                title: "Menção em chamado",
-                message: `${commenter.name} mencionou você em um comentário no chamado "${ticket.title}"`,
-                module: "chamados",
-                entityId: ticket.id,
-                linkUrl: `/chamados?ticket=${ticket.id}`,
-              }).catch(console.error);
-            }
+        // Menções: avisa quem foi acionado. Nunca o autor; em nota interna, só técnicos.
+        if (commenter) {
+          for (const mentionedUser of await mentionRecipients(storage, mentions, userId, isInternal)) {
+            sendMentionNotificationEmail(mentionedUser, commenter.name, ticket.title, ticket.id, validated.content).catch(console.error);
+            storage.createNotification({
+              userId: mentionedUser.id,
+              fromUserId: commenter.id,
+              title: "Menção em chamado",
+              message: `${commenter.name} mencionou você no chamado ${ticket.code} "${ticket.title}"`,
+              module: "chamados",
+              entityId: ticket.id,
+              linkUrl: `/chamados/${ticket.id}`,
+            }).catch(console.error);
           }
         }
       }
