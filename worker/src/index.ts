@@ -254,9 +254,9 @@ async function scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionCon
       console.log("[cron] respostas por e-mail:", inbound);
     }
   })());
-  // Automações por tempo: só na execução do início de cada hora, para uma regra que não muda o
-  // status não repetir a nota a cada 5 minutos (mesma cadência de antes do cron de e-mails).
-  if (new Date(event.scheduledTime).getUTCMinutes() >= 5) return;
+  // Automações por tempo: só na execução do minuto 0 de cada hora (o cron roda a cada minuto),
+  // para uma regra que não muda o status não repetir a nota a cada execução.
+  if (new Date(event.scheduledTime).getUTCMinutes() !== 0) return;
   ctx.waitUntil((async () => {
     try {
       const touched = await runWaitingRequesterTimeouts(getStorage(db));
