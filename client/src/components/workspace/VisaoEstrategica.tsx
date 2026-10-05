@@ -54,7 +54,7 @@ function KpiItem({ label, value, color }: { label: string; value: number; color?
           textTransform: "uppercase",
           fontSize: "9px",
           letterSpacing: "0.05em",
-          color: "rgba(255,255,255,0.35)",
+          color: "hsl(var(--foreground) / 0.35)",
           marginBottom: 4,
         }}
       >
@@ -65,7 +65,7 @@ function KpiItem({ label, value, color }: { label: string; value: number; color?
           fontFamily: "'DM Sans', sans-serif",
           fontSize: "21px",
           fontWeight: 600,
-          color: color || "rgba(255,255,255,0.85)",
+          color: color || "hsl(var(--foreground) / 0.85)",
           lineHeight: 1.2,
         }}
       >
@@ -84,8 +84,8 @@ function ProjetoCard({ projeto }: { projeto: ProjetoItem }) {
     <div
       className="rounded-lg p-4 flex flex-col gap-3"
       style={{
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "hsl(var(--foreground) / 0.03)",
+        border: "1px solid hsl(var(--foreground) / 0.06)",
       }}
     >
       {/* Header */}
@@ -113,13 +113,13 @@ function ProjetoCard({ projeto }: { projeto: ProjetoItem }) {
       </div>
 
       {/* Nome */}
-      <span className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.85)" }}>
+      <span className="text-sm font-medium" style={{ color: "hsl(var(--foreground) / 0.85)" }}>
         {projeto.nome}
       </span>
 
       {/* Barra de progresso */}
       <div className="flex flex-col gap-1">
-        <div style={{ width: "100%", height: 4, borderRadius: 2, background: "rgba(255,255,255,0.08)" }}>
+        <div style={{ width: "100%", height: 4, borderRadius: 2, background: "hsl(var(--foreground) / 0.08)" }}>
           <div
             style={{
               width: `${Math.min(prog, 100)}%`,
@@ -132,7 +132,7 @@ function ProjetoCard({ projeto }: { projeto: ProjetoItem }) {
         </div>
         <span
           className="text-[10px]"
-          style={{ fontFamily: "'JetBrains Mono', monospace", color: "rgba(255,255,255,0.4)" }}
+          style={{ fontFamily: "'JetBrains Mono', monospace", color: "hsl(var(--foreground) / 0.4)" }}
         >
           {prog}% concluído · {projeto.tarefas.length} atividades
         </span>
@@ -152,7 +152,7 @@ function ProjetoCard({ projeto }: { projeto: ProjetoItem }) {
           >
             {projeto.responsavelInitials}
           </div>
-          <span className="text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>
+          <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.4)" }}>
             {projeto.responsavel}
           </span>
         </div>
@@ -206,21 +206,21 @@ export function VisaoEstrategica({ open, projetos, kpis, onClose }: VisaoEstrate
         {/* Header */}
         <div
           className="flex items-center justify-between px-6 py-4"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+          style={{ borderBottom: "1px solid hsl(var(--foreground) / 0.06)" }}
         >
-          <span className="text-sm font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+          <span className="text-sm font-semibold" style={{ color: "hsl(var(--foreground) / 0.85)" }}>
             Visão Estratégica
           </span>
           <button
             onClick={onClose}
             className="p-1.5 rounded-md hover:bg-white/5 transition-colors"
           >
-            <X className="h-4 w-4" style={{ color: "rgba(255,255,255,0.4)" }} />
+            <X className="h-4 w-4" style={{ color: "hsl(var(--foreground) / 0.4)" }} />
           </button>
         </div>
 
         {/* KPI Strip */}
-        <div className="grid grid-cols-4 gap-0 px-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="grid grid-cols-4 gap-0 px-2" style={{ borderBottom: "1px solid hsl(var(--foreground) / 0.06)" }}>
           {kpiConfig.map((k) => (
             <KpiItem
               key={k.key}

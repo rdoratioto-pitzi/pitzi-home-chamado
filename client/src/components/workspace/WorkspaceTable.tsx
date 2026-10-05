@@ -516,9 +516,9 @@ function InlineSelectChip({
         onBlur={() => setEditing(false)}
         className="text-xs rounded px-1 py-0 outline-none"
         style={{
-          background: "rgba(255,255,255,0.06)",
+          background: "hsl(var(--foreground) / 0.06)",
           border: "1px solid rgba(59,66,222,0.3)",
-          color: "rgba(255,255,255,0.85)",
+          color: "hsl(var(--foreground) / 0.85)",
         }}
       >
         {options.map((o) => (
@@ -661,7 +661,7 @@ function UnifiedItemRow({ item, colTemplate, onRowClick, onStatusChange, onPrior
                 width: 7,
                 height: 7,
                 borderRadius: "50%",
-                background: item.corContexto || "rgba(255,255,255,0.3)",
+                background: item.corContexto || "hsl(var(--foreground) / 0.3)",
               }}
             />
             <span className="text-xs truncate" style={{ color: item.corContexto || "var(--l2)", opacity: 0.85 }}>
