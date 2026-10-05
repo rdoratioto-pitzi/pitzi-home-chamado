@@ -6,6 +6,14 @@ import axios from 'axios';
 import App from "./App";
 import "./index.css";
 import { queryClient } from "./lib/queryClient";
+import { reloadForNewVersion } from "./lib/stale-build";
+
+// Versão nova publicada enquanto a página estava aberta: o Vite avisa quando não acha
+// um arquivo da versão antiga; recarrega uma vez para pegar a nova.
+window.addEventListener("vite:preloadError", (event) => {
+  event.preventDefault();
+  reloadForNewVersion();
+});
 
 // Configuração global do axios — garante envio de cookies em todos os requests
 axios.defaults.withCredentials = true;
