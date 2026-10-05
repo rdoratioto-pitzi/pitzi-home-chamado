@@ -160,11 +160,15 @@ export async function isTicketGroupMember(
 export async function canViewTicket(
   storage: IStorage,
   actor: QueueActor,
-  ticket: Pick<Ticket, "tenantId" | "requesterId" | "assigneeId" | "category"> | null | undefined,
+  ticket: (Pick<Ticket, "tenantId" | "requesterId" | "assigneeId" | "category"> & { id?: string }) | null | undefined,
 ): Promise<boolean> {
   if (!ticket) return false;
   if (actor.tenantId !== undefined && !sameTenant(ticket.tenantId, actor.tenantId)) return false;
   if (actor.isAdmin) return true;
   if (ticket.requesterId === actor.userId || ticket.assigneeId === actor.userId) return true;
-  return isTicketGroupMember(storage, actor, ticket);
+  if (await isTicketGroupMember(storage, actor, ticket)) return true;
+  // Quem foi mencionado (@) em algum comentário foi acionado para ajudar e pode abrir o chamado.
+  return "id" in ticket && typeof ticket.id === "string"
+    ? storage.isUserMentionedInTicket(ticket.id, actor.userId)
+    : false;
 }

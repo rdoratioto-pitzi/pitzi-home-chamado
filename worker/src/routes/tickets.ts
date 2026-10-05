@@ -12,7 +12,6 @@ import {
 import { isValidApplicationKey } from "../../../shared/applications";
 import { sameTenant } from "../../../shared/tenant";
 import { filterVisibleComments, resolveIsInternal } from "../../../shared/ticket-comments";
-import { extractMentions } from "../lib/sanitize-rich-text";
 import {
   sendTicketCreatedEmail,
   sendTicketAssignedEmail,
@@ -31,10 +30,33 @@ import { checkRequestSelection, resolveCustomFieldValues } from "../../../server
 import { runTicketAutomations } from "../../../server/services/automations.service";
 import { isTicketGroupMember } from "../../../server/services/ticket-queue.service";
 import { isTechnicianUserId } from "../../../server/services/user-type.service";
-import { canBeAssignee, TECHNICIAN_REQUIRED_ERROR } from "../../../shared/user-type";
+import { canBeAssignee, isTechnician, TECHNICIAN_REQUIRED_ERROR } from "../../../shared/user-type";
+import { mentionRecipients, mentionsToStore, resolveMentions } from "../../../server/services/mentions.service";
+import type { Ticket } from "../../../shared/schema";
 import { REQUESTER_EDITABLE_TICKET_FIELDS } from "../../../shared/requester-view";
 
 const tickets = new Hono<AppEnv>();
+
+type AuthUser = { userId: string; role?: string; tenantId?: string | null };
+
+/**
+ * Quem pode ver/comentar o chamado e o que vê nos comentários: admin, solicitante,
+ * responsável, membro do grupo ou quem foi mencionado (@) em algum comentário. Técnico
+ * mencionado também vê notas internas; Usuário mencionado só os comentários públicos.
+ */
+async function ticketCommentAccess(storage: ReturnType<typeof getStorage>, user: AuthUser, ticket: Ticket) {
+  const isAdmin = user.role === "admin";
+  const isParty = ticket.requesterId === user.userId || ticket.assigneeId === user.userId;
+  const isGroupMember = !isAdmin && !isParty &&
+    (await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket));
+  const isMentioned = !isAdmin && !isParty && !isGroupMember &&
+    (await storage.isUserMentionedInTicket(ticket.id, user.userId));
+  const isMentionedTechnician = isMentioned && isTechnician(await storage.getUser(user.userId));
+  return {
+    allowed: isAdmin || isParty || isGroupMember || isMentioned,
+    viewer: { userId: user.userId, isAdmin, isGroupMember, isMentionedTechnician },
+  };
+}
 
 // IMPORTANT: Static paths MUST be registered BEFORE parameterized paths
 // to avoid Hono matching "csat" as an :id parameter.
@@ -184,12 +206,7 @@ tickets.get("/api/tickets/:id", async (c) => {
   const storage = getStorage(c.get("db"));
   const ticket = await storage.getTicket(c.req.param("id"));
   if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
-  if (
-    user.role !== "admin" &&
-    ticket.requesterId !== user.userId &&
-    ticket.assigneeId !== user.userId &&
-    !(await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket))
-  ) {
+  if (!(await ticketCommentAccess(storage, user, ticket)).allowed) {
     return c.json({ error: "Ticket not found" }, 404);
   }
   return c.json(ticket);
@@ -486,20 +503,9 @@ tickets.get("/api/tickets/:id/comments", async (c) => {
   const id = c.req.param("id");
   const ticket = await storage.getTicket(id);
   if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
-  // Só consulta os grupos para quem não é admin, solicitante nem responsável.
-  const isGroupMember =
-    user.role !== "admin" && ticket.requesterId !== user.userId && ticket.assigneeId !== user.userId &&
-    (await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket));
-  if (
-    user.role !== "admin" &&
-    ticket.requesterId !== user.userId &&
-    ticket.assigneeId !== user.userId &&
-    !isGroupMember
-  ) {
-    return c.json({ error: "Access denied" }, 403);
-  }
+  const { allowed, viewer } = await ticketCommentAccess(storage, user, ticket);
+  if (!allowed) return c.json({ error: "Access denied" }, 403);
   const comments = await storage.getTicketComments(id);
-  const viewer = { userId: user.userId, isAdmin: user.role === "admin", isGroupMember };
   return c.json(filterVisibleComments(comments, viewer, ticket));
 });
 
@@ -512,22 +518,15 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
   const ticket = await storage.getTicket(id);
   if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
 
-  // Membros do grupo também comentam (fila do grupo), inclusive notas internas.
-  // Só consulta os grupos para quem não é admin, solicitante nem responsável.
-  const isGroupMember =
-    user.role !== "admin" && ticket.requesterId !== user.userId && ticket.assigneeId !== user.userId &&
-    (await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket));
-  if (
-    user.role !== "admin" &&
-    ticket.requesterId !== user.userId &&
-    ticket.assigneeId !== user.userId &&
-    !isGroupMember
-  ) {
-    return c.json({ error: "Access denied" }, 403);
-  }
+  // Membros do grupo e mencionados também comentam; notas internas só quem pode vê-las.
+  const { allowed, viewer } = await ticketCommentAccess(storage, user, ticket);
+  if (!allowed) return c.json({ error: "Access denied" }, 403);
 
   const body = await c.req.json();
-  const viewer = { userId: user.userId, isAdmin: user.role === "admin", isGroupMember };
+  const wantsInternal = resolveIsInternal(body?.isInternal, viewer, ticket);
+  const mentions = await mentionsToStore(
+    storage, await resolveMentions(storage, body?.content, ticket.tenantId), wantsInternal,
+  );
   const validated = insertTicketCommentSchema.parse({
     ...body,
     ticketId: id,
@@ -536,43 +535,30 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
     // Origem e id do Gmail só são gravados pelo processador de respostas por e-mail.
     source: "app",
     inboundEmailId: null,
-    isInternal: resolveIsInternal(body?.isInternal, viewer, ticket),
-    mentions: extractMentions(body?.content),
+    isInternal: wantsInternal,
+    mentions,
   });
   const comment = await storage.createTicketComment(validated);
   const isInternal = comment.isInternal === true;
   const { commenter } = await runTicketCommentEffects(mailContext(c), storage, ticket, comment);
 
-  // Mention handling
-  const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);
-  if (mentionMatches) {
-    const users = await storage.getUsers();
-    for (const mention of mentionMatches) {
-      const mentionedName = mention.slice(1).trim();
-      const mentionedUser = users.find(
-        (u) =>
-          u.name.toLowerCase() === mentionedName.toLowerCase() &&
-          u.status === "active"
-      );
-      // Nota interna não é enviada ao solicitante, mesmo que ele seja mencionado.
-      if (
-        mentionedUser &&
-        commenter &&
-        !(isInternal && mentionedUser.id === ticket.requesterId && mentionedUser.id !== ticket.assigneeId)
-      ) {
-        sendMentionNotificationEmail(
-          mailContext(c), storage, mentionedUser, commenter.name, ticket.title, ticket.id, validated.content, ticket
-        ).catch(console.error);
-        storage.createNotification({
-          userId: mentionedUser.id,
-          fromUserId: commenter.id,
-          title: "Menção em chamado",
-          message: `${commenter.name} mencionou você em um comentário no chamado "${ticket.title}"`,
-          module: "chamados",
-          entityId: ticket.id,
-          linkUrl: `/chamados?ticket=${ticket.id}`,
-        }).catch(console.error);
-      }
+  // Menções: avisa quem foi acionado (e-mail na conversa do chamado + sino). Nunca o autor;
+  // em nota interna, só técnicos.
+  if (commenter) {
+    const mentioned = await mentionRecipients(storage, mentions, user.userId, isInternal);
+    for (const mentionedUser of mentioned) {
+      sendMentionNotificationEmail(
+        mailContext(c), storage, mentionedUser, commenter.name, ticket.title, ticket.id, validated.content, ticket
+      ).catch(console.error);
+      storage.createNotification({
+        userId: mentionedUser.id,
+        fromUserId: commenter.id,
+        title: "Menção em chamado",
+        message: `${commenter.name} mencionou você no chamado ${ticket.code} "${ticket.title}"`,
+        module: "chamados",
+        entityId: ticket.id,
+        linkUrl: `/chamados/${ticket.id}`,
+      }).catch(console.error);
     }
   }
 
