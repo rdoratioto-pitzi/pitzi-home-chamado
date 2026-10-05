@@ -37,11 +37,18 @@ describe.skipIf(!url)("Slack → chamado", () => {
   let db: any;
   let calls: { method: string; params: Record<string, string> }[] = [];
   let postMessageOk = true;
+  // conversations.replies simulado: mensagens da thread ou erro (ex.: missing_scope).
+  let thread: any[] = [];
+  let repliesError: string | null = null;
+  // Download de anexos: false simula app sem files:read (Slack devolve a página de login).
+  let filesReadOk = true;
+  const saved: string[] = [];
   const realFetch = globalThis.fetch;
 
   const env = {
     SLACK_BOT_TOKEN: "xoxb-teste", SLACK_SIGNING_SECRET: SECRET,
     ALLOWED_GOOGLE_DOMAINS: DOMAIN, APP_URL: "https://app.test",
+    ATTACHMENTS: { put: vi.fn(async (key: string) => { saved.push(key); }) },
   };
   const app = () => {
     const a = new Hono<any>();
@@ -101,8 +108,18 @@ describe.skipIf(!url)("Slack → chamado", () => {
     );
     calls = [];
     postMessageOk = true;
+    thread = [];
+    repliesError = null;
+    filesReadOk = true;
+    saved.length = 0;
     globalThis.fetch = vi.fn(async (input: any, init?: any) => {
       const href = String(input);
+      if (href.startsWith("https://files.slack.com/")) {
+        expect(init?.headers?.Authorization).toBe("Bearer xoxb-teste");
+        return filesReadOk
+          ? new Response(new Uint8Array([1, 2, 3]), { headers: { "content-type": "image/png" } })
+          : new Response("<html>login</html>", { headers: { "content-type": "text/html" } });
+      }
       if (!href.startsWith("https://slack.com/api/")) return realFetch(input, init);
       const method = href.replace("https://slack.com/api/", "");
       const params = Object.fromEntries(new URLSearchParams(String(init?.body ?? "")));
@@ -113,6 +130,11 @@ describe.skipIf(!url)("Slack → chamado", () => {
         return json(email ? { ok: true, user: { id: params.user, profile: { email, real_name: `Pessoa ${params.user}` } } } : { ok: false, error: "user_not_found" });
       }
       if (method === "chat.getPermalink") return json({ ok: true, permalink: "https://pitzi.slack.com/archives/C1/p123" });
+      if (method === "conversations.replies") {
+        if (repliesError) return json({ ok: false, error: repliesError });
+        const limit = Number(params.limit || 200);
+        return json({ ok: true, messages: thread.slice(0, limit), response_metadata: { next_cursor: "" } });
+      }
       if (method === "chat.postMessage" && params.thread_ts) return json(postMessageOk ? { ok: true } : { ok: false, error: "not_in_channel" });
       return json({ ok: true });
     }) as any;
@@ -173,10 +195,11 @@ describe.skipIf(!url)("Slack → chamado", () => {
   });
 
   it("atalho do técnico: solicitante é o autor, guarda a thread e responde nela", async () => {
+    thread = [{ ts: "1700000000.000100", user: "UUSR", text: "slack-test VPN caiu\nde novo hoje" }];
     await shortcut("UTEC", "UUSR");
     const view = viewOf("views.open");
     const descricao = view.blocks.find((b: any) => b.block_id === "descricao");
-    expect(descricao.element.initial_value).toContain("Mensagem original no Slack: https://pitzi.slack.com/archives/C1/p123");
+    expect(descricao.element.initial_value).toBe("slack-test VPN caiu\nde novo hoje");
     expect(view.blocks[0].elements[0].text).toContain("Solicitante: *Usuário Slack*");
     expect(view.blocks.some((b: any) => b.block_id === "gravidade")).toBe(true);
 
@@ -187,6 +210,88 @@ describe.skipIf(!url)("Slack → chamado", () => {
     expect(rows[0]).toMatchObject({ email: `usuario@${DOMAIN}`, impact: "alto", slack_channel_id: "C1", slack_thread_ts: "1700000000.000100" });
     const reply = calls.find((c) => c.method === "chat.postMessage" && c.params.thread_ts)!;
     expect(reply.params.text).toContain(`Virou o chamado *${rows[0].code}*`);
+  });
+
+  // Conversa: raiz de UUSR, resposta de UTEC com menção e link, resposta de bot; anexos na raiz.
+  const ROOT_TS = "1759680000.000100";
+  const conversa = () => [
+    {
+      ts: ROOT_TS, user: "UUSR", text: "slack-test impressora do 3º andar parou", reply_count: 2,
+      files: [
+        { name: "erro.png", mimetype: "image/png", size: 3, url_private_download: "https://files.slack.com/erro.png" },
+        { name: "setup.exe", mimetype: "application/x-msdownload", size: 3, url_private_download: "https://files.slack.com/setup.exe" },
+      ],
+    },
+    { ts: "1759680060.000200", thread_ts: ROOT_TS, user: "UTEC", text: "<@UUSR> reiniciou? veja <https://wiki.test/impressora|o guia>" },
+    { ts: "1759680120.000300", thread_ts: ROOT_TS, bot_id: "B1", bot_profile: { name: "Monitor" }, text: "fila de impressão travada" },
+  ];
+  const shortcutReply = (clicker: string, author: string) => interaction({
+    type: "message_action", callback_id: "transformar_em_chamado", trigger_id: "TRIG3",
+    user: { id: clicker }, channel: { id: "C1", name: "suporte" },
+    message: { user: author, ts: "1759680060.000200", thread_ts: ROOT_TS, text: "reiniciou?" },
+  });
+
+  it("atalho em resposta: leva a conversa inteira; solicitante é quem começou; anexos importados", async () => {
+    thread = conversa();
+    await shortcutReply("UTEC", "UTEC");
+    const view = viewOf("views.open");
+    // A raiz foi lida para achar quem começou (limit 1) — e o título vem dela.
+    expect(calls.find((c) => c.method === "conversations.replies")!.params).toMatchObject({ ts: ROOT_TS, limit: "1" });
+    expect(view.blocks.find((b: any) => b.block_id === "titulo").element.initial_value).toBe("slack-test impressora do 3º andar parou");
+    expect(view.blocks[0].elements[0].text).toContain("Solicitante: *Usuário Slack* (quem começou a conversa)");
+    expect(view.blocks[0].elements[0].text).toContain("3 mensagens");
+
+    await submit(view.private_metadata, { title: "slack-test impressora", category: "sap" });
+    const { rows } = await pool.query(
+      `SELECT t.description, t.attachments, t.slack_thread_ts, t.slack_message_ts, u.email
+         FROM tickets t JOIN users u ON u.id = t.requester_id WHERE t.title = 'slack-test impressora'`,
+    );
+    expect(rows[0]).toMatchObject({ email: `usuario@${DOMAIN}`, slack_thread_ts: ROOT_TS, slack_message_ts: "1759680060.000200" });
+    const d: string = rows[0].description;
+    expect(d).toContain("<strong>Conversa no Slack</strong> (#suporte, 3 mensagens)");
+    const ordem = [
+      "<strong>Pessoa UUSR</strong>",
+      "<strong>Pessoa UTEC</strong> (05/10 13:01): @Pessoa UUSR reiniciou? veja o guia (https://wiki.test/impressora)",
+      "<strong>Monitor</strong>",
+    ].map((p) => d.indexOf(p));
+    expect(ordem.every((i) => i >= 0)).toBe(true);
+    expect([...ordem].sort((a, b) => a - b)).toEqual(ordem);
+    expect(d).toContain("Anexos da conversa que não foram importados: setup.exe");
+    const anexos = JSON.parse(rows[0].attachments);
+    expect(anexos).toHaveLength(1);
+    expect(anexos[0]).toMatchObject({ name: "erro.png", type: "image/png", size: 3 });
+    expect(saved).toHaveLength(1);
+  });
+
+  it("atalho em resposta: Usuário não transforma conversa começada por outra pessoa", async () => {
+    thread = conversa().map((m, i) => (i === 0 ? { ...m, user: "UTEC" } : m));
+    await shortcutReply("UUSR", "UUSR");
+    expect(calls.some((c) => c.method === "views.open")).toBe(false);
+    expect(calls.find((c) => c.method === "chat.postEphemeral")!.params.text).toContain("Só técnicos");
+  });
+
+  it("sem permissão para ler a conversa: avisa e segue só com a mensagem escolhida", async () => {
+    repliesError = "missing_scope";
+    await shortcutReply("UTEC", "UTEC");
+    const aviso = calls.find((c) => c.method === "chat.postEphemeral")!;
+    expect(aviso.params.text).toContain("channels:history");
+    const view = viewOf("views.open");
+    expect(view.blocks[0].elements[0].text).toContain("Só a mensagem escolhida");
+    await submit(view.private_metadata, { title: "slack-test sem escopo", category: "sap" });
+    const { rows } = await pool.query("SELECT description, slack_thread_ts FROM tickets WHERE title = 'slack-test sem escopo'");
+    expect(rows[0].description).toContain("Mensagem original no Slack: https://pitzi.slack.com/archives/C1/p123");
+    expect(rows[0].slack_thread_ts).toBe("1759680060.000200");
+  });
+
+  it("sem files:read: chamado criado, anexos não vêm e quem clicou é avisado", async () => {
+    thread = conversa();
+    filesReadOk = false;
+    await shortcutReply("UTEC", "UTEC");
+    await submit(viewOf("views.open").private_metadata, { title: "slack-test sem files", category: "sap" });
+    const { rows } = await pool.query("SELECT description, attachments FROM tickets WHERE title = 'slack-test sem files'");
+    expect(rows[0].attachments).toBeNull();
+    expect(rows[0].description).toContain("não foram importados: setup.exe, erro.png");
+    expect(calls.some((c) => c.method === "chat.postEphemeral" && c.params.text.includes("files:read"))).toBe(true);
   });
 
   it("sem acesso à conversa: avisa só quem clicou", async () => {
