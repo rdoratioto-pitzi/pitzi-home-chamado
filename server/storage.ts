@@ -191,6 +191,9 @@ export interface IStorage {
 
   // Ticket Comments
   getTicketComments(ticketId: string): Promise<TicketCommentWithUser[]>;
+  /** Chamados em que o usuário foi mencionado em algum comentário (ticket_comments.mentions). */
+  getTicketIdsMentioningUser(userId: string): Promise<string[]>;
+  isUserMentionedInTicket(ticketId: string, userId: string): Promise<boolean>;
   createTicketComment(comment: InsertTicketComment): Promise<TicketComment>;
 
   // Projects
@@ -1174,6 +1177,26 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(users, eq(ticketComments.userId, users.id))
       .where(eq(ticketComments.ticketId, ticketId))
       .orderBy(desc(ticketComments.createdAt));
+  }
+  async getTicketIdsMentioningUser(userId: string): Promise<string[]> {
+    if (!this.db) return [];
+    const rows = await this.db
+      .selectDistinct({ ticketId: ticketComments.ticketId })
+      .from(ticketComments)
+      .where(sql`${ticketComments.mentions} @> ${JSON.stringify([{ userId }])}::jsonb`);
+    return rows.map((r) => r.ticketId);
+  }
+  async isUserMentionedInTicket(ticketId: string, userId: string): Promise<boolean> {
+    if (!this.db) return false;
+    const [row] = await this.db
+      .select({ id: ticketComments.id })
+      .from(ticketComments)
+      .where(and(
+        eq(ticketComments.ticketId, ticketId),
+        sql`${ticketComments.mentions} @> ${JSON.stringify([{ userId }])}::jsonb`,
+      ))
+      .limit(1);
+    return !!row;
   }
   async createTicketComment(insertComment: InsertTicketComment): Promise<TicketComment> {
     if (!this.db) throw new Error("Database not connected");
