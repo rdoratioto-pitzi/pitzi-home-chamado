@@ -22,8 +22,6 @@ import {
 } from "../../../shared/email-settings";
 import { emailDomain, newMessageId, ticketThreadRootId } from "../../../shared/email-mime";
 import { ticketStatusLabel, ticketTypeLabel } from "../../../shared/ticket-options";
-import { isTechnician } from "../../../shared/user-type";
-import { sameTenant } from "../../../shared/tenant";
 import {
   emailTemplate,
   getTicketUrl,
@@ -263,22 +261,6 @@ export function ticketVariables(env: MailEnv, ticket: Ticket, input: TicketEmail
   };
 }
 
-/**
- * Quem recebe a "resposta do solicitante" quando o chamado não tem responsável: os técnicos
- * ativos do grupo do chamado; grupo sem técnicos (ou inexistente), os admins ativos.
- */
-export async function ticketTeamFallback(storage: IStorage, ticket: Ticket): Promise<User[]> {
-  const [groups, allUsers] = await Promise.all([
-    storage.getSupportGroups(ticket.tenantId ?? null),
-    storage.getUsers(),
-  ]);
-  const users = allUsers.filter((u) => u.status === "active" && sameTenant(u.tenantId, ticket.tenantId));
-  const group = groups.find((g) => g.key === ticket.category);
-  const technicians = group ? users.filter((u) => group.memberIds.includes(u.id) && isTechnician(u)) : [];
-  if (technicians.length > 0) return technicians;
-  return users.filter((u) => u.isAdmin === true);
-}
-
 function ticketDetailsCard(ticket: Ticket, input: TicketEmailInput): string {
   const e = (v: string | null | undefined) => escapeHtml(v ?? "");
   return sectionCard(`
@@ -314,23 +296,21 @@ export async function buildTicketEmailRows(
     solicitante: input.requester,
     responsavel: input.assignee,
   };
+  // Só as duas pontas do chamado recebem: solicitante e responsável (nunca o grupo nem os
+  // admins). Sem responsável, a resposta do solicitante fica só no histórico do chamado.
   const recipients = new Map<string, User>();
-  let teamFallback = false;
   for (const role of config.recipients) {
-    // Resposta do solicitante sem responsável: avisa a equipe do grupo (ou os admins).
-    const users = role === "responsavel" && !input.assignee && event === "requester_reply"
-      ? ((teamFallback = true), await ticketTeamFallback(storage, ticket))
-      : [byRole[role]];
-    for (const user of users) {
-      if (!user || (input.actor && user.id === input.actor.id)) continue;
-      recipients.set(user.id, user);
-    }
+    const user = byRole[role];
+    if (!user || (input.actor && user.id === input.actor.id)) continue;
+    recipients.set(user.id, user);
   }
-  if (recipients.size === 0) return [];
+  if (recipients.size === 0) {
+    logEmailSkipped(event, "Sem destinatário (chamado sem responsável ou autor é o único envolvido)");
+    return [];
+  }
 
   const meta = EMAIL_EVENT_META[event];
   const vars = ticketVariables(ctx.env, ticket, input);
-  if (teamFallback) vars.responsavel = "equipe";
   const subject = renderSubject(config.subject, vars);
   const link = vars.link!;
   const html = emailTemplate({
