@@ -72,6 +72,10 @@ export function registerTicketRoutes(router: Router) {
       if (!isAdmin || !data.requesterId) {
         data.requesterId = userId;
       }
+      // Quem não é técnico não escolhe o responsável (vai para o automático ou para a fila).
+      if (!isAdmin && !(await isTechnicianUserId(storage, userId))) {
+        delete data.assigneeId;
+      }
 
       // Aplicação é opcional: o formulário não pede mais; se vier, precisa ser válida.
       if (data.applicationKey && !isValidApplicationKey(data.applicationKey)) {

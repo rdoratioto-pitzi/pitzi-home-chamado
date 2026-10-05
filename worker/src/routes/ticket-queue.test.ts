@@ -246,6 +246,20 @@ describe.skipIf(!url)("fila do grupo", () => {
     expect((await send(app(ids.admin, "admin"), "PATCH", `/api/workspace/chamados/${id}`, { responsavelId: ids.sapA })).status).toBe(200);
   });
 
+  it("solicitante (Usuário) não escolhe o responsável ao abrir; técnico escolhe", async () => {
+    const doUsuario = await send(app(ids.requester), "POST", "/api/tickets", {
+      code: "", title: "queue-test usuario escolhe", description: "d", category: "sap", type: "bug", assigneeId: ids.sapA,
+    });
+    expect(doUsuario.status).toBe(201);
+    expect((await json(doUsuario)).assigneeId ?? null).not.toBe(ids.sapA);
+
+    const doTecnico = await send(app(ids.sapB), "POST", "/api/tickets", {
+      code: "", title: "queue-test tecnico escolhe", description: "d", category: "sap", type: "bug", assigneeId: ids.sapA,
+    });
+    expect(doTecnico.status).toBe(201);
+    expect((await json(doTecnico)).assigneeId).toBe(ids.sapA);
+  });
+
   it("assumir e transferir exigem técnico, mesmo para quem está no grupo", async () => {
     // Simula um membro antigo que não é técnico.
     await pool.query(
