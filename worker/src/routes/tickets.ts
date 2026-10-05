@@ -21,6 +21,8 @@ import {
   sendMentionNotificationEmail,
   sendCSATReceivedEmail,
 } from "../lib/email";
+import { runTicketCommentEffects } from "../lib/ticket-comment-effects";
+import { notifyRequesterOfTeamChanges } from "../lib/ticket-update-email";
 import { ticketStatusLabel } from "../../../shared/ticket-options";
 import { mailContext } from "../lib/mailer";
 import { slaPauseUpdate } from "../../../shared/sla";
@@ -415,6 +417,9 @@ tickets.patch("/api/tickets/:id", async (c) => {
     ? await runTicketAutomations(storage, "status_changed", saved, { actorId: user.userId, newStatus: updateData.status })
     : saved;
 
+  // Grupo ou título mudados pela equipe: e-mail ao solicitante (evento ticket_updated).
+  await notifyRequesterOfTeamChanges(mailContext(c), storage, oldTicket, ticket, user.userId);
+
   // Status change email + notification
   if (updateData.status && updateData.status !== oldTicket.status) {
     const requester = await storage.getUser(ticket.requesterId);
@@ -528,60 +533,15 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
     ticketId: id,
     userId: user.userId,
     tenantId: ticket.tenantId,
+    // Origem e id do Gmail só são gravados pelo processador de respostas por e-mail.
+    source: "app",
+    inboundEmailId: null,
     isInternal: resolveIsInternal(body?.isInternal, viewer, ticket),
     mentions: extractMentions(body?.content),
   });
   const comment = await storage.createTicketComment(validated);
   const isInternal = comment.isInternal === true;
-
-  // Primeira resposta: comentário público de quem não é o solicitante (nota interna não conta).
-  if (
-    !isInternal &&
-    comment.userId !== ticket.requesterId &&
-    !ticket.dataPrimeiraResposta
-  ) {
-    await storage.updateTicket(ticket.id, { dataPrimeiraResposta: new Date() });
-  }
-
-  const commenter = await storage.getUser(comment.userId);
-  const requester = await storage.getUser(ticket.requesterId);
-  const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
-
-  // Comment email
-  if (commenter && requester) {
-    sendTicketCommentEmail(mailContext(c), storage, ticket, comment, commenter, requester, assignee || null).catch(
-      console.error
-    );
-  }
-
-  // Notifications for requester and assignee
-  if (!isInternal && requester && commenter && commenter.id !== requester.id) {
-    storage.createNotification({
-      userId: requester.id,
-      fromUserId: commenter.id,
-      title: "Novo comentário no chamado",
-      message: `${commenter.name} comentou no chamado "${ticket.title}"`,
-      module: "chamados",
-      entityId: ticket.id,
-      linkUrl: `/chamados?ticket=${ticket.id}`,
-    }).catch(console.error);
-  }
-  if (
-    assignee &&
-    commenter &&
-    commenter.id !== assignee.id &&
-    assignee.id !== requester?.id
-  ) {
-    storage.createNotification({
-      userId: assignee.id,
-      fromUserId: commenter.id,
-      title: "Novo comentário no chamado",
-      message: `${commenter.name} comentou no chamado "${ticket.title}"`,
-      module: "chamados",
-      entityId: ticket.id,
-      linkUrl: `/chamados?ticket=${ticket.id}`,
-    }).catch(console.error);
-  }
+  const { commenter } = await runTicketCommentEffects(mailContext(c), storage, ticket, comment);
 
   // Mention handling
   const mentionMatches = validated.content.match(/@(\w+(?:\s+\w+)?)/g);

@@ -181,7 +181,12 @@ export default function RequesterTicketPage() {
                     className={`rounded-xl border p-4 ${meu ? "bg-muted/30" : "bg-card border-primary/20"}`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className="text-sm font-medium">{meu ? "Você" : c.author?.name || "Equipe"}</span>
+                      <span className="text-sm font-medium">
+                        {meu ? "Você" : c.author?.name || "Equipe"}
+                        {c.source === "email" && (
+                          <span className="ml-2 text-[10px] font-normal text-muted-foreground border rounded px-1.5 py-0.5">via e-mail</span>
+                        )}
+                      </span>
                       <span className="text-xs text-muted-foreground">{formatDateTime(c.createdAt)}</span>
                     </div>
                     <div className="prose prose-sm dark:prose-invert max-w-none">

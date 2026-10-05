@@ -22,6 +22,8 @@ import {
 } from "../../../shared/email-settings";
 import { emailDomain, newMessageId, ticketThreadRootId } from "../../../shared/email-mime";
 import { ticketStatusLabel, ticketTypeLabel } from "../../../shared/ticket-options";
+import { isTechnician } from "../../../shared/user-type";
+import { sameTenant } from "../../../shared/tenant";
 import {
   emailTemplate,
   getTicketUrl,
@@ -229,6 +231,7 @@ const EVENT_PREFERENCE: Record<EmailEvent, EmailNotificationType> = {
   requester_reply: "ticket_comment",
   status_changed: "ticket_status",
   ticket_closed: "ticket_status",
+  ticket_updated: "ticket_status",
 };
 
 export interface TicketEmailInput {
@@ -239,6 +242,8 @@ export interface TicketEmailInput {
   comment?: string | null;
   newStatus?: string | null;
   oldStatus?: string | null;
+  /** Resumo das alterações da equipe (evento ticket_updated), ex.: "grupo: TI → Financeiro". */
+  changes?: string | null;
 }
 
 export function ticketLink(env: MailEnv, ticket: Pick<Ticket, "id">): string {
@@ -254,7 +259,24 @@ export function ticketVariables(env: MailEnv, ticket: Ticket, input: TicketEmail
     status: ticketStatusLabel(input.newStatus ?? ticket.status),
     link: ticketLink(env, ticket),
     comentario: input.comment ?? "",
+    alteracoes: input.changes ?? "",
   };
+}
+
+/**
+ * Quem recebe a "resposta do solicitante" quando o chamado não tem responsável: os técnicos
+ * ativos do grupo do chamado; grupo sem técnicos (ou inexistente), os admins ativos.
+ */
+export async function ticketTeamFallback(storage: IStorage, ticket: Ticket): Promise<User[]> {
+  const [groups, allUsers] = await Promise.all([
+    storage.getSupportGroups(ticket.tenantId ?? null),
+    storage.getUsers(),
+  ]);
+  const users = allUsers.filter((u) => u.status === "active" && sameTenant(u.tenantId, ticket.tenantId));
+  const group = groups.find((g) => g.key === ticket.category);
+  const technicians = group ? users.filter((u) => group.memberIds.includes(u.id) && isTechnician(u)) : [];
+  if (technicians.length > 0) return technicians;
+  return users.filter((u) => u.isAdmin === true);
 }
 
 function ticketDetailsCard(ticket: Ticket, input: TicketEmailInput): string {
@@ -293,15 +315,22 @@ export async function buildTicketEmailRows(
     responsavel: input.assignee,
   };
   const recipients = new Map<string, User>();
+  let teamFallback = false;
   for (const role of config.recipients) {
-    const user = byRole[role];
-    if (!user || (input.actor && user.id === input.actor.id)) continue;
-    recipients.set(user.id, user);
+    // Resposta do solicitante sem responsável: avisa a equipe do grupo (ou os admins).
+    const users = role === "responsavel" && !input.assignee && event === "requester_reply"
+      ? ((teamFallback = true), await ticketTeamFallback(storage, ticket))
+      : [byRole[role]];
+    for (const user of users) {
+      if (!user || (input.actor && user.id === input.actor.id)) continue;
+      recipients.set(user.id, user);
+    }
   }
   if (recipients.size === 0) return [];
 
   const meta = EMAIL_EVENT_META[event];
   const vars = ticketVariables(ctx.env, ticket, input);
+  if (teamFallback) vars.responsavel = "equipe";
   const subject = renderSubject(config.subject, vars);
   const link = vars.link!;
   const html = emailTemplate({
@@ -394,6 +423,21 @@ async function sendTicketStatusChangedEmailNow(
 ): Promise<void> {
   const event: EmailEvent = newStatus === "resolved" || newStatus === "closed" ? "ticket_closed" : "status_changed";
   await queueTicketEmail(ctx, storage, event, ticket, { requester, assignee, oldStatus, newStatus });
+}
+
+// ============== 5b. sendTicketUpdatedEmail ==============
+
+/** A equipe alterou grupo ou título: avisa o solicitante (nunca quem fez a alteração). */
+async function sendTicketUpdatedEmailNow(
+  ctx: MailContext,
+  storage: IStorage,
+  ticket: Ticket,
+  changes: string,
+  requester: User,
+  actor: User | null,
+): Promise<void> {
+  if (!changes) return;
+  await queueTicketEmail(ctx, storage, "ticket_updated", ticket, { requester, assignee: null, actor, changes });
 }
 
 // ============== 6. sendTicketCommentEmail ==============
@@ -959,6 +1003,7 @@ export const sendWelcomeEmail: typeof sendWelcomeEmailNow = (...args) => keepAli
 export const sendTicketCreatedEmail: typeof sendTicketCreatedEmailNow = (...args) => keepAlive(args[0], sendTicketCreatedEmailNow(...args));
 export const sendTicketAssignedEmail: typeof sendTicketAssignedEmailNow = (...args) => keepAlive(args[0], sendTicketAssignedEmailNow(...args));
 export const sendTicketStatusChangedEmail: typeof sendTicketStatusChangedEmailNow = (...args) => keepAlive(args[0], sendTicketStatusChangedEmailNow(...args));
+export const sendTicketUpdatedEmail: typeof sendTicketUpdatedEmailNow = (...args) => keepAlive(args[0], sendTicketUpdatedEmailNow(...args));
 export const sendTicketCommentEmail: typeof sendTicketCommentEmailNow = (...args) => keepAlive(args[0], sendTicketCommentEmailNow(...args));
 export const sendCSATReceivedEmail: typeof sendCSATReceivedEmailNow = (...args) => keepAlive(args[0], sendCSATReceivedEmailNow(...args));
 export const sendMentionNotificationEmail: typeof sendMentionNotificationEmailNow = (...args) => keepAlive(args[0], sendMentionNotificationEmailNow(...args));

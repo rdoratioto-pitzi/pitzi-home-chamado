@@ -339,6 +339,9 @@ export function registerTicketRoutes(router: Router) {
         ...req.body,
         ticketId: getId(req),
         userId: userId,
+        // Origem e id do Gmail só são gravados pelo processador de respostas por e-mail (Worker).
+        source: "app",
+        inboundEmailId: null,
         isInternal: resolveIsInternal(req.body?.isInternal, { userId, isAdmin, isGroupMember }, ticket),
         mentions: extractMentions(req.body?.content),
       });
