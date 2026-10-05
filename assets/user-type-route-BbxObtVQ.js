@@ -1,0 +1,1 @@
+import{j as n,R as s}from"./index-BzeEKbdW.js";import{u as e}from"./use-is-technician-Bk-_ADvu.js";function a({technician:r,requester:t}){return n.jsx(n.Fragment,{children:e()?r:t})}function c({children:r}){return e()?n.jsx(n.Fragment,{children:r}):n.jsx(s,{to:"/chamados"})}export{a as ByUserType,c as TechnicianOnly};
