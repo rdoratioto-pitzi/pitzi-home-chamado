@@ -132,6 +132,35 @@ export function ChamadosView() {
     };
   }, [periodo, escopo, reloadKey]);
 
+  // Atualização silenciosa (sem o "carregando"): mudanças feitas por outras pessoas, como um
+  // técnico assumindo o chamado, aparecem sem precisar recarregar a página.
+  const silentRefresh = async () => {
+    try {
+      const escopoParam = escopo === "fila" ? "&escopo=fila" : "";
+      const res = await fetchWithAuth(`/api/workspace/chamados?periodo=${periodo}${escopoParam}`);
+      if (!res.ok) return;
+      const data: WorkspaceChamadosResponse = await res.json();
+      setKpis(data.kpis);
+      setItems(data.items);
+      setSelectedItem((current) => (current ? data.items.find((i) => i.id === current.id) ?? current : current));
+    } catch {
+      // Silencioso: a próxima atualização tenta de novo.
+    }
+  };
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void silentRefresh();
+    }, 30_000);
+    const onFocus = () => { void silentRefresh(); };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodo, escopo]);
+
   async function postQueueAction(url: string, body: unknown, erro: string): Promise<boolean> {
     try {
       const res = await fetchWithAuth(url, {
@@ -327,7 +356,7 @@ export function ChamadosView() {
         <WorkspaceTable
           items={filteredItems}
           loading={loading}
-          onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); }}
+          onRowClick={(item) => { setSelectedItem(item); setDrawerOpen(true); void silentRefresh(); }}
           onClaim={escopo === "fila" ? handleClaim : undefined}
           canClaim={canClaim}
           onTransfer={escopo === "fila" ? setTransferItem : undefined}
@@ -383,7 +412,7 @@ export function ChamadosView() {
         <KanbanView
           items={filteredItems}
           variant="chamados"
-          onItemClick={(item) => { setSelectedItem(item as ChamadoItem); setDrawerOpen(true); }}
+          onItemClick={(item) => { setSelectedItem(item as ChamadoItem); setDrawerOpen(true); void silentRefresh(); }}
           onStatusChange={async (itemId, newStatus) => {
             try {
               const res = await fetchWithAuth(`/api/workspace/chamados/${itemId}`, {
