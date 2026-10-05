@@ -131,6 +131,7 @@ export type AppEnv = {
 import { activeRoutesMiddleware } from "./middleware/active-routes";
 import { configureRsApiToken } from "./lib/rs-token";
 import { processPendingEmails } from "./lib/mailer";
+import { processInboundEmails } from "./lib/inbound-email";
 
 const app = new Hono<AppEnv>();
 
@@ -245,6 +246,13 @@ async function scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionCon
   ctx.waitUntil((async () => {
     const result = await processPendingEmails(env, db, { releaseStuck: true, limit: 50 });
     if (result.sent || result.failed || result.retrying) console.log("[cron] e-mails:", result);
+  })());
+  // Respostas por e-mail: lê a caixa chamados@ e grava como comentário (lib/inbound-email.ts).
+  ctx.waitUntil((async () => {
+    const inbound = await processInboundEmails(env, db, { limit: 25, timeBudgetMs: 20_000 });
+    if (inbound.processed || inbound.ignored || inbound.errors || inbound.status !== "ok") {
+      console.log("[cron] respostas por e-mail:", inbound);
+    }
   })());
   // Automações por tempo: só na execução do início de cada hora, para uma regra que não muda o
   // status não repetir a nota a cada 5 minutos (mesma cadência de antes do cron de e-mails).

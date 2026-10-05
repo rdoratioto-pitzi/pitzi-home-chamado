@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckCircle2, Mail, RefreshCw, RotateCcw, Save, Send, XCircle } from "lucide-react";
+import { CheckCircle2, Inbox, Mail, RefreshCw, RotateCcw, Save, Send, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { apiErrorMessage } from "@/hooks/use-ticket-fields";
@@ -65,6 +65,7 @@ const PREVIEW_VARS = {
   status: "Em Andamento",
   link: "https://…/chamados/…",
   comentario: "Pode trazer o equipamento amanhã às 10h?",
+  alteracoes: "grupo de Suporte TI para Financeiro",
 };
 
 interface EmailStatus {
@@ -102,6 +103,7 @@ export function EmailSettingsPanel() {
   return (
     <div className="space-y-6">
       <EmailStatusCard />
+      <InboundEmailCard />
       <EmailSettingsForm />
       <EmailOutboxCard />
     </div>
@@ -171,6 +173,130 @@ function EmailStatusCard() {
             {test.isPending ? "Enviando..." : "Enviar e-mail de teste"}
           </Button>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+interface InboundOverview {
+  status: {
+    lastRunAt: string | null;
+    ok: boolean;
+    scopeOk: boolean | null;
+    lastError: string | null;
+  } | null;
+  last24h: { processed: number; ignored: number; error: number };
+  recent: Array<{ createdAt: string; fromEmail: string | null; subject: string | null; status: string; reason: string | null }>;
+  scopeHelp: string;
+  localOnly?: boolean;
+}
+
+const INBOUND_STATUS: Record<string, { label: string; className: string }> = {
+  processed: { label: "Virou comentário", className: "bg-green-500/10 text-green-700 dark:text-green-400" },
+  ignored: { label: "Ignorada", className: "bg-muted text-muted-foreground" },
+  error: { label: "Erro", className: "bg-red-500/10 text-red-700 dark:text-red-400" },
+};
+
+/** Respostas por e-mail: o cron lê a caixa a cada 5 min e grava as respostas no chamado. */
+function InboundEmailCard() {
+  const { toast } = useToast();
+  const { data, isLoading } = useQuery<InboundOverview>({
+    queryKey: ["/api/email/inbound"],
+    queryFn: () => getJson("/api/email/inbound"),
+  });
+  const run = useMutation({
+    mutationFn: async () => (await apiRequest("POST", "/api/email/inbound/run")).json() as Promise<{ result: { status: string; processed: number; ignored: number; error?: string } }>,
+    onSuccess: ({ result }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/email/inbound"] });
+      if (result.status === "ok") toast({ title: `Caixa lida: ${result.processed} resposta(s) importada(s), ${result.ignored} ignorada(s)` });
+      else toast({ title: "Não foi possível ler a caixa", description: result.error, variant: "destructive" });
+    },
+    onError: (err) => toast({ title: apiErrorMessage(err, "Erro ao ler a caixa"), variant: "destructive" }),
+  });
+  const status = data?.status;
+  const scopeMissing = status?.scopeOk === false;
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Inbox className="h-5 w-5 text-primary" />
+          <CardTitle className="text-lg">Respostas recebidas</CardTitle>
+        </div>
+        <CardDescription>
+          Quem responde um e-mail do chamado tem a resposta gravada no histórico, como comentário.
+          A caixa é lida a cada 5 minutos; respostas automáticas e de quem não tem acesso ao chamado
+          são ignoradas.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">Carregando...</p>
+        ) : data?.localOnly ? (
+          <p className="text-sm text-muted-foreground">A leitura da caixa só funciona no servidor de produção.</p>
+        ) : scopeMissing ? (
+          <div className="flex items-start gap-2 text-sm">
+            <XCircle className="h-4 w-4 text-red-600 mt-0.5" />
+            <span>
+              <strong>{data?.scopeHelp}.</strong>{" "}
+              <span className="text-muted-foreground">
+                No Admin do Google: Segurança → Controles de API → Delegação em todo o domínio, no
+                cliente do sistema de chamados, inclua https://www.googleapis.com/auth/gmail.modify.
+              </span>
+            </span>
+          </div>
+        ) : status?.ok ? (
+          <div className="flex items-center gap-2 text-sm">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <span>Lendo a caixa normalmente. Última leitura: {formatDate(status.lastRunAt)}</span>
+          </div>
+        ) : status ? (
+          <div className="flex items-start gap-2 text-sm">
+            <XCircle className="h-4 w-4 text-red-600 mt-0.5" />
+            <span>Falha na última leitura ({formatDate(status.lastRunAt)}): {status.lastError}</span>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">A caixa ainda não foi lida.</p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className={INBOUND_STATUS.processed.className}>Últimas 24 h — importadas: {data?.last24h.processed ?? 0}</Badge>
+          <Badge variant="outline" className={INBOUND_STATUS.ignored.className}>ignoradas: {data?.last24h.ignored ?? 0}</Badge>
+          {data?.last24h.error ? (
+            <Badge variant="outline" className={INBOUND_STATUS.error.className}>com erro: {data.last24h.error}</Badge>
+          ) : null}
+          <div className="flex-1" />
+          <Button variant="outline" onClick={() => run.mutate()} disabled={run.isPending || data?.localOnly} data-testid="button-inbound-run">
+            <RefreshCw className={`h-4 w-4 mr-2 ${run.isPending ? "animate-spin" : ""}`} />
+            {run.isPending ? "Lendo..." : "Ler a caixa agora"}
+          </Button>
+        </div>
+        {data?.recent?.length ? (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Recebida</TableHead>
+                <TableHead>De</TableHead>
+                <TableHead>Assunto</TableHead>
+                <TableHead>Resultado</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.recent.map((row, i) => (
+                <TableRow key={i}>
+                  <TableCell className="whitespace-nowrap text-xs">{formatDate(row.createdAt)}</TableCell>
+                  <TableCell className="text-xs">{row.fromEmail ?? "—"}</TableCell>
+                  <TableCell className="text-xs max-w-[260px] truncate">{row.subject ?? "—"}</TableCell>
+                  <TableCell className="text-xs">
+                    <Badge variant="outline" className={INBOUND_STATUS[row.status]?.className}>
+                      {INBOUND_STATUS[row.status]?.label ?? row.status}
+                    </Badge>
+                    {row.reason ? <span className="block text-muted-foreground mt-1">{row.reason}</span> : null}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : null}
       </CardContent>
     </Card>
   );

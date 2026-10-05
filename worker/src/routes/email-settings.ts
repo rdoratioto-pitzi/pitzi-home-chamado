@@ -23,6 +23,8 @@ import {
 } from "../../../server/services/email-outbox.service";
 import { getMailTransportStatus, loadEmailSettings, mailContext, processPendingEmails, queueEmails } from "../lib/mailer";
 
+import { inboundEmailOverview, processInboundEmails } from "../lib/inbound-email";
+
 export const emailSettings = new Hono<AppEnv>();
 
 emailSettings.use("/api/email/*", requireTicketFieldsManager);
@@ -42,6 +44,19 @@ emailSettings.get("/api/email/status", async (c) => {
   const transport = getMailTransportStatus(c.env);
   const counts = await outboxStatusCounts(c.get("db")).catch(() => ({}));
   return c.json({ ...transport, configured: transport.provider !== null, counts });
+});
+
+/** Respostas por e-mail (worker/src/lib/inbound-email.ts): última leitura e contagens. */
+emailSettings.get("/api/email/inbound", async (c) => {
+  const db = c.get("db");
+  return c.json(await inboundEmailOverview(db, getStorage(db)));
+});
+
+/** Lê a caixa agora (o cron faz o mesmo a cada 5 min). Útil para testar a autorização. */
+emailSettings.post("/api/email/inbound/run", async (c) => {
+  const db = c.get("db");
+  const result = await processInboundEmails(c.env, db, { limit: 10, timeBudgetMs: 20_000 });
+  return c.json({ result, overview: await inboundEmailOverview(db, getStorage(db)) });
 });
 
 /** Envia um e-mail de teste para quem clicou e devolve o resultado do envio. */

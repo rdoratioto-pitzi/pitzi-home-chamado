@@ -123,3 +123,65 @@ describe("e-mails de chamado", () => {
     expect(queued[0]).toMatchObject({ event: "password_reset_link", status: "pending", toEmail: "solic@pitzi.com.br" });
   });
 });
+
+
+describe("resposta do solicitante: quem recebe", () => {
+  const comment = (userId: string) => ({ id: "c", content: "Ainda não funciona", isInternal: false, userId }) as any;
+  const tecA = user("tecA", { isTechnician: true });
+  const tecB = user("tecB", { isTechnician: true });
+  const naoTecnico = user("usuarioDoGrupo", { isTechnician: false });
+  const admin = user("admin", { isAdmin: true });
+  const inativo = user("tecInativo", { isTechnician: true, status: "inactive" });
+  const semResponsavel = { ...ticket, assigneeId: null, category: "helpdesk" };
+  const teamStorage = (members: string[]) => ({
+    ...storage,
+    getSupportGroups: vi.fn(async () => [{ key: "helpdesk", name: "Helpdesk", memberIds: members }]),
+    getUsers: vi.fn(async () => [requester, assignee, tecA, tecB, naoTecnico, admin, inativo]),
+  }) as any;
+
+  it("com responsável: só o responsável", async () => {
+    await email.sendTicketCommentEmail(ctx, teamStorage(["tecA"]), ticket, comment("solic"), requester, requester, assignee);
+    expect(queued.map((r) => r.toUserId)).toEqual(["tec"]);
+  });
+
+  it("sem responsável: os técnicos ativos do grupo, e o texto fala com a equipe", async () => {
+    await email.sendTicketCommentEmail(
+      ctx, teamStorage(["tecA", "tecB", "usuarioDoGrupo", "tecInativo"]), semResponsavel, comment("solic"), requester, requester, null,
+    );
+    expect(queued.map((r) => r.toUserId).sort()).toEqual(["tecA", "tecB"]);
+    expect(queued[0].event).toBe("requester_reply");
+    expect(queued[0].text).toContain("Olá, equipe.");
+  });
+
+  it("grupo sem técnicos: os admins", async () => {
+    await email.sendTicketCommentEmail(ctx, teamStorage(["usuarioDoGrupo"]), semResponsavel, comment("solic"), requester, requester, null);
+    expect(queued.map((r) => r.toUserId)).toEqual(["admin"]);
+  });
+
+  it("nunca manda para o autor do comentário", async () => {
+    const autorAdmin = { ...requester, id: "admin", isAdmin: true };
+    const t = { ...semResponsavel, requesterId: "admin" };
+    await email.sendTicketCommentEmail(ctx, teamStorage([]), t, comment("admin"), autorAdmin, autorAdmin, null);
+    expect(queued.map((r) => r.toUserId)).not.toContain("admin");
+  });
+});
+
+describe("alteração pela equipe (ticket_updated)", () => {
+  it("avisa o solicitante com o resumo das alterações", async () => {
+    await email.sendTicketUpdatedEmail(ctx, storage, ticket, "grupo de Helpdesk para Financeiro", requester, assignee);
+    expect(queued).toHaveLength(1);
+    expect(queued[0]).toMatchObject({ event: "ticket_updated", toUserId: "solic", subject: "[CHA-0009] Impressora" });
+    expect(queued[0].text).toContain("grupo de Helpdesk para Financeiro");
+  });
+
+  it("desligado em Configurações → E-mail não envia", async () => {
+    settings.events.ticket_updated.enabled = false;
+    await email.sendTicketUpdatedEmail(ctx, storage, ticket, "título para \"X\"", requester, assignee);
+    expect(queued).toHaveLength(0);
+  });
+
+  it("quem alterou não recebe (solicitante que é o próprio autor)", async () => {
+    await email.sendTicketUpdatedEmail(ctx, storage, ticket, "título para \"X\"", requester, requester);
+    expect(queued).toHaveLength(0);
+  });
+});

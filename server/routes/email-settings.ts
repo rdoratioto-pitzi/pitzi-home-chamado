@@ -34,6 +34,17 @@ export function registerEmailSettingsRoutes(router: Router) {
     res.json({ settings: result.settings });
   });
 
+  // Respostas por e-mail só são lidas no Worker (cron com a API do Gmail).
+  router.get("/api/email/inbound", requireAuth, requireTicketFieldsManager, async (_req, res) => {
+    res.json({
+      status: null,
+      last24h: { processed: 0, ignored: 0, error: 0 },
+      recent: [],
+      scopeHelp: "Autorize o escopo gmail.modify na delegação do Workspace",
+      localOnly: true,
+    });
+  });
+
   router.get("/api/email/status", requireAuth, requireTicketFieldsManager, async (_req, res) => {
     const counts = db ? await outboxStatusCounts(db).catch(() => ({})) : {};
     res.json({ provider: null, sender: null, configured: false, counts, note: LOCAL_ONLY });
