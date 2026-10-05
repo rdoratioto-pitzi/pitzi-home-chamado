@@ -204,6 +204,11 @@ tickets.post("/api/tickets", async (c) => {
   if (user.role !== "admin" || !data.requesterId) {
     data.requesterId = user.userId;
   }
+  // Quem não é técnico não escolhe o responsável: o chamado vai para o responsável
+  // automático do grupo ou para a fila (evita o solicitante apontar o técnico errado).
+  if (user.role !== "admin" && !(await isTechnicianUserId(storage, user.userId))) {
+    delete data.assigneeId;
+  }
 
   // Aplicação é opcional: o formulário não pede mais; se vier, precisa ser válida.
   if (data.applicationKey && !isValidApplicationKey(data.applicationKey)) {
