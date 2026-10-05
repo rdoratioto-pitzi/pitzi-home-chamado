@@ -9,7 +9,7 @@ workers_dev = true
 # A cada 5 minutos: fila de e-mails (novas tentativas). As automações "X dias aguardando
 # o solicitante" rodam só na execução do início de cada hora (worker/src/index.ts).
 [triggers]
-crons = ["*/5 * * * *"]
+crons = ["* * * * *"]
 
 [placement]
 mode = "smart"

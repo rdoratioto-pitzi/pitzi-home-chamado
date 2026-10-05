@@ -197,7 +197,7 @@ const INBOUND_STATUS: Record<string, { label: string; className: string }> = {
   error: { label: "Erro", className: "bg-red-500/10 text-red-700 dark:text-red-400" },
 };
 
-/** Respostas por e-mail: o cron lê a caixa a cada 5 min e grava as respostas no chamado. */
+/** Respostas por e-mail: o cron lê a caixa a cada minuto e grava as respostas no chamado. */
 function InboundEmailCard() {
   const { toast } = useToast();
   const { data, isLoading } = useQuery<InboundOverview>({
@@ -225,7 +225,7 @@ function InboundEmailCard() {
         </div>
         <CardDescription>
           Quem responde um e-mail do chamado tem a resposta gravada no histórico, como comentário.
-          A caixa é lida a cada 5 minutos; respostas automáticas e de quem não tem acesso ao chamado
+          A caixa é lida a cada minuto; respostas automáticas e de quem não tem acesso ao chamado
           são ignoradas.
         </CardDescription>
       </CardHeader>
