@@ -7,15 +7,20 @@ export interface CommentViewer {
   isAdmin: boolean;
   /** Membro do grupo de atendimento do chamado (fila do grupo). */
   isGroupMember?: boolean;
+  /** Técnico mencionado em algum comentário do chamado (foi acionado para ajudar). */
+  isMentionedTechnician?: boolean;
 }
 
 interface TicketParticipants {
   assigneeId: string | null;
 }
 
-/** Notas internas são visíveis para administradores, o responsável e os membros do grupo do chamado. */
+/**
+ * Notas internas são visíveis para administradores, o responsável, os membros do grupo do
+ * chamado e técnicos mencionados no chamado. Usuário (não técnico) mencionado nunca vê.
+ */
 export function canSeeInternalComments(viewer: CommentViewer, ticket: TicketParticipants): boolean {
-  return viewer.isAdmin || viewer.isGroupMember === true ||
+  return viewer.isAdmin || viewer.isGroupMember === true || viewer.isMentionedTechnician === true ||
     (ticket.assigneeId !== null && ticket.assigneeId === viewer.userId);
 }
 

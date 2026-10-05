@@ -15,6 +15,7 @@ import {
 import type { Ticket, SlaRule } from "../../../shared/schema";
 import { isValidApplicationKey } from "../../../shared/applications";
 import { sameTenant } from "../../../shared/tenant";
+import { isTechnician } from "../../../shared/user-type";
 import { extractMentions } from "../lib/sanitize-rich-text";
 import {
   notifyChamadoCriado,
@@ -208,6 +209,15 @@ workspace.get("/api/workspace/chamados", async (c) => {
       allTickets = isAdmin
         ? await storage.getTickets({ tenantId })
         : await storage.getTickets({ requesterId: userId, assigneeId: userId, tenantId });
+      // Técnico acionado por menção (@) também vê o chamado na lista dele.
+      if (!isAdmin && isTechnician(await storage.getUser(userId))) {
+        const known = new Set(allTickets.map((t) => t.id));
+        for (const ticketId of await storage.getTicketIdsMentioningUser(userId)) {
+          if (known.has(ticketId)) continue;
+          const t = await storage.getTicket(ticketId);
+          if (t && sameTenant(t.tenantId, tenantId)) allTickets.push(t);
+        }
+      }
     }
 
     const allUsers = await storage.getUsers();

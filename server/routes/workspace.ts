@@ -25,7 +25,7 @@ import { runTicketAutomations } from "../services/automations.service";
 import { isInQueue } from "@shared/ticket-queue";
 import { canViewTicket, getQueueViewer } from "../services/ticket-queue.service";
 import { isTechnicianUserId } from "../services/user-type.service";
-import { TECHNICIAN_REQUIRED_ERROR } from "@shared/user-type";
+import { isTechnician, TECHNICIAN_REQUIRED_ERROR } from "@shared/user-type";
 import { REQUESTER_FORBIDDEN_CHANGE_ERROR } from "@shared/requester-view";
 
 /**
@@ -179,7 +179,19 @@ export function registerWorkspaceRoutes(router: Router) {
             .then(([all, viewer]) => all.filter((t) => isInQueue(viewer, t)))
         : isAdmin
           ? storage.getTicketsForWorkspace()
-          : storage.getTicketsForWorkspace({ requesterId: userId, assigneeId: userId });
+          : Promise.all([
+              storage.getTicketsForWorkspace({ requesterId: userId, assigneeId: userId }),
+              storage.getUser(userId),
+              storage.getTicketIdsMentioningUser(userId),
+            ]).then(async ([own, me, mentionedIds]) => {
+              // Técnico acionado por menção (@) também vê o chamado na lista dele.
+              if (!isTechnician(me) || mentionedIds.length === 0) return own;
+              const known = new Set(own.map((t) => t.id));
+              const missing = new Set(mentionedIds.filter((id) => !known.has(id)));
+              if (missing.size === 0) return own;
+              const all = await storage.getTicketsForWorkspace();
+              return [...own, ...all.filter((t) => missing.has(t.id))];
+            });
 
       const [allTickets, users, slaRules] = await Promise.all([
         ticketsPromise,
