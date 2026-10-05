@@ -159,6 +159,11 @@ export const tickets = pgTable("tickets", {
   slaPausaMinutos: integer("sla_pausa_minutos").notNull().default(0),
   // Valores dos campos personalizados do grupo, por id do campo (shared/custom-fields.ts, migration 0027)
   customFields: jsonb("custom_fields"),
+  // Origem no Slack (atalho "Transformar em chamado"; migration 0035). Base da fase 2:
+  // sincronizar a conversa do chamado com a thread da mensagem.
+  slackChannelId: text("slack_channel_id"),
+  slackThreadTs: text("slack_thread_ts"),
+  slackMessageTs: text("slack_message_ts"),
   // Audit log for description edits
   descriptionLastEditedBy: varchar("description_last_edited_by"),
   descriptionLastEditedAt: timestamp("description_last_edited_at"),

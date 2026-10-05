@@ -24,6 +24,7 @@ import { runTicketCommentEffects } from "../lib/ticket-comment-effects";
 import { notifyRequesterOfTeamChanges } from "../lib/ticket-update-email";
 import { ticketStatusLabel } from "../../../shared/ticket-options";
 import { mailContext } from "../lib/mailer";
+import { createTicketFor } from "../lib/create-ticket";
 import { slaPauseUpdate } from "../../../shared/sla";
 import { normalizeRequestSelection } from "../../../shared/request-objects";
 import { checkRequestSelection, resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
@@ -216,93 +217,12 @@ tickets.get("/api/tickets/:id", async (c) => {
 tickets.post("/api/tickets", async (c) => {
   const user = c.get("user");
   const storage = getStorage(c.get("db"));
-  const env = c.env;
   const body = await c.req.json();
-  const data = { ...body };
-
-  if (user.role !== "admin" || !data.requesterId) {
-    data.requesterId = user.userId;
-  }
-  // Quem não é técnico não escolhe o responsável: o chamado vai para o responsável
-  // automático do grupo ou para a fila (evita o solicitante apontar o técnico errado).
-  if (user.role !== "admin" && !(await isTechnicianUserId(storage, user.userId))) {
-    delete data.assigneeId;
-  }
-
-  // Aplicação é opcional: o formulário não pede mais; se vier, precisa ser válida.
-  if (data.applicationKey && !isValidApplicationKey(data.applicationKey)) {
-    return c.json({ error: "Aplicação inválida" }, 400);
-  }
-  data.applicationKey = data.applicationKey || null;
-
-  normalizeRequestSelection(data);
-  if (!(await checkRequestSelection(storage, data))) {
-    return c.json({ error: "Objeto da Requisição inválido" }, 400);
-  }
-
-  const validated = insertTicketSchema.parse(data);
-
-  if (!(await storage.getActiveSupportGroupByKey(validated.category))) {
-    return c.json({ error: "Grupo de atendimento é obrigatório e deve ser válido" }, 400);
-  }
-
-  // Campos personalizados do grupo (obrigatórios exigidos na abertura).
-  const custom = await resolveCustomFieldValues(storage, {
-    incoming: body?.customFields, groupKey: validated.category, isCreate: true,
-  });
-  if (!custom.ok) return c.json({ error: custom.error }, custom.status);
-  validated.customFields = custom.values ?? null;
-
-  // Responsável informado na abertura precisa ser técnico.
-  if (validated.assigneeId && !(await isTechnicianUserId(storage, validated.assigneeId))) {
-    return c.json({ error: TECHNICIAN_REQUIRED_ERROR }, 400);
-  }
-
-  // Auto-assignment (regra antiga cujo responsável deixou de ser técnico é ignorada)
-  if (!validated.assigneeId && validated.category && validated.type) {
-    const autoAssignee = await storage.findResponsavelForTicket(
-      validated.category,
-      validated.type,
-      user.tenantId ?? null,
-    );
-    if (autoAssignee && (await isTechnicianUserId(storage, autoAssignee))) validated.assigneeId = autoAssignee;
-  }
-
-  const created = await storage.createTicket({ ...validated, tenantId: user.tenantId });
-  // Automações de abertura rodam depois do responsável automático; e-mails e avisos abaixo
-  // já usam o resultado final.
-  const ticket = await runTicketAutomations(storage, "ticket_created", created, {
-    actorId: user.userId, notifyAssignee: false,
-  });
-  const requester = await storage.getUser(ticket.requesterId);
-  const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
-
-  // Emails (fire-and-forget)
-  if (requester) {
-    sendTicketCreatedEmail(mailContext(c), storage, ticket, requester, assignee || null).catch(
-      console.error
-    );
-  }
-  if (assignee && assignee.id !== ticket.requesterId) {
-    sendTicketAssignedEmail(mailContext(c), storage, ticket, assignee).catch(console.error);
-  }
-
-  // Notification
-  if (ticket.assigneeId && ticket.assigneeId !== ticket.requesterId) {
-    storage
-      .createNotification({
-        userId: ticket.assigneeId,
-        fromUserId: ticket.requesterId,
-        title: "Novo chamado atribuído",
-        message: `O chamado "${ticket.title}" (${ticket.code}) foi criado e atribuído a você`,
-        module: "chamados",
-        entityId: ticket.id,
-        linkUrl: `/chamados?ticket=${ticket.id}`,
-      })
-      .catch(console.error);
-  }
-
-  return c.json(ticket, 201);
+  const result = await createTicketFor(storage, mailContext(c), {
+    userId: user.userId, isAdmin: user.role === "admin", tenantId: user.tenantId ?? null,
+  }, body ?? {});
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json(result.ticket, 201);
 });
 
 // PATCH /api/tickets/:id

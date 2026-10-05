@@ -6,7 +6,7 @@ const SUPPORT_API_PREFIXES = [
   "/api/slas", "/api/notifications", "/api/uploads",
   "/api/v1/support-groups", "/api/ticket-fields",
   "/api/canned-responses", "/api/automations", "/api/email",
-  "/api/conhecimento",
+  "/api/conhecimento", "/api/slack",
 ];
 const SUPPORT_API_PATHS = new Set([
   "/api/health", "/api/version", "/api/external/chamados",
