@@ -1,4 +1,5 @@
 import React from "react";
+import { isStaleChunkError, reloadForNewVersion } from "@/lib/stale-build";
 
 interface WorkspaceErrorBoundaryState {
   hasError: boolean;
@@ -23,6 +24,8 @@ export class WorkspaceErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    // Versão antiga aberta depois de um deploy: recarrega em vez de mostrar o erro.
+    if (isStaleChunkError(error) && reloadForNewVersion()) return;
     console.error("[WorkspaceErrorBoundary] Uncaught error:", error, info);
   }
 

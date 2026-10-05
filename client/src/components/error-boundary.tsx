@@ -2,6 +2,7 @@ import { Component, type ReactNode } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { isStaleChunkError, reloadForNewVersion } from "@/lib/stale-build";
 
 interface Props {
   children: ReactNode;
@@ -24,6 +25,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error) {
+    // Versão antiga aberta depois de um deploy: recarrega em vez de mostrar o erro.
+    if (isStaleChunkError(error) && reloadForNewVersion()) return;
     console.error("[ErrorBoundary] Uncaught error:", error);
   }
 
