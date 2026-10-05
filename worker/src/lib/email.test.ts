@@ -144,18 +144,11 @@ describe("resposta do solicitante: quem recebe", () => {
     expect(queued.map((r) => r.toUserId)).toEqual(["tec"]);
   });
 
-  it("sem responsável: os técnicos ativos do grupo, e o texto fala com a equipe", async () => {
+  it("sem responsável: ninguém recebe (só solicitante e responsável recebem resposta)", async () => {
     await email.sendTicketCommentEmail(
-      ctx, teamStorage(["tecA", "tecB", "usuarioDoGrupo", "tecInativo"]), semResponsavel, comment("solic"), requester, requester, null,
+      ctx, teamStorage(["tecA", "tecB"]), semResponsavel, comment("solic"), requester, requester, null,
     );
-    expect(queued.map((r) => r.toUserId).sort()).toEqual(["tecA", "tecB"]);
-    expect(queued[0].event).toBe("requester_reply");
-    expect(queued[0].text).toContain("Olá, equipe.");
-  });
-
-  it("grupo sem técnicos: os admins", async () => {
-    await email.sendTicketCommentEmail(ctx, teamStorage(["usuarioDoGrupo"]), semResponsavel, comment("solic"), requester, requester, null);
-    expect(queued.map((r) => r.toUserId)).toEqual(["admin"]);
+    expect(queued).toHaveLength(0);
   });
 
   it("nunca manda para o autor do comentário", async () => {
