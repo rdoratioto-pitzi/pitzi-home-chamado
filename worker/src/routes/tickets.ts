@@ -1,4 +1,5 @@
 // worker/src/routes/tickets.ts
+import { sendCommentToSlackThread } from "../lib/slack-thread-sync";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { AppEnv } from "../index";
@@ -455,10 +456,13 @@ tickets.post("/api/tickets/:id/comments", async (c) => {
     // Origem e id do Gmail só são gravados pelo processador de respostas por e-mail.
     source: "app",
     inboundEmailId: null,
+    slackMessageKey: null,
     isInternal: wantsInternal,
     mentions,
   });
   const comment = await storage.createTicketComment(validated);
+  const slackWork = sendCommentToSlackThread(c.env, ticket, comment).catch((error) => console.error("[slack-thread] outbound", error));
+  try { c.executionCtx.waitUntil(slackWork); } catch { await slackWork; }
   const isInternal = comment.isInternal === true;
   const { commenter } = await runTicketCommentEffects(mailContext(c), storage, ticket, comment);
 

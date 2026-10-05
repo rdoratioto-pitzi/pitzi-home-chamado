@@ -6,6 +6,7 @@ import {
   parseTicketModal,
   plainTextToHtml,
   slackTextToPlain,
+  generateSlackTicketTitle,
   verifySlackSignature,
 } from "./slack-ticket";
 
@@ -76,4 +77,13 @@ describe("janela de abertura", () => {
     expect(values).toEqual({ title: "Impressora", description: "não imprime", category: "sap", type: "bug", impact: null });
     expect(parseModalMetadata("lixo")).toBeNull();
   });
+});
+
+describe("título automático", () => {
+  it.each([
+    ["Minha VPN não está conectando.", "Problema de acesso à VPN"],
+    ["Meu notebook não liga.", "Notebook não liga"],
+    ["Não consigo acessar o Google Drive.", "Problema de acesso ao Google Drive"],
+    ["", "Problema relatado via Slack"],
+  ])("%s → %s", (message, title) => expect(generateSlackTicketTitle(message)).toBe(title));
 });

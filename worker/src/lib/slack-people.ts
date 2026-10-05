@@ -1,6 +1,7 @@
 // Quem é quem: usuário do Slack → usuário dos chamados, pelo e-mail do perfil do Slack.
 // Quem ainda não tem cadastro e é de um domínio liberado (ALLOWED_GOOGLE_DOMAINS) entra como
 // "Usuário", igual ao primeiro login com Google.
+import { hasModulePermission } from "../../../shared/permissions";
 import { eq } from "drizzle-orm";
 import { users, type User } from "../../../shared/schema";
 import { findOrProvisionGoogleUser } from "../../../server/services/google-login.service";
@@ -23,9 +24,11 @@ export async function resolveSlackPerson(
   env: { SLACK_BOT_TOKEN?: string; ALLOWED_GOOGLE_DOMAINS?: string },
   slackUserId: string,
 ): Promise<SlackPersonResult> {
+  if (!slackUserId) return { ok: false, message: "Usuário do Slack inválido." };
   const [known] = await db.select().from(users).where(eq(users.slackUserId, slackUserId)).limit(1);
   if (known) {
     if (known.status !== "active") return { ok: false, message: "Sua conta nos chamados está desativada." };
+    if (!hasModulePermission(known, "chamados")) return { ok: false, message: "Sua conta não tem permissão para acessar chamados." };
     return { ok: true, user: known };
   }
 
@@ -47,6 +50,7 @@ export async function resolveSlackPerson(
   });
   if (!result.ok) return { ok: false, message: "Sua conta nos chamados está desativada." };
 
+  if (!hasModulePermission(result.user, "chamados")) return { ok: false, message: "Sua conta não tem permissão para acessar chamados." };
   if (result.user.slackUserId !== slackUserId) {
     await db.update(users).set({ slackUserId }).where(eq(users.id, result.user.id));
   }

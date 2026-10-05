@@ -1166,6 +1166,10 @@ export class DatabaseStorage implements IStorage {
         content: ticketComments.content,
         attachments: ticketComments.attachments,
         isInternal: ticketComments.isInternal,
+        mentions: ticketComments.mentions,
+        source: ticketComments.source,
+        inboundEmailId: ticketComments.inboundEmailId,
+        slackMessageKey: ticketComments.slackMessageKey,
         createdAt: ticketComments.createdAt,
         author: {
           id: users.id,

@@ -4,10 +4,17 @@ Duas formas de abrir chamado pelo Slack:
 
 - **`/chamado [texto]`** em qualquer canal ou DM: abre uma janela com Título, Descrição,
   Grupo e Tipo (técnicos e admins também escolhem a Gravidade). O solicitante é quem digitou.
-- **Atalho de mensagem "Transformar em chamado"** (menu ⋯ da mensagem → *Mais ações*): mesma
-  janela, já com o texto e o link da mensagem. O solicitante é o **autor da mensagem**. Só
-  técnicos e admins usam o atalho em mensagem de outra pessoa; qualquer pessoa pode usar na
-  própria mensagem. Depois de criado, o app responde na thread: "Virou o chamado CHA-XXXX".
+- **Criar chamado** (menu ⋯ da mensagem → *Mais ações*): cria imediatamente com texto,
+  autor, título automático e grupo padrão. Não abre formulário. Mantém o callback
+  `transformar_em_chamado` para compatibilidade.
+- **Criar chamado avançado**: abre o formulário existente com o texto preenchido,
+  callback `criar_chamado_avancado`. O solicitante é o autor; só técnicos/admins
+  podem criar a partir de mensagens de outra pessoa do mesmo tenant.
+
+A confirmação e os botões Assumir, Em atendimento, Resolver e Ver chamado ficam na thread.
+As ações validam conta ativa, módulo chamados, workspace, tenant e acesso ao chamado.
+Sem e-mail no Slack, é necessário um vínculo prévio por `users.slack_user_id`; um autor
+sem vínculo e sem e-mail é recusado, sem inventar uma identidade.
 
 A pessoa é reconhecida pelo e-mail do perfil do Slack. Quem ainda não tem cadastro e é de um
 domínio liberado (`ALLOWED_GOOGLE_DOMAINS`, hoje `pitzi.com.br`) entra como **Usuário**, igual
@@ -35,10 +42,14 @@ features:
       usage_hint: "[descrição do problema]"
       should_escape: false
   shortcuts:
-    - name: Transformar em chamado
+    - name: Criar chamado
       type: message
       callback_id: transformar_em_chamado
-      description: Abre um chamado a partir desta mensagem
+      description: Cria um chamado automaticamente a partir desta mensagem
+    - name: Criar chamado avançado
+      type: message
+      callback_id: criar_chamado_avancado
+      description: Abre o formulário com o texto desta mensagem
 oauth_config:
   scopes:
     bot:
@@ -90,18 +101,48 @@ O app responde sozinho nas threads de canais públicos. Em **canais privados**, 
 uma vez: no canal, `/invite @Chamados Pitzi`. Sem o convite, o chamado é criado normalmente e o
 aviso "Virou o chamado…" vai só para quem clicou (mensagem visível só para a pessoa).
 
-## 5. Testar
+## 5. Banco e configuração obrigatória
 
-1. Em qualquer canal: `/chamado Impressora do 2º andar não imprime` → a janela abre já com o
-   título → escolha o grupo → **Abrir chamado**. Chega uma mensagem "Chamado CHA-XXXX aberto ✅".
-2. Numa mensagem de outra pessoa: ⋯ → *Mais ações* → **Transformar em chamado** (com conta de
-   técnico) → **Abrir chamado**. O app responde na thread com o número e o link.
+Aplique as migrations `0036_chamados_slack_message_link.sql` e `0037_slack_thread_notes.sql`
+pelo runner existente, antes de publicar o Worker. A primeira guarda workspace, autor e
+permalink e cria índice único por workspace + canal + timestamp. A segunda deduplica notas.
 
-## Limites (fase 1)
+Defina `SLACK_ALLOWED_TEAM_ID` com o ID real do workspace (ou `SLACK_ALLOWED_TEAM_IDS`
+com IDs separados por vírgula). Sem essa configuração, o workspace é confirmado
+pelo `auth.test` do token do bot instalado; falhas dessa confirmação são recusadas.
+Renomeie o atalho existente para **Criar chamado**, conservando o callback, e adicione o
+atalho avançado do manifesto. `/chamado` continua abrindo o formulário existente.
 
-- Grupos com **campos personalizados obrigatórios** não abrem pelo Slack: a janela mostra um
-  erro pedindo para abrir pelo sistema.
-- Anexos e imagens da mensagem não são copiados; o link da mensagem original vai na descrição.
-- A conversa do chamado ainda não volta para a thread (fase 2: o chamado já guarda o canal e a
-  thread de origem — `tickets.slack_channel_id`, `slack_thread_ts`, `slack_message_ts`).
-- No Express local as rotas respondem 501; só funcionam no Worker de produção.
+## 6. Sincronização opcional
+
+Por padrão fica desligada. Para ativar, defina `SLACK_THREAD_SYNC_ENABLED=true` e cadastre
+Event Subscriptions no endpoint `/api/slack/events` do mesmo Worker, com os eventos
+`message.channels` e, se necessário, `message.groups`; adicione os escopos correspondentes
+`channels:history` / `groups:history` e reinstale o app. O bot precisa participar dos canais.
+A verificação de URL exige assinatura; eventos exigem também workspace autorizado.
+
+Respostas humanas de usuários com acesso ao ticket são registradas como notas internas.
+Mensagens originais, bots e subtipos de edição/exclusão são ignorados. Cada timestamp gera
+no máximo uma nota por ticket, mesmo com retries da Event API.
+
+Comentários públicos criados pela tela do sistema voltam à thread. Notas internas só voltam
+se `SLACK_INTERNAL_NOTES_TO_THREAD_ENABLED=true`: ative apenas em canais cuja audiência
+possa ler essas notas. A origem `slack` não é reenviada e mensagens do bot são ignoradas,
+evitando loops. Falhas de envio são registradas; não há fila automática de reenvio.
+
+## 7. Testar
+
+1. Mensagem "Não consigo conectar na VPN" → **Criar chamado**: nenhum modal;
+   ticket criado e confirmação na thread com botões.
+2. Repetir o clique: aviso do chamado existente, sem duplicação.
+3. **Criar chamado avançado** e `/chamado`: formulário preservado.
+4. Técnico com acesso: assumir, colocar em atendimento e resolver.
+5. Com sync ativado: resposta humana vira nota interna uma vez; bots não criam notas.
+
+Os testes usam Slack Web API simulada e `TEST_DATABASE_URL` apontando para um banco
+**descartável** com schema e migrations aplicados.
+
+Limites: anexos não são copiados. Grupos com campos personalizados obrigatórios podem
+recusar a criação rápida; o erro orienta o usuário ao fluxo avançado/sistema. Express local
+continua retornando 501 para a integração. O deploy, as migrations em produção e a alteração
+do manifesto são etapas separadas dos testes locais.

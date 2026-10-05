@@ -76,6 +76,10 @@ type Bindings = {
   // silenciosamente se SLACK_BOT_TOKEN ausente ou SLACK_INTEGRATION_ENABLED=false.
   SLACK_BOT_TOKEN?: string;
   SLACK_SIGNING_SECRET?: string; // Assinatura das requisições do Slack (/chamado e atalhos)
+  SLACK_THREAD_SYNC_ENABLED?: string;
+  SLACK_INTERNAL_NOTES_TO_THREAD_ENABLED?: string;
+  SLACK_ALLOWED_TEAM_ID?: string;
+  SLACK_ALLOWED_TEAM_IDS?: string;
   SLACK_CHANNEL_DEVS?: string;
   SLACK_INTEGRATION_ENABLED?: string;
   // SendPulse (Phase 2A — replaces nodemailer)

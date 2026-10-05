@@ -49,3 +49,21 @@ export async function notifyPerson(
   }
   await slackApi(token, "chat.postMessage", { channel: slackUserId, text });
 }
+
+let verifiedWorkspace: { token: string; teamId: string; expiresAt: number } | undefined;
+
+/** Explicit allowlist, or the workspace authenticated by the installed bot token. */
+export async function isAllowedSlackTeam(env: {
+  SLACK_ALLOWED_TEAM_IDS?: string; SLACK_ALLOWED_TEAM_ID?: string; SLACK_BOT_TOKEN?: string;
+}, teamId: string | null | undefined): Promise<boolean> {
+  if (!teamId) return false;
+  const configured = env.SLACK_ALLOWED_TEAM_IDS ?? env.SLACK_ALLOWED_TEAM_ID;
+  if (configured) return configured.split(",").map((id) => id.trim()).filter(Boolean).includes(teamId);
+  if (!env.SLACK_BOT_TOKEN) return false;
+  if (!verifiedWorkspace || verifiedWorkspace.token !== env.SLACK_BOT_TOKEN || verifiedWorkspace.expiresAt < Date.now()) {
+    const auth = await slackApi(env.SLACK_BOT_TOKEN, "auth.test", {});
+    if (!auth.ok || !auth.team_id) return false;
+    verifiedWorkspace = { token: env.SLACK_BOT_TOKEN, teamId: auth.team_id, expiresAt: Date.now() + 300_000 };
+  }
+  return verifiedWorkspace.teamId === teamId;
+}
