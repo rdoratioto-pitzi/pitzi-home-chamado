@@ -92,8 +92,8 @@ function ChipSelect({ value, onValueChange, placeholder, options, greenStyle }: 
               }
             : {
                 background: "transparent",
-                borderColor: "rgba(255,255,255,0.12)",
-                color: value ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)",
+                borderColor: "hsl(var(--foreground) / 0.12)",
+                color: value ? "hsl(var(--foreground) / 0.7)" : "hsl(var(--foreground) / 0.3)",
               }
         }
       >
@@ -101,7 +101,7 @@ function ChipSelect({ value, onValueChange, placeholder, options, greenStyle }: 
       </SelectTrigger>
       <SelectContent>
         {placeholder && (
-          <SelectItem value="none" style={{ color: "rgba(255,255,255,0.35)" }}>
+          <SelectItem value="none" style={{ color: "hsl(var(--foreground) / 0.35)" }}>
             {placeholder}
           </SelectItem>
         )}
@@ -125,11 +125,11 @@ function ChipDate({ value, onChange, placeholder }: ChipDateProps) {
   return (
     <div
       className="flex items-center h-7 px-2 rounded-full text-xs"
-      style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+      style={{ border: "1px solid hsl(var(--foreground) / 0.12)" }}
     >
       <span
         className="mr-1 whitespace-nowrap"
-        style={{ color: value ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.3)", fontSize: "10px" }}
+        style={{ color: value ? "hsl(var(--foreground) / 0.5)" : "hsl(var(--foreground) / 0.3)", fontSize: "10px" }}
       >
         {!value && placeholder}
       </span>
@@ -139,7 +139,7 @@ function ChipDate({ value, onChange, placeholder }: ChipDateProps) {
         onChange={(e) => onChange(e.target.value)}
         className="bg-transparent outline-none text-xs"
         style={{
-          color: "rgba(255,255,255,0.7)",
+          color: "hsl(var(--foreground) / 0.7)",
           colorScheme: "dark",
           width: value ? "100px" : "16px",
         }}
@@ -464,7 +464,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
         className="max-w-2xl p-0 gap-0 overflow-hidden"
         style={{
           background: "#0d1117",
-          border: "1px solid rgba(255,255,255,0.08)",
+          border: "1px solid hsl(var(--foreground) / 0.08)",
         }}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
@@ -483,7 +483,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
         {/* Type Bar */}
         <div
           className="flex items-center gap-2 px-4 py-3"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+          style={{ borderBottom: "1px solid hsl(var(--foreground) / 0.06)" }}
         >
           {(["chamado", "tarefa", "projeto"] as ItemType[]).map((t) => (
             <button
@@ -504,8 +504,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                     }
                   : {
                       background: "transparent",
-                      borderColor: "rgba(255,255,255,0.08)",
-                      color: "rgba(255,255,255,0.3)",
+                      borderColor: "hsl(var(--foreground) / 0.08)",
+                      color: "hsl(var(--foreground) / 0.3)",
                     }
               }
             >
@@ -517,7 +517,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
         {/* Header Row */}
         <div
           className="flex items-center justify-between px-6 py-3"
-          style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+          style={{ borderBottom: "1px solid hsl(var(--foreground) / 0.06)" }}
         >
           <div className="flex items-center gap-2 text-sm">
             <span
@@ -532,15 +532,15 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             >
               {TYPE_CONFIG[type].prefix}
             </span>
-            <span style={{ color: "rgba(255,255,255,0.25)" }}>›</span>
-            <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 500 }}>
+            <span style={{ color: "hsl(var(--foreground) / 0.25)" }}>›</span>
+            <span style={{ color: "hsl(var(--foreground) / 0.85)", fontWeight: 500 }}>
               {TYPE_CONFIG[type].label}
             </span>
           </div>
           <button
             onClick={onClose}
             className="rounded p-1 transition-colors hover:bg-white/5"
-            style={{ color: "rgba(255,255,255,0.3)" }}
+            style={{ color: "hsl(var(--foreground) / 0.3)" }}
           >
             <X className="h-4 w-4" />
           </button>
@@ -554,7 +554,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             onChange={(e) => setTitulo(e.target.value)}
             placeholder={TYPE_CONFIG[type].titlePlaceholder}
             className="border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-medium shadow-none"
-            style={{ fontSize: "19px", color: "rgba(255,255,255,0.9)" }}
+            style={{ fontSize: "19px", color: "hsl(var(--foreground) / 0.9)" }}
             onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
           />
 
@@ -611,7 +611,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs transition-colors hover:bg-white/5"
-              style={{ border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.4)" }}
+              style={{ border: "1px solid hsl(var(--foreground) / 0.1)", color: "hsl(var(--foreground) / 0.4)" }}
             >
               <Paperclip className="h-3 w-3" />
               Anexar
@@ -624,14 +624,14 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                     src={att.url}
                     alt={att.name}
                     className="w-11 h-11 object-cover rounded"
-                    style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+                    style={{ border: "1px solid hsl(var(--foreground) / 0.1)" }}
                   />
                 ) : (
                   <div
                     className="w-11 h-11 rounded flex items-center justify-center"
-                    style={{ border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)" }}
+                    style={{ border: "1px solid hsl(var(--foreground) / 0.1)", background: "hsl(var(--foreground) / 0.04)" }}
                   >
-                    <Paperclip className="h-4 w-4" style={{ color: "rgba(255,255,255,0.3)" }} />
+                    <Paperclip className="h-4 w-4" style={{ color: "hsl(var(--foreground) / 0.3)" }} />
                   </div>
                 )}
                 <button
@@ -644,7 +644,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
               </div>
             ))}
 
-            <span className="text-xs ml-1" style={{ color: "rgba(255,255,255,0.2)" }}>
+            <span className="text-xs ml-1" style={{ color: "hsl(var(--foreground) / 0.2)" }}>
               Ctrl+V ou arraste arquivos
             </span>
           </div>
@@ -677,7 +677,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                   <SelectValue placeholder="Projeto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none" style={{ color: "rgba(255,255,255,0.35)" }}>
+                  <SelectItem value="none" style={{ color: "hsl(var(--foreground) / 0.35)" }}>
                     Sem projeto
                   </SelectItem>
                   {projetos.map((p) => (
@@ -707,8 +707,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                 placeholder="Sprint"
                 className="h-7 px-3 text-xs rounded-full bg-transparent outline-none"
                 style={{
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  color: sprint ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)",
+                  border: "1px solid hsl(var(--foreground) / 0.12)",
+                  color: sprint ? "hsl(var(--foreground) / 0.7)" : "hsl(var(--foreground) / 0.3)",
                   width: "70px",
                 }}
               />
@@ -760,18 +760,18 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                 placeholder="Categoria"
                 className="h-7 px-3 text-xs rounded-full bg-transparent outline-none"
                 style={{
-                  border: "1px solid rgba(255,255,255,0.12)",
-                  color: categoriaProjeto ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)",
+                  border: "1px solid hsl(var(--foreground) / 0.12)",
+                  color: categoriaProjeto ? "hsl(var(--foreground) / 0.7)" : "hsl(var(--foreground) / 0.3)",
                   width: "90px",
                 }}
               />
               <div
                 className="flex items-center h-7 px-2 rounded-full text-xs"
-                style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+                style={{ border: "1px solid hsl(var(--foreground) / 0.12)" }}
               >
                 <span
                   className="mr-1 whitespace-nowrap"
-                  style={{ color: budget ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.3)", fontSize: "10px" }}
+                  style={{ color: budget ? "hsl(var(--foreground) / 0.5)" : "hsl(var(--foreground) / 0.3)", fontSize: "10px" }}
                 >
                   R$
                 </span>
@@ -783,7 +783,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                   step="100"
                   placeholder="Budget"
                   className="bg-transparent outline-none text-xs"
-                  style={{ color: "rgba(255,255,255,0.7)", width: "70px" }}
+                  style={{ color: "hsl(var(--foreground) / 0.7)", width: "70px" }}
                 />
               </div>
               <div className="min-w-[180px]">
@@ -799,7 +799,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
               {/* Visibilidade — 3 botões compactos chip-style */}
               <div
                 className="flex items-center h-7 rounded-full overflow-hidden"
-                style={{ border: "1px solid rgba(255,255,255,0.12)" }}
+                style={{ border: "1px solid hsl(var(--foreground) / 0.12)" }}
                 title={
                   visibilityProjeto === "private"
                     ? "Apenas o responsável pode ver este projeto."
@@ -820,7 +820,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                       className="flex items-center gap-1 px-2 h-full text-xs transition-colors"
                       style={{
                         background: isActive ? "rgba(0,200,83,0.08)" : "transparent",
-                        color: isActive ? "#5B62EC" : "rgba(255,255,255,0.5)",
+                        color: isActive ? "#5B62EC" : "hsl(var(--foreground) / 0.5)",
                       }}
                     >
                       <Icon className="h-3 w-3" />
@@ -841,8 +841,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                 onClick={() => setExtraOpen((v) => !v)}
                 className="flex items-center gap-2 text-xs w-full py-2 transition-colors hover:opacity-70"
                 style={{
-                  color: "rgba(255,255,255,0.3)",
-                  borderTop: "1px solid rgba(255,255,255,0.05)",
+                  color: "hsl(var(--foreground) / 0.3)",
+                  borderTop: "1px solid hsl(var(--foreground) / 0.05)",
                 }}
               >
                 {extraOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -853,7 +853,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                   <div>
                     <label
                       className="text-xs mb-1 block"
-                      style={{ color: "rgba(255,255,255,0.35)" }}
+                      style={{ color: "hsl(var(--foreground) / 0.35)" }}
                     >
                       Estimativa (h)
                     </label>
@@ -865,16 +865,16 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                       step="0.5"
                       className="w-full h-8 px-3 text-sm rounded outline-none"
                       style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        color: "rgba(255,255,255,0.7)",
+                        background: "hsl(var(--foreground) / 0.04)",
+                        border: "1px solid hsl(var(--foreground) / 0.1)",
+                        color: "hsl(var(--foreground) / 0.7)",
                       }}
                     />
                   </div>
                   <div>
                     <label
                       className="text-xs mb-1 block"
-                      style={{ color: "rgba(255,255,255,0.35)" }}
+                      style={{ color: "hsl(var(--foreground) / 0.35)" }}
                     >
                       Etapa
                     </label>
@@ -885,9 +885,9 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                       placeholder="Ex: Design, Dev, QA..."
                       className="w-full h-8 px-3 text-sm rounded outline-none"
                       style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        color: "rgba(255,255,255,0.7)",
+                        background: "hsl(var(--foreground) / 0.04)",
+                        border: "1px solid hsl(var(--foreground) / 0.1)",
+                        color: "hsl(var(--foreground) / 0.7)",
                       }}
                     />
                   </div>
@@ -899,8 +899,8 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
           {/* Membros — só aparece quando projeto+shared. Sem collapsible: a seleção
               de membros precisa estar visível assim que o usuário escolhe "Comp.". */}
           {type === "projeto" && visibilityProjeto === "shared" && (
-            <div className="pt-3 mt-1" style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-              <label className="text-xs mb-2 block" style={{ color: "rgba(255,255,255,0.35)" }}>
+            <div className="pt-3 mt-1" style={{ borderTop: "1px solid hsl(var(--foreground) / 0.05)" }}>
+              <label className="text-xs mb-2 block" style={{ color: "hsl(var(--foreground) / 0.35)" }}>
                 Membros do projeto
               </label>
               <div className="space-y-2">
@@ -916,7 +916,7 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
                 {memberSearchProjeto && (
                   <div
                     className="rounded-md max-h-32 overflow-y-auto"
-                    style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+                    style={{ border: "1px solid hsl(var(--foreground) / 0.1)" }}
                   >
                     {users
                       .filter((u) => u.status === "active")
@@ -966,11 +966,11 @@ export function NovoItemModal({ open, defaultType, onClose, onSuccess }: NovoIte
         {/* Footer */}
         <div
           className="flex items-center justify-between px-6 py-3"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}
+          style={{ borderTop: "1px solid hsl(var(--foreground) / 0.06)" }}
         >
           <label
             className="flex items-center gap-2 text-sm cursor-pointer select-none"
-            style={{ color: "rgba(255,255,255,0.4)" }}
+            style={{ color: "hsl(var(--foreground) / 0.4)" }}
           >
             <input
               type="checkbox"
