@@ -441,6 +441,8 @@ export default function NovoChamadoPage() {
                     )}
                   />
 
+                  {/* Só a equipe escolhe o responsável; o solicitante deixa para a atribuição automática. */}
+                  {isTech && (
                   <FormField
                     control={form.control}
                     name="assigneeId"
@@ -473,6 +475,7 @@ export default function NovoChamadoPage() {
                       </FormItem>
                     )}
                   />
+                  )}
                 </div>
 
                 <RequestObjectSelect
