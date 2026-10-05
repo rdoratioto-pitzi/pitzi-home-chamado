@@ -30,6 +30,7 @@ import { fireFor as fireHermes } from "../services/hermes-trigger.service";
 import { REQUESTER_FORBIDDEN_CHANGE_ERROR } from "../../../shared/requester-view";
 import { sendTicketAssignedEmail, sendTicketStatusChangedEmail } from "../lib/email";
 import { mailContext } from "../lib/mailer";
+import { notifyRequesterOfTeamChanges } from "../lib/ticket-update-email";
 import { OPEN_TICKET_STATUSES } from "../../../shared/ticket-options";
 import { getSlaForTicket, slaPauseUpdate } from "../../../shared/sla";
 import { resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
@@ -1019,6 +1020,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
     }
 
     // E-mails: mesma regra de PATCH /api/tickets/:id (a gaveta e a lista usam esta rota).
+    await notifyRequesterOfTeamChanges(mailContext(c), storage, previous, ticket, actorId);
     if (ticket.status !== previous.status) {
       const requester = await storage.getUser(ticket.requesterId);
       const assigneeUser = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;

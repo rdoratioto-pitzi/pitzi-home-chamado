@@ -12,6 +12,7 @@ export const EMAIL_EVENTS = [
   "requester_reply",
   "status_changed",
   "ticket_closed",
+  "ticket_updated",
 ] as const;
 export type EmailEvent = (typeof EMAIL_EVENTS)[number];
 
@@ -19,7 +20,7 @@ export const EMAIL_RECIPIENTS = ["solicitante", "responsavel"] as const;
 export type EmailRecipient = (typeof EMAIL_RECIPIENTS)[number];
 
 export const EMAIL_VARIABLES = [
-  "codigo", "titulo", "solicitante", "responsavel", "status", "link", "comentario",
+  "codigo", "titulo", "solicitante", "responsavel", "status", "link", "comentario", "alteracoes",
 ] as const;
 export type EmailVariables = Partial<Record<(typeof EMAIL_VARIABLES)[number], string>>;
 
@@ -52,7 +53,7 @@ export const EMAIL_EVENT_META: Record<EmailEvent, EmailEventMeta> = {
   },
   requester_reply: {
     label: "Resposta do solicitante",
-    description: "Comentário do solicitante no chamado.",
+    description: "Comentário do solicitante (na tela ou respondendo o e-mail). Vai para o responsável; sem responsável, para os técnicos do grupo; grupo sem técnicos, para os admins.",
     heading: "O solicitante respondeu",
     cta: "Ver resposta",
   },
@@ -67,6 +68,12 @@ export const EMAIL_EVENT_META: Record<EmailEvent, EmailEventMeta> = {
     description: "Chamado resolvido ou fechado, com o convite para avaliar o atendimento.",
     heading: "Chamado encerrado",
     cta: "Avaliar atendimento",
+  },
+  ticket_updated: {
+    label: "Alteração pela equipe",
+    description: "A equipe mudou o grupo ou o título do chamado. Campos internos (gravidade, responsável, campos personalizados) não geram e-mail.",
+    heading: "Chamado atualizado",
+    cta: "Ver chamado",
   },
 };
 
@@ -127,6 +134,12 @@ export const DEFAULT_EMAIL_SETTINGS: EmailSettings = {
       recipients: ["solicitante"],
       subject: DEFAULT_SUBJECT,
       body: "Olá, {{solicitante}}.\n\nO chamado {{codigo}} — {{titulo}} foi encerrado ({{status}}).\n\nConte para a gente como foi o atendimento: a avaliação leva menos de um minuto.",
+    },
+    ticket_updated: {
+      enabled: true,
+      recipients: ["solicitante"],
+      subject: DEFAULT_SUBJECT,
+      body: "Olá, {{solicitante}}.\n\nO chamado {{codigo}} foi atualizado: {{alteracoes}}.",
     },
   },
 };

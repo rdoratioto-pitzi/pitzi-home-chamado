@@ -315,8 +315,26 @@ export const ticketComments = pgTable("ticket_comments", {
   attachments: text("attachments"), // JSON array of attachment URLs
   mentions: jsonb("mentions").notNull().default(sql`'[]'::jsonb`), // [{userId, displayName}]
   isInternal: boolean("is_internal").default(false),
+  // 'app' (tela) ou 'email' (resposta recebida por e-mail, migration 0034).
+  source: text("source").notNull().default("app"),
+  // Id da mensagem no Gmail para respostas por e-mail; único (não duplica o comentário).
+  inboundEmailId: text("inbound_email_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// ============== INBOUND EMAIL LOG (respostas por e-mail, migration 0034) ==============
+export const inboundEmailLog = pgTable("inbound_email_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gmailMessageId: text("gmail_message_id").notNull(),
+  ticketId: varchar("ticket_id"),
+  commentId: varchar("comment_id"),
+  fromEmail: text("from_email"),
+  subject: text("subject"),
+  status: text("status").notNull(), // processed | ignored | error
+  reason: text("reason"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+export type InboundEmailLogRow = typeof inboundEmailLog.$inferSelect;
 
 export const insertTicketCommentSchema = createInsertSchema(ticketComments).omit({ id: true, createdAt: true });
 export type InsertTicketComment = z.infer<typeof insertTicketCommentSchema>;

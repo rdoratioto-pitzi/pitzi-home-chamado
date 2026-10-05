@@ -83,6 +83,8 @@ interface Comentario {
   criadoEm: string | null;
   /** Só chamados: nota interna (a equipe vê; o solicitante não). */
   interno?: boolean;
+  /** Só chamados: resposta recebida por e-mail. */
+  viaEmail?: boolean;
 }
 
 interface TicketCommentApi {
@@ -90,6 +92,7 @@ interface TicketCommentApi {
   content: string;
   userId: string;
   isInternal: boolean | null;
+  source?: string | null;
   createdAt: string | null;
   author?: { name?: string | null } | null;
 }
@@ -109,6 +112,7 @@ function fromTicketComment(c: TicketCommentApi): Comentario {
     autorInitials: initialsOf(autorNome),
     criadoEm: c.createdAt,
     interno: c.isInternal === true,
+    viaEmail: c.source === "email",
   };
 }
 
@@ -1121,6 +1125,11 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                                 {c.interno && (
                                   <span className="text-[10px] font-medium px-1.5 rounded" style={{ color: "#f59e0b", background: "rgba(245,158,11,0.12)" }}>
                                     Nota interna
+                                  </span>
+                                )}
+                                {c.viaEmail && (
+                                  <span className="text-[10px] font-medium px-1.5 rounded" style={{ color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.08)" }} title="Resposta recebida por e-mail">
+                                    via e-mail
                                   </span>
                                 )}
                               </div>

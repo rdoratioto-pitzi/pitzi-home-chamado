@@ -869,6 +869,11 @@ export default function TicketDetailPage() {
                               Nota interna
                             </Badge>
                           )}
+                          {c.source === "email" && (
+                            <Badge variant="outline" className="text-[10px]" title="Resposta recebida por e-mail">
+                              via e-mail
+                            </Badge>
+                          )}
                         </div>
                         <div className="prose prose-sm dark:prose-invert">
                           <RichContent content={c.content} />
