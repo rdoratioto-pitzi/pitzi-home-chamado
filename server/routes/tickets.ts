@@ -354,6 +354,7 @@ export function registerTicketRoutes(router: Router) {
         // Origem e id do Gmail só são gravados pelo processador de respostas por e-mail (Worker).
         source: "app",
         inboundEmailId: null,
+        slackMessageKey: null,
         isInternal: wantsInternal,
         mentions,
       });

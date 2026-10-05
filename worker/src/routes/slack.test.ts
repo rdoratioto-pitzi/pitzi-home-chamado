@@ -25,9 +25,10 @@ async function sign(timestamp: string, body: string): Promise<string> {
 }
 
 // Perfis do Slack simulados: id → e-mail.
-const SLACK_PROFILES: Record<string, string> = {
+const SLACK_PROFILES: Record<string, string | null> = {
   UTEC: `tecnico@${DOMAIN}`,
   UUSR: `usuario@${DOMAIN}`,
+  UNOEMAIL: null,
   UNOVO: `novo@${DOMAIN}`,
   UFORA: "alguem@outra-empresa.com",
 };
@@ -40,7 +41,7 @@ describe.skipIf(!url)("Slack → chamado", () => {
   const realFetch = globalThis.fetch;
 
   const env = {
-    SLACK_BOT_TOKEN: "xoxb-teste", SLACK_SIGNING_SECRET: SECRET,
+    SLACK_BOT_TOKEN: "xoxb-teste", SLACK_SIGNING_SECRET: SECRET, SLACK_ALLOWED_TEAM_ID: "T1",
     ALLOWED_GOOGLE_DOMAINS: DOMAIN, APP_URL: "https://app.test",
   };
   const app = () => {
@@ -59,13 +60,13 @@ describe.skipIf(!url)("Slack → chamado", () => {
     }, env);
   };
   const command = (userId: string, text: string) =>
-    post("/api/slack/commands", new URLSearchParams({ command: "/chamado", text, user_id: userId, trigger_id: "TRIG", channel_id: "C1" }).toString());
+    post("/api/slack/commands", new URLSearchParams({ team_id: "T1", command: "/chamado", text, user_id: userId, trigger_id: "TRIG", channel_id: "C1" }).toString());
   const interaction = (payload: unknown) =>
     post("/api/slack/interactions", new URLSearchParams({ payload: JSON.stringify(payload) }).toString());
   const viewOf = (method: string) => JSON.parse(calls.find((c) => c.method === method)!.params.view);
   const submit = (privateMetadata: string, values: { title: string; category: string; impact?: string }) =>
     interaction({
-      type: "view_submission",
+      type: "view_submission", team: { id: "T1" }, user: { id: JSON.parse(privateMetadata).clickerSlackId },
       view: {
         callback_id: "chamado_slack_modal",
         private_metadata: privateMetadata,
@@ -83,8 +84,9 @@ describe.skipIf(!url)("Slack → chamado", () => {
 
   async function cleanup() {
     await pool.query("DELETE FROM ticket_custom_fields WHERE label LIKE 'slack-test%'");
-    await pool.query("DELETE FROM email_outbox WHERE ticket_id IN (SELECT id FROM tickets WHERE title LIKE 'slack-test%')");
-    await pool.query("DELETE FROM tickets WHERE title LIKE 'slack-test%'");
+    await pool.query("DELETE FROM email_outbox WHERE ticket_id IN (SELECT id FROM tickets WHERE title LIKE 'slack-test%' OR slack_channel_id = 'C1' OR description LIKE '%slack-test%')");
+    await pool.query("DELETE FROM ticket_comments WHERE ticket_id IN (SELECT id FROM tickets WHERE slack_channel_id = 'C1')");
+    await pool.query("DELETE FROM tickets WHERE title LIKE 'slack-test%' OR slack_channel_id = 'C1' OR description LIKE '%slack-test%'");
     await pool.query(`DELETE FROM users WHERE email LIKE '%@${DOMAIN}'`);
   }
 
@@ -97,8 +99,10 @@ describe.skipIf(!url)("Slack → chamado", () => {
     await pool.query(
       `INSERT INTO users (name, email, status, is_admin, is_technician, module_permissions) VALUES
         ('Técnico Slack', 'tecnico@${DOMAIN}', 'active', false, true, '{"chamados":true}'),
-        ('Usuário Slack', 'usuario@${DOMAIN}', 'active', false, false, '{"chamados":true}')`,
+        ('Usuário Slack', 'usuario@${DOMAIN}', 'active', false, false, '{"chamados":true}'),
+        ('Usuário Sem Email Slack', 'sem-email@${DOMAIN}', 'active', false, false, '{"chamados":true}')`,
     );
+    await pool.query("UPDATE users SET slack_user_id = 'UNOEMAIL' WHERE email = $1", [`sem-email@${DOMAIN}`]);
     calls = [];
     postMessageOk = true;
     globalThis.fetch = vi.fn(async (input: any, init?: any) => {
@@ -110,6 +114,7 @@ describe.skipIf(!url)("Slack → chamado", () => {
       const json = (data: unknown) => new Response(JSON.stringify(data), { headers: { "content-type": "application/json" } });
       if (method === "users.info") {
         const email = SLACK_PROFILES[params.user];
+        if (email === null) return json({ ok: true, user: { id: params.user, profile: { real_name: `Pessoa ${params.user}` } } });
         return json(email ? { ok: true, user: { id: params.user, profile: { email, real_name: `Pessoa ${params.user}` } } } : { ok: false, error: "user_not_found" });
       }
       if (method === "chat.getPermalink") return json({ ok: true, permalink: "https://pitzi.slack.com/archives/C1/p123" });
@@ -117,7 +122,7 @@ describe.skipIf(!url)("Slack → chamado", () => {
       return json({ ok: true });
     }) as any;
   });
-  afterEach(() => { globalThis.fetch = realFetch; });
+  afterEach(() => { globalThis.fetch = realFetch; vi.restoreAllMocks(); });
   afterAll(async () => {
     await cleanup();
     await pool?.end();
@@ -160,10 +165,15 @@ describe.skipIf(!url)("Slack → chamado", () => {
     expect(calls.filter((c) => c.method === "views.open")).toHaveLength(1);
   });
 
-  const shortcut = (clicker: string, author: string) => interaction({
-    type: "message_action", callback_id: "transformar_em_chamado", trigger_id: "TRIG2",
-    user: { id: clicker }, channel: { id: "C1" },
-    message: { user: author, ts: "1700000000.000100", text: "slack-test VPN caiu\nde novo hoje" },
+  const shortcut = (clicker: string, author: string, options: { ts?: string; text?: string; threadTs?: string } = {}) => interaction({
+    type: "message_action", callback_id: "transformar_em_chamado", trigger_id: "TRIG2", team: { id: "T1" },
+    user: { id: clicker }, channel: { id: "C1", name: "suporte-ti" },
+    message: {
+      user: author,
+      ts: options.ts ?? "1700000000.000100",
+      ...(options.threadTs ? { thread_ts: options.threadTs } : {}),
+      text: options.text ?? "slack-test VPN caiu\nde novo hoje",
+    },
   });
 
   it("atalho: Usuário não transforma mensagem de outra pessoa", async () => {
@@ -172,28 +182,72 @@ describe.skipIf(!url)("Slack → chamado", () => {
     expect(calls.find((c) => c.method === "chat.postEphemeral")!.params.text).toContain("Só técnicos");
   });
 
-  it("atalho do técnico: solicitante é o autor, guarda a thread e responde nela", async () => {
-    await shortcut("UTEC", "UUSR");
-    const view = viewOf("views.open");
-    const descricao = view.blocks.find((b: any) => b.block_id === "descricao");
-    expect(descricao.element.initial_value).toContain("Mensagem original no Slack: https://pitzi.slack.com/archives/C1/p123");
-    expect(view.blocks[0].elements[0].text).toContain("Solicitante: *Usuário Slack*");
-    expect(view.blocks.some((b: any) => b.block_id === "gravidade")).toBe(true);
-
-    await submit(view.private_metadata, { title: "slack-test VPN caiu", category: "sap", impact: "alto" });
+  it("atalho do técnico: cria direto, solicitante é o autor, guarda a thread e responde nela", async () => {
+    await shortcut("UTEC", "UUSR", { text: "slack-test não consigo conectar na VPN" });
     const { rows } = await pool.query(
-      "SELECT t.code, t.impact, t.slack_channel_id, t.slack_thread_ts, u.email FROM tickets t JOIN users u ON u.id = t.requester_id WHERE t.title = 'slack-test VPN caiu'",
+      "SELECT t.code, t.title, t.impact, t.description, t.slack_team_id, t.slack_channel_id, t.slack_thread_ts, t.slack_message_ts, t.slack_user_id, t.slack_permalink, u.email FROM tickets t JOIN users u ON u.id = t.requester_id WHERE t.slack_message_ts = '1700000000.000100'",
     );
-    expect(rows[0]).toMatchObject({ email: `usuario@${DOMAIN}`, impact: "alto", slack_channel_id: "C1", slack_thread_ts: "1700000000.000100" });
+    expect(rows[0]).toMatchObject({
+      email: `usuario@${DOMAIN}`,
+      title: "Problema de acesso à VPN",
+      impact: "medio",
+      slack_team_id: "T1",
+      slack_channel_id: "C1",
+      slack_thread_ts: "1700000000.000100",
+      slack_message_ts: "1700000000.000100",
+      slack_user_id: "UUSR",
+      slack_permalink: "https://pitzi.slack.com/archives/C1/p123",
+    });
+    expect(rows[0].description).toContain("Origem: Slack");
+    expect(calls.some((c) => c.method === "views.open")).toBe(false);
     const reply = calls.find((c) => c.method === "chat.postMessage" && c.params.thread_ts)!;
-    expect(reply.params.text).toContain(`Virou o chamado *${rows[0].code}*`);
+    expect(reply.params.text).toContain(`Chamado ${rows[0].code} criado com sucesso`);
+    expect(reply.params.blocks).toContain("Assumir");
   });
 
   it("sem acesso à conversa: avisa só quem clicou", async () => {
     postMessageOk = false;
-    await shortcut("UTEC", "UTEC");
-    await submit(viewOf("views.open").private_metadata, { title: "slack-test canal privado", category: "sap" });
+    await shortcut("UTEC", "UTEC", { text: "slack-test canal privado" });
     expect(calls.find((c) => c.method === "chat.postEphemeral")!.params.text).toContain("convide o app");
+  });
+
+  it("atalho em thread salva a thread original", async () => {
+    await shortcut("UTEC", "UUSR", { ts: "1700000000.000200", threadTs: "1699999999.000001", text: "slack-test notebook não liga" });
+    const { rows } = await pool.query("SELECT title, slack_thread_ts FROM tickets WHERE slack_message_ts = '1700000000.000200'");
+    expect(rows[0]).toMatchObject({ title: "Notebook não liga", slack_thread_ts: "1699999999.000001" });
+    expect(calls.find((c) => c.method === "chat.postMessage" && c.params.thread_ts)!.params.thread_ts).toBe("1699999999.000001");
+  });
+
+  it("clique repetido no mesmo atalho não duplica chamado", async () => {
+    await shortcut("UTEC", "UUSR", { text: "slack-test duplicado" });
+    await shortcut("UTEC", "UUSR", { text: "slack-test duplicado" });
+    const { rows } = await pool.query("SELECT count(*)::int AS total, max(code) AS code FROM tickets WHERE slack_channel_id = 'C1' AND slack_message_ts = '1700000000.000100'");
+    expect(rows[0].total).toBe(1);
+    const duplicateNotice = calls.find((c) => c.method === "chat.postMessage" && c.params.text.includes("já possui o chamado"));
+    expect(duplicateNotice!.params.text).toContain(rows[0].code);
+  });
+
+  it("mensagem sem e-mail disponível usa usuário já relacionado pelo slack_user_id", async () => {
+    await shortcut("UTEC", "UNOEMAIL", { ts: "1700000000.000300", text: "slack-test sem email" });
+    const { rows } = await pool.query(
+      "SELECT u.email FROM tickets t JOIN users u ON u.id = t.requester_id WHERE t.slack_message_ts = '1700000000.000300'",
+    );
+    expect(rows[0].email).toBe(`sem-email@${DOMAIN}`);
+  });
+
+  it("ações rápidas: técnico assume, move para atendimento e resolve", async () => {
+    await shortcut("UTEC", "UUSR", { text: "slack-test ação rápida" });
+    const { rows } = await pool.query("SELECT id FROM tickets WHERE slack_message_ts = '1700000000.000100'");
+    const ticketId = rows[0].id;
+    await pool.query("UPDATE users SET is_admin = true WHERE email = $1", [`tecnico@${DOMAIN}`]);
+
+    await interaction({ type: "block_actions", team: { id: "T1" }, user: { id: "UTEC" }, channel: { id: "C1" }, actions: [{ action_id: "chamado_assumir", value: ticketId }] });
+    await interaction({ type: "block_actions", team: { id: "T1" }, user: { id: "UTEC" }, channel: { id: "C1" }, actions: [{ action_id: "chamado_em_atendimento", value: ticketId }] });
+    await interaction({ type: "block_actions", team: { id: "T1" }, user: { id: "UTEC" }, channel: { id: "C1" }, actions: [{ action_id: "chamado_resolver", value: ticketId }] });
+
+    const updated = await pool.query("SELECT status, assignee_id, data_resolucao IS NOT NULL AS resolved FROM tickets WHERE id = $1", [ticketId]);
+    const technician = await pool.query("SELECT id FROM users WHERE email = $1", [`tecnico@${DOMAIN}`]);
+    expect(updated.rows[0]).toMatchObject({ status: "resolved", assignee_id: technician.rows[0].id, resolved: true });
   });
 
   it("grupo com campo obrigatório volta erro na janela e não cria o chamado", async () => {
@@ -205,4 +259,115 @@ describe.skipIf(!url)("Slack → chamado", () => {
     expect(body.errors.grupo).toContain("slack-test Loja");
     expect((await pool.query("SELECT 1 FROM tickets WHERE title = 'slack-test obrigatorio'")).rowCount).toBe(0);
   });
+  it("recusa workspace não autorizado", async () => {
+    const res = await interaction({ type: "message_action", callback_id: "transformar_em_chamado", team: { id: "OUTSIDE" } });
+    expect(res.status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("recusa conta sem permissão de chamados", async () => {
+    await pool.query("UPDATE users SET slack_user_id = 'UUSR', module_permissions = '{}' WHERE email = $1", [`usuario@${DOMAIN}`]);
+    await shortcut("UUSR", "UUSR");
+    expect(calls.find((c) => c.method === "chat.postEphemeral")?.params.text).toContain("permissão");
+    expect((await pool.query("SELECT count(*)::int AS total FROM tickets WHERE slack_channel_id = 'C1'")).rows[0].total).toBe(0);
+  });
+
+  it("usuário comum não executa ações técnicas", async () => {
+    await shortcut("UUSR", "UUSR");
+    const { rows } = await pool.query("SELECT id FROM tickets WHERE slack_channel_id = 'C1'");
+    await interaction({ type: "block_actions", team: { id: "T1" }, user: { id: "UUSR" }, channel: { id: "C1" }, actions: [{ action_id: "chamado_resolver", value: rows[0].id }] });
+    expect((await pool.query("SELECT status FROM tickets WHERE id = $1", [rows[0].id])).rows[0].status).toBe("open");
+    expect(calls.some((c) => c.params.text?.includes("Só técnicos podem atualizar"))).toBe(true);
+  });
+
+  it("cliques concorrentes não duplicam o chamado", async () => {
+    await command("UTEC", "inicializar técnico");
+    await command("UUSR", "inicializar usuário");
+    calls = [];
+    await Promise.all([shortcut("UTEC", "UUSR"), shortcut("UTEC", "UUSR")]);
+    expect((await pool.query("SELECT count(*)::int AS total FROM tickets WHERE slack_channel_id = 'C1'")).rows[0].total).toBe(1);
+  });
+
+  it("falha de validação ao criar chamado é informada", async () => {
+    await pool.query("INSERT INTO ticket_custom_fields (group_key, label, field_type, required, active) VALUES ('sap', 'slack-test obrigatório', 'text', true, true)");
+    await shortcut("UUSR", "UUSR");
+    expect(calls.some((c) => c.params.text?.includes("Não consegui abrir o chamado"))).toBe(true);
+    expect((await pool.query("SELECT count(*)::int AS total FROM tickets WHERE slack_channel_id = 'C1'")).rows[0].total).toBe(0);
+  });
+
+  it("atalho avançado mantém o formulário e cria com relação Slack", async () => {
+    await interaction({ type: "message_action", callback_id: "criar_chamado_avancado", team: { id: "T1" }, trigger_id: "TRIG", user: { id: "UUSR" }, channel: { id: "C1" }, message: { user: "UUSR", ts: "1700000000.000100", text: "slack-test avançado" } });
+    const view = viewOf("views.open");
+    await submit(view.private_metadata, { title: "slack-test avançado", category: "sap" });
+    expect((await pool.query("SELECT slack_team_id FROM tickets WHERE slack_channel_id = 'C1'")).rows[0].slack_team_id).toBe("T1");
+  });
+
+  it("eventos repetidos criam uma nota interna e ignoram bots", async () => {
+    await shortcut("UUSR", "UUSR");
+    const { recordSlackThreadMessage } = await import("../lib/slack-thread-sync");
+    const event = { type: "message", user: "UUSR", channel: "C1", thread_ts: "1700000000.000100", ts: "1700000001.000100", text: "slack-test verificando" };
+    await Promise.all([recordSlackThreadMessage(db, env as any, "T1", event), recordSlackThreadMessage(db, env as any, "T1", event)]);
+    await recordSlackThreadMessage(db, env as any, "T1", { ...event, ts: "1700000002.000100", bot_id: "BOT" });
+    const { rows } = await pool.query("SELECT source, is_internal FROM ticket_comments WHERE slack_message_key IS NOT NULL");
+    expect(rows).toEqual([{ source: "slack", is_internal: true }]);
+  });
+
+  it("erro inesperado ao criar ticket não produz confirmação de sucesso", async () => {
+    const creator = await import("../lib/create-ticket");
+    vi.spyOn(creator, "createTicketFor").mockRejectedValueOnce(new Error("simulated database failure"));
+    await shortcut("UUSR", "UUSR");
+    expect(calls.some((c) => c.params.text?.includes("Não consegui abrir o chamado"))).toBe(true);
+    expect(calls.some((c) => c.params.text?.includes("criado com sucesso"))).toBe(false);
+  });
+
+  it("falha de permalink não impede criação e não inventa link", async () => {
+    const mockedFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: any, init?: any) => {
+      if (String(input).endsWith("/chat.getPermalink")) return new Response(JSON.stringify({ ok: false, error: "missing_scope" }));
+      return mockedFetch(input, init);
+    }) as any;
+    await shortcut("UUSR", "UUSR");
+    const { rows } = await pool.query("SELECT slack_permalink, description FROM tickets WHERE slack_channel_id = 'C1'");
+    expect(rows[0].slack_permalink).toBeNull();
+    expect(rows[0].description).toContain("permalink indisponível");
+  });
+
+  it("autor sem e-mail e sem vínculo é recusado sem criar identidade falsa", async () => {
+    await pool.query("UPDATE users SET slack_user_id = NULL WHERE slack_user_id = 'UNOEMAIL'");
+    await shortcut("UTEC", "UNOEMAIL");
+    expect(calls.some((c) => c.params.text?.includes("e-mail"))).toBe(true);
+    expect((await pool.query("SELECT count(*)::int AS total FROM tickets WHERE slack_channel_id = 'C1'")).rows[0].total).toBe(0);
+  });
+
+  it("nota interna só sai com opt-in separado; origem Slack não é reenviada", async () => {
+    await shortcut("UUSR", "UUSR");
+    const ticket = (await db.select().from(schema.tickets)).find((t: any) => t.slackChannelId === "C1");
+    const { sendCommentToSlackThread } = await import("../lib/slack-thread-sync");
+    const note = { id: "note", source: "app", content: "<p>Teste de nota</p>", isInternal: true } as any;
+    const syncEnv = { ...env, SLACK_THREAD_SYNC_ENABLED: "true" } as any;
+    calls = [];
+    await sendCommentToSlackThread(syncEnv, ticket, note);
+    expect(calls).toHaveLength(0);
+    syncEnv.SLACK_INTERNAL_NOTES_TO_THREAD_ENABLED = "true";
+    await sendCommentToSlackThread(syncEnv, ticket, note);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].params.thread_ts).toBe(ticket.slackThreadTs);
+    await sendCommentToSlackThread(syncEnv, ticket, { ...note, source: "slack" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("ações não alcançam chamados de outro tenant", async () => {
+    await shortcut("UUSR", "UUSR");
+    const { rows } = await pool.query("UPDATE tickets SET tenant_id = 'another-tenant' WHERE slack_channel_id = 'C1' RETURNING id");
+    await pool.query("UPDATE users SET is_admin = true WHERE email = $1", [`tecnico@${DOMAIN}`]);
+    await interaction({ type: "block_actions", team: { id: "T1" }, user: { id: "UTEC" }, channel: { id: "C1" }, actions: [{ action_id: "chamado_assumir", value: rows[0].id }] });
+    expect((await pool.query("SELECT assignee_id FROM tickets WHERE id = $1", [rows[0].id])).rows[0].assignee_id).toBeNull();
+  });
+
+  it("verificação de URL exige assinatura e aceita challenge sem team_id", async () => {
+    const body = JSON.stringify({ type: "url_verification", challenge: "challenge-test" });
+    expect((await post("/api/slack/events", body, { badSignature: true })).status).toBe(401);
+    expect(await (await post("/api/slack/events", body)).json()).toEqual({ challenge: "challenge-test" });
+  });
+
 });

@@ -161,9 +161,12 @@ export const tickets = pgTable("tickets", {
   customFields: jsonb("custom_fields"),
   // Origem no Slack (atalho "Transformar em chamado"; migration 0035). Base da fase 2:
   // sincronizar a conversa do chamado com a thread da mensagem.
+  slackTeamId: text("slack_team_id"),
   slackChannelId: text("slack_channel_id"),
   slackThreadTs: text("slack_thread_ts"),
   slackMessageTs: text("slack_message_ts"),
+  slackUserId: text("slack_user_id"),
+  slackPermalink: text("slack_permalink"),
   // Audit log for description edits
   descriptionLastEditedBy: varchar("description_last_edited_by"),
   descriptionLastEditedAt: timestamp("description_last_edited_at"),
@@ -324,6 +327,7 @@ export const ticketComments = pgTable("ticket_comments", {
   source: text("source").notNull().default("app"),
   // Id da mensagem no Gmail para respostas por e-mail; único (não duplica o comentário).
   inboundEmailId: text("inbound_email_id"),
+  slackMessageKey: text("slack_message_key").unique(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -2040,4 +2044,3 @@ export const insertHermesSlackThreadSchema = createInsertSchema(hermesSlackThrea
 export type InsertHermesSlackThread = z.infer<typeof insertHermesSlackThreadSchema>;
 export type HermesSlackThread = typeof hermesSlackThreads.$inferSelect;
 export type HermesDecision = "aprovado" | "ajustar" | "cancelado";
-

@@ -19,6 +19,7 @@ const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   // Slack → chamado: assinatura do Slack conferida na rota (SLACK_SIGNING_SECRET).
   { method: "POST", path: "/api/slack/commands" },
   { method: "POST", path: "/api/slack/interactions" },
+  { method: "POST", path: "/api/slack/events" },
   { method: "GET", path: /^\/api\/settings\/(logo_url_light|logo_url_dark|favicon_url)$/ },
   { method: "GET", path: /^\/api\/etiquetas\/barcode\// },
   // Phase 2B public routes

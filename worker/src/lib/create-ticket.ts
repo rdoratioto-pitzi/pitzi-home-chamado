@@ -23,13 +23,17 @@ export type CreateTicketResult =
   | { ok: false; status: 400 | 403 | 404; error: string };
 
 // Campos que só o sistema grava (origem no Slack): nunca vêm do corpo da requisição.
-const SYSTEM_ONLY_FIELDS = ["slackChannelId", "slackThreadTs", "slackMessageTs"] as const;
+const SYSTEM_ONLY_FIELDS = ["slackTeamId", "slackChannelId", "slackThreadTs", "slackMessageTs", "slackUserId", "slackPermalink"] as const;
+type SystemTicketFields = Partial<Pick<Ticket,
+  "slackTeamId" | "slackChannelId" | "slackThreadTs" | "slackMessageTs" | "slackUserId" | "slackPermalink"
+>>;
 
 export async function createTicketFor(
   storage: IStorage,
   mail: MailContext,
   creator: TicketCreator,
   body: Record<string, unknown>,
+  systemFields: SystemTicketFields = {},
 ): Promise<CreateTicketResult> {
   const data: Record<string, unknown> = { ...body };
   for (const field of SYSTEM_ONLY_FIELDS) delete data[field];
@@ -82,7 +86,7 @@ export async function createTicketFor(
     if (autoAssignee && (await isTechnicianUserId(storage, autoAssignee))) validated.assigneeId = autoAssignee;
   }
 
-  const created = await storage.createTicket({ ...validated, tenantId: creator.tenantId });
+  const created = await storage.createTicket({ ...validated, tenantId: creator.tenantId, ...systemFields });
   // Automações de abertura rodam depois do responsável automático; e-mails e avisos abaixo
   // já usam o resultado final.
   const ticket = await runTicketAutomations(storage, "ticket_created", created, {

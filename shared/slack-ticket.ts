@@ -68,6 +68,28 @@ export function firstLine(text: string, max = 80): string {
   return line.length > max ? `${line.slice(0, max - 1).trimEnd()}…` : line;
 }
 
+function normalizedText(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+/** Título curto e determinístico para o fluxo rápido do Slack. */
+export function generateSlackTicketTitle(text: string): string {
+  const normalized = normalizedText(text);
+  if (/\bvpn\b/.test(normalized) && /(conect|acess|entra|login)/.test(normalized)) {
+    return "Problema de acesso à VPN";
+  }
+  if (/\bnotebook\b/.test(normalized) && /(nao liga|nao inicia)/.test(normalized)) {
+    return "Notebook não liga";
+  }
+  if (/(google drive|\bdrive\b)/.test(normalized) && /(acess|entra|abr|consigo)/.test(normalized)) {
+    return "Problema de acesso ao Google Drive";
+  }
+  return firstLine(text, 90) || "Problema relatado via Slack";
+}
+
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
@@ -84,6 +106,7 @@ export function plainTextToHtml(text: string): string {
 /** O que a janela leva escondido até o envio (private_metadata, limite de 3000 caracteres). */
 export interface SlackModalMetadata {
   mode: "command" | "shortcut";
+  teamId?: string | null;
   /** Quem abriu a janela (quem digitou o comando ou clicou no atalho). */
   clickerSlackId: string;
   /** Quem vai ser o solicitante: no comando é quem digitou; no atalho, o autor da mensagem. */
