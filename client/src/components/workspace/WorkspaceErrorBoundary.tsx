@@ -45,7 +45,7 @@ export class WorkspaceErrorBoundary extends React.Component<
           <div
             style={{
               backgroundColor: "#0d1117",
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: "1px solid hsl(var(--foreground) / 0.08)",
               borderRadius: "0.75rem",
               padding: "2.5rem 2rem",
               maxWidth: "480px",
@@ -86,7 +86,7 @@ export class WorkspaceErrorBoundary extends React.Component<
                 margin: "0 0 0.5rem",
                 fontSize: "1.125rem",
                 fontWeight: 600,
-                color: "rgba(255,255,255,0.9)",
+                color: "hsl(var(--foreground) / 0.9)",
               }}
             >
               Algo deu errado
@@ -96,7 +96,7 @@ export class WorkspaceErrorBoundary extends React.Component<
               style={{
                 margin: "0 0 1.5rem",
                 fontSize: "0.875rem",
-                color: "rgba(255,255,255,0.5)",
+                color: "hsl(var(--foreground) / 0.5)",
                 lineHeight: 1.6,
               }}
             >
@@ -108,12 +108,12 @@ export class WorkspaceErrorBoundary extends React.Component<
                 style={{
                   margin: "0 0 1.5rem",
                   padding: "0.75rem 1rem",
-                  backgroundColor: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.06)",
+                  backgroundColor: "hsl(var(--foreground) / 0.04)",
+                  border: "1px solid hsl(var(--foreground) / 0.06)",
                   borderRadius: "0.375rem",
                   fontSize: "0.75rem",
                   fontFamily: "monospace",
-                  color: "rgba(255,255,255,0.35)",
+                  color: "hsl(var(--foreground) / 0.35)",
                   textAlign: "left",
                   whiteSpace: "pre-wrap",
                   wordBreak: "break-word",
@@ -128,10 +128,10 @@ export class WorkspaceErrorBoundary extends React.Component<
               onClick={() => window.location.reload()}
               style={{
                 padding: "0.5rem 1.5rem",
-                backgroundColor: "rgba(255,255,255,0.08)",
-                border: "1px solid rgba(255,255,255,0.12)",
+                backgroundColor: "hsl(var(--foreground) / 0.08)",
+                border: "1px solid hsl(var(--foreground) / 0.12)",
                 borderRadius: "0.375rem",
-                color: "rgba(255,255,255,0.8)",
+                color: "hsl(var(--foreground) / 0.8)",
                 fontSize: "0.875rem",
                 fontWeight: 500,
                 cursor: "pointer",
@@ -139,11 +139,11 @@ export class WorkspaceErrorBoundary extends React.Component<
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                  "rgba(255,255,255,0.13)";
+                  "hsl(var(--foreground) / 0.13)";
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                  "rgba(255,255,255,0.08)";
+                  "hsl(var(--foreground) / 0.08)";
               }}
             >
               Tentar novamente

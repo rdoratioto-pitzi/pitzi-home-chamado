@@ -215,7 +215,7 @@ export function TodosView() {
         {/* View mode toggle */}
         <div
           className="flex items-center gap-0 border rounded-md overflow-hidden ml-auto"
-          style={{ borderColor: "rgba(255,255,255,0.1)" }}
+          style={{ borderColor: "hsl(var(--foreground) / 0.1)" }}
         >
           {(Object.keys(viewIcons) as ViewMode[]).map((mode) => (
             <button
@@ -224,7 +224,7 @@ export function TodosView() {
               className="p-1.5 transition-colors"
               style={{
                 background: viewMode === mode ? "rgba(59,66,222,0.15)" : "transparent",
-                color: viewMode === mode ? "#5B62EC" : "rgba(255,255,255,0.3)",
+                color: viewMode === mode ? "#5B62EC" : "hsl(var(--foreground) / 0.3)",
               }}
               title={mode.charAt(0).toUpperCase() + mode.slice(1)}
             >

@@ -138,7 +138,7 @@ function getFileIcon(name: string) {
   if (["pdf"].includes(ext)) return { Icon: FileText, color: "#ef4444" };
   if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { Icon: FileArchive, color: "#f59e0b" };
   if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return { Icon: FileImage, color: "#8b5cf6" };
-  return { Icon: File, color: "rgba(255,255,255,0.5)" };
+  return { Icon: File, color: "hsl(var(--foreground) / 0.5)" };
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────

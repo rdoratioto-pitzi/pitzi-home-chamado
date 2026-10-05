@@ -64,13 +64,13 @@ const SECTION_LABEL_STYLE: React.CSSProperties = {
   textTransform: "uppercase",
   fontSize: "9px",
   letterSpacing: "0.08em",
-  color: "rgba(255,255,255,0.25)",
+  color: "hsl(var(--foreground) / 0.25)",
   marginBottom: "12px",
 };
 
 const ROW_LABEL_STYLE: React.CSSProperties = {
   fontSize: "11px",
-  color: "rgba(255,255,255,0.35)",
+  color: "hsl(var(--foreground) / 0.35)",
   minWidth: "90px",
 };
 
@@ -179,7 +179,7 @@ function getFileIcon(name: string) {
   if (["pdf"].includes(ext)) return { Icon: FileText, color: "#ef4444" };
   if (["zip", "rar", "7z", "tar", "gz"].includes(ext)) return { Icon: FileArchive, color: "#f59e0b" };
   if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return { Icon: FileImage, color: "#8b5cf6" };
-  return { Icon: File, color: "rgba(255,255,255,0.5)" };
+  return { Icon: File, color: "hsl(var(--foreground) / 0.5)" };
 }
 
 export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: ItemDetailDrawerProps) {
@@ -357,6 +357,28 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
     };
   }
 
+  // Técnico pega o chamado sem responsável para si (admin pode pegar qualquer um).
+  const [assumindo, setAssumindo] = useState(false);
+  async function handleAssumir() {
+    if (!item || !currentUser) return;
+    setAssumindo(true);
+    try {
+      const r = await fetchWithAuth(`/api/tickets/${item.id}/assumir`, { method: "POST" });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body.error || "Não foi possível assumir o chamado");
+      }
+      const nome = currentUser.name || "Você";
+      const initials = nome.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("");
+      onUpdate?.({ ...(item as ChamadoItem), responsavelId: currentUser.id, responsavel: nome, responsavelInitials: initials });
+      toast({ title: "Chamado assumido", description: "Agora o chamado está com você." });
+    } catch (err) {
+      toast({ title: "Erro ao assumir", description: err instanceof Error ? err.message : String(err), variant: "destructive" });
+    } finally {
+      setAssumindo(false);
+    }
+  }
+
   async function handlePatch(field: string, value: string | number | null) {
     if (!item) return;
     setIsPatching(true);
@@ -428,7 +450,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
     }
   }
 
-  const statusColor = item ? statusColorOf(item.status) : "rgba(255,255,255,0.3)";
+  const statusColor = item ? statusColorOf(item.status) : "hsl(var(--foreground) / 0.3)";
   const statusLabel = item ? statusLabelOf(item.status) : "";
 
   const prioClass = item ? priorityClassOf(item.prioridade) : priorityClassOf("media");
@@ -477,7 +499,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
             width: 480,
             height: "100vh",
             background: "hsl(var(--background))",
-            borderLeft: "1px solid rgba(255,255,255,0.08)",
+            borderLeft: "1px solid hsl(var(--foreground) / 0.08)",
             display: "flex",
             flexDirection: "column",
             transform: open ? "translateX(0)" : "translateX(100%)",
@@ -494,7 +516,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
               alignItems: "center",
               justifyContent: "space-between",
               padding: "0 16px",
-              borderBottom: "1px solid rgba(255,255,255,0.06)",
+              borderBottom: "1px solid hsl(var(--foreground) / 0.06)",
               flexShrink: 0,
             }}
           >
@@ -505,13 +527,13 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     style={{
                       fontFamily: "'JetBrains Mono', monospace",
                       fontSize: "12px",
-                      color: "rgba(255,255,255,0.4)",
+                      color: "hsl(var(--foreground) / 0.4)",
                       flexShrink: 0,
                     }}
                   >
                     {item.codigo}
                   </span>
-                  <span style={{ color: "rgba(255,255,255,0.15)" }}>·</span>
+                  <span style={{ color: "hsl(var(--foreground) / 0.15)" }}>·</span>
                   {editingField === "titulo" ? (
                     <input
                       autoFocus
@@ -538,15 +560,15 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                       }}
                       className="flex-1 text-sm rounded px-2 py-0.5 outline-none min-w-0"
                       style={{
-                        background: "rgba(255,255,255,0.06)",
+                        background: "hsl(var(--foreground) / 0.06)",
                         border: "1px solid rgba(59,66,222,0.3)",
-                        color: "rgba(255,255,255,0.95)",
+                        color: "hsl(var(--foreground) / 0.95)",
                       }}
                     />
                   ) : (
                     <span
                       className="truncate text-sm cursor-pointer hover:bg-white/5 rounded px-1 -mx-1 flex-1 min-w-0"
-                      style={{ color: "rgba(255,255,255,0.85)" }}
+                      style={{ color: "hsl(var(--foreground) / 0.85)" }}
                       onClick={() => setEditingField("titulo")}
                       title="Clique para editar"
                     >
@@ -556,7 +578,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                   {isPatching && editingField === "titulo" && (
                     <span
                       className="text-[10px] flex-shrink-0"
-                      style={{ color: "rgba(255,255,255,0.4)" }}
+                      style={{ color: "hsl(var(--foreground) / 0.4)" }}
                     >
                       salvando...
                     </span>
@@ -569,8 +591,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                 <button
                   onClick={() => { onClose(); setLocation(isChamado ? `/chamados/${item!.id}` : `/workspace/tarefas/${item!.id}`); }}
                   className="p-1.5 rounded transition-colors"
-                  style={{ color: "rgba(255,255,255,0.4)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                  style={{ color: "hsl(var(--foreground) / 0.4)" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(var(--foreground) / 0.06)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   title={isChamado ? "Abrir detalhe" : "Editar atividade"}
                 >
@@ -580,8 +602,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
               <button
                 onClick={onClose}
                 className="p-1.5 rounded transition-colors"
-                style={{ color: "rgba(255,255,255,0.4)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
+                style={{ color: "hsl(var(--foreground) / 0.4)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(var(--foreground) / 0.06)")}
                 onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
                 <X className="h-4 w-4" />
@@ -608,7 +630,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           onChange={(e) => { handlePatch("status", e.target.value); }}
                           onBlur={() => setEditingField(null)}
                           className="text-xs rounded px-2 py-0.5 outline-none"
-                          style={{ background: "#0f1124", border: "1px solid rgba(59,66,222,0.3)", color: "#5B62EC" }}
+                          style={{ background: "hsl(var(--background))", border: "1px solid rgba(59,66,222,0.3)", color: "#5B62EC" }}
                         >
                           {statusOptionsForKind(kind).map((o) => (
                             <option key={o.value} value={o.value}>{o.label}</option>
@@ -640,7 +662,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           onChange={(e) => { handlePatch("prioridade", e.target.value); }}
                           onBlur={() => setEditingField(null)}
                           className="text-xs rounded px-2 py-0.5 outline-none"
-                          style={{ background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                          style={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--foreground) / 0.15)", color: "hsl(var(--foreground) / 0.7)" }}
                         >
                           {priorityOptionsForKind(kind).map((o) => (
                             <option key={o.value} value={o.value}>{o.label}</option>
@@ -662,7 +684,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     {isChamado && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>Tipo</span>
-                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                        <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.65)" }}>
                           {(item as ChamadoItem).tipo || "—"}
                         </span>
                       </div>
@@ -672,7 +694,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     {isChamado && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>Grupo</span>
-                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                        <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.65)" }}>
                           {groupName((item as ChamadoItem).categoria) || "—"}
                         </span>
                       </div>
@@ -689,7 +711,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                             onChange={(e) => { if (e.target.value) handlePatch("projetoId", e.target.value); }}
                             onBlur={() => setEditingField(null)}
                             className="text-xs rounded px-2 py-0.5 outline-none"
-                            style={{ background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                            style={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--foreground) / 0.15)", color: "hsl(var(--foreground) / 0.7)" }}
                           >
                             {availableProjetos.map((p) => (
                               <option key={p.id} value={p.id}>{p.nome}</option>
@@ -699,7 +721,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           <span
                             className="text-xs font-medium"
                             onClick={() => setEditingField("projeto")}
-                            style={{ color: "rgba(255,255,255,0.65)", cursor: "pointer" }}
+                            style={{ color: "hsl(var(--foreground) / 0.65)", cursor: "pointer" }}
                           >
                             {(item as UnifiedItem).contexto || "—"}
                           </span>
@@ -711,7 +733,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     {!isChamado && (item as UnifiedItem).sprint && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>Sprint</span>
-                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                        <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.65)" }}>
                           {(item as UnifiedItem).sprint}
                         </span>
                       </div>
@@ -742,7 +764,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                               onClick={() => setEditingField("applicationKey")}
                               style={{
                                 color: appKey
-                                  ? "rgba(255,255,255,0.65)"
+                                  ? "hsl(var(--foreground) / 0.65)"
                                   : "rgba(255,180,0,0.85)",
                                 cursor: "pointer",
                               }}
@@ -757,7 +779,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     {isChamado && (item as ChamadoItem).requestObject && (
                       <div className="flex items-start gap-3">
                         <span style={ROW_LABEL_STYLE}>{REQUEST_OBJECT_LABEL}</span>
-                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                        <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.65)" }}>
                           {formatRequestObject(item as ChamadoItem)}
                         </span>
                       </div>
@@ -781,7 +803,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           onChange={(e) => { if (e.target.value) handlePatch("responsavelId", e.target.value); }}
                           onBlur={() => setEditingField(null)}
                           className="text-xs rounded px-2 py-0.5 outline-none"
-                          style={{ background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                          style={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--foreground) / 0.15)", color: "hsl(var(--foreground) / 0.7)" }}
                         >
                           {isChamado && <option value="">Manter atual</option>}
                           {(isChamado ? onlyTechnicians(availableUsers) : availableUsers).map((u) => (
@@ -800,18 +822,33 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           >
                             {item!.responsavelInitials}
                           </div>
-                          <span className="text-xs" style={{ color: "rgba(255,255,255,0.7)" }}>
+                          <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.7)" }}>
                             {item!.responsavel}
                           </span>
                         </div>
                       )}
+                      {isChamado && isTech && currentUser &&
+                        (item as ChamadoItem).responsavelId !== currentUser.id &&
+                        (!(item as ChamadoItem).responsavelId || currentUser.isAdmin) &&
+                        !["resolved", "closed"].includes(item!.status) && (
+                          <button
+                            type="button"
+                            onClick={handleAssumir}
+                            disabled={assumindo}
+                            className="ml-auto text-xs font-medium rounded px-2 py-0.5 transition-colors"
+                            style={{ background: "rgba(59,66,222,0.12)", border: "1px solid rgba(59,66,222,0.35)", color: "#3B42DE" }}
+                            data-testid="button-assumir-chamado"
+                          >
+                            {assumindo ? "Assumindo..." : "Assumir"}
+                          </button>
+                        )}
                     </div>
 
                     {/* Solicitante — só chamados */}
                     {isChamado && (item as ChamadoItem).solicitante && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>Solicitante</span>
-                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.65)" }}>
+                        <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.65)" }}>
                           {(item as ChamadoItem).solicitante}
                         </span>
                       </div>
@@ -820,7 +857,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     {/* Abertura */}
                     <div className="flex items-center gap-3">
                       <span style={ROW_LABEL_STYLE}>Abertura</span>
-                      <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+                      <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.55)" }}>
                         {abertura}
                       </span>
                     </div>
@@ -837,13 +874,13 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                             onChange={(e) => { handlePatch("dataEntrega", e.target.value || null); }}
                             onBlur={() => setEditingField(null)}
                             className="text-xs rounded px-2 py-0.5 outline-none"
-                            style={{ background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                            style={{ background: "hsl(var(--background))", border: "1px solid hsl(var(--foreground) / 0.15)", color: "hsl(var(--foreground) / 0.7)" }}
                           />
                         ) : (
                           <span
                             className="text-xs"
                             onClick={() => setEditingField("entrega")}
-                            style={{ color: "rgba(255,255,255,0.55)", cursor: "pointer" }}
+                            style={{ color: "hsl(var(--foreground) / 0.55)", cursor: "pointer" }}
                           >
                             {formatDate((item as UnifiedItem).dataEntrega)}
                           </span>
@@ -875,7 +912,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                               }
                             }}
                             className="text-xs rounded px-2 py-0.5 outline-none"
-                            style={{ width: 64, background: "#0f1124", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                            style={{ width: 64, background: "hsl(var(--background))", border: "1px solid hsl(var(--foreground) / 0.15)", color: "hsl(var(--foreground) / 0.7)" }}
                           />
                         ) : (
                           <div
@@ -883,7 +920,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                             onClick={() => setEditingField("progresso")}
                             style={{ cursor: "pointer" }}
                           >
-                            <div style={{ width: 80, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.08)" }}>
+                            <div style={{ width: 80, height: 6, borderRadius: 3, background: "hsl(var(--foreground) / 0.08)" }}>
                               <div
                                 style={{
                                   width: `${Math.min((item as UnifiedItem).progresso ?? 0, 100)}%`,
@@ -893,7 +930,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                                 }}
                               />
                             </div>
-                            <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)", fontFamily: "'JetBrains Mono', monospace" }}>
+                            <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.55)", fontFamily: "'JetBrains Mono', monospace" }}>
                               {(item as UnifiedItem).progresso ?? 0}%
                             </span>
                           </div>
@@ -905,7 +942,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     {isChamado && (
                       <div className="flex items-center gap-3">
                         <span style={ROW_LABEL_STYLE}>SLA</span>
-                        <span className="text-xs" style={{ color: "rgba(255,255,255,0.55)" }}>
+                        <span className="text-xs" style={{ color: "hsl(var(--foreground) / 0.55)" }}>
                           {item.sla ? `${item.sla}h` : "—"}
                         </span>
                       </div>
@@ -918,7 +955,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                   style={{
                     marginBottom: 24,
                     paddingTop: 20,
-                    borderTop: "1px solid rgba(255,255,255,0.05)",
+                    borderTop: "1px solid hsl(var(--foreground) / 0.05)",
                   }}
                 >
                   <div style={{ ...SECTION_LABEL_STYLE, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -931,19 +968,19 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                         }}
                         className="text-[10px] px-1.5 py-0.5 rounded transition-colors"
                         style={{
-                          color: "rgba(255,255,255,0.4)",
+                          color: "hsl(var(--foreground) / 0.4)",
                           background: "transparent",
-                          border: "1px solid rgba(255,255,255,0.1)",
+                          border: "1px solid hsl(var(--foreground) / 0.1)",
                           textTransform: "none",
                           letterSpacing: "0",
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-                          e.currentTarget.style.color = "rgba(255,255,255,0.7)";
+                          e.currentTarget.style.background = "hsl(var(--foreground) / 0.04)";
+                          e.currentTarget.style.color = "hsl(var(--foreground) / 0.7)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.background = "transparent";
-                          e.currentTarget.style.color = "rgba(255,255,255,0.4)";
+                          e.currentTarget.style.color = "hsl(var(--foreground) / 0.4)";
                         }}
                       >
                         Editar
@@ -966,8 +1003,8 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           className="text-xs px-2.5 py-1 rounded"
                           style={{
                             background: "transparent",
-                            color: "rgba(255,255,255,0.5)",
-                            border: "1px solid rgba(255,255,255,0.1)",
+                            color: "hsl(var(--foreground) / 0.5)",
+                            border: "1px solid hsl(var(--foreground) / 0.1)",
                           }}
                         >
                           Cancelar
@@ -989,12 +1026,12 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                   ) : descricao ? (
                     <RichContent
                       content={descricao}
-                      className="text-sm [&_*]:!text-[rgba(255,255,255,0.55)] !leading-relaxed"
+                      className="text-sm [&_*]:!text-muted-foreground !leading-relaxed"
                     />
                   ) : (
                     <p
                       className="text-sm"
-                      style={{ color: "rgba(255,255,255,0.55)", lineHeight: "1.6" }}
+                      style={{ color: "hsl(var(--foreground) / 0.55)", lineHeight: "1.6" }}
                     >
                       —
                     </p>
@@ -1007,7 +1044,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     style={{
                       marginBottom: 24,
                       paddingTop: 20,
-                      borderTop: "1px solid rgba(255,255,255,0.05)",
+                      borderTop: "1px solid hsl(var(--foreground) / 0.05)",
                     }}
                   >
                     <div style={SECTION_LABEL_STYLE}>Subtarefas</div>
@@ -1032,7 +1069,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     style={{
                       marginBottom: 24,
                       paddingTop: 20,
-                      borderTop: "1px solid rgba(255,255,255,0.05)",
+                      borderTop: "1px solid hsl(var(--foreground) / 0.05)",
                     }}
                   >
                     <div style={SECTION_LABEL_STYLE}>
@@ -1046,7 +1083,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                             <DialogTrigger asChild>
                               <div
                                 className="rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition-colors cursor-pointer relative group"
-                                style={{ background: "rgba(255,255,255,0.04)" }}
+                                style={{ background: "hsl(var(--foreground) / 0.04)" }}
                               >
                                 <img
                                   src={anexo.url}
@@ -1074,7 +1111,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                             key={idx}
                             onClick={() => downloadAnexo(anexo.url, anexo.name || `Arquivo_${idx + 1}`)}
                             className="flex items-center gap-3 p-3 rounded-lg border border-white/10 hover:border-white/30 transition-colors text-left w-full cursor-pointer"
-                            style={{ background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.7)" }}
+                            style={{ background: "hsl(var(--foreground) / 0.04)", color: "hsl(var(--foreground) / 0.7)" }}
                           >
                             {(() => { const { Icon, color } = getFileIcon(anexo.name); return <Icon size={20} style={{ color }} className="flex-shrink-0" />; })()}
                             <span className="text-xs truncate flex-1">{anexo.name || `Arquivo ${idx + 1}`}</span>
@@ -1092,7 +1129,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                   <div
                     style={{
                       paddingTop: 20,
-                      borderTop: "1px solid rgba(255,255,255,0.05)",
+                      borderTop: "1px solid hsl(var(--foreground) / 0.05)",
                     }}
                   >
                     <div style={SECTION_LABEL_STYLE}>Comentários</div>
@@ -1100,7 +1137,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                     {/* Existing comments */}
                     <div className="flex flex-col gap-3 mb-4">
                       {comentarios.length === 0 ? (
-                        <p className="text-xs italic" style={{ color: "rgba(255,255,255,0.25)" }}>
+                        <p className="text-xs italic" style={{ color: "hsl(var(--foreground) / 0.25)" }}>
                           Nenhum comentário ainda
                         </p>
                       ) : (
@@ -1114,11 +1151,11 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                             </div>
                             <div className="flex flex-col gap-0.5 min-w-0">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.7)" }}>
+                                <span className="text-xs font-medium" style={{ color: "hsl(var(--foreground) / 0.7)" }}>
                                   {c.autorNome}
                                 </span>
                                 {c.criadoEm && (
-                                  <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>
+                                  <span className="text-[10px]" style={{ color: "hsl(var(--foreground) / 0.25)" }}>
                                     {new Date(c.criadoEm).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                                   </span>
                                 )}
@@ -1128,14 +1165,14 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                                   </span>
                                 )}
                                 {c.viaEmail && (
-                                  <span className="text-[10px] font-medium px-1.5 rounded" style={{ color: "rgba(255,255,255,0.55)", background: "rgba(255,255,255,0.08)" }} title="Resposta recebida por e-mail">
+                                  <span className="text-[10px] font-medium px-1.5 rounded" style={{ color: "hsl(var(--foreground) / 0.55)", background: "hsl(var(--foreground) / 0.08)" }} title="Resposta recebida por e-mail">
                                     via e-mail
                                   </span>
                                 )}
                               </div>
                               <RichContent
                                 content={c.texto}
-                                className="text-xs [&_*]:!text-[rgba(255,255,255,0.55)] !leading-relaxed"
+                                className="text-xs [&_*]:!text-muted-foreground !leading-relaxed"
                               />
                             </div>
                           </div>
@@ -1161,16 +1198,16 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                         disabled={enviandoComentario || !novoComentario.trim()}
                         className="flex-shrink-0 p-2 rounded transition-colors"
                         style={{
-                          background: novoComentario.trim() ? "rgba(59,66,222,0.15)" : "rgba(255,255,255,0.04)",
+                          background: novoComentario.trim() ? "rgba(59,66,222,0.15)" : "hsl(var(--foreground) / 0.04)",
                           border: "1px solid rgba(0,200,83,0.2)",
-                          color: novoComentario.trim() ? "#5B62EC" : "rgba(255,255,255,0.2)",
+                          color: novoComentario.trim() ? "#5B62EC" : "hsl(var(--foreground) / 0.2)",
                         }}
                       >
                         <Send className="h-4 w-4" />
                       </button>
                     </div>
                     {isChamado && isTech && currentUser?.id !== (item as ChamadoItem).solicitanteId && (
-                      <label className="mt-2 flex items-center gap-2 text-xs cursor-pointer select-none" style={{ color: "rgba(255,255,255,0.55)" }}>
+                      <label className="mt-2 flex items-center gap-2 text-xs cursor-pointer select-none" style={{ color: "hsl(var(--foreground) / 0.55)" }}>
                         <input
                           type="checkbox"
                           checked={comentarioInterno}
@@ -1209,7 +1246,7 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                 justifyContent: "space-between",
                 gap: 8,
                 padding: "12px 16px",
-                borderTop: "1px solid rgba(255,255,255,0.06)",
+                borderTop: "1px solid hsl(var(--foreground) / 0.06)",
                 background: "hsl(var(--background))",
               }}
             >
@@ -1236,10 +1273,10 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                   className="text-xs px-3 py-1.5 rounded transition-colors"
                   style={{
                     background: "transparent",
-                    color: "rgba(255,255,255,0.55)",
-                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "hsl(var(--foreground) / 0.55)",
+                    border: "1px solid hsl(var(--foreground) / 0.1)",
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "hsl(var(--foreground) / 0.04)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                 >
                   Fechar

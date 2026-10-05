@@ -122,10 +122,17 @@ describe.skipIf(!url)("fila do grupo", () => {
     expect((await send(app(ids.outsider), "GET", `/api/tickets/${id}/comments`)).status).toBe(403);
   });
 
-  it("assumir: membro pega chamado sem responsável e fica registrado no histórico", async () => {
+  it("assumir: técnico de outro grupo também pega chamado sem responsável; Usuário não", async () => {
     const id = await ticket("sap");
-    expect((await send(app(ids.outsider), "POST", `/api/tickets/${id}/assumir`)).status).toBe(403);
-    expect((await send(app(ids.dadosA), "POST", `/api/tickets/${id}/assumir`)).status).toBe(403);
+    expect((await send(app(ids.requester), "POST", `/api/tickets/${id}/assumir`)).status).toBe(403);
+    const res = await send(app(ids.dadosA), "POST", `/api/tickets/${id}/assumir`);
+    expect(res.status).toBe(200);
+    expect((await json(res)).assigneeId).toBe(ids.dadosA);
+  });
+
+  it("assumir: técnico pega chamado sem responsável e fica registrado no histórico", async () => {
+    const id = await ticket("sap");
+    expect((await send(app(ids.requester), "POST", `/api/tickets/${id}/assumir`)).status).toBe(403);
 
     const res = await send(app(ids.sapA), "POST", `/api/tickets/${id}/assumir`);
     expect(res.status).toBe(200);
