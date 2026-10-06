@@ -52,6 +52,7 @@ import type { User } from "@shared/schema";
 import { USER_TYPES, isTechnician } from "@shared/user-type";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
+import { SquadPicker } from "@/components/squad-picker";
 
 const MODULES = [
   { key: "chamados", label: "Chamados" },
@@ -350,6 +351,30 @@ export function UsersSettings() {
     setIsDialogOpen(true);
   };
 
+  // Squad direto na tabela: grava na hora (só admin; só técnicos podem ser membros).
+  const squadMutation = useMutation({
+    mutationFn: async ({ userId, keys }: { userId: string; keys: string[] }) =>
+      apiRequest("PUT", `/api/v1/support-groups/users/${userId}`, { groupKeys: keys }),
+    // Atualiza a tela na hora para cliques seguidos não usarem a lista antiga.
+    onMutate: ({ userId, keys }) => {
+      queryClient.setQueryData<typeof groups>(["/api/v1/support-groups"], (old) =>
+        old?.map((g) => ({
+          ...g,
+          memberIds: keys.includes(g.key)
+            ? Array.from(new Set([...g.memberIds, userId]))
+            : g.memberIds.filter((id) => id !== userId),
+        })),
+      );
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["/api/v1/support-groups"] }),
+    onSuccess: () => {
+      toast({ title: "Squad atualizada" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao salvar squad", description: error.message, variant: "destructive" });
+    },
+  });
+
   const toggleStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
       return apiRequest("PATCH", `/api/users/${id}`, { status });
@@ -492,7 +517,15 @@ export function UsersSettings() {
                     )}
                   </TableCell>
                   <TableCell data-testid={`cell-squad-${user.id}`}>
-                    {squadsByUser.get(user.id)?.length ? (
+                    {currentUserIsAdmin && isTechnician(user) && groups.length > 0 ? (
+                      <SquadPicker
+                        variant="cell"
+                        options={groups}
+                        value={squadKeysOf(user.id)}
+                        onChange={(keys) => squadMutation.mutate({ userId: user.id, keys })}
+                        testId={`select-squad-${user.id}`}
+                      />
+                    ) : squadsByUser.get(user.id)?.length ? (
                       <div className="flex flex-wrap gap-1">
                         {squadsByUser.get(user.id)!.map((s) => (
                           <Badge key={s.key} variant="outline">{s.name}</Badge>
@@ -710,23 +743,14 @@ export function UsersSettings() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Squads</FormLabel>
-                      <div className="grid grid-cols-2 gap-2 rounded-md border p-3" data-testid="select-squads">
-                        {groups.map((g) => {
-                          const checked = field.value.includes(g.key);
-                          return (
-                            <label key={g.key} className="flex items-center gap-2 text-sm cursor-pointer">
-                              <Checkbox
-                                checked={checked}
-                                onCheckedChange={(on) =>
-                                  field.onChange(on ? [...field.value, g.key] : field.value.filter((k) => k !== g.key))
-                                }
-                                data-testid={`checkbox-squad-${g.key}`}
-                              />
-                              {g.name}
-                            </label>
-                          );
-                        })}
-                      </div>
+                      <FormControl>
+                        <SquadPicker
+                          options={groups}
+                          value={field.value}
+                          onChange={field.onChange}
+                          testId="select-squads"
+                        />
+                      </FormControl>
                       <FormDescription>
                         A squad define a Fila do Grupo da pessoa. Técnicos continuam vendo e atendendo todos os chamados.
                       </FormDescription>
