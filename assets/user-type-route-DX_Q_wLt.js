@@ -1,1 +1,0 @@
-import{j as n,R as s}from"./index-DruzpLAj.js";import{u as e}from"./use-is-technician-CKBw1-dv.js";function a({technician:r,requester:t}){return n.jsx(n.Fragment,{children:e()?r:t})}function c({children:r}){return e()?n.jsx(n.Fragment,{children:r}):n.jsx(s,{to:"/chamados"})}export{a as ByUserType,c as TechnicianOnly};
