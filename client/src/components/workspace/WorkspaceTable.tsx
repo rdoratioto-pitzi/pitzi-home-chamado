@@ -606,7 +606,7 @@ function ChamadoItemRow({ item, colTemplate, onRowClick, onDelete, onClaim, onTr
       </span>
       <SlaStatusCell statusSla={item.statusSla} pausado={item.slaPausado} primeiraResposta={item.statusPrimeiraResposta} className="ws-col-sla" />
       <ActionsMenu
-        onEdit={() => { window.location.href = `/chamados/${item.id}`; }}
+        onEdit={() => { window.location.href = `${import.meta.env.BASE_URL}chamados/${item.id}`; }}
         onDelete={onDelete ? () => onDelete(item) : undefined}
         onClaim={onClaim ? () => onClaim(item) : undefined}
         onTransfer={onTransfer ? () => onTransfer(item) : undefined}
