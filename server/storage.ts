@@ -91,7 +91,7 @@ import {
   passwordResetTokens,
  } from "@shared/schema";
  import { db as defaultDb, type Database } from "./db";
- import { eq, and, or, sql, asc, desc, gt, isNull, ilike, type SQL } from "drizzle-orm";
+ import { eq, and, or, sql, asc, desc, gt, isNull, ilike, inArray, type SQL } from "drizzle-orm";
 import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../shared/password";
 import { completeModulePermissions } from "../shared/permissions";
  import { alias } from "drizzle-orm/pg-core";
@@ -159,6 +159,8 @@ export interface IStorage {
   getSupportGroups(tenantId: string | null): Promise<SupportGroupWithMembers[]>;
   getActiveSupportGroupByKey(key: string): Promise<SupportGroup | undefined>;
   setSupportGroupMembers(groupId: string, userIds: string[], tenantId: string | null): Promise<void>;
+  /** Squads da pessoa: substitui as participações dela nos grupos ativos informados (activeGroupIds). */
+  setUserSupportGroups(userId: string, groupIds: string[], activeGroupIds: string[], tenantId: string | null): Promise<void>;
 
   // Campos personalizados por grupo (shared/custom-fields.ts)
   getTicketCustomFields(): Promise<TicketCustomField[]>;
@@ -1078,6 +1080,22 @@ export class DatabaseStorage implements IStorage {
     if (userIds.length > 0) {
       await this.db.insert(supportGroupMembers)
         .values(userIds.map(userId => ({ groupId, userId, tenantId })))
+        .onConflictDoNothing();
+    }
+  }
+
+  async setUserSupportGroups(userId: string, groupIds: string[], activeGroupIds: string[], tenantId: string | null): Promise<void> {
+    if (!this.db) throw new Error("Database not connected");
+    const tenantCondition = tenantId == null ? isNull(supportGroupMembers.tenantId) : eq(supportGroupMembers.tenantId, tenantId);
+    // Só mexe nos grupos ativos; participação em grupo desativado fica como estava.
+    if (activeGroupIds.length > 0) {
+      await this.db.delete(supportGroupMembers).where(and(
+        eq(supportGroupMembers.userId, userId), inArray(supportGroupMembers.groupId, activeGroupIds), tenantCondition,
+      ));
+    }
+    if (groupIds.length > 0) {
+      await this.db.insert(supportGroupMembers)
+        .values(groupIds.map(groupId => ({ groupId, userId, tenantId })))
         .onConflictDoNothing();
     }
   }

@@ -173,19 +173,22 @@ export function registerWorkspaceRoutes(router: Router) {
       const periodo = (req.query.periodo as string) || "este-ano";
 
       // Fetch tickets, users and SLA rules in parallel (avoid sequential DB roundtrips)
-      // escopo=fila: chamados em aberto dos grupos do usuário (shared/ticket-queue.ts).
-      const ticketsPromise = req.query.escopo === "fila"
+      // Escopos (técnicos e admins): padrão/"todos" = todos os chamados; "meus" = solicitante,
+      // responsável ou mencionado; "fila" = em aberto das squads do usuário
+      // (shared/ticket-queue.ts). Usuário (não técnico) sempre vê só os dele. Igual ao Worker.
+      const escopo = req.query.escopo;
+      const tech = isAdmin || isTechnician(await storage.getUser(userId));
+      const ticketsPromise = escopo === "fila"
         ? Promise.all([storage.getTicketsForWorkspace(), getQueueViewer(storage, { userId, isAdmin })])
             .then(([all, viewer]) => all.filter((t) => isInQueue(viewer, t)))
-        : isAdmin
+        : tech && escopo !== "meus"
           ? storage.getTicketsForWorkspace()
           : Promise.all([
               storage.getTicketsForWorkspace({ requesterId: userId, assigneeId: userId }),
-              storage.getUser(userId),
               storage.getTicketIdsMentioningUser(userId),
-            ]).then(async ([own, me, mentionedIds]) => {
+            ]).then(async ([own, mentionedIds]) => {
               // Técnico acionado por menção (@) também vê o chamado na lista dele.
-              if (!isTechnician(me) || mentionedIds.length === 0) return own;
+              if (!tech || mentionedIds.length === 0) return own;
               const known = new Set(own.map((t) => t.id));
               const missing = new Set(mentionedIds.filter((id) => !known.has(id)));
               if (missing.size === 0) return own;
@@ -1083,7 +1086,9 @@ export function registerWorkspaceRoutes(router: Router) {
       // Mesma regra do Worker: admin, solicitante ou responsável; quem não é técnico só
       // ajusta título e descrição.
       if (!previous) return res.status(404).json({ error: "Chamado não encontrado" });
-      if (!isAdmin && previous.requesterId !== actorId && previous.assigneeId !== actorId) {
+      // Técnicos editam qualquer chamado.
+      if (!isAdmin && previous.requesterId !== actorId && previous.assigneeId !== actorId &&
+          !(await isTechnicianUserId(storage, actorId))) {
         return res.status(403).json({ error: "Acesso negado" });
       }
       if (
