@@ -36,6 +36,17 @@ export async function slackApi(
   }
 }
 
+/**
+ * DM do app com a pessoa. Abre a conversa com conversations.open (escopo im:write): postar
+ * direto no ID do usuário devolve channel_not_found em vários workspaces.
+ */
+export async function dmPerson(token: string, slackUserId: string, text: string, extra: Record<string, unknown> = {}): Promise<boolean> {
+  const opened = await slackApi(token, "conversations.open", { users: slackUserId });
+  const channel: string = opened.ok ? opened.channel?.id ?? slackUserId : slackUserId;
+  const sent = await slackApi(token, "chat.postMessage", { channel, text, unfurl_links: false, ...extra });
+  return sent.ok;
+}
+
 /** Mensagem só para uma pessoa; se não der no canal (bot fora dele), manda na DM do app. */
 export async function notifyPerson(
   token: string,
@@ -47,7 +58,7 @@ export async function notifyPerson(
     const ephemeral = await slackApi(token, "chat.postEphemeral", { channel: channelId, user: slackUserId, text });
     if (ephemeral.ok) return;
   }
-  await slackApi(token, "chat.postMessage", { channel: slackUserId, text });
+  await dmPerson(token, slackUserId, text);
 }
 
 let verifiedWorkspace: { token: string; teamId: string; expiresAt: number } | undefined;

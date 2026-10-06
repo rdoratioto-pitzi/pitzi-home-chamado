@@ -38,11 +38,17 @@ describe.skipIf(!url)("Slack → chamado", () => {
   let db: any;
   let calls: { method: string; params: Record<string, string> }[] = [];
   let postMessageOk = true;
+  let ephemeralOk = true;
+  // Thread simulada para conversations.replies (null = sem thread configurada → lista vazia).
+  let threadMessages: any[] | null = null;
+  let repliesError: string | null = null;
+  const stored: { key: string; type?: string }[] = [];
   const realFetch = globalThis.fetch;
 
   const env = {
     SLACK_BOT_TOKEN: "xoxb-teste", SLACK_SIGNING_SECRET: SECRET, SLACK_ALLOWED_TEAM_ID: "T1",
     ALLOWED_GOOGLE_DOMAINS: DOMAIN, APP_URL: "https://app.test",
+    ATTACHMENTS: { put: async (key: string, _v: unknown, o?: any) => { stored.push({ key, type: o?.httpMetadata?.contentType }); } },
   };
   const app = () => {
     const a = new Hono<any>();
@@ -105,8 +111,16 @@ describe.skipIf(!url)("Slack → chamado", () => {
     await pool.query("UPDATE users SET slack_user_id = 'UNOEMAIL' WHERE email = $1", [`sem-email@${DOMAIN}`]);
     calls = [];
     postMessageOk = true;
+    ephemeralOk = true;
+    threadMessages = null;
+    repliesError = null;
+    stored.length = 0;
     globalThis.fetch = vi.fn(async (input: any, init?: any) => {
       const href = String(input);
+      if (href.startsWith("https://files.slack.com/")) {
+        calls.push({ method: "file", params: { url: href, auth: String(init?.headers?.Authorization ?? "") } });
+        return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { "content-type": "image/png" } });
+      }
       if (!href.startsWith("https://slack.com/api/")) return realFetch(input, init);
       const method = href.replace("https://slack.com/api/", "");
       const params = Object.fromEntries(new URLSearchParams(String(init?.body ?? "")));
@@ -118,6 +132,13 @@ describe.skipIf(!url)("Slack → chamado", () => {
         return json(email ? { ok: true, user: { id: params.user, profile: { email, real_name: `Pessoa ${params.user}` } } } : { ok: false, error: "user_not_found" });
       }
       if (method === "chat.getPermalink") return json({ ok: true, permalink: "https://pitzi.slack.com/archives/C1/p123" });
+      if (method === "conversations.replies") {
+        if (repliesError) return json({ ok: false, error: repliesError });
+        const all = threadMessages ?? [];
+        return json({ ok: true, messages: Number(params.limit) === 1 ? all.slice(0, 1) : all });
+      }
+      if (method === "conversations.open") return json({ ok: true, channel: { id: "D1" } });
+      if (method === "chat.postEphemeral") return json(ephemeralOk ? { ok: true } : { ok: false, error: "channel_not_found" });
       if (method === "chat.postMessage" && params.thread_ts) return json(postMessageOk ? { ok: true } : { ok: false, error: "not_in_channel" });
       return json({ ok: true });
     }) as any;
@@ -293,6 +314,96 @@ describe.skipIf(!url)("Slack → chamado", () => {
     await shortcut("UUSR", "UUSR");
     expect(calls.some((c) => c.params.text?.includes("Não consegui abrir o chamado"))).toBe(true);
     expect((await pool.query("SELECT count(*)::int AS total FROM tickets WHERE slack_channel_id = 'C1'")).rows[0].total).toBe(0);
+  });
+
+  // ─── Conversa inteira ───────────────────────────────────────────────────────
+  const ROOT = "1699999999.000001";
+  const conversa = () => [
+    { ts: ROOT, user: "UUSR", text: "slack-test meu notebook não liga", reply_count: 2 },
+    { ts: "1699999999.000002", user: "UTEC", text: "Já tentou outro carregador, <@UUSR>?" },
+    {
+      ts: "1699999999.000003", user: "UUSR", text: "Sim, segue o print",
+      files: [
+        { name: "print.png", mimetype: "image/png", size: 4, url_private_download: "https://files.slack.com/files-pri/T1-F1/print.png" },
+        { name: "logs.zip", mimetype: "application/zip", size: 100, url_private_download: "https://files.slack.com/files-pri/T1-F2/logs.zip" },
+      ],
+    },
+  ];
+
+  it("Criar chamado numa resposta leva a conversa inteira; solicitante é quem começou; anexos importados", async () => {
+    threadMessages = conversa();
+    await shortcut("UTEC", "UUSR", { ts: "1699999999.000003", threadTs: ROOT, text: "Sim, segue o print" });
+    const { rows } = await pool.query(
+      "SELECT t.title, t.description, t.attachments, t.slack_message_ts, t.slack_thread_ts, u.email FROM tickets t JOIN users u ON u.id = t.requester_id WHERE t.slack_channel_id = 'C1'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ email: `usuario@${DOMAIN}`, title: "Notebook não liga", slack_message_ts: ROOT, slack_thread_ts: ROOT });
+    const d = rows[0].description as string;
+    expect(d).toContain("Conversa no Slack");
+    expect(d).toContain("3 mensagens");
+    // Ordem e nomes, com a menção convertida.
+    expect(d.indexOf("meu notebook não liga")).toBeLessThan(d.indexOf("outro carregador"));
+    expect(d.indexOf("outro carregador")).toBeLessThan(d.indexOf("segue o print"));
+    expect(d).toContain("@Pessoa UUSR");
+    expect(d).toContain("Origem: Slack");
+    // Anexo aceito foi para o R2 com o token do bot; o .zip ficou listado como não importado.
+    expect(JSON.parse(rows[0].attachments)).toHaveLength(1);
+    expect(stored).toHaveLength(1);
+    expect(calls.find((c) => c.method === "file")!.params.auth).toBe("Bearer xoxb-teste");
+    expect(d).toContain("não foram importados: logs.zip");
+    expect(calls.find((c) => c.method === "chat.postMessage" && c.params.thread_ts)!.params.thread_ts).toBe(ROOT);
+  });
+
+  it("a mesma conversa não vira dois chamados, mesmo clicando em outra resposta", async () => {
+    threadMessages = conversa();
+    await shortcut("UTEC", "UUSR", { ts: "1699999999.000003", threadTs: ROOT });
+    await shortcut("UTEC", "UTEC", { ts: "1699999999.000002", threadTs: ROOT });
+    const { rows } = await pool.query("SELECT count(*)::int AS n FROM tickets WHERE slack_channel_id = 'C1'");
+    expect(rows[0].n).toBe(1);
+    expect(calls.some((c) => c.method === "chat.postMessage" && String(c.params.text).includes("já possui o chamado"))).toBe(true);
+  });
+
+  it("Usuário não transforma conversa iniciada por outra pessoa, mesmo clicando na própria resposta", async () => {
+    threadMessages = [{ ts: ROOT, user: "UTEC", text: "slack-test aviso geral", reply_count: 1 }, { ts: "1699999999.000002", user: "UUSR", text: "comigo também" }];
+    await shortcut("UUSR", "UUSR", { ts: "1699999999.000002", threadTs: ROOT });
+    expect((await pool.query("SELECT count(*)::int AS n FROM tickets WHERE slack_channel_id = 'C1'")).rows[0].n).toBe(0);
+    expect(calls.find((c) => c.method === "chat.postEphemeral")!.params.text).toContain("conversas iniciadas por outras pessoas");
+  });
+
+  it("sem permissão para ler a conversa: avisa e cria só com a mensagem clicada", async () => {
+    repliesError = "missing_scope";
+    await shortcut("UTEC", "UUSR", { ts: "1699999999.000003", threadTs: ROOT, text: "slack-test só esta mensagem" });
+    const { rows } = await pool.query("SELECT slack_message_ts, description FROM tickets WHERE slack_channel_id = 'C1'");
+    expect(rows[0].slack_message_ts).toBe("1699999999.000003");
+    expect(rows[0].description).not.toContain("Conversa no Slack");
+    expect(calls.some((c) => c.method === "chat.postEphemeral" && String(c.params.text).includes("channels:history"))).toBe(true);
+  });
+
+  it("app fora do canal privado: confirmação vai por DM (conversations.open) com o link e o /invite", async () => {
+    postMessageOk = false;
+    ephemeralOk = false;
+    await shortcut("UTEC", "UUSR", { text: "slack-test canal privado sem app" });
+    expect(calls.some((c) => c.method === "conversations.open" && c.params.users === "UTEC")).toBe(true);
+    const dm = calls.find((c) => c.method === "chat.postMessage" && c.params.channel === "D1")!;
+    expect(dm.params.text).toContain("aberto");
+    expect(dm.params.text).toContain("/invite @Chamados Pitzi");
+  });
+
+  it("Criar chamado avançado numa resposta: janela com a raiz e, no envio, a conversa inteira", async () => {
+    threadMessages = conversa();
+    await interaction({
+      type: "message_action", callback_id: "criar_chamado_avancado", team: { id: "T1" }, trigger_id: "TRIG", user: { id: "UTEC" },
+      channel: { id: "C1", name: "suporte-ti" }, message: { user: "UUSR", ts: "1699999999.000002", thread_ts: ROOT, text: "resposta" },
+    });
+    const view = viewOf("views.open");
+    expect(JSON.stringify(view.blocks)).toContain("quem começou a conversa");
+    const meta = JSON.parse(view.private_metadata);
+    expect(meta).toMatchObject({ requesterSlackId: "UUSR", messageTs: ROOT, threadTs: ROOT, conversation: true });
+    await submit(view.private_metadata, { title: "slack-test avançado conversa", category: "sap" });
+    const { rows } = await pool.query("SELECT description, attachments FROM tickets WHERE slack_channel_id = 'C1'");
+    expect(rows[0].description).toContain("descrição vinda do Slack");
+    expect(rows[0].description).toContain("Conversa no Slack");
+    expect(JSON.parse(rows[0].attachments)).toHaveLength(1);
   });
 
   it("atalho avançado mantém o formulário e cria com relação Slack", async () => {
