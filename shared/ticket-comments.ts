@@ -9,6 +9,8 @@ export interface CommentViewer {
   isGroupMember?: boolean;
   /** Técnico mencionado em algum comentário do chamado (foi acionado para ajudar). */
   isMentionedTechnician?: boolean;
+  /** Técnico (ou admin): atende qualquer chamado do tenant, inclusive notas internas. */
+  isTechnician?: boolean;
 }
 
 interface TicketParticipants {
@@ -16,11 +18,12 @@ interface TicketParticipants {
 }
 
 /**
- * Notas internas são visíveis para administradores, o responsável, os membros do grupo do
- * chamado e técnicos mencionados no chamado. Usuário (não técnico) mencionado nunca vê.
+ * Notas internas são visíveis para administradores e técnicos (qualquer chamado), o responsável,
+ * os membros do grupo do chamado e técnicos mencionados. Usuário (não técnico) nunca vê.
  */
 export function canSeeInternalComments(viewer: CommentViewer, ticket: TicketParticipants): boolean {
-  return viewer.isAdmin || viewer.isGroupMember === true || viewer.isMentionedTechnician === true ||
+  return viewer.isAdmin || viewer.isTechnician === true || viewer.isGroupMember === true ||
+    viewer.isMentionedTechnician === true ||
     (ticket.assigneeId !== null && ticket.assigneeId === viewer.userId);
 }
 

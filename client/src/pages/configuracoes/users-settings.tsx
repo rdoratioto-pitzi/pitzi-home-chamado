@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/auth-context";
 import { useMetaAreas } from "@/hooks/use-meta-areas";
+import { useSupportGroups } from "@/hooks/use-support-groups";
 import {
   Table,
   TableBody,
@@ -64,6 +65,8 @@ const formSchema = z.object({
   isAdmin: z.boolean().default(false),
   // Técnico atende chamados; Usuário só abre e acompanha os seus (shared/user-type.ts).
   tipo: z.enum(["tecnico", "usuario"]).default("usuario"),
+  // Squads (grupos de atendimento) da pessoa: organizam a Fila do Grupo. Só para técnicos.
+  squads: z.array(z.string()).default([]),
   areaNegocio: z.string().optional(),
   perfilAcesso: z.string().optional(),
   modulePermissions: z.object({
@@ -99,6 +102,15 @@ export function UsersSettings() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: areas = [] } = useMetaAreas();
+  // Squads de cada pessoa a partir dos grupos (uma consulta só, sem uma por usuário).
+  const { groups } = useSupportGroups();
+  const squadsByUser = new Map<string, { key: string; name: string }[]>();
+  for (const g of groups) {
+    for (const memberId of g.memberIds) {
+      squadsByUser.set(memberId, [...(squadsByUser.get(memberId) ?? []), { key: g.key, name: g.name }]);
+    }
+  }
+  const squadKeysOf = (userId: string) => (squadsByUser.get(userId) ?? []).map((s) => s.key);
 
   const [sortConfig, setSortConfig] = useState<{ key: keyof User; direction: "asc" | "desc" }>({
     key: "status",
@@ -179,6 +191,7 @@ export function UsersSettings() {
       password: "",
       isAdmin: false,
       tipo: "usuario",
+      squads: [],
       areaNegocio: "",
       perfilAcesso: "",
       modulePermissions: {
@@ -218,13 +231,24 @@ export function UsersSettings() {
         modulePermissions: JSON.stringify(data.modulePermissions),
       };
 
-      if (editingUser) {
-        return apiRequest("PATCH", `/api/users/${editingUser.id}`, payload);
+      const res = editingUser
+        ? await apiRequest("PATCH", `/api/users/${editingUser.id}`, payload)
+        : await apiRequest("POST", "/api/users", payload);
+
+      // Squads: só técnicos (ou admins) participam; quem vira Usuário sai de todas.
+      const canHaveSquads = data.tipo === "tecnico" || data.isAdmin;
+      const squads = canHaveSquads ? data.squads : [];
+      const userId = editingUser?.id ?? ((await res.clone().json()) as { id?: string }).id;
+      const previous = editingUser ? squadKeysOf(editingUser.id) : [];
+      const changed = squads.length !== previous.length || squads.some((k) => !previous.includes(k));
+      if (userId && changed) {
+        await apiRequest("PUT", `/api/v1/support-groups/users/${userId}`, { groupKeys: squads });
       }
-      return apiRequest("POST", "/api/users", payload);
+      return res;
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/v1/support-groups"] });
       
       // Se o usuário editado for o próprio usuário logado, atualiza o contexto de auth
       if (editingUser && authUser && editingUser.id === authUser.id) {
@@ -284,6 +308,7 @@ export function UsersSettings() {
       password: "",
       isAdmin: user.isAdmin || false,
       tipo: user.isTechnician ? "tecnico" : "usuario",
+      squads: squadKeysOf(user.id),
       areaNegocio: user.areaNegocio || "",
       perfilAcesso: user.perfilAcesso || "",
       modulePermissions: perms,
@@ -299,6 +324,7 @@ export function UsersSettings() {
       password: "",
       isAdmin: false,
       tipo: "usuario",
+      squads: [],
       areaNegocio: "",
       perfilAcesso: "",
       modulePermissions: {
@@ -423,6 +449,7 @@ export function UsersSettings() {
                     Tipo <SortIcon column="isTechnician" />
                   </div>
                 </TableHead>
+                <TableHead>Squad</TableHead>
                 <TableHead className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => handleSort("isAdmin")}>
                   <div className="flex items-center">
                     Acesso <SortIcon column="isAdmin" />
@@ -462,6 +489,17 @@ export function UsersSettings() {
                       <Badge variant="outline" className="border-primary/40 text-primary" data-testid={`badge-tipo-${user.id}`}>Técnico</Badge>
                     ) : (
                       <Badge variant="secondary" data-testid={`badge-tipo-${user.id}`}>Usuário</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell data-testid={`cell-squad-${user.id}`}>
+                    {squadsByUser.get(user.id)?.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {squadsByUser.get(user.id)!.map((s) => (
+                          <Badge key={s.key} variant="outline">{s.name}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -664,6 +702,39 @@ export function UsersSettings() {
                   )}
                 />
               </div>
+
+              {(form.watch("tipo") === "tecnico" || form.watch("isAdmin")) && groups.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="squads"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Squads</FormLabel>
+                      <div className="grid grid-cols-2 gap-2 rounded-md border p-3" data-testid="select-squads">
+                        {groups.map((g) => {
+                          const checked = field.value.includes(g.key);
+                          return (
+                            <label key={g.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(on) =>
+                                  field.onChange(on ? [...field.value, g.key] : field.value.filter((k) => k !== g.key))
+                                }
+                                data-testid={`checkbox-squad-${g.key}`}
+                              />
+                              {g.name}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <FormDescription>
+                        A squad define a Fila do Grupo da pessoa. Técnicos continuam vendo e atendendo todos os chamados.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}

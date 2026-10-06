@@ -200,17 +200,21 @@ workspace.get("/api/workspace/chamados", async (c) => {
     const periodo = c.req.query("periodo") || "este-ano";
     const storage = getStorage(c.get("db"));
 
-    // escopo=fila: chamados em aberto dos grupos do usuário (shared/ticket-queue.ts).
+    // Escopos (técnicos e admins): padrão/"todos" = todos os chamados do tenant;
+    // "meus" = solicitante, responsável ou mencionado; "fila" = em aberto das squads do
+    // usuário (shared/ticket-queue.ts). Usuário (não técnico) sempre vê só os dele.
+    const escopo = c.req.query("escopo");
+    const tech = isAdmin || isTechnician(await storage.getUser(userId));
     let allTickets: Ticket[];
-    if (c.req.query("escopo") === "fila") {
+    if (escopo === "fila") {
       const viewer = await getQueueViewer(storage, { userId, isAdmin, tenantId: tenantId ?? null });
       allTickets = (await storage.getTickets({ tenantId })).filter((t) => isInQueue(viewer, t));
+    } else if (tech && escopo !== "meus") {
+      allTickets = await storage.getTickets({ tenantId });
     } else {
-      allTickets = isAdmin
-        ? await storage.getTickets({ tenantId })
-        : await storage.getTickets({ requesterId: userId, assigneeId: userId, tenantId });
+      allTickets = await storage.getTickets({ requesterId: userId, assigneeId: userId, tenantId });
       // Técnico acionado por menção (@) também vê o chamado na lista dele.
-      if (!isAdmin && isTechnician(await storage.getUser(userId))) {
+      if (tech) {
         const known = new Set(allTickets.map((t) => t.id));
         for (const ticketId of await storage.getTicketIdsMentioningUser(userId)) {
           if (known.has(ticketId)) continue;
@@ -978,7 +982,11 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
     if (!previous || !sameTenant(previous.tenantId, tenantId)) {
       return c.json({ error: "Chamado não encontrado" }, 404);
     }
-    if (role !== "admin" && previous.requesterId !== actorId && previous.assigneeId !== actorId) {
+    // Técnicos editam qualquer chamado do tenant.
+    if (
+      role !== "admin" && previous.requesterId !== actorId && previous.assigneeId !== actorId &&
+      !(await isTechnicianUserId(storage, actorId))
+    ) {
       return c.json({ error: "Acesso negado" }, 403);
     }
     // Solicitante que não é técnico só ajusta título e descrição.
