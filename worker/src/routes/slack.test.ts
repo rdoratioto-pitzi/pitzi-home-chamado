@@ -406,6 +406,46 @@ describe.skipIf(!url)("Slack → chamado", () => {
     expect(JSON.parse(rows[0].attachments)).toHaveLength(1);
   });
 
+  // ─── Responsável ao converter ───────────────────────────────────────────────
+  it("técnico que converte conversa de outra pessoa vira o responsável e enxerga o chamado", async () => {
+    await shortcut("UTEC", "UUSR", { ts: "1700000000.000400", text: "slack-test técnico converte" });
+    const { rows } = await pool.query(
+      `SELECT t.id, t.code, a.email AS responsavel, r.email AS solicitante FROM tickets t
+         JOIN users r ON r.id = t.requester_id LEFT JOIN users a ON a.id = t.assignee_id
+        WHERE t.slack_message_ts = '1700000000.000400'`,
+    );
+    expect(rows[0]).toMatchObject({ responsavel: `tecnico@${DOMAIN}`, solicitante: `usuario@${DOMAIN}` });
+    // Nota interna de quem converteu e confirmação com o responsável.
+    const notas = (await pool.query("SELECT content, is_internal FROM ticket_comments WHERE ticket_id = $1", [rows[0].id])).rows;
+    expect(notas.some((n) => n.is_internal && String(n.content).includes("Chamado criado pelo Slack por Técnico Slack"))).toBe(true);
+    const reply = calls.find((c) => c.method === "chat.postMessage" && c.params.thread_ts)!;
+    expect(reply.params.text).toContain("Responsável: Técnico Slack");
+    // Sem e-mail de atribuição para quem se atribuiu.
+    expect((await pool.query("SELECT count(*)::int AS n FROM email_outbox WHERE ticket_id = $1 AND event = 'ticket_assigned'", [rows[0].id])).rows[0].n).toBe(0);
+    // Como responsável, o técnico enxerga o chamado (mesma regra das rotas).
+    const { canViewTicket } = await import("../../../server/services/ticket-queue.service");
+    const { getStorage } = await import("../lib/storage");
+    const tecnico = (await pool.query("SELECT id FROM users WHERE email = $1", [`tecnico@${DOMAIN}`])).rows[0];
+    const storage = getStorage(db);
+    expect(await canViewTicket(storage, { userId: tecnico.id, isAdmin: false, tenantId: null }, await storage.getTicket(rows[0].id))).toBe(true);
+  });
+
+  it("Usuário que converte a própria mensagem não vira responsável", async () => {
+    await shortcut("UUSR", "UUSR", { ts: "1700000000.000500", text: "slack-test usuário converte" });
+    const { rows } = await pool.query("SELECT assignee_id FROM tickets WHERE slack_message_ts = '1700000000.000500'");
+    expect(rows[0].assignee_id).toBeNull();
+    expect(calls.find((c) => c.method === "chat.postMessage" && c.params.thread_ts)!.params.text).toContain("Responsável: Não atribuído");
+  });
+
+  it("avançado: técnico que converte vira o responsável", async () => {
+    await interaction({ type: "message_action", callback_id: "criar_chamado_avancado", team: { id: "T1" }, trigger_id: "TRIG", user: { id: "UTEC" }, channel: { id: "C1" }, message: { user: "UUSR", ts: "1700000000.000600", text: "slack-test avançado técnico" } });
+    await submit(viewOf("views.open").private_metadata, { title: "slack-test avançado técnico", category: "sap" });
+    const { rows } = await pool.query(
+      "SELECT a.email FROM tickets t LEFT JOIN users a ON a.id = t.assignee_id WHERE t.slack_message_ts = '1700000000.000600'",
+    );
+    expect(rows[0].email).toBe(`tecnico@${DOMAIN}`);
+  });
+
   it("atalho avançado mantém o formulário e cria com relação Slack", async () => {
     await interaction({ type: "message_action", callback_id: "criar_chamado_avancado", team: { id: "T1" }, trigger_id: "TRIG", user: { id: "UUSR" }, channel: { id: "C1" }, message: { user: "UUSR", ts: "1700000000.000100", text: "slack-test avançado" } });
     const view = viewOf("views.open");

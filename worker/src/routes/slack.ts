@@ -275,6 +275,31 @@ async function attachConversationFiles(
   }
 }
 
+/**
+ * Conversão de conversa pelo Slack: o técnico/admin que clicou vira o responsável (mesmo com
+ * solicitante de outra pessoa), substituindo o responsável automático. Usuário que converte a
+ * própria mensagem não define responsável (vai para a fila/automático).
+ */
+function slackAssignment(clickerIsTechnician: boolean, clickerUserId: string) {
+  return clickerIsTechnician ? { assigneeOverride: clickerUserId, actorId: clickerUserId } : { actorId: clickerUserId };
+}
+
+async function assigneeName(storage: ReturnType<typeof getStorage>, ticket: Ticket): Promise<string> {
+  return ticket.assigneeId ? (await storage.getUser(ticket.assigneeId))?.name ?? "Não atribuído" : "Não atribuído";
+}
+
+/** Nota interna dizendo quem converteu a conversa em chamado. */
+async function recordConversion(storage: ReturnType<typeof getStorage>, ticket: Ticket, clickerUserId: string, clickerName: string) {
+  try {
+    await storage.createTicketComment({
+      ticketId: ticket.id, tenantId: ticket.tenantId, userId: clickerUserId,
+      content: plainTextToHtml(`Chamado criado pelo Slack por ${clickerName}.`), isInternal: true, mentions: [],
+    } as any);
+  } catch (error) {
+    console.error("[slack-chamados] nota de conversão não gravada", error);
+  }
+}
+
 async function handleShortcut(c: Context<AppEnv>, token: string, payload: any, advanced = false) {
   const clickerSlackId: string = payload.user?.id ?? "";
   const teamId: string | null = payload.team?.id ?? payload.user?.team_id ?? null;
@@ -391,6 +416,9 @@ async function handleShortcut(c: Context<AppEnv>, token: string, payload: any, a
     text: slackTextToPlain(starter.text),
     permalink,
     messages: conversationMessages,
+    clickerUserId: clicker.user.id,
+    clickerName: clicker.user.name,
+    clickerIsTechnician: isTechnician(clicker.user),
   });
   return c.body(null, 200);
 }
@@ -411,6 +439,9 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
   permalink?: string;
   /** Conversa inteira (raiz + respostas); null = só a mensagem clicada. */
   messages?: SlackThreadMessage[] | null;
+  clickerUserId: string;
+  clickerName: string;
+  clickerIsTechnician: boolean;
 }) {
   const db = c.get("db");
   const storage = getStorage(db);
@@ -471,7 +502,7 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
       slackMessageTs: input.messageTs,
       slackUserId: input.requesterSlackId,
       slackPermalink: input.permalink ?? null,
-    });
+    }, slackAssignment(input.clickerIsTechnician, input.clickerUserId));
   } catch (error) {
     if (isUniqueViolation(error)) {
       const duplicate = await findTicketBySlackMessage(db, input.teamId, input.channelId, input.messageTs);
@@ -492,6 +523,7 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
 
   const ticket = result.ticket;
   console.info("[slack-chamados] ticket created", { ticketId: ticket.id, code: ticket.code });
+  await recordConversion(storage, ticket, input.clickerUserId, input.clickerName);
   if (input.messages && input.messages.length > 0) {
     await attachConversationFiles(c, token, ticket, input.messages, input.clickerSlackId, input.channelId);
   }
@@ -502,8 +534,8 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
     clickerSlackId: input.clickerSlackId,
     code: ticket.code,
     link,
-    text: `🎫 Chamado ${ticket.code} criado com sucesso\n${ticket.title}\nStatus: ${ticketStatusLabel(ticket.status)}\n${link}`,
-    blocks: ticketReplyBlocks(ticket, link, true, ticket.assigneeId ? (await storage.getUser(ticket.assigneeId))?.name ?? "Não atribuído" : "Não atribuído"),
+    text: `🎫 Chamado ${ticket.code} criado com sucesso\n${ticket.title}\nStatus: ${ticketStatusLabel(ticket.status)}\nResponsável: ${await assigneeName(storage, ticket)}\n${link}`,
+    blocks: ticketReplyBlocks(ticket, link, true, await assigneeName(storage, ticket)),
   });
 }
 
@@ -668,7 +700,7 @@ async function createFromSlack(
     slackTeamId: meta.teamId, slackChannelId: meta.channelId, slackMessageTs: meta.messageTs,
     slackThreadTs: meta.threadTs ?? meta.messageTs, slackUserId: meta.requesterSlackId,
     slackPermalink: meta.permalink ?? null,
-  } : {});
+  } : {}, meta.mode === "shortcut" ? slackAssignment(isTechnician(clickerUser), clickerUser.id) : {});
   } catch (error) {
     if (isUniqueViolation(error) && meta.channelId && meta.messageTs) {
       const existing = await findTicketBySlackMessage(db, meta.teamId ?? null, meta.channelId, meta.messageTs);
@@ -690,6 +722,7 @@ async function createFromSlack(
   console.info("[slack-chamados] ticket created", { ticketId: ticket.id, code: ticket.code });
   const link = ticketLink(c.env.APP_URL, ticket.id);
   if (meta.mode === "shortcut" && meta.channelId) {
+    await recordConversion(storage, ticket, clickerUser.id, clickerUser.name);
     if (fromSlack && fromSlack.messages.length > 0) {
       await attachConversationFiles(c, token, ticket, fromSlack.messages, meta.clickerSlackId, meta.channelId);
     }
@@ -699,8 +732,8 @@ async function createFromSlack(
       clickerSlackId: meta.clickerSlackId,
       code: ticket.code,
       link,
-      text: `Virou o chamado *${ticket.code}*: <${link}|${ticket.title}>`,
-      blocks: ticketReplyBlocks(ticket, link, true),
+      text: `Virou o chamado *${ticket.code}*: <${link}|${ticket.title}>\nResponsável: ${await assigneeName(storage, ticket)}`,
+      blocks: ticketReplyBlocks(ticket, link, true, await assigneeName(storage, ticket)),
     });
     return;
   }
