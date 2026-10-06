@@ -8,6 +8,12 @@ import {
   slackTextToPlain,
   generateSlackTicketTitle,
   verifySlackSignature,
+  buildConversationHtml,
+  formatSlackTs,
+  selectSlackFiles,
+  slackAccessHint,
+  slackMrkdwnToText,
+  slackUserIdsIn,
 } from "./slack-ticket";
 
 async function sign(secret: string, timestamp: string, body: string): Promise<string> {
@@ -86,4 +92,74 @@ describe("título automático", () => {
     ["Não consigo acessar o Google Drive.", "Problema de acesso ao Google Drive"],
     ["", "Problema relatado via Slack"],
   ])("%s → %s", (message, title) => expect(generateSlackTicketTitle(message)).toBe(title));
+});
+
+describe("conversa do Slack", () => {
+  const names = new Map([["U1", "Ana Lima"], ["U2", "Bruno Reis"]]);
+  // 05/10/2026 13:00 de Brasília = 16:00 UTC
+  const ts = (min: number) => String(Date.UTC(2026, 9, 5, 16, min) / 1000);
+
+  it("converte mrkdwn: menções com nome, canais, links e entidades", () => {
+    expect(slackMrkdwnToText("oi <@U1>, veja <#C9|suporte> e <https://x.com/a|o painel> &amp; <!here>", names))
+      .toBe("oi @Ana Lima, veja #suporte e o painel (https://x.com/a) & @here");
+    expect(slackMrkdwnToText("<@U9>", names)).toBe("@usuário");
+    expect(slackUserIdsIn([{ ts: "1", user: "U1", text: "fala <@U2>" }]).sort()).toEqual(["U1", "U2"]);
+  });
+
+  it("horário em Brasília", () => {
+    expect(formatSlackTs(ts(5))).toBe("05/10 13:05");
+  });
+
+  it("monta a conversa em ordem, com nomes, bots e anexos", () => {
+    const html = buildConversationHtml({
+      channelName: "suporte", permalink: "https://pitzi.slack.com/archives/C1/p1",
+      names,
+      messages: [
+        { ts: ts(0), user: "U1", text: "a VPN caiu" },
+        { ts: ts(1), subtype: "channel_join", user: "U2", text: "entrou" },
+        { ts: ts(2), user: "U2", text: "reiniciei <@U1>", files: [{ name: "print.png" }] },
+        { ts: ts(3), bot_id: "B1", bot_profile: { name: "Monitor" }, text: "alerta resolvido" },
+      ],
+    });
+    expect(html).toContain("<strong>Conversa no Slack</strong> (#suporte, 3 mensagens)");
+    expect(html).toContain('<a href="https://pitzi.slack.com/archives/C1/p1">');
+    const order = [
+      "Ana Lima</strong> (05/10 13:00): a VPN caiu",
+      "Bruno Reis</strong> (05/10 13:02): reiniciei @Ana Lima<br>[anexo: print.png]",
+      "Monitor</strong> (05/10 13:03): alerta resolvido",
+    ].map((part) => html.indexOf(part));
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(html).not.toContain("entrou");
+  });
+
+  it("corta conversas longas e avisa quantas mensagens ficaram de fora", () => {
+    const messages = Array.from({ length: 50 }, (_, i) => ({ ts: ts(i % 59), user: "U1", text: "x".repeat(200) }));
+    const html = buildConversationHtml({ messages, names, maxChars: 2_000 });
+    expect(html.length).toBeLessThan(2_400);
+    expect(html).toMatch(/Conversa cortada: \d+ mensagens não couberam/);
+  });
+
+  it("escapa HTML vindo do Slack", () => {
+    const html = buildConversationHtml({ messages: [{ ts: ts(0), user: "U1", text: "&lt;script&gt;alert(1)&lt;/script&gt;" }], names });
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("seleciona anexos aceitos (tipo e tamanho) e lista os que ficam de fora", () => {
+    const { importable, skipped } = selectSlackFiles([
+      { ts: "1", user: "U1", files: [
+        { name: "a.png", mimetype: "image/png", size: 100, url_private_download: "https://files.slack.com/a" },
+        { name: "b.exe", mimetype: "application/x-msdownload", size: 100, url_private_download: "https://files.slack.com/b" },
+        { name: "c.pdf", mimetype: "application/pdf", size: 20 * 1024 * 1024, url_private_download: "https://files.slack.com/c" },
+      ] },
+    ]);
+    expect(importable.map((f) => f.name)).toEqual(["a.png"]);
+    expect(skipped).toEqual(["b.exe", "c.pdf"]);
+  });
+
+  it("explica o que falta quando não dá para ler a conversa", () => {
+    expect(slackAccessHint("not_in_channel")).toContain("/invite @Chamados Pitzi");
+    expect(slackAccessHint("missing_scope")).toContain("channels:history");
+  });
 });

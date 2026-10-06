@@ -1,9 +1,11 @@
 // worker/src/routes/slack.ts
 //
-// Slack → chamado (fase 1):
+// Slack → chamado:
 //  - /chamado [texto]: abre a janela de abertura; o solicitante é quem digitou.
-//  - atalho de mensagem "Transformar em chamado": cria o chamado direto com texto, autor e
-//    thread da mensagem. Só técnicos/admins usam em mensagem de outra pessoa.
+//  - atalho "Criar chamado" (callback transformar_em_chamado): cria na hora. Em thread, leva a
+//    conversa inteira (raiz + respostas) e os anexos; o solicitante é quem começou a conversa.
+//  - atalho "Criar chamado avançado": abre a janela; no envio leva a conversa e os anexos.
+//  Só técnicos/admins transformam conversa iniciada por outra pessoa.
 // Rotas públicas: a autenticidade vem da assinatura do Slack (SLACK_SIGNING_SECRET).
 import { recordSlackThreadMessage } from "../lib/slack-thread-sync";
 import { Hono } from "hono";
@@ -15,6 +17,9 @@ import { mailContext } from "../lib/mailer";
 import { createTicketFor } from "../lib/create-ticket";
 import { notifyPerson, slackApi, isAllowedSlackTeam } from "../lib/slack-api";
 import { resolveSlackPerson } from "../lib/slack-people";
+import { fetchSlackThread, importSlackFiles, resolveSlackNames } from "../lib/slack-thread";
+import { sanitizeRichText } from "../lib/sanitize-rich-text";
+import type { Ticket } from "../../../shared/schema";
 import { sameTenant } from "../../../shared/tenant";
 import { canViewTicket } from "../../../server/services/ticket-queue.service";
 import { tickets } from "../../../shared/schema";
@@ -34,6 +39,11 @@ import {
   plainTextToHtml,
   slackTextToPlain,
   verifySlackSignature,
+  buildConversationHtml,
+  selectSlackFiles,
+  slackAccessHint,
+  slackMrkdwnToText,
+  type SlackThreadMessage,
 } from "../../../shared/slack-ticket";
 
 export const slack = new Hono<AppEnv>();
@@ -194,6 +204,102 @@ function ticketReplyBlocks(ticket: { id: string; code: string; title: string; st
   ];
 }
 
+/** Resposta mais lenta que isso cai na mensagem única (o trigger_id da janela vale 3 s). */
+const ROOT_LOOKUP_TIMEOUT_MS = 1_200;
+
+async function withTimeout<T>(work: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((resolve) => { timer = setTimeout(() => resolve(fallback), ms); });
+  try {
+    return await Promise.race([work, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+type ThreadLookup = { ok: true; messages: SlackThreadMessage[] } | { ok: false; error: string } | null;
+
+function slackOriginFooter(input: { requesterName: string; requesterEmail?: string | null; channelId: string; channelName?: string | null }) {
+  const channel = input.channelName ? `#${input.channelName}` : input.channelId;
+  return [
+    "Origem: Slack",
+    `Solicitante: ${input.requesterName}`,
+    ...(input.requesterEmail ? [`E-mail: ${input.requesterEmail}`] : []),
+    `Canal: ${channel}`,
+  ].join("\n");
+}
+
+/** Confirmação na thread; se o app não estiver no canal, avisa quem clicou (efêmero ou DM). */
+async function confirmInThread(token: string, input: {
+  channelId: string; threadTs: string; clickerSlackId: string; text: string; blocks?: unknown; link: string; code: string;
+}) {
+  const reply = await slackApi(token, "chat.postMessage", {
+    channel: input.channelId,
+    thread_ts: input.threadTs,
+    text: input.text,
+    ...(input.blocks ? { blocks: JSON.stringify(input.blocks) } : {}),
+    unfurl_links: false,
+  });
+  if (!reply.ok) {
+    await notifyPerson(token, input.clickerSlackId,
+      `Chamado *${input.code}* aberto ✅ <${input.link}|Ver chamado>.\nNão consegui responder na conversa: convide o app no canal com \`/invite @Chamados Pitzi\` para ver a confirmação na thread.`,
+      input.channelId);
+  }
+}
+
+/**
+ * Anexos da conversa vão para o chamado depois que ele existe (R2, mesmo formato da tela).
+ * Os que não entram ficam listados na descrição.
+ */
+async function attachConversationFiles(
+  c: Context<AppEnv>, token: string, ticket: Ticket, messages: readonly SlackThreadMessage[], clickerSlackId: string, channelId: string,
+) {
+  const storage = getStorage(c.get("db"));
+  const files = selectSlackFiles(messages);
+  if (files.importable.length === 0 && files.skipped.length === 0) return;
+  const imported = files.importable.length > 0
+    ? await importSlackFiles(c.env, token, ticket, files.importable)
+    : { saved: [], failed: [], missingScope: false };
+  const notImported = [...files.skipped, ...imported.failed];
+  const update: Partial<Ticket> = {};
+  if (imported.saved.length > 0) update.attachments = JSON.stringify(imported.saved);
+  if (notImported.length > 0) {
+    const names = notImported.map((n) => n.replace(/[<>&"]/g, "")).join(", ");
+    update.description = `${ticket.description ?? ""}<p><em>Anexos da conversa que não foram importados: ${names}. Veja no Slack.</em></p>`;
+  }
+  if (Object.keys(update).length > 0) await storage.updateTicket(ticket.id, update);
+  if (imported.missingScope) {
+    await notifyPerson(token, clickerSlackId,
+      "Os anexos da conversa não vieram: o app precisa da permissão files:read. Peça ao admin do Slack para atualizar o manifesto e reinstalar o app.",
+      channelId);
+  }
+}
+
+/**
+ * Conversão de conversa pelo Slack: o técnico/admin que clicou vira o responsável (mesmo com
+ * solicitante de outra pessoa), substituindo o responsável automático. Usuário que converte a
+ * própria mensagem não define responsável (vai para a fila/automático).
+ */
+function slackAssignment(clickerIsTechnician: boolean, clickerUserId: string) {
+  return clickerIsTechnician ? { assigneeOverride: clickerUserId, actorId: clickerUserId } : { actorId: clickerUserId };
+}
+
+async function assigneeName(storage: ReturnType<typeof getStorage>, ticket: Ticket): Promise<string> {
+  return ticket.assigneeId ? (await storage.getUser(ticket.assigneeId))?.name ?? "Não atribuído" : "Não atribuído";
+}
+
+/** Nota interna dizendo quem converteu a conversa em chamado. */
+async function recordConversion(storage: ReturnType<typeof getStorage>, ticket: Ticket, clickerUserId: string, clickerName: string) {
+  try {
+    await storage.createTicketComment({
+      ticketId: ticket.id, tenantId: ticket.tenantId, userId: clickerUserId,
+      content: plainTextToHtml(`Chamado criado pelo Slack por ${clickerName}.`), isInternal: true, mentions: [],
+    } as any);
+  } catch (error) {
+    console.error("[slack-chamados] nota de conversão não gravada", error);
+  }
+}
+
 async function handleShortcut(c: Context<AppEnv>, token: string, payload: any, advanced = false) {
   const clickerSlackId: string = payload.user?.id ?? "";
   const teamId: string | null = payload.team?.id ?? payload.user?.team_id ?? null;
@@ -204,35 +310,65 @@ async function handleShortcut(c: Context<AppEnv>, token: string, payload: any, a
   const channelId: string | null = payload.channel?.id ?? null;
   const channelName: string | null = payload.channel?.name ?? null;
   const message = payload.message ?? {};
-  const authorSlackId: string | undefined = message.user;
-  if (!authorSlackId || message.bot_id || message.subtype === "bot_message") {
-    await notifyPerson(token, clickerSlackId, "Mensagens de bots ou de apps não viram chamado.", channelId);
-    return c.body(null, 200);
-  }
   if (!channelId || !message.ts) {
     await notifyPerson(token, clickerSlackId, "Não consegui identificar a mensagem do Slack para abrir o chamado.", channelId);
     return c.body(null, 200);
   }
+  // A conversa começa na raiz da thread (ou na própria mensagem, se não for resposta).
+  const rootTs: string = message.thread_ts ?? message.ts;
+  const isReply = Boolean(message.thread_ts && message.thread_ts !== message.ts);
+  const hasReplies = isReply || Number(message.reply_count ?? 0) > 0;
 
   const db = c.get("db");
   const storage = getStorage(db);
-  const sameAuthor = authorSlackId === clickerSlackId;
-  const [clicker, author, permalink] = await Promise.all([
+  // Rápido: lê a conversa inteira já (roda depois da resposta ao Slack).
+  // Avançado: só a raiz, com limite de tempo, para abrir a janela nos 3 s do trigger.
+  const threadWork: Promise<ThreadLookup> = !hasReplies
+    ? Promise.resolve(null)
+    : advanced
+      ? (isReply ? withTimeout<ThreadLookup>(fetchSlackThread(token, channelId, rootTs, 1), ROOT_LOOKUP_TIMEOUT_MS, { ok: false, error: "timeout" }) : Promise.resolve(null))
+      : fetchSlackThread(token, channelId, rootTs);
+  const [clicker, rootPermalink, threadLookup] = await Promise.all([
     resolveSlackPerson(db, c.env, clickerSlackId),
-    sameAuthor ? Promise.resolve(null) : resolveSlackPerson(db, c.env, authorSlackId),
-    channelId ? slackApi(token, "chat.getPermalink", { channel: channelId, message_ts: message.ts }) : Promise.resolve(null),
+    slackApi(token, "chat.getPermalink", { channel: channelId, message_ts: rootTs }),
+    threadWork,
   ]);
   if (!clicker.ok) {
     await notifyPerson(token, clickerSlackId, clicker.message, channelId);
     return c.body(null, 200);
   }
-  if (!sameAuthor && !isTechnician(clicker.user)) {
-    await notifyPerson(token, clickerSlackId, "Só técnicos podem transformar mensagens de outras pessoas em chamado.", channelId);
+
+  // Sem acesso à conversa (app fora do canal / sem permissão): segue só com a mensagem clicada.
+  // Conversa lida mas vazia (thread apagada etc.) também cai na mensagem clicada, sem aviso.
+  const lookupFailed = Boolean(threadLookup && (!threadLookup.ok || threadLookup.messages.length === 0));
+  if (threadLookup && !threadLookup.ok) {
+    await notifyPerson(token, clickerSlackId, `${slackAccessHint(threadLookup.error)} Vai só a mensagem que você escolheu.`, channelId);
+  }
+  const conversation = hasReplies && !lookupFailed;
+  const rootMessage: SlackThreadMessage | null = threadLookup?.ok ? threadLookup.messages[0] ?? null : isReply ? null : message;
+  const starter: SlackThreadMessage = conversation && rootMessage ? rootMessage : message;
+  const conversationMessages: SlackThreadMessage[] | null = !advanced && conversation && threadLookup?.ok ? threadLookup.messages : null;
+  // A mesma conversa não vira dois chamados: a chave é a raiz quando vai a thread inteira.
+  const keyTs: string = conversation ? rootTs : message.ts;
+  const permalink: string | undefined = conversation || !isReply
+    ? (rootPermalink.ok ? rootPermalink.permalink : undefined)
+    : await slackApi(token, "chat.getPermalink", { channel: channelId, message_ts: message.ts }).then((r) => (r.ok ? r.permalink : undefined));
+
+  const authorSlackId: string | undefined = starter.user;
+  if (!authorSlackId || starter.bot_id || starter.subtype === "bot_message") {
+    await notifyPerson(token, clickerSlackId, "Mensagens de bots ou de apps não viram chamado.", channelId);
     return c.body(null, 200);
   }
-  const requester = sameAuthor ? clicker : author!;
+  const sameAuthor = authorSlackId === clickerSlackId;
+  if (!sameAuthor && !isTechnician(clicker.user)) {
+    await notifyPerson(token, clickerSlackId, conversation
+      ? "Só técnicos podem transformar conversas iniciadas por outras pessoas em chamado."
+      : "Só técnicos podem transformar mensagens de outras pessoas em chamado.", channelId);
+    return c.body(null, 200);
+  }
+  const requester = sameAuthor ? clicker : await resolveSlackPerson(db, c.env, authorSlackId);
   if (!requester.ok) {
-    await notifyPerson(token, clickerSlackId, `Não dá para abrir o chamado em nome do autor: ${requester.message}`, channelId);
+    await notifyPerson(token, clickerSlackId, `Não dá para abrir o chamado em nome ${conversation ? "de quem começou a conversa" : "do autor"}: ${requester.message}`, channelId);
     return c.body(null, 200);
   }
 
@@ -241,14 +377,25 @@ async function handleShortcut(c: Context<AppEnv>, token: string, payload: any, a
     return c.body(null, 200);
   }
   if (advanced) {
+    const starterText = slackMrkdwnToText(starter.text);
+    const replies = Number(rootMessage?.reply_count ?? message.reply_count ?? 0);
+    const whatGoes = conversation
+      ? `A conversa inteira${replies > 0 ? ` (${replies + 1} mensagens)` : ""}, o link e os anexos vão junto no chamado.`
+      : hasReplies
+        ? "Só a mensagem escolhida vai para o chamado (o app não conseguiu ler a conversa)."
+        : "A mensagem, o link e os anexos vão junto no chamado.";
     const opened = await slackApi(token, "views.open", {
       trigger_id: payload.trigger_id,
       view: buildTicketModal({
-        metadata: { teamId, mode: "shortcut", clickerSlackId, requesterSlackId: authorSlackId, channelId, messageTs: message.ts, threadTs: message.thread_ts ?? message.ts },
-        title: generateSlackTicketTitle(slackTextToPlain(message.text)),
-        description: slackTextToPlain(message.text),
+        metadata: {
+          teamId, mode: "shortcut", clickerSlackId, requesterSlackId: authorSlackId, channelId,
+          messageTs: keyTs, threadTs: rootTs, channelName, permalink: permalink ?? null, conversation: conversation || !hasReplies,
+        },
+        title: generateSlackTicketTitle(starterText),
+        description: starterText,
         groups: await activeGroups(storage, requester.user.tenantId ?? null),
         showImpact: isTechnician(clicker.user),
+        context: `Solicitante: *${requester.user.name}* (${sameAuthor ? "você" : conversation ? "quem começou a conversa" : "autor da mensagem"})\n${whatGoes}`,
       }),
     });
     if (!opened.ok) await notifyPerson(token, clickerSlackId, "Não consegui abrir o formulário avançado. Tente novamente.", channelId);
@@ -264,10 +411,14 @@ async function handleShortcut(c: Context<AppEnv>, token: string, payload: any, a
     requesterName: requester.user.name,
     requesterEmail: requester.user.email,
     requesterTenantId: requester.user.tenantId ?? null,
-    messageTs: message.ts,
-    threadTs: message.thread_ts ?? message.ts,
-    text: slackTextToPlain(message.text),
-    permalink: permalink?.ok ? permalink.permalink : undefined,
+    messageTs: keyTs,
+    threadTs: rootTs,
+    text: slackTextToPlain(starter.text),
+    permalink,
+    messages: conversationMessages,
+    clickerUserId: clicker.user.id,
+    clickerName: clicker.user.name,
+    clickerIsTechnician: isTechnician(clicker.user),
   });
   return c.body(null, 200);
 }
@@ -286,17 +437,24 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
   threadTs: string;
   text: string;
   permalink?: string;
+  /** Conversa inteira (raiz + respostas); null = só a mensagem clicada. */
+  messages?: SlackThreadMessage[] | null;
+  clickerUserId: string;
+  clickerName: string;
+  clickerIsTechnician: boolean;
 }) {
   const db = c.get("db");
   const storage = getStorage(db);
+  const alreadyHas = async (code: string, threadTs: string | null) => {
+    const text = `🎫 Esta conversa já possui o chamado *${code}*.`;
+    const reply = await slackApi(token, "chat.postMessage", {
+      channel: input.channelId, thread_ts: threadTs ?? input.threadTs, text, unfurl_links: false,
+    });
+    if (!reply.ok) await notifyPerson(token, input.clickerSlackId, text, input.channelId);
+  };
   const existing = await findTicketBySlackMessage(db, input.teamId, input.channelId, input.messageTs);
   if (existing) {
-    await slackApi(token, "chat.postMessage", {
-      channel: input.channelId,
-      thread_ts: existing.slackThreadTs ?? input.threadTs,
-      text: `🎫 Esta mensagem já possui o chamado *${existing.code}*.`,
-      unfurl_links: false,
-    });
+    await alreadyHas(existing.code, existing.slackThreadTs);
     return;
   }
 
@@ -306,7 +464,25 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
     return;
   }
 
-  const title = generateSlackTicketTitle(input.text);
+  let title = generateSlackTicketTitle(input.text);
+  let description: string;
+  if (input.messages && input.messages.length > 0) {
+    const names = await resolveSlackNames(token, input.messages);
+    title = generateSlackTicketTitle(slackMrkdwnToText(input.messages[0].text, names)) || title;
+    description = sanitizeRichText(`${buildConversationHtml({
+      channelName: input.channelName, permalink: input.permalink, messages: input.messages, names,
+    })}${plainTextToHtml(slackOriginFooter(input))}`);
+  } else {
+    description = plainTextToHtml(slackTicketDescription({
+      text: input.text,
+      requesterName: input.requesterName,
+      requesterEmail: input.requesterEmail,
+      channelId: input.channelId,
+      channelName: input.channelName,
+      permalink: input.permalink,
+    }));
+  }
+
   let result;
   try {
     result = await createTicketFor(storage, mailContext(c), {
@@ -314,14 +490,7 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
     }, {
       code: "",
       title,
-      description: plainTextToHtml(slackTicketDescription({
-        text: input.text,
-        requesterName: input.requesterName,
-        requesterEmail: input.requesterEmail,
-        channelId: input.channelId,
-        channelName: input.channelName,
-        permalink: input.permalink,
-      })),
+      description,
       category: group.key,
       type: "bug",
       impact: DEFAULT_SLACK_IMPACT,
@@ -333,17 +502,12 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
       slackMessageTs: input.messageTs,
       slackUserId: input.requesterSlackId,
       slackPermalink: input.permalink ?? null,
-    });
+    }, slackAssignment(input.clickerIsTechnician, input.clickerUserId));
   } catch (error) {
     if (isUniqueViolation(error)) {
       const duplicate = await findTicketBySlackMessage(db, input.teamId, input.channelId, input.messageTs);
       if (duplicate) {
-        await slackApi(token, "chat.postMessage", {
-          channel: input.channelId,
-          thread_ts: duplicate.slackThreadTs ?? input.threadTs,
-          text: `🎫 Esta mensagem já possui o chamado *${duplicate.code}*.`,
-          unfurl_links: false,
-        });
+        await alreadyHas(duplicate.code, duplicate.slackThreadTs);
         return;
       }
     }
@@ -359,19 +523,20 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
 
   const ticket = result.ticket;
   console.info("[slack-chamados] ticket created", { ticketId: ticket.id, code: ticket.code });
-  const link = ticketLink(c.env.APP_URL, ticket.id);
-  const reply = await slackApi(token, "chat.postMessage", {
-    channel: input.channelId,
-    thread_ts: input.threadTs,
-    text: `🎫 Chamado ${ticket.code} criado com sucesso\n${ticket.title}\nStatus: ${ticketStatusLabel(ticket.status)}\n${link}`,
-    blocks: JSON.stringify(ticketReplyBlocks(ticket, link, true, ticket.assigneeId ? (await storage.getUser(ticket.assigneeId))?.name ?? "Não atribuído" : "Não atribuído")),
-    unfurl_links: false,
-  });
-  if (!reply.ok) {
-    await notifyPerson(token, input.clickerSlackId,
-      `Chamado *${ticket.code}* aberto ✅ <${link}|Ver chamado>. Não consegui responder na conversa: convide o app *Chamados Pitzi* neste canal.`,
-      input.channelId);
+  await recordConversion(storage, ticket, input.clickerUserId, input.clickerName);
+  if (input.messages && input.messages.length > 0) {
+    await attachConversationFiles(c, token, ticket, input.messages, input.clickerSlackId, input.channelId);
   }
+  const link = ticketLink(c.env.APP_URL, ticket.id);
+  await confirmInThread(token, {
+    channelId: input.channelId,
+    threadTs: input.threadTs,
+    clickerSlackId: input.clickerSlackId,
+    code: ticket.code,
+    link,
+    text: `🎫 Chamado ${ticket.code} criado com sucesso\n${ticket.title}\nStatus: ${ticketStatusLabel(ticket.status)}\nResponsável: ${await assigneeName(storage, ticket)}\n${link}`,
+    blocks: ticketReplyBlocks(ticket, link, true, await assigneeName(storage, ticket)),
+  });
 }
 
 async function handleBlockActions(c: Context<AppEnv>, token: string, payload: any) {
@@ -429,6 +594,31 @@ async function handleBlockActions(c: Context<AppEnv>, token: string, payload: an
     });
   }
   return c.body(null, 200);
+}
+
+/**
+ * Fluxo avançado: texto da janela + a conversa inteira lida no envio (assim entram também as
+ * respostas mandadas enquanto a janela estava aberta).
+ */
+async function advancedDescription(
+  token: string,
+  meta: NonNullable<ReturnType<typeof parseModalMetadata>>,
+  typed: string,
+): Promise<{ html: string; messages: SlackThreadMessage[]; error?: string }> {
+  const fallback = (error?: string) => ({
+    html: plainTextToHtml(meta.permalink ? `${typed}\n\nMensagem original no Slack: ${meta.permalink}` : typed),
+    messages: [] as SlackThreadMessage[],
+    error,
+  });
+  if (!meta.conversation || !meta.channelId || !meta.threadTs) return fallback();
+  const thread = await fetchSlackThread(token, meta.channelId, meta.threadTs);
+  if (!thread.ok) return fallback(thread.error);
+  if (thread.messages.length === 0) return fallback();
+  const names = await resolveSlackNames(token, thread.messages);
+  const conversation = buildConversationHtml({
+    channelName: meta.channelName, permalink: meta.permalink, messages: thread.messages, names,
+  });
+  return { html: sanitizeRichText(`${plainTextToHtml(typed)}${conversation}`), messages: thread.messages };
 }
 
 async function handleSubmission(c: Context<AppEnv>, token: string, payload: any) {
@@ -490,13 +680,18 @@ async function createFromSlack(
       return;
     }
   }
+  const fromSlack = meta.mode === "shortcut" ? await advancedDescription(token, meta, values.description) : null;
+  if (fromSlack?.error) {
+    await notifyPerson(token, meta.clickerSlackId, `${slackAccessHint(fromSlack.error)} O chamado vai com a mensagem escolhida.`, meta.channelId);
+  }
+
   let result;
   try { result = await createTicketFor(storage, mailContext(c), {
     userId: requester.user.id, isAdmin: requester.user.isAdmin === true, tenantId: requester.user.tenantId ?? null,
   }, {
     code: "",
     title: values.title,
-    description: plainTextToHtml(values.description),
+    description: fromSlack?.html ?? plainTextToHtml(values.description),
     category: values.category,
     type: values.type,
     impact,
@@ -504,7 +699,8 @@ async function createFromSlack(
   }, meta.mode === "shortcut" ? {
     slackTeamId: meta.teamId, slackChannelId: meta.channelId, slackMessageTs: meta.messageTs,
     slackThreadTs: meta.threadTs ?? meta.messageTs, slackUserId: meta.requesterSlackId,
-  } : {});
+    slackPermalink: meta.permalink ?? null,
+  } : {}, meta.mode === "shortcut" ? slackAssignment(isTechnician(clickerUser), clickerUser.id) : {});
   } catch (error) {
     if (isUniqueViolation(error) && meta.channelId && meta.messageTs) {
       const existing = await findTicketBySlackMessage(db, meta.teamId ?? null, meta.channelId, meta.messageTs);
@@ -526,21 +722,19 @@ async function createFromSlack(
   console.info("[slack-chamados] ticket created", { ticketId: ticket.id, code: ticket.code });
   const link = ticketLink(c.env.APP_URL, ticket.id);
   if (meta.mode === "shortcut" && meta.channelId) {
-    await storage.updateTicket(ticket.id, {
-      slackChannelId: meta.channelId, slackThreadTs: meta.threadTs ?? null, slackMessageTs: meta.messageTs ?? null,
-    });
-    const reply = await slackApi(token, "chat.postMessage", {
-      channel: meta.channelId,
-      thread_ts: meta.threadTs ?? meta.messageTs ?? undefined,
-      text: `Virou o chamado *${ticket.code}*: <${link}|${ticket.title}>`,
-      unfurl_links: false,
-    });
-    if (!reply.ok) {
-      // Canal privado sem o app: avisa só quem clicou.
-      await notifyPerson(token, meta.clickerSlackId,
-        `Chamado *${ticket.code}* aberto ✅ <${link}|Ver chamado>. Não consegui responder na conversa: convide o app *Chamados Pitzi* neste canal.`,
-        meta.channelId);
+    await recordConversion(storage, ticket, clickerUser.id, clickerUser.name);
+    if (fromSlack && fromSlack.messages.length > 0) {
+      await attachConversationFiles(c, token, ticket, fromSlack.messages, meta.clickerSlackId, meta.channelId);
     }
+    await confirmInThread(token, {
+      channelId: meta.channelId,
+      threadTs: meta.threadTs ?? meta.messageTs ?? "",
+      clickerSlackId: meta.clickerSlackId,
+      code: ticket.code,
+      link,
+      text: `Virou o chamado *${ticket.code}*: <${link}|${ticket.title}>\nResponsável: ${await assigneeName(storage, ticket)}`,
+      blocks: ticketReplyBlocks(ticket, link, true, await assigneeName(storage, ticket)),
+    });
     return;
   }
   await notifyPerson(token, meta.clickerSlackId, `Chamado *${ticket.code}* aberto ✅ <${link}|Ver chamado>`, meta.channelId);

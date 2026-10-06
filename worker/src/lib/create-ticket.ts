@@ -28,12 +28,23 @@ type SystemTicketFields = Partial<Pick<Ticket,
   "slackTeamId" | "slackChannelId" | "slackThreadTs" | "slackMessageTs" | "slackUserId" | "slackPermalink"
 >>;
 
+export interface CreateTicketOptions {
+  /**
+   * Responsável definido pelo sistema (Slack: o técnico que converteu a conversa). Precisa ser
+   * técnico; vale mesmo que o solicitante seja Usuário e substitui o responsável automático.
+   */
+  assigneeOverride?: string | null;
+  /** Quem fez a ação (não recebe e-mail/aviso de atribuição para si mesmo). */
+  actorId?: string | null;
+}
+
 export async function createTicketFor(
   storage: IStorage,
   mail: MailContext,
   creator: TicketCreator,
   body: Record<string, unknown>,
   systemFields: SystemTicketFields = {},
+  options: CreateTicketOptions = {},
 ): Promise<CreateTicketResult> {
   const data: Record<string, unknown> = { ...body };
   for (const field of SYSTEM_ONLY_FIELDS) delete data[field];
@@ -71,6 +82,8 @@ export async function createTicketFor(
   if (!custom.ok) return { ok: false, status: custom.status as 400, error: custom.error };
   validated.customFields = custom.values ?? null;
 
+  if (options.assigneeOverride) validated.assigneeId = options.assigneeOverride;
+
   // Responsável informado na abertura precisa ser técnico.
   if (validated.assigneeId && !(await isTechnicianUserId(storage, validated.assigneeId))) {
     return { ok: false, status: 400, error: TECHNICIAN_REQUIRED_ERROR };
@@ -90,7 +103,7 @@ export async function createTicketFor(
   // Automações de abertura rodam depois do responsável automático; e-mails e avisos abaixo
   // já usam o resultado final.
   const ticket = await runTicketAutomations(storage, "ticket_created", created, {
-    actorId: creator.userId, notifyAssignee: false,
+    actorId: options.actorId ?? creator.userId, notifyAssignee: false,
   });
   const requester = await storage.getUser(ticket.requesterId);
   const assignee = ticket.assigneeId ? await storage.getUser(ticket.assigneeId) : null;
@@ -99,12 +112,13 @@ export async function createTicketFor(
   if (requester) {
     sendTicketCreatedEmail(mail, storage, ticket, requester, assignee || null).catch(console.error);
   }
-  if (assignee && assignee.id !== ticket.requesterId) {
+  const actorId = options.actorId ?? null;
+  if (assignee && assignee.id !== ticket.requesterId && assignee.id !== actorId) {
     sendTicketAssignedEmail(mail, storage, ticket, assignee).catch(console.error);
   }
 
   // Notification
-  if (ticket.assigneeId && ticket.assigneeId !== ticket.requesterId) {
+  if (ticket.assigneeId && ticket.assigneeId !== ticket.requesterId && ticket.assigneeId !== actorId) {
     storage
       .createNotification({
         userId: ticket.assigneeId,
