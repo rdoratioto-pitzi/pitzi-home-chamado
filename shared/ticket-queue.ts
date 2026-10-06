@@ -9,6 +9,8 @@ export interface QueueViewer {
   isAdmin: boolean;
   /** Chaves dos grupos ativos de que o usuário é membro. */
   groupKeys: readonly string[];
+  /** Técnico (ou admin): atende e transfere qualquer chamado, mesmo fora das squads dele. */
+  isTechnician?: boolean;
 }
 
 interface QueueTicket {
@@ -41,9 +43,10 @@ export function claimDenial(viewer: QueueViewer, ticket: QueueTicket): string | 
   return null;
 }
 
-/** Transferir: membros do grupo atual, o responsável ou admin. */
+/** Transferir: qualquer técnico, membros do grupo atual, o responsável ou admin. */
 export function transferDenial(viewer: QueueViewer, ticket: QueueTicket): string | null {
   if (!OPEN_TICKET_STATUSES.includes(ticket.status)) return "Chamado já encerrado";
-  if (viewer.isAdmin || ticket.assigneeId === viewer.userId || isGroupMember(viewer, ticket)) return null;
+  if (viewer.isAdmin || viewer.isTechnician === true) return null;
+  if (ticket.assigneeId === viewer.userId || isGroupMember(viewer, ticket)) return null;
   return "Apenas membros do grupo ou o responsável podem transferir este chamado";
 }

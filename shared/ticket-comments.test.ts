@@ -24,6 +24,12 @@ describe("ticket-comments", () => {
     expect(canSeeInternalComments({ userId: "req-1", isAdmin: false }, { assigneeId: null })).toBe(false);
   });
 
+  it("técnico vê e escreve nota interna em qualquer chamado", () => {
+    const tech = { userId: "outro-tech", isAdmin: false, isTechnician: true };
+    expect(canSeeInternalComments(tech, { assigneeId: null })).toBe(true);
+    expect(resolveIsInternal(true, tech, ticket)).toBe(true);
+  });
+
   it("solicitante não consegue criar nota interna", () => {
     expect(resolveIsInternal(true, { userId: "req-1", isAdmin: false }, ticket)).toBe(false);
     expect(resolveIsInternal(true, { userId: "tech-1", isAdmin: false }, ticket)).toBe(true);

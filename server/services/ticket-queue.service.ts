@@ -5,7 +5,7 @@ import type { Ticket, User } from "../../shared/schema";
 import { sameTenant } from "../../shared/tenant";
 import { claimDenial, isGroupMember, transferDenial, type QueueViewer } from "../../shared/ticket-queue";
 import type { IStorage } from "../storage";
-import { TECHNICIAN_REQUIRED_ERROR } from "../../shared/user-type";
+import { isTechnician, TECHNICIAN_REQUIRED_ERROR } from "../../shared/user-type";
 import { isTechnicianUserId } from "./user-type.service";
 
 export interface QueueActor {
@@ -26,10 +26,12 @@ export const transferSchema = z.object({
 
 export async function getQueueViewer(storage: IStorage, actor: QueueActor): Promise<QueueViewer> {
   const groups = await storage.getSupportGroups(actor.tenantId ?? null);
+  const user = actor.isAdmin ? undefined : await storage.getUser(actor.userId);
   return {
     userId: actor.userId,
     isAdmin: actor.isAdmin,
     groupKeys: groups.filter(g => g.memberIds.includes(actor.userId)).map(g => g.key),
+    isTechnician: actor.isAdmin || isTechnician(user),
   };
 }
 
@@ -166,6 +168,8 @@ export async function canViewTicket(
   if (actor.tenantId !== undefined && !sameTenant(ticket.tenantId, actor.tenantId)) return false;
   if (actor.isAdmin) return true;
   if (ticket.requesterId === actor.userId || ticket.assigneeId === actor.userId) return true;
+  // Técnicos atendem qualquer chamado do tenant; a squad (grupo) organiza a fila, não restringe.
+  if (isTechnician(await storage.getUser(actor.userId))) return true;
   if (await isTicketGroupMember(storage, actor, ticket)) return true;
   // Quem foi mencionado (@) em algum comentário foi acionado para ajudar e pode abrir o chamado.
   return "id" in ticket && typeof ticket.id === "string"
