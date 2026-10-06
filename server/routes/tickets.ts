@@ -34,6 +34,9 @@ import { REQUESTER_EDITABLE_TICKET_FIELDS } from "@shared/requester-view";
  * em algum comentário. Técnico mencionado também vê notas internas.
  */
 async function ticketCommentAccess(userId: string, isAdmin: boolean, ticket: Ticket) {
+  // Técnicos atendem qualquer chamado (com notas internas), igual ao Worker.
+  const tech = !isAdmin && (await isTechnicianUserId(storage, userId));
+  if (isAdmin || tech) return { allowed: true, viewer: { userId, isAdmin, isTechnician: tech } };
   const isParty = ticket.requesterId === userId || ticket.assigneeId === userId;
   const isGroupMember = !isAdmin && !isParty && (await isTicketGroupMember(storage, { userId, isAdmin }, ticket));
   const isMentioned = !isAdmin && !isParty && !isGroupMember && (await storage.isUserMentionedInTicket(ticket.id, userId));
@@ -167,7 +170,8 @@ export function registerTicketRoutes(router: Router) {
       const { userId, isAdmin } = getSessionUser(req);
       const oldTicket = await storage.getTicket(getId(req));
       if (!oldTicket) return res.status(404).json({ error: "Ticket not found" });
-      if (!isAdmin && oldTicket.requesterId !== userId && oldTicket.assigneeId !== userId) {
+      if (!isAdmin && oldTicket.requesterId !== userId && oldTicket.assigneeId !== userId &&
+          !(await isTechnicianUserId(storage, userId))) {
         return res.status(403).json({ error: "Access denied" });
       }
 

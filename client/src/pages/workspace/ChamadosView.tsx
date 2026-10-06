@@ -32,7 +32,7 @@ import { useIsTechnician } from "@/hooks/use-is-technician";
 
 type Periodo = "este-ano" | "mes-vigente" | "mes-anterior" | "em-tratativa";
 type ViewMode = "lista" | "kanban" | "gantt" | "calendario" | "dashboard";
-type Escopo = "meus" | "fila";
+type Escopo = "todos" | "meus" | "fila";
 type FiltroFila = "sem-responsavel" | "todos";
 
 interface WorkspaceChamadosResponse {
@@ -48,6 +48,7 @@ const periodLabels: Record<Periodo, string> = {
 };
 
 const escopoLabels: Record<Escopo, string> = {
+  todos: "Todos",
   meus: "Meus Chamados",
   fila: "Fila do Grupo",
 };
@@ -90,7 +91,8 @@ export function ChamadosView() {
   const [selectedItem, setSelectedItem] = useState<ChamadoItem | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filtroKpi, setFiltroKpi] = useState<string | null>(null);
-  const [escopo, setEscopo] = useState<Escopo>("meus");
+  // Técnicos veem todos os chamados por padrão; Usuário sempre recebe só os dele (servidor).
+  const [escopo, setEscopo] = useState<Escopo>("todos");
   // Fila do Grupo é de quem atende: só técnicos (e admins) veem o seletor.
   const isTech = useIsTechnician();
   const [filtroFila, setFiltroFila] = useState<FiltroFila>("sem-responsavel");
@@ -101,6 +103,7 @@ export function ChamadosView() {
     userId: user?.id ?? "",
     isAdmin: user?.isAdmin === true,
     groupKeys: groups.filter((g) => user && g.memberIds.includes(user.id)).map((g) => g.key),
+    isTechnician: isTech,
   };
   const canClaim = (item: ChamadoItem) =>
     claimDenial(queueViewer, { category: item.categoria, assigneeId: item.responsavelId ?? null, status: item.status }) === null;
@@ -109,7 +112,7 @@ export function ChamadosView() {
     let cancelled = false;
     setLoading(true);
 
-    const escopoParam = escopo === "fila" ? "&escopo=fila" : "";
+    const escopoParam = `&escopo=${escopo}`;
     fetchWithAuth(`/api/workspace/chamados?periodo=${periodo}${escopoParam}`)
       .then((res) => res.json())
       .then((data: WorkspaceChamadosResponse) => {
@@ -136,7 +139,7 @@ export function ChamadosView() {
   // técnico assumindo o chamado, aparecem sem precisar recarregar a página.
   const silentRefresh = async () => {
     try {
-      const escopoParam = escopo === "fila" ? "&escopo=fila" : "";
+      const escopoParam = `&escopo=${escopo}`;
       const res = await fetchWithAuth(`/api/workspace/chamados?periodo=${periodo}${escopoParam}`);
       if (!res.ok) return;
       const data: WorkspaceChamadosResponse = await res.json();
@@ -253,7 +256,7 @@ export function ChamadosView() {
           />
         </div>
 
-        {/* Escopo: meus chamados ou fila dos grupos do usuário (só técnicos) */}
+        {/* Escopo: todos, meus chamados ou fila das squads do usuário (só técnicos) */}
         {isTech && (
         <div className="flex items-center gap-0 border rounded-md overflow-hidden" style={{ borderColor: "var(--sep)" }}>
           {(Object.keys(escopoLabels) as Escopo[]).map((e) => (

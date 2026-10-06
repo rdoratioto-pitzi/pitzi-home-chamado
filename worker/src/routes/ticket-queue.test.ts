@@ -76,9 +76,10 @@ describe.skipIf(!url)("fila do grupo", () => {
   });
   beforeEach(async () => {
     await cleanup();
-    for (const key of ["requester", "sapA", "sapB", "dadosA", "admin", "outsider"]) {
+    // "requester" e "leigo" são do tipo Usuário; os demais são técnicos.
+    for (const key of ["requester", "sapA", "sapB", "dadosA", "admin", "outsider", "leigo"]) {
       const { rows } = await pool.query(
-        "INSERT INTO users (name, email, status, is_admin, is_technician, tenant_id) VALUES ($1, $2, 'active', $3, $1 <> 'requester', 'tenant-q') RETURNING id",
+        "INSERT INTO users (name, email, status, is_admin, is_technician, tenant_id) VALUES ($1, $2, 'active', $3, $1 NOT IN ('requester', 'leigo'), 'tenant-q') RETURNING id",
         [key, `${key}@queue-test.local`, key === "admin"],
       );
       ids[key] = rows[0].id;
@@ -114,12 +115,38 @@ describe.skipIf(!url)("fila do grupo", () => {
     expect(outsider.items).toEqual([]);
   });
 
-  it("membro do grupo consulta o chamado; quem é de fora não", async () => {
+  it("qualquer técnico consulta o chamado; Usuário que não é parte dele não", async () => {
     const id = await ticket("sap");
     expect((await send(app(ids.sapB), "GET", `/api/tickets/${id}`)).status).toBe(200);
     expect((await send(app(ids.sapB), "GET", `/api/tickets/${id}/comments`)).status).toBe(200);
-    expect((await send(app(ids.dadosA), "GET", `/api/tickets/${id}`)).status).toBe(404);
-    expect((await send(app(ids.outsider), "GET", `/api/tickets/${id}/comments`)).status).toBe(403);
+    expect((await send(app(ids.dadosA), "GET", `/api/tickets/${id}`)).status).toBe(200);
+    expect((await send(app(ids.outsider), "GET", `/api/tickets/${id}/comments`)).status).toBe(200);
+    expect((await send(app(ids.leigo), "GET", `/api/tickets/${id}`)).status).toBe(404);
+    expect((await send(app(ids.leigo), "GET", `/api/tickets/${id}/comments`)).status).toBe(403);
+    // Técnico de outro tenant continua sem acesso.
+    expect((await send(app(ids.outsider, "user", "tenant-outro"), "GET", `/api/tickets/${id}`)).status).toBe(404);
+  });
+
+  it("técnico fora da squad vê nota interna, comenta e edita o chamado", async () => {
+    const id = await ticket("sap", { assignee: ids.sapA });
+    const route = `/api/tickets/${id}/comments`;
+    await send(app(ids.sapA), "POST", route, { content: "nota da equipe", isInternal: true });
+
+    const vistos = (await json(await send(app(ids.outsider), "GET", route))).map((c: any) => c.content);
+    expect(vistos).toContain("nota da equipe");
+    const nota = await send(app(ids.outsider), "POST", route, { content: "nota de fora", isInternal: true });
+    expect(nota.status).toBe(201);
+    expect((await json(nota)).isInternal).toBe(true);
+
+    expect((await send(app(ids.outsider), "PATCH", `/api/tickets/${id}`, { status: "in_progress" })).status).toBe(200);
+    expect((await send(app(ids.outsider), "PATCH", `/api/workspace/chamados/${id}`, { prioridade: "alta" })).status).toBe(200);
+    const { rows: [t] } = await pool.query("SELECT status, priority FROM tickets WHERE id = $1", [id]);
+    expect(t).toMatchObject({ status: "in_progress", priority: "high" });
+
+    // Usuário que não é parte do chamado continua bloqueado.
+    expect((await send(app(ids.leigo), "POST", route, { content: "x" })).status).toBe(403);
+    expect((await send(app(ids.leigo), "PATCH", `/api/tickets/${id}`, { title: "queue-test invadido" })).status).toBe(403);
+    expect((await send(app(ids.leigo), "PATCH", `/api/workspace/chamados/${id}`, { titulo: "queue-test invadido" })).status).toBe(403);
   });
 
   it("assumir: técnico de outro grupo também pega chamado sem responsável; Usuário não", async () => {
@@ -160,7 +187,7 @@ describe.skipIf(!url)("fila do grupo", () => {
 
   it("transferir: membro move para outro grupo e o responsável de fora sai", async () => {
     const id = await ticket("sap", { assignee: ids.sapA });
-    expect((await send(app(ids.outsider), "POST", `/api/tickets/${id}/transferir`, { category: "dados" })).status).toBe(403);
+    expect((await send(app(ids.leigo), "POST", `/api/tickets/${id}/transferir`, { category: "dados" })).status).toBe(403);
 
     const res = await send(app(ids.sapB), "POST", `/api/tickets/${id}/transferir`, { category: "dados" });
     expect(res.status).toBe(200);
@@ -171,8 +198,10 @@ describe.skipIf(!url)("fila do grupo", () => {
     const note = (await pool.query("SELECT content FROM ticket_comments WHERE ticket_id = $1", [id])).rows[0].content;
     expect(note).toContain("transferido de SAP para Dados por sapB");
 
-    // sapB não é mais do grupo do chamado nem responsável.
-    expect((await send(app(ids.sapB), "POST", `/api/tickets/${id}/transferir`, { category: "sap" })).status).toBe(403);
+    // Técnico transfere mesmo fora do grupo do chamado.
+    const volta = await send(app(ids.outsider), "POST", `/api/tickets/${id}/transferir`, { category: "sap" });
+    expect(volta.status).toBe(200);
+    expect((await json(volta)).category).toBe("sap");
   });
 
   it("transferir: responsável indicado precisa ser do grupo de destino e é notificado", async () => {
@@ -202,9 +231,10 @@ describe.skipIf(!url)("fila do grupo", () => {
     const id = await ticket("sap");
     const route = `/api/workspace/chamados/${id}/comentarios`;
 
-    // Quem não é solicitante, responsável, membro do grupo nem admin não lê nem comenta.
-    expect((await send(app(ids.outsider), "GET", route)).status).toBe(404);
-    expect((await send(app(ids.dadosA), "POST", route, { texto: "invasor" })).status).toBe(404);
+    // Usuário que não é solicitante nem responsável não lê nem comenta; técnico sim.
+    expect((await send(app(ids.leigo), "GET", route)).status).toBe(404);
+    expect((await send(app(ids.leigo), "POST", route, { texto: "invasor" })).status).toBe(404);
+    expect((await send(app(ids.outsider), "GET", route)).status).toBe(200);
     // Outro tenant também não, mesmo sendo admin.
     expect((await send(app(ids.admin, "admin", "tenant-outro"), "GET", route)).status).toBe(404);
 
@@ -221,7 +251,7 @@ describe.skipIf(!url)("fila do grupo", () => {
   it("membro do grupo comenta e escreve nota interna; o solicitante não vê a nota", async () => {
     const id = await ticket("sap");
     const route = `/api/tickets/${id}/comments`;
-    expect((await send(app(ids.outsider), "POST", route, { content: "x" })).status).toBe(403);
+    expect((await send(app(ids.leigo), "POST", route, { content: "x" })).status).toBe(403);
 
     const nota = await send(app(ids.sapA), "POST", route, { content: "nota da equipe", isInternal: true });
     expect(nota.status).toBe(201);
@@ -333,7 +363,6 @@ describe.skipIf(!url)("fila do grupo", () => {
     const id = await ticket("sap", { assignee: ids.sapA });
     const route = `/api/tickets/${id}/comments`;
     // dadosA é técnico, mas não é do grupo sap nem parte do chamado.
-    expect((await send(app(ids.dadosA), "GET", `/api/tickets/${id}`)).status).toBe(404);
     await send(app(ids.sapA), "POST", route, { content: "nota da equipe", isInternal: true });
 
     const res = await send(app(ids.sapA), "POST", route, { content: mencao(ids.dadosA, "dadosA") });
@@ -383,12 +412,64 @@ describe.skipIf(!url)("fila do grupo", () => {
     expect((await json(dele)).isInternal).toBe(false);
   });
 
-  it("lista do técnico inclui os chamados em que ele foi mencionado", async () => {
+  it("\"Meus Chamados\" do técnico inclui os chamados em que ele foi mencionado", async () => {
     const id = await ticket("sap", { assignee: ids.sapA });
-    const antes = await json(await send(app(ids.dadosA), "GET", "/api/workspace/chamados?periodo=em-tratativa"));
+    const meus = "/api/workspace/chamados?periodo=em-tratativa&escopo=meus";
+    const antes = await json(await send(app(ids.dadosA), "GET", meus));
     expect(antes.items.map((i: any) => i.id)).not.toContain(id);
     await send(app(ids.sapA), "POST", `/api/tickets/${id}/comments`, { content: mencao(ids.dadosA, "dadosA") });
-    const depois = await json(await send(app(ids.dadosA), "GET", "/api/workspace/chamados?periodo=em-tratativa"));
+    const depois = await json(await send(app(ids.dadosA), "GET", meus));
     expect(depois.items.map((i: any) => i.id)).toContain(id);
+  });
+
+  // ── Squads por pessoa e listagem do técnico ────────────────────────────────────
+  it("lista do técnico traz todos os chamados do tenant; \"meus\" só os dele; Usuário só os dele", async () => {
+    const deSap = await ticket("sap", { assignee: ids.sapA });
+    const semGrupoDele = await ticket("dados");
+    const outroTenant = await ticket("sap", { tenant: "tenant-outro" });
+    const doOutsider = await ticket("sap", { assignee: ids.outsider });
+
+    const listar = async (userId: string, escopo = "") =>
+      (await json(await send(app(userId), "GET", `/api/workspace/chamados?periodo=em-tratativa${escopo}`))).items.map((i: any) => i.id);
+
+    for (const escopo of ["", "&escopo=todos"]) {
+      const todos = await listar(ids.outsider, escopo);
+      expect(todos).toEqual(expect.arrayContaining([deSap, semGrupoDele, doOutsider]));
+      expect(todos).not.toContain(outroTenant);
+    }
+    expect(await listar(ids.outsider, "&escopo=meus")).toEqual([doOutsider]);
+    // Usuário ignora o escopo: só os chamados em que é parte.
+    expect(await listar(ids.leigo, "&escopo=todos")).toEqual([]);
+    expect((await listar(ids.requester, "&escopo=todos")).sort()).toEqual([deSap, semGrupoDele, doOutsider].sort());
+  });
+
+  it("squads da pessoa: só admin define, só técnico entra, e a fila segue as squads", async () => {
+    const route = (userId: string) => `/api/v1/support-groups/users/${userId}`;
+    expect((await send(app(ids.sapA), "PUT", route(ids.outsider), { groupKeys: ["sap"] })).status).toBe(403);
+
+    const recusa = await send(app(ids.admin, "admin"), "PUT", route(ids.leigo), { groupKeys: ["sap"] });
+    expect(recusa.status).toBe(400);
+    expect((await json(recusa)).error).toBe("Só técnicos podem ser membros de grupos de atendimento");
+    expect((await send(app(ids.admin, "admin"), "PUT", route(ids.leigo), { groupKeys: [] })).status).toBe(200);
+    expect((await send(app(ids.admin, "admin"), "PUT", route(ids.outsider), { groupKeys: ["nao-existe"] })).status).toBe(400);
+    expect((await send(app(ids.admin, "admin", "tenant-outro"), "PUT", route(ids.outsider), { groupKeys: ["sap"] })).status).toBe(404);
+
+    // dadosA troca dados por sap; a participação no grupo desativado (dev) fica como estava.
+    const ok = await send(app(ids.admin, "admin"), "PUT", route(ids.dadosA), { groupKeys: ["sap"] });
+    expect(ok.status).toBe(200);
+    const { rows } = await pool.query(
+      "SELECT sg.key FROM support_group_members m JOIN support_groups sg ON sg.id = m.group_id WHERE m.user_id = $1 ORDER BY sg.key",
+      [ids.dadosA],
+    );
+    expect(rows.map((r) => r.key)).toEqual(["dev", "sap"]);
+    const lista = await json(await send(app(ids.admin, "admin"), "GET", "/api/v1/support-groups"));
+    expect(lista.find((g: any) => g.key === "sap").memberIds).toContain(ids.dadosA);
+    expect(lista.find((g: any) => g.key === "dados").memberIds).not.toContain(ids.dadosA);
+
+    // Fila do Grupo: só os chamados em aberto das squads da pessoa.
+    const deSap = await ticket("sap");
+    await ticket("dados");
+    const fila = await json(await send(app(ids.dadosA), "GET", "/api/workspace/chamados?periodo=em-tratativa&escopo=fila"));
+    expect(fila.items.map((i: any) => i.id)).toEqual([deSap]);
   });
 });

@@ -42,12 +42,16 @@ const tickets = new Hono<AppEnv>();
 type AuthUser = { userId: string; role?: string; tenantId?: string | null };
 
 /**
- * Quem pode ver/comentar o chamado e o que vê nos comentários: admin, solicitante,
- * responsável, membro do grupo ou quem foi mencionado (@) em algum comentário. Técnico
- * mencionado também vê notas internas; Usuário mencionado só os comentários públicos.
+ * Quem pode ver/comentar o chamado e o que vê nos comentários: admin e técnicos (qualquer
+ * chamado do tenant, com notas internas), solicitante, responsável, membro do grupo ou quem
+ * foi mencionado (@). Usuário mencionado só vê os comentários públicos.
  */
 async function ticketCommentAccess(storage: ReturnType<typeof getStorage>, user: AuthUser, ticket: Ticket) {
   const isAdmin = user.role === "admin";
+  const tech = !isAdmin && (await isTechnicianUserId(storage, user.userId));
+  if (isAdmin || tech) {
+    return { allowed: true, viewer: { userId: user.userId, isAdmin, isTechnician: tech } };
+  }
   const isParty = ticket.requesterId === user.userId || ticket.assigneeId === user.userId;
   const isGroupMember = !isAdmin && !isParty &&
     (await isTicketGroupMember(storage, { userId: user.userId, isAdmin: false, tenantId: user.tenantId ?? null }, ticket));
@@ -235,10 +239,12 @@ tickets.patch("/api/tickets/:id", async (c) => {
   const oldTicket = await storage.getTicket(id);
   if (!oldTicket || !sameTenant(oldTicket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
 
+  // Técnicos editam qualquer chamado do tenant (os campos que técnico pode alterar).
   if (
     user.role !== "admin" &&
     oldTicket.requesterId !== user.userId &&
-    oldTicket.assigneeId !== user.userId
+    oldTicket.assigneeId !== user.userId &&
+    !(await isTechnicianUserId(storage, user.userId))
   ) {
     return c.json({ error: "Access denied" }, 403);
   }
