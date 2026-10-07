@@ -12,6 +12,7 @@ const allowed = [
   "/api/slas", "/api/uploads/request-url", "/api/notifications", "/api/version",
   "/objects/tenant/anexo.pdf", "/api/external/chamados", "/api/meta-areas",
   "/api/v1/support-groups", "/api/v1/support-groups/abc/members",
+  "/api/v1/assets", "/api/v1/assets/sync", "/api/v1/assets/abc",
 ];
 const disabled = [
   "/api/projects", "/api/tasks", "/api/workspace/projetos", "/api/workspace/todos",
