@@ -289,7 +289,7 @@ tickets.patch("/api/tickets/:id", async (c) => {
       ? [
           "status", "title", "description", "attachments",
           "applicationKey", "impact", "dueDate",
-          "requestObject", "requestAction", "requestDetail", "customFields",
+          "requestObject", "requestAction", "requestDetail", "customFields", "assetId",
         ]
       : [...REQUESTER_EDITABLE_TICKET_FIELDS];
     const filteredData: any = {};
@@ -311,6 +311,18 @@ tickets.patch("/api/tickets/:id", async (c) => {
     if (!custom.ok) return c.json({ error: custom.error }, custom.status);
     if (custom.values !== undefined) updateData.customFields = custom.values;
     else delete updateData.customFields;
+  }
+
+  // Equipamento trocado precisa ser do tenant (null tira o equipamento do chamado).
+  if (updateData.assetId !== undefined && updateData.assetId !== oldTicket.assetId) {
+    if (updateData.assetId) {
+      const asset = await storage.getAsset(updateData.assetId);
+      if (!asset || !sameTenant(asset.tenantId, user.tenantId)) {
+        return c.json({ error: "Equipamento inválido" }, 400);
+      }
+    } else {
+      updateData.assetId = null;
+    }
   }
 
   // Novo responsável precisa ser técnico (o atual continua válido mesmo que tenha mudado de tipo).

@@ -30,6 +30,7 @@ const ConfiguracoesPage = lazy(() => import("@/pages/configuracoes/index"));
 const MarkdownPage = lazy(() => import("@/pages/markdown"));
 const ConhecimentoPage = lazy(() => import("@/pages/conhecimento/index"));
 const ArtigoPage = lazy(() => import("@/pages/conhecimento/artigo"));
+const EquipamentosPage = lazy(() => import("@/pages/equipamentos/index"));
 const NovoArtigoPage = lazy(() => import("@/pages/conhecimento/artigo").then(m => ({ default: m.NovoArtigoPage })));
 
 function Router() {
@@ -72,6 +73,10 @@ function Router() {
       </Route>
       <Route path="/conhecimento/:id">
         <ProtectedRoute><TechnicianOnly><ArtigoPage /></TechnicianOnly></ProtectedRoute>
+      </Route>
+      {/* Equipamentos (inventário do OCS): só para a equipe; a API também exige técnico. */}
+      <Route path="/equipamentos">
+        <ProtectedRoute><TechnicianOnly><EquipamentosPage /></TechnicianOnly></ProtectedRoute>
       </Route>
       <Route path="/configuracoes">
         <ProtectedRoute requiredPermission="configuracoes"><ConfiguracoesPage /></ProtectedRoute>

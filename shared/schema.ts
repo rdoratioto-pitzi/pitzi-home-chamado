@@ -123,6 +123,36 @@ export type SupportGroup = typeof supportGroups.$inferSelect;
 export type SupportGroupMember = typeof supportGroupMembers.$inferSelect;
 export type SupportGroupWithMembers = SupportGroup & { memberIds: string[] };
 
+// Equipamentos (inventário vindo do OCS Inventory; migration 0038). O script na máquina do OCS
+// envia a lista para POST /api/v1/assets/sync. A pessoa é ligada pelo nome do usuário da
+// máquina (shared/assets.ts), na abertura do chamado.
+export const assets = pgTable("assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  source: text("source").notNull().default("ocs"),
+  externalId: text("external_id").notNull(), // ID da máquina no OCS
+  name: text("name").notNull(),
+  serial: text("serial"),
+  userLabel: text("user_label"), // usuário da máquina como o OCS informa
+  osName: text("os_name"),
+  cpu: text("cpu"),
+  memoryMb: integer("memory_mb"),
+  ipAddress: text("ip_address"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  details: jsonb("details"), // discos e monitores (shared/assets.ts AssetDetails)
+  lastInventoryAt: timestamp("last_inventory_at", { withTimezone: true }),
+  active: boolean("active").notNull().default(true), // some do OCS → inativo (não apaga histórico)
+  syncedAt: timestamp("synced_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  // Índice único (coalesce(tenant_id,''), source, external_id) criado só na migration 0038.
+  nameIdx: index("assets_name_idx").on(table.name),
+}));
+
+export type Asset = typeof assets.$inferSelect;
+export type InsertAsset = typeof assets.$inferInsert;
+
 // ============== TICKETS (Chamados) ==============
 // Numeração dos chamados (CHA-0001). Criada e alinhada por migrations/0017_tickets_code_unique.sql.
 export const ticketCodeSeq = pgSequence("ticket_code_seq");
@@ -167,6 +197,9 @@ export const tickets = pgTable("tickets", {
   slackMessageTs: text("slack_message_ts"),
   slackUserId: text("slack_user_id"),
   slackPermalink: text("slack_permalink"),
+  // Equipamento do chamado (tabela assets; migration 0038). Sugerido na abertura pela máquina
+  // do solicitante; o técnico pode trocar.
+  assetId: varchar("asset_id"),
   // Audit log for description edits
   descriptionLastEditedBy: varchar("description_last_edited_by"),
   descriptionLastEditedAt: timestamp("description_last_edited_at"),

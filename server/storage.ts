@@ -3,6 +3,7 @@ import {
   type Ticket, type InsertTicket,
   type TicketResponsavel, type InsertTicketResponsavel,
   type SupportGroup, type SupportGroupWithMembers,
+  type Asset,
   type TicketCustomField, type InsertTicketCustomField,
   type CannedResponse, type InsertCannedResponse,
   type KnowledgeArticle, type InsertKnowledgeArticle, type KnowledgeArticleWithAuthor,
@@ -71,7 +72,7 @@ import {
   type ClaudeCodeUsageReport, type InsertClaudeCodeUsage,
   type KanbanLabel, type InsertKanbanLabel,
   type KanbanCardDependency, type InsertKanbanCardDependency,
-  users, tickets, ticketResponsaveis, supportGroups, supportGroupMembers, ticketCustomFields, cannedResponses, knowledgeArticles, automationRules, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
+  users, tickets, ticketResponsaveis, supportGroups, supportGroupMembers, assets, ticketCustomFields, cannedResponses, knowledgeArticles, automationRules, ticketComments, projects, projectMembers, kanbanColumns, kanbanCards, kanbanComments,
   kanbanLabels, kanbanCardDependencies,
   objectives, keyResults, keyResultUpdates, initiatives, shipments, shipmentEvents, settings, taskTags, taskTagMembers,
   // Backward compatibility
@@ -94,8 +95,15 @@ import {
  import { eq, and, or, sql, asc, desc, gt, isNull, ilike, inArray, type SQL } from "drizzle-orm";
 import { generateResetToken, hashPassword, isPasswordHash, sha256Hex } from "../shared/password";
 import { completeModulePermissions } from "../shared/permissions";
+import type { SyncedAsset } from "../shared/assets";
  import { alias } from "drizzle-orm/pg-core";
  
+/** Chamado na ficha do equipamento. */
+export type AssetTicket = {
+  id: string; code: string; title: string; status: string;
+  createdAt: Date | null; requesterName: string | null;
+};
+
  export type NotificationPreferences = {
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
@@ -161,6 +169,13 @@ export interface IStorage {
   setSupportGroupMembers(groupId: string, userIds: string[], tenantId: string | null): Promise<void>;
   /** Squads da pessoa: substitui as participações dela nos grupos ativos informados (activeGroupIds). */
   setUserSupportGroups(userId: string, groupIds: string[], activeGroupIds: string[], tenantId: string | null): Promise<void>;
+
+  // Equipamentos (inventário do OCS; shared/assets.ts)
+  getAssets(tenantId: string | null): Promise<Asset[]>;
+  getAsset(id: string): Promise<Asset | undefined>;
+  /** Grava a lista completa vinda do inventário: cria, atualiza e inativa o que sumiu. */
+  syncAssets(tenantId: string | null, source: string, rows: SyncedAsset[]): Promise<{ created: number; updated: number; deactivated: number }>;
+  getTicketsByAsset(assetId: string, tenantId: string | null): Promise<AssetTicket[]>;
 
   // Campos personalizados por grupo (shared/custom-fields.ts)
   getTicketCustomFields(): Promise<TicketCustomField[]>;
@@ -1098,6 +1113,61 @@ export class DatabaseStorage implements IStorage {
         .values(groupIds.map(groupId => ({ groupId, userId, tenantId })))
         .onConflictDoNothing();
     }
+  }
+
+  async getAssets(tenantId: string | null): Promise<Asset[]> {
+    if (!this.db) return [];
+    return await this.db.select().from(assets)
+      .where(tenantId == null ? isNull(assets.tenantId) : eq(assets.tenantId, tenantId))
+      .orderBy(asc(assets.name));
+  }
+  async getAsset(id: string): Promise<Asset | undefined> {
+    if (!this.db) return undefined;
+    const [asset] = await this.db.select().from(assets).where(eq(assets.id, id));
+    return asset;
+  }
+  async syncAssets(tenantId: string | null, source: string, rows: SyncedAsset[]) {
+    if (!this.db) throw new Error("Database not connected");
+    const existing = (await this.getAssets(tenantId)).filter(a => a.source === source);
+    const byExternalId = new Map(existing.map(a => [a.externalId, a]));
+    const seen = new Set<string>();
+    const now = new Date();
+    let created = 0, updated = 0, deactivated = 0;
+    for (const row of rows) {
+      if (seen.has(row.externalId)) continue;
+      seen.add(row.externalId);
+      const values = { ...row, tenantId, source, active: true, syncedAt: now };
+      const current = byExternalId.get(row.externalId);
+      if (current) {
+        await this.db.update(assets).set(values).where(eq(assets.id, current.id));
+        updated++;
+      } else {
+        await this.db.insert(assets).values(values);
+        created++;
+      }
+    }
+    // Máquina que saiu do inventário fica inativa: os chamados dela continuam apontando para ela.
+    const gone = existing.filter(a => a.active && !seen.has(a.externalId)).map(a => a.id);
+    if (gone.length > 0) {
+      await this.db.update(assets).set({ active: false, syncedAt: now }).where(inArray(assets.id, gone));
+      deactivated = gone.length;
+    }
+    return { created, updated, deactivated };
+  }
+  async getTicketsByAsset(assetId: string, tenantId: string | null): Promise<AssetTicket[]> {
+    if (!this.db) return [];
+    const requester = alias(users, "requester");
+    return await this.db.select({
+      id: tickets.id, code: tickets.code, title: tickets.title, status: tickets.status,
+      createdAt: tickets.createdAt, requesterName: requester.name,
+    })
+      .from(tickets)
+      .leftJoin(requester, eq(requester.id, tickets.requesterId))
+      .where(and(
+        eq(tickets.assetId, assetId),
+        tenantId == null ? isNull(tickets.tenantId) : eq(tickets.tenantId, tenantId),
+      ))
+      .orderBy(desc(tickets.createdAt));
   }
 
   // Ticket Responsaveis (Assignment Rules)

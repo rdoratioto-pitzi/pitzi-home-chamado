@@ -54,6 +54,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useAuth } from "@/contexts/auth-context";
 import { useIsTechnician } from "@/hooks/use-is-technician";
+import { TicketAssetField } from "@/components/assets/ticket-asset-field";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { getApplicationLabel } from "@shared/applications";
 import { TICKET_STATUSES, TICKET_TYPES, ticketTypeLabel } from "@shared/ticket-options";
@@ -978,6 +979,14 @@ export default function TicketDetailPage() {
                     <span className="text-sm">{assigneeName}</span>
                   </div>
                 </div>
+
+                {isTech && (
+                  <TicketAssetField
+                    ticketId={ticket.id}
+                    assetId={ticket.assetId}
+                    onSaved={() => queryClient.invalidateQueries({ queryKey: ["/api/tickets", id] })}
+                  />
+                )}
 
                 <div>
                   <span className="text-xs text-muted-foreground">Criado em</span>

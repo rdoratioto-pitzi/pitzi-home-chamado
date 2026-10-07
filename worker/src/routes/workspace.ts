@@ -322,6 +322,7 @@ workspace.get("/api/workspace/chamados", async (c) => {
         requestDetail: t.requestDetail ?? null,
         responsavelId: t.assigneeId ?? null,
         solicitanteId: t.requesterId ?? null,
+        assetId: t.assetId ?? null,
       };
     });
 
@@ -1091,6 +1092,7 @@ workspace.patch("/api/workspace/chamados/:id", async (c) => {
       solicitante: requester?.name || null,
       responsavelId: ticket.assigneeId ?? null,
       solicitanteId: ticket.requesterId ?? null,
+      assetId: ticket.assetId ?? null,
     });
   } catch (error: any) {
     return c.json({ error: error.message }, error.status || 500);
