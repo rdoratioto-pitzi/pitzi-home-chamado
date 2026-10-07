@@ -16,6 +16,8 @@ const storage = {
   updateTicket: vi.fn(),
   getUser: vi.fn(),
   createNotification: vi.fn(),
+  getAssets: vi.fn().mockResolvedValue([]),
+  getAsset: vi.fn(),
 };
 
 vi.mock("../lib/storage", () => ({ getStorage: () => storage }));

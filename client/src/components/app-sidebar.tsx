@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Ticket, Plus, FileText, Settings, User, LogOut, ChevronDown, BookOpen } from "lucide-react";
+import { Home, Ticket, Plus, FileText, Settings, User, LogOut, ChevronDown, BookOpen, Laptop } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarMenu,
   SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter } from "@/components/ui/sidebar";
 import { VersionBadge } from "./version-badge";
@@ -32,6 +32,7 @@ export function AppSidebar() {
     { title: "Chamados", url: "/chamados", icon: Ticket, visible: true },
     { title: "Novo chamado", url: "/chamados/novo", icon: Plus, visible: permissions.chamados },
     { title: "Base de Conhecimento", url: "/conhecimento", icon: BookOpen, visible: true },
+    { title: "Equipamentos", url: "/equipamentos", icon: Laptop, visible: true },
     { title: "Markdown", url: "/markdown", icon: FileText, visible: true },
     { title: "Configurações", url: "/configuracoes", icon: Settings, visible: permissions.configuracoes || permissions.campos_chamado },
   ];

@@ -41,6 +41,8 @@ export interface ChamadoItem {
   responsavelId?: string | null;
   /** Id de quem abriu o chamado (esconde a opção de nota interna para ele). */
   solicitanteId?: string | null;
+  /** Equipamento do chamado (inventário do OCS). */
+  assetId?: string | null;
   anexos: Array<{ name: string; url: string }>;
 }
 
