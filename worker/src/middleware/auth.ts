@@ -20,6 +20,8 @@ const PUBLIC_ROUTES: Array<{ method: string; path: string | RegExp }> = [
   { method: "POST", path: "/api/slack/commands" },
   { method: "POST", path: "/api/slack/interactions" },
   { method: "POST", path: "/api/slack/events" },
+  // Inventário do OCS → equipamentos: header X-Asset-Sync-Secret conferido na rota.
+  { method: "POST", path: "/api/v1/assets/sync" },
   { method: "GET", path: /^\/api\/settings\/(logo_url_light|logo_url_dark|favicon_url)$/ },
   { method: "GET", path: /^\/api\/etiquetas\/barcode\// },
   // Phase 2B public routes
