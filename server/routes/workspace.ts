@@ -1178,6 +1178,7 @@ export function registerWorkspaceRoutes(router: Router) {
         solicitante: requester?.name || null,
         responsavelId: ticket.assigneeId ?? null,
         solicitanteId: ticket.requesterId ?? null,
+        assetId: ticket.assetId ?? null,
       });
     } catch (error: any) {
       return res.status(error.status || 500).json({ error: error.message });

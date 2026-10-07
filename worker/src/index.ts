@@ -22,6 +22,7 @@ import { knowledge } from "./routes/knowledge";
 import { integrations } from "./routes/integrations";
 import { tickets } from "./routes/tickets";
 import { supportGroups } from "./routes/support-groups";
+import { assetsRoutes } from "./routes/assets";
 import { ticketQueue } from "./routes/ticket-queue";
 import { ticketFields } from "./routes/ticket-fields";
 import { automations } from "./routes/automations";
@@ -103,6 +104,10 @@ type Bindings = {
   // Token das APIs em dash.pitzi.com.br (estoque, triagem, logística, avaliações).
   RENOVSMART_API_TOKEN?: string;
   APP_VERSION: string;
+  // Equipamentos do OCS (routes/assets.ts): segredo do script de sincronização e, opcional,
+  // o tenant que recebe o inventário (vazio = instalação de um tenant só).
+  ASSET_SYNC_SECRET?: string;
+  ASSET_SYNC_TENANT_ID?: string;
   // Hermes (Fase 2 — webhook outbound). Opcionais — service desabilita
   // silenciosamente se ausentes.
   HERMES_ROUTINE_URL?: string;
@@ -223,6 +228,7 @@ app.route("/", knowledge);
 app.route("/", integrations);
 app.route("/", tickets);
 app.route("/", supportGroups);
+app.route("/", assetsRoutes);
 app.route("/", ticketQueue);
 app.route("/", ticketFields);
 app.route("/", automations);

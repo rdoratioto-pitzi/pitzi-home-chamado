@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { TicketAssetField } from "@/components/assets/ticket-asset-field";
 import { useSupportGroups } from "@/hooks/use-support-groups";
 import { useAuth } from "@/contexts/auth-context";
 import { onlyTechnicians, useIsTechnician } from "@/hooks/use-is-technician";
@@ -852,6 +853,17 @@ export function ItemDetailDrawer({ open, item, onClose, onUpdate, onDelete }: It
                           {(item as ChamadoItem).solicitante}
                         </span>
                       </div>
+                    )}
+
+                    {/* Equipamento (inventário do OCS) — só chamados, só técnicos */}
+                    {isChamado && isTech && (
+                      <TicketAssetField
+                        layout="row"
+                        labelStyle={ROW_LABEL_STYLE}
+                        ticketId={item!.id}
+                        assetId={(item as ChamadoItem).assetId}
+                        onSaved={(assetId) => onUpdate?.({ ...(item as ChamadoItem), assetId })}
+                      />
                     )}
 
                     {/* Abertura */}

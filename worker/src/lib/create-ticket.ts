@@ -5,6 +5,8 @@ import { insertTicketSchema, type Ticket } from "../../../shared/schema";
 import { isValidApplicationKey } from "../../../shared/applications";
 import { normalizeRequestSelection } from "../../../shared/request-objects";
 import { TECHNICIAN_REQUIRED_ERROR } from "../../../shared/user-type";
+import { findAssetForPerson } from "../../../shared/assets";
+import { sameTenant } from "../../../shared/tenant";
 import { checkRequestSelection, resolveCustomFieldValues } from "../../../server/services/ticket-fields.service";
 import { runTicketAutomations } from "../../../server/services/automations.service";
 import { isTechnicianUserId } from "../../../server/services/user-type.service";
@@ -45,6 +47,7 @@ export async function createTicketFor(
   // automático do grupo ou para a fila (evita o solicitante apontar o técnico errado).
   if (!creator.isAdmin && !(await isTechnicianUserId(storage, creator.userId))) {
     delete data.assigneeId;
+    delete data.assetId; // o equipamento é sugerido pelo sistema; quem troca é o técnico
   }
 
   // Aplicação é opcional: o formulário não pede mais; se vier, precisa ser válida.
@@ -70,6 +73,18 @@ export async function createTicketFor(
   });
   if (!custom.ok) return { ok: false, status: custom.status as 400, error: custom.error };
   validated.customFields = custom.values ?? null;
+
+  // Equipamento: o informado precisa ser do tenant; sem ele, sugere a máquina do solicitante (OCS).
+  if (validated.assetId) {
+    const asset = await storage.getAsset(validated.assetId);
+    if (!asset || !sameTenant(asset.tenantId, creator.tenantId)) {
+      return { ok: false, status: 400, error: "Equipamento inválido" };
+    }
+  } else {
+    const requester = await storage.getUser(validated.requesterId);
+    const suggested = requester ? findAssetForPerson(await storage.getAssets(creator.tenantId), requester) : null;
+    validated.assetId = suggested?.id ?? null;
+  }
 
   // Responsável informado na abertura precisa ser técnico.
   if (validated.assigneeId && !(await isTechnicianUserId(storage, validated.assigneeId))) {
