@@ -7,6 +7,7 @@ const SUPPORT_API_PREFIXES = [
   "/api/v1/support-groups", "/api/ticket-fields",
   "/api/canned-responses", "/api/automations", "/api/email",
   "/api/conhecimento", "/api/slack",
+  "/api/v1/assets", // Equipamentos (inventário do OCS)
 ];
 const SUPPORT_API_PATHS = new Set([
   "/api/health", "/api/version", "/api/external/chamados",
