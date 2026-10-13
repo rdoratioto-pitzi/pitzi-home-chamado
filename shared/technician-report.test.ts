@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTechnicianReport, formatBusinessMinutes, slaPercent, type ReportTicket } from "./technician-report";
+import { buildTechnicianReport, csvCell, formatBusinessMinutes, isValidDay, slaPercent, type ReportTicket } from "./technician-report";
 
 // Horário útil: seg–sex 9h–18h de Brasília (UTC-3). 12/10/2026 é segunda-feira.
 const at = (day: number, hour: number, minute = 0) => new Date(Date.UTC(2026, 9, day, hour + 3, minute));
@@ -69,5 +69,49 @@ describe("formatBusinessMinutes", () => {
     expect(formatBusinessMinutes(95)).toBe("1h35");
     expect(formatBusinessMinutes(120)).toBe("2h");
     expect(formatBusinessMinutes(null)).toBe("—");
+  });
+});
+
+describe("correções da revisão", () => {
+  it("chamado fechado direto (só dataFechamento) conta como resolvido, com CSAT e tempo", () => {
+    const report = buildTechnicianReport({
+      tickets: [ticket("9", { status: "closed", dataAbertura: at(1, 9), dataFechamento: at(13, 10), satisfactionRating: 5 })],
+      people, technicianIds: ["ana"], slaRules: rules, from: at(12, 0), to: at(19, 0), now: at(14, 10),
+    });
+    const ana = report.rows.find((r) => r.assigneeId === "ana")!;
+    expect(ana.resolved).toBe(1);
+    expect(ana.csat).toEqual({ average: 5, count: 1 });
+    expect(report.tickets[0].resolvedAt).not.toBeNull();
+    expect(report.tickets[0].resolutionMin).toBeGreaterThan(0);
+  });
+
+  it("tempos de cada chamado aparecem mesmo fora do período da média", () => {
+    const report = buildTechnicianReport({
+      tickets: [ticket("8", { status: "resolved", dataAbertura: at(1, 9), dataPrimeiraResposta: at(1, 10), dataResolucao: at(13, 10) })],
+      people, technicianIds: ["ana"], slaRules: rules, from: at(12, 0), to: at(19, 0), now: at(14, 10),
+    });
+    expect(report.tickets[0].firstResponseMin).toBe(60);
+    expect(report.rows[0].avgFirstResponseMin).toBeNull(); // aberto antes do período: fora da média
+  });
+});
+
+describe("csvCell e isValidDay", () => {
+  it("neutraliza fórmulas e protege separadores e quebras de linha", () => {
+    expect(csvCell("=1+1")).toBe("'=1+1");
+    expect(csvCell(" @SOMA(A1)")).toBe("' @SOMA(A1)");
+    expect(csvCell("\t-2")).toBe("'\t-2");
+    expect(csvCell("a;b")).toBe('"a;b"');
+    expect(csvCell("linha\rquebrada")).toBe('"linha\rquebrada"');
+    expect(csvCell('diz "oi"')).toBe('"diz ""oi"""');
+    expect(csvCell(-3)).toBe("-3");
+    expect(csvCell(null)).toBe("");
+  });
+
+  it("rejeita datas que não existem", () => {
+    expect(isValidDay("2026-10-13")).toBe(true);
+    expect(isValidDay("2024-02-29")).toBe(true);
+    expect(isValidDay("2026-02-30")).toBe(false);
+    expect(isValidDay("2026-13-01")).toBe(false);
+    expect(isValidDay("13/10/2026")).toBe(false);
   });
 });

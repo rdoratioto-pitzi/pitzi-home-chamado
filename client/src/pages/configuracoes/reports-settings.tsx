@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fetchWithAuth } from "@/lib/queryClient";
 import { useSupportGroups } from "@/hooks/use-support-groups";
-import { formatBusinessMinutes, slaPercent, type TechnicianReport, type TechnicianRow, type ReportTicketLine } from "@shared/technician-report";
+import { csvCell, formatBusinessMinutes, slaPercent, type TechnicianReport, type TechnicianRow, type ReportTicketLine } from "@shared/technician-report";
 
 type PeriodKey = "this-month" | "last-month" | "last-7" | "last-30" | "this-year" | "custom";
 
@@ -58,7 +58,7 @@ export function periodRange(key: PeriodKey, today = todayBr()): { from: string; 
   }
 }
 
-const fmtDate = (value: string | null) => (value ? new Date(value).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
+const fmtDate = (value: string | null) => (value ? new Date(value).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—");
 const pct = (sla: { met: number; total: number }) => {
   const value = slaPercent(sla);
   return value == null ? "—" : `${value}%`;
@@ -74,11 +74,7 @@ function slaTone(sla: { met: number; total: number }) {
 
 /** CSV com ";" e BOM para abrir direto no Excel em português. */
 function downloadCsv(filename: string, header: string[], rows: (string | number | null)[][]) {
-  const escape = (value: string | number | null) => {
-    const text = value == null ? "" : String(value);
-    return /[;"\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-  };
-  const content = [header, ...rows].map((row) => row.map(escape).join(";")).join("\r\n");
+  const content = [header, ...rows].map((row) => row.map(csvCell).join(";")).join("\r\n");
   const blob = new Blob(["﻿" + content], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
