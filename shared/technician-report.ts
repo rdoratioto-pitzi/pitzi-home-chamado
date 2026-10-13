@@ -10,6 +10,7 @@ export interface ReportTicket extends SlaTicketLike {
   assigneeId: string | null;
   requesterId: string;
   satisfactionRating?: number | null;
+  dataFechamento?: Date | string | null;
 }
 
 export interface ReportPerson {
@@ -111,21 +112,22 @@ export function buildTechnicianReport(input: {
     const row = rowFor(ticket.assigneeId);
     const opened = toDate(ticket.dataAbertura ?? ticket.createdAt);
     const firstResponse = toDate(ticket.dataPrimeiraResposta);
-    const resolvedAt = toDate(ticket.dataResolucao);
     const isClosed = CLOSED.includes(ticket.status ?? "");
-    const sla = getSlaForTicket(ticket, slaRules, now);
+    // Conclusão efetiva: resolução ou, para chamado fechado direto, a data de fechamento.
+    const resolvedAt = toDate(ticket.dataResolucao) ?? (isClosed ? toDate(ticket.dataFechamento) : null);
+    const sla = getSlaForTicket({ ...ticket, dataResolucao: resolvedAt }, slaRules, now);
 
     const openedInPeriod = inRange(opened, from, to);
     const resolvedInPeriod = isClosed && inRange(resolvedAt, from, to);
-    let firstResponseMin: number | null = null;
-    let resolutionMin: number | null = null;
+    // Tempos de cada chamado sempre que houver as datas; o período só decide o que entra nas médias.
+    const firstResponseMin = opened && firstResponse ? businessMinutesBetween(opened, firstResponse) : null;
+    const resolutionMin = opened && resolvedAt
+      ? Math.max(0, businessMinutesBetween(opened, resolvedAt) - slaPausedMinutes(ticket, resolvedAt))
+      : null;
 
     if (openedInPeriod) {
       row.received += 1;
-      if (opened && firstResponse) {
-        firstResponseMin = businessMinutesBetween(opened, firstResponse);
-        push(firstResponseTimes, row, firstResponseMin);
-      }
+      if (firstResponseMin != null) push(firstResponseTimes, row, firstResponseMin);
       if (sla.primeiraResposta.status) {
         row.firstResponseSla.total += 1;
         if (sla.primeiraResposta.status === "dentro_prazo") row.firstResponseSla.met += 1;
@@ -133,10 +135,7 @@ export function buildTechnicianReport(input: {
     }
     if (resolvedInPeriod) {
       row.resolved += 1;
-      if (opened && resolvedAt) {
-        resolutionMin = Math.max(0, businessMinutesBetween(opened, resolvedAt) - slaPausedMinutes(ticket, resolvedAt));
-        push(resolutionTimes, row, resolutionMin);
-      }
+      if (resolutionMin != null) push(resolutionTimes, row, resolutionMin);
       if (sla.status) {
         row.resolutionSla.total += 1;
         if (sla.status === "dentro_prazo") row.resolutionSla.met += 1;
@@ -215,4 +214,25 @@ export function formatBusinessMinutes(minutes: number | null | undefined): strin
 
 export function slaPercent(sla: { met: number; total: number }): number | null {
   return sla.total ? Math.round((sla.met / sla.total) * 100) : null;
+}
+
+/**
+ * Célula de CSV para Excel (separador ";"): neutraliza fórmulas (=, +, -, @ no início, mesmo após
+ * espaços ou caracteres de controle) com um apóstrofo e põe entre aspas quando há ; " \r ou \n.
+ */
+export function csvCell(value: string | number | null | undefined): string {
+  if (value == null) return "";
+  if (typeof value === "number") return String(value);
+  let text = String(value);
+  if (/^[\s\u0000-\u001f]*[=+\-@]/.test(text)) text = `'${text}`;
+  return /[;"\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+/** "AAAA-MM-DD" válido de verdade (rejeita 2026-02-30 e 2026-13-01). */
+export function isValidDay(day: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!match) return false;
+  const [y, m, d] = match.slice(1).map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
 }

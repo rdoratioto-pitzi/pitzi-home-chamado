@@ -6,11 +6,9 @@ import { getStorage } from "../lib/storage";
 import { requireAdmin } from "../middleware/auth";
 import { canBeAssignee, isTechnician } from "../../../shared/user-type";
 import { sameTenant } from "../../../shared/tenant";
-import { buildTechnicianReport } from "../../../shared/technician-report";
+import { buildTechnicianReport, isValidDay } from "../../../shared/technician-report";
 
 export const reports = new Hono<AppEnv>();
-
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** "2026-10-01" no fuso de Brasília → instante UTC do início do dia. */
 function brasiliaDayStart(day: string): Date {
@@ -23,7 +21,7 @@ reports.get("/api/v1/reports/technicians", requireAdmin, async (c) => {
   const fromDay = c.req.query("from") || "";
   const toDay = c.req.query("to") || "";
   const group = c.req.query("group") || "";
-  if (!DAY.test(fromDay) || !DAY.test(toDay) || fromDay > toDay) {
+  if (!isValidDay(fromDay) || !isValidDay(toDay) || fromDay > toDay) {
     return c.json({ error: "Período inválido (use from e to no formato AAAA-MM-DD)" }, 400);
   }
   const from = brasiliaDayStart(fromDay);

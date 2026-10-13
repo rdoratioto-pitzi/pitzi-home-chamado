@@ -52,6 +52,8 @@ describe.skipIf(!url)("relatório por técnico", () => {
   it("só admin consulta e o período precisa ser válido", async () => {
     expect((await get(app(ids.user, "user"), "/api/v1/reports/technicians?from=2026-10-01&to=2026-10-31")).status).toBe(403);
     expect((await get(app(ids.admin, "admin"), "/api/v1/reports/technicians?from=2026-10-31&to=2026-10-01")).status).toBe(400);
+    expect((await get(app(ids.admin, "admin"), "/api/v1/reports/technicians?from=2026-02-30&to=2026-03-05")).status).toBe(400);
+    expect((await get(app(ids.admin, "admin"), "/api/v1/reports/technicians?from=2026-13-01&to=2026-13-05")).status).toBe(400);
   });
 
   it("traz o técnico com recebidos, resolvidos e em aberto", async () => {
