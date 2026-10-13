@@ -111,6 +111,7 @@ process.on("uncaughtException", (error: any) => {
  * --------------------------------------------------
  */
 const app = express();
+app.disable("x-powered-by"); // não revela a tecnologia do servidor (teste OWASP ZAP)
 app.use(activeRoutesMiddleware);
 const httpServer = createServer(app);
 

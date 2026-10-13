@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { sql } from "drizzle-orm";
 import { createDb, type Database } from "./lib/db";
 import { createCorsMiddleware } from "./middleware/cors";
+import { securityHeadersMiddleware } from "./middleware/security-headers";
 import { authMiddleware } from "./middleware/auth";
 import { errorHandler } from "./middleware/error-handler";
 import { sanitizeRichText } from "./lib/sanitize-rich-text";
@@ -148,6 +149,9 @@ const app = new Hono<AppEnv>();
 
 // Error handler
 app.onError(errorHandler);
+
+// Cabeçalhos de segurança em todas as respostas
+app.use("*", securityHeadersMiddleware);
 
 // CORS
 app.use("*", createCorsMiddleware());
