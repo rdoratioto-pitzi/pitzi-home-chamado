@@ -26,6 +26,7 @@ export async function slackApi(
         "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
       },
       body: form.toString(),
+      signal: AbortSignal.timeout(8_000),
     });
     const data = (await res.json()) as SlackApiResponse;
     if (!data.ok) console.warn(`[slack-chamados] ${method} falhou:`, data.error);

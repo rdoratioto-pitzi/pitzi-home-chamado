@@ -25,6 +25,7 @@ export async function fetchSlackThread(
 ): Promise<SlackThreadResult> {
   const messages: SlackThreadMessage[] = [];
   let cursor: string | undefined;
+  const seen = new Set<string>();
   do {
     const page = await slackApi(token, "conversations.replies", {
       channel, ts: rootTs, limit: Math.min(200, limit - messages.length), cursor,
@@ -32,6 +33,8 @@ export async function fetchSlackThread(
     if (!page.ok) return { ok: false, error: page.error ?? "erro" };
     messages.push(...((page.messages ?? []) as SlackThreadMessage[]));
     cursor = page.response_metadata?.next_cursor || undefined;
+    if (cursor && seen.has(cursor)) return { ok: false, error: "invalid_pagination" };
+    if (cursor) seen.add(cursor);
   } while (cursor && messages.length < limit);
   return { ok: true, messages: messages.slice(0, limit) };
 }
@@ -82,24 +85,51 @@ export async function importSlackFiles(
       continue;
     }
     try {
-      const res = await fetchImpl(url, { headers: { Authorization: `Bearer ${token}` } });
+      const parsed = new URL(url);
+      if (parsed.protocol !== "https:" || parsed.hostname !== "files.slack.com" || parsed.username || parsed.password || (parsed.port && parsed.port !== "443")) {
+        failed.push(name);
+        continue;
+      }
+      const res = await fetchImpl(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        redirect: "error",
+        signal: AbortSignal.timeout(8_000),
+      });
       const type = res.headers.get("content-type") ?? "";
       if (!res.ok || type.startsWith("text/html")) {
         if (type.startsWith("text/html")) missingScope = true;
         failed.push(name);
         continue;
       }
-      const bytes = await res.arrayBuffer();
-      if (bytes.byteLength > SLACK_MAX_FILE_BYTES) {
+      if (Number(res.headers.get("content-length")) > SLACK_MAX_FILE_BYTES || !res.body) {
+        await res.body?.cancel();
         failed.push(name);
         continue;
       }
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let length = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          length += value.byteLength;
+          if (length > SLACK_MAX_FILE_BYTES) {
+            await reader.cancel();
+            throw new Error("attachment_too_large");
+          }
+          chunks.push(value);
+        }
+      } finally { reader.releaseLock(); }
+      const bytes = new Uint8Array(length);
+      let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
       const contentType = f.mimetype || type || "application/octet-stream";
       const key = `${ticket.tenantId}/uploads/${crypto.randomUUID()}-${name}`;
       await env.ATTACHMENTS.put(key, bytes, { httpMetadata: { contentType } });
       saved.push({ name, url: `/objects/${key}`, size: bytes.byteLength, type: contentType });
     } catch (error) {
-      console.error("[slack-chamados] anexo não importado:", name, error);
+      console.warn("[slack-chamados] anexo não importado:", name);
       failed.push(name);
     }
   }

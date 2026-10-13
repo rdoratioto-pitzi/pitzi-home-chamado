@@ -37,7 +37,7 @@ workspace da Pitzi → cole o manifesto (aba JSON) → **Next** → **Create**.
 
 **App já criado ("Chamados Pitzi"):** **https://api.slack.com/apps** → *Chamados Pitzi* →
 **App Manifest** → aba JSON → apague tudo e cole o manifesto → **Save Changes** → no aviso
-amarelo, **Reinstall to Workspace** → **Permitir**. O token `xoxb-` continua o mesmo.
+amarelo, **Reinstall to Workspace** → **Permitir**. Confira o token `xoxb-` após a reinstalação; se mudar, atualize o secret do Worker.
 
 ```json
 {
@@ -202,3 +202,21 @@ Limites: até 200 mensagens por thread e nomes de até 40 pessoas; descrição c
 caracteres (com aviso e link). Imagens embutidas em blocos ricos que não são arquivos não vêm.
 Grupos com campos personalizados obrigatórios podem recusar a criação rápida; o erro orienta
 ao fluxo avançado/sistema. Express local continua retornando 501 para a integração.
+
+## Armazenamento dos anexos
+
+A importação exige um bucket R2 privado vinculado ao Worker como `ATTACHMENTS`.
+Se a conta ainda não tiver R2 habilitado, o administrador precisa ativá-lo no painel
+Cloudflare e verificar os termos/cobrança antes de criar o bucket. Não tornar o
+bucket público. Após a criação, cadastrar o binding `[[r2_buckets]]` no wrangler.toml
+com `binding = "ATTACHMENTS"` e o nome confirmado do bucket; publicar novamente.
+Sem esse binding, o ticket é criado e os anexos que não vieram ficam identificados
+na descrição com indicação de consultar o Slack. A API de arquivos continua
+protegida pelas permissões e URLs assinadas existentes.
+
+Downloads aceitam somente HTTPS de files.slack.com, sem redirects automáticos,
+com timeout e limite real de bytes, mesmo quando o tamanho informado estiver errado.
+Arquivos que exigirem redirecionamento ficam no Slack e são listados como não importados.
+
+Referência da leitura de threads e limites da API:
+https://docs.slack.dev/reference/methods/conversations.replies/

@@ -354,6 +354,19 @@ describe.skipIf(!url)("Slack → chamado", () => {
     expect(calls.find((c) => c.method === "chat.postMessage" && c.params.thread_ts)!.params.thread_ts).toBe(ROOT);
   });
 
+  it("mensagem sem respostas também importa seus anexos", async () => {
+    await interaction({
+      type: "message_action", callback_id: "transformar_em_chamado", team: { id: "T1" }, user: { id: "UTEC" },
+      channel: { id: "C1", name: "suporte-ti" }, message: {
+        user: "UUSR", ts: "1700000000.000700", text: "slack-test mensagem com print",
+        files: [{ name: "print.png", mimetype: "image/png", size: 4, url_private_download: "https://files.slack.com/files-pri/T1-F1/print.png" }],
+      },
+    });
+    const { rows } = await pool.query("SELECT attachments FROM tickets WHERE slack_message_ts = '1700000000.000700'");
+    expect(JSON.parse(rows[0].attachments)).toHaveLength(1);
+    expect(stored).toHaveLength(1);
+  });
+
   it("a mesma conversa não vira dois chamados, mesmo clicando em outra resposta", async () => {
     threadMessages = conversa();
     await shortcut("UTEC", "UUSR", { ts: "1699999999.000003", threadTs: ROOT });

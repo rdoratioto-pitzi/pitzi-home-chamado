@@ -416,6 +416,7 @@ async function handleShortcut(c: Context<AppEnv>, token: string, payload: any, a
     text: slackTextToPlain(starter.text),
     permalink,
     messages: conversationMessages,
+    fileMessages: conversationMessages ?? [message],
     clickerUserId: clicker.user.id,
     clickerName: clicker.user.name,
     clickerIsTechnician: isTechnician(clicker.user),
@@ -439,6 +440,7 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
   permalink?: string;
   /** Conversa inteira (raiz + respostas); null = só a mensagem clicada. */
   messages?: SlackThreadMessage[] | null;
+  fileMessages?: SlackThreadMessage[];
   clickerUserId: string;
   clickerName: string;
   clickerIsTechnician: boolean;
@@ -524,8 +526,8 @@ async function createQuickTicketFromShortcut(c: Context<AppEnv>, token: string, 
   const ticket = result.ticket;
   console.info("[slack-chamados] ticket created", { ticketId: ticket.id, code: ticket.code });
   await recordConversion(storage, ticket, input.clickerUserId, input.clickerName);
-  if (input.messages && input.messages.length > 0) {
-    await attachConversationFiles(c, token, ticket, input.messages, input.clickerSlackId, input.channelId);
+  if (input.fileMessages?.length || input.messages?.length) {
+    await attachConversationFiles(c, token, ticket, input.fileMessages ?? input.messages!, input.clickerSlackId, input.channelId);
   }
   const link = ticketLink(c.env.APP_URL, ticket.id);
   await confirmInThread(token, {
