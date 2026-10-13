@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Key, Bell, Palette, Settings, UserCheck, UsersRound, ListTree, MessageSquareText, Workflow, Mail } from "lucide-react";
+import { Users, Key, Bell, Palette, Settings, UserCheck, UsersRound, ListTree, MessageSquareText, Workflow, Mail, BarChart3 } from "lucide-react";
 import { UsersSettings } from "./users-settings";
 import { AuthSettings } from "./auth-settings";
 import { NotificationsSettings } from "./notifications-settings";
@@ -11,6 +11,7 @@ import { SupportGroupsSettings } from "./support-groups-settings";
 import { TicketFieldsSettings } from "./ticket-fields-settings";
 import { AutomationsSettings, CannedResponsesSettings } from "./automations-settings";
 import { EmailSettingsPanel } from "./email-settings";
+import { ReportsSettings } from "./reports-settings";
 
 export default function ConfiguracoesPage() {
 
@@ -25,6 +26,10 @@ export default function ConfiguracoesPage() {
         <Tabs defaultValue="users" className="space-y-6">
           {/* Abas quebram linha em telas menores em vez de se sobrepor. */}
           <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+            <TabsTrigger value="relatorios" className="flex items-center gap-2" data-testid="tab-relatorios">
+              <BarChart3 className="h-4 w-4" />
+              Relatórios
+            </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2" data-testid="tab-users">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Usuários</span>
@@ -89,6 +94,10 @@ export default function ConfiguracoesPage() {
 
           <TabsContent value="users">
             <UsersSettings />
+          </TabsContent>
+
+          <TabsContent value="relatorios">
+            <ReportsSettings />
           </TabsContent>
 
           <TabsContent value="grupos">
