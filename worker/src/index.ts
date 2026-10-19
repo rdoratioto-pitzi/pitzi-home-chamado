@@ -258,7 +258,18 @@ app.route("/", serviceAccounts);
 app.route("/", hermes);
 
 // Cron (wrangler.toml [triggers]): automações "X dias aguardando o solicitante".
+// Janela de operação do cron (America/Sao_Paulo, UTC-3): liga 07:59, desliga 23:00.
+// Fora dela o cron NÃO conecta no banco, deixando o Neon suspender (economia de compute
+// para não estourar a cota do plano). Atividade de usuário ainda acorda o banco quando precisa.
+export function cronDentroDaJanela(scheduledTime: number): boolean {
+  const t = new Date(scheduledTime);
+  const horaBrt = (t.getUTCHours() + 21) % 24; // UTC-3
+  const minutoBrt = t.getUTCMinutes();
+  return (horaBrt > 7 && horaBrt < 23) || (horaBrt === 7 && minutoBrt >= 59);
+}
+
 async function scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
+  if (!cronDentroDaJanela(event.scheduledTime)) return;
   const db = createDb(env.DATABASE_URL);
   // Fila de e-mails: a cada execução (5 em 5 minutos).
   ctx.waitUntil((async () => {
