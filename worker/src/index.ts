@@ -258,20 +258,23 @@ app.route("/", serviceAccounts);
 app.route("/", hermes);
 
 // Cron (wrangler.toml [triggers]): automações "X dias aguardando o solicitante".
-// Janela de operação do cron (America/Sao_Paulo, UTC-3): liga 07:59, desliga 23:00.
-// Fora dela o cron NÃO conecta no banco, deixando o Neon suspender (economia de compute
-// para não estourar a cota do plano). Atividade de usuário ainda acorda o banco quando precisa.
+// Janela de operação do cron (America/Sao_Paulo, UTC-3): dias úteis, das 07:00 às 20:00.
+// Fora dela o cron NÃO conecta no banco, deixando o Neon suspender. O plano Free dá
+// 100 CU-hours por projeto/mês (~400 h de relógio a 0,25 CU) e o cron a cada minuto
+// mantinha o banco ligado 24 h, estourando a cota. Atividade de usuário ainda acorda o
+// banco quando precisa; e-mail que chega fora da janela entra na próxima execução.
 export function cronDentroDaJanela(scheduledTime: number): boolean {
-  const t = new Date(scheduledTime);
-  const horaBrt = (t.getUTCHours() + 21) % 24; // UTC-3
-  const minutoBrt = t.getUTCMinutes();
-  return (horaBrt > 7 && horaBrt < 23) || (horaBrt === 7 && minutoBrt >= 59);
+  const brt = new Date(scheduledTime - 3 * 60 * 60 * 1000); // UTC-3, sem horário de verão
+  const diaDaSemana = brt.getUTCDay(); // 0 = domingo, 6 = sábado
+  if (diaDaSemana === 0 || diaDaSemana === 6) return false;
+  const hora = brt.getUTCHours();
+  return hora >= 7 && hora < 20;
 }
 
 async function scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
   if (!cronDentroDaJanela(event.scheduledTime)) return;
   const db = createDb(env.DATABASE_URL);
-  // Fila de e-mails: a cada execução (5 em 5 minutos).
+  // Fila de e-mails: a cada execução (10 em 10 minutos).
   ctx.waitUntil((async () => {
     const result = await processPendingEmails(env, db, { releaseStuck: true, limit: 50 });
     if (result.sent || result.failed || result.retrying) console.log("[cron] e-mails:", result);
@@ -283,7 +286,7 @@ async function scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionCon
       console.log("[cron] respostas por e-mail:", inbound);
     }
   })());
-  // Automações por tempo: só na execução do minuto 0 de cada hora (o cron roda a cada minuto),
+  // Automações por tempo: só na execução do minuto 0 de cada hora (o cron roda de 10 em 10 min),
   // para uma regra que não muda o status não repetir a nota a cada execução.
   if (new Date(event.scheduledTime).getUTCMinutes() !== 0) return;
   ctx.waitUntil((async () => {
