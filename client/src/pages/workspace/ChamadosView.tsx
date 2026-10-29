@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ItemDetailDrawer } from "@/components/workspace/ItemDetailDrawer";
 import { Input } from "@/components/ui/input";
 import {
@@ -151,15 +151,33 @@ export function ChamadosView() {
     }
   };
 
+  // Depois de OCIOSO_MS sem ninguém mexer, a atualização automática para: uma aba esquecida
+  // aberta mantinha o banco acordado a noite e o fim de semana inteiros, e o plano Free do
+  // Neon cobra por hora de compute. Qualquer clique, tecla ou volta do foco religa na hora.
+  const ultimaInteracaoRef = useRef(Date.now());
+
   useEffect(() => {
+    const OCIOSO_MS = 10 * 60_000;
+    const marcarInteracao = () => { ultimaInteracaoRef.current = Date.now(); };
+    const eventos = ["pointerdown", "keydown", "wheel"] as const;
+    eventos.forEach((e) => window.addEventListener(e, marcarInteracao, { passive: true }));
+
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void silentRefresh();
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - ultimaInteracaoRef.current > OCIOSO_MS) return;
+      void silentRefresh();
     }, 30_000);
-    const onFocus = () => { void silentRefresh(); };
+
+    const onFocus = () => {
+      marcarInteracao();
+      void silentRefresh();
+    };
     window.addEventListener("focus", onFocus);
+
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", onFocus);
+      eventos.forEach((e) => window.removeEventListener(e, marcarInteracao));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodo, escopo]);
