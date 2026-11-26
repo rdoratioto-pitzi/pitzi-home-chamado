@@ -70,7 +70,7 @@ describe.skipIf(!url)("Slack → chamado", () => {
   const interaction = (payload: unknown) =>
     post("/api/slack/interactions", new URLSearchParams({ payload: JSON.stringify(payload) }).toString());
   const viewOf = (method: string) => JSON.parse(calls.find((c) => c.method === method)!.params.view);
-  const submit = (privateMetadata: string, values: { title: string; category: string; impact?: string }) =>
+  const submit = (privateMetadata: string, values: { title: string; category: string; impact?: string; requester?: string }) =>
     interaction({
       type: "view_submission", team: { id: "T1" }, user: { id: JSON.parse(privateMetadata).clickerSlackId },
       view: {
@@ -83,6 +83,7 @@ describe.skipIf(!url)("Slack → chamado", () => {
             grupo: { valor: { selected_option: { value: values.category } } },
             tipo: { valor: { selected_option: { value: "bug" } } },
             ...(values.impact ? { gravidade: { valor: { selected_option: { value: values.impact } } } } : {}),
+            ...(values.requester ? { solicitante: { valor: { selected_user: values.requester } } } : {}),
           },
         },
       },
@@ -155,12 +156,15 @@ describe.skipIf(!url)("Slack → chamado", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("/chamado abre a janela; Usuário não vê Gravidade e o envio cria o chamado em nome dele", async () => {
+  it("/chamado abre a janela com Solicitante; Usuário não vê Gravidade e o envio cria o chamado em nome dele", async () => {
     const res = await command("UUSR", "slack-test impressora parada\ndetalhes");
     expect(res.status).toBe(200);
     const view = viewOf("views.open");
     expect(calls.find((c) => c.method === "views.open")!.params.trigger_id).toBe("TRIG");
-    expect(view.blocks.map((b: any) => b.block_id).filter(Boolean)).toEqual(["titulo", "descricao", "grupo", "tipo"]);
+    expect(view.blocks.map((b: any) => b.block_id).filter(Boolean)).toEqual(["titulo", "descricao", "solicitante", "grupo", "tipo"]);
+    // Usuário não recebe palpite: o campo abre marcado nele mesmo, para não nascer no nome errado.
+    expect(view.blocks.find((b: any) => b.block_id === "solicitante").element.initial_user).toBe("UUSR");
+    expect(view.blocks.some((b: any) => b.type === "context")).toBe(false);
     expect(view.blocks.find((b: any) => b.block_id === "titulo").element.initial_value).toBe("slack-test impressora parada");
 
     const sub = await submit(view.private_metadata, { title: "slack-test impressora", category: "sap", impact: "critico" });
@@ -174,6 +178,19 @@ describe.skipIf(!url)("Slack → chamado", () => {
     const aviso = calls.find((c) => c.method === "chat.postEphemeral");
     expect(aviso!.params.text).toContain(rows[0].code);
     expect(aviso!.params.user).toBe("UUSR");
+  });
+
+  it("Usuário abre chamado em nome de outra pessoa e a descrição registra quem abriu", async () => {
+    await command("UUSR", "slack-test notebook da Débora");
+    const view = viewOf("views.open");
+    const sub = await submit(view.private_metadata, { title: "slack-test em nome de", category: "sap", requester: "UTEC" });
+    expect(sub.status).toBe(200);
+    const { rows } = await pool.query(
+      "SELECT t.description, u.email FROM tickets t JOIN users u ON u.id = t.requester_id WHERE t.title = 'slack-test em nome de'",
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].email).toBe(`tecnico@${DOMAIN}`);
+    expect(rows[0].description).toContain("Aberto no Slack por Usuário Slack em nome de Técnico Slack");
   });
 
   it("primeiro uso cria a pessoa como Usuário; domínio de fora é recusado", async () => {

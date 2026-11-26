@@ -3,7 +3,7 @@
 Três formas de abrir chamado pelo Slack:
 
 - **`/chamado [texto]`** em qualquer canal ou DM: abre uma janela com Título, Descrição,
-  Grupo e Tipo (técnicos e admins também escolhem a Gravidade e o **Solicitante**).
+  Grupo, Tipo e **Solicitante** (a Gravidade só aparece para técnicos e admins).
   O comando do Slack só recebe o texto digitado — não sabe em qual thread a pessoa estava —,
   então ele **não** leva conversa; para isso use os atalhos de mensagem abaixo.
 - **Criar chamado** (menu ⋯ da mensagem → *Conectar-se a apps* / *Mais ações*): cria na hora,
@@ -25,12 +25,18 @@ app não estiver no canal, a confirmação (com o link) vai por **DM** para quem
 dica de convidar o app. As ações validam conta ativa, módulo chamados, workspace, tenant e
 acesso ao chamado.
 
-**Solicitante sugerido:** quem digita `/chamado` quase nunca é quem está com o problema. Para
-técnicos e admins a janela traz um campo **Solicitante** já marcado com a última pessoa que
-falou no canal (bots e avisos de entrada não contam, e só vale conversa das últimas 2 horas),
-com uma linha dizendo de onde veio o palpite. Trocar é um clique; deixar em branco abre o
-chamado no nome de quem digitou. Quem é **Usuário** não vê o campo e continua abrindo só em
-nome próprio — a regra é a mesma do formulário e é conferida de novo no envio.
+**Solicitante:** quem digita `/chamado` quase nunca é quem está com o problema. A janela traz
+um campo **Solicitante** para **qualquer pessoa** — não só técnicos: quem recebe o pedido de
+ajuda muitas vezes é do time, não do suporte. Deixar em branco abre o chamado no nome de quem
+digitou. Quando o solicitante é outra pessoa, a descrição do chamado registra quem abriu
+("Aberto no Slack por Fulana em nome de Beltrano"), para o chamado nunca ficar sem dono do
+pedido.
+
+**Palpite automático:** só para técnicos e admins, o campo já vem marcado com a última pessoa
+que falou no canal (bots e avisos de entrada não contam, e só vale conversa das últimas 2
+horas), com uma linha dizendo de onde veio o palpite. Para quem é **Usuário** o campo abre
+marcado nela mesma: Usuário quase sempre abre o próprio chamado, e vir marcado com o colega que
+falou antes faria o chamado nascer no nome errado sem ninguém perceber.
 
 O palpite depende do app conseguir ler o canal (`channels:history` / `groups:history`), então:
 

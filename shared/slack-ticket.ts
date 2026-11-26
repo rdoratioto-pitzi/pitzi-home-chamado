@@ -128,7 +128,7 @@ export interface SlackModalOptions {
   groups: readonly { key: string; name: string }[];
   /** Gravidade só aparece para técnicos e admins; quem abre como Usuário fica com "Médio". */
   showImpact: boolean;
-  /** Seletor de solicitante: só técnico/admin abre chamado em nome de outra pessoa. */
+  /** Seletor de solicitante: qualquer pessoa pode abrir chamado em nome de outra. */
   showRequester?: boolean;
   /** Pessoa já marcada no seletor — o palpite da conversa, ou quem digitou o comando. */
   initialRequesterSlackId?: string | null;
