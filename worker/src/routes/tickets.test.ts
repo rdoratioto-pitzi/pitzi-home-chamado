@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 const storage = {
   getTicket: vi.fn(),
+  getTicketWithNames: vi.fn(),
   getTicketComments: vi.fn(),
   createTicketComment: vi.fn(),
   updateTicket: vi.fn(),
@@ -52,6 +53,7 @@ function buildApp(userId: string, role = "user") {
 beforeEach(() => {
   vi.clearAllMocks();
   storage.getTicket.mockResolvedValue(TICKET);
+  storage.getTicketWithNames.mockResolvedValue({ ...TICKET, requesterName: "Débora", assigneeName: "Rodrigo" });
   storage.getTicketComments.mockResolvedValue(COMMENTS);
   storage.createTicketComment.mockImplementation(async (data: any) => ({ id: "new", ...data }));
   // "tech-*" são técnicos; os demais ("req-*") são solicitantes do tipo Usuário.
@@ -59,6 +61,15 @@ beforeEach(() => {
   storage.getUsers.mockResolvedValue([]);
   storage.createNotification.mockResolvedValue(undefined);
   storage.updateTicket.mockResolvedValue(TICKET);
+});
+
+describe("Worker GET /api/tickets/:id", () => {
+  it("devolve o nome do solicitante e do responsável (a tela de detalhe mostra os dois)", async () => {
+    const res = await buildApp("tech-1").request("/api/tickets/t1");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: "t1", requesterName: "Débora", assigneeName: "Rodrigo" });
+    expect(storage.getTicketWithNames).toHaveBeenCalledWith("t1");
+  });
 });
 
 describe("Worker GET /api/tickets/:id/comments", () => {

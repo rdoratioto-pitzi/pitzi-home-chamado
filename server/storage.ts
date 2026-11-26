@@ -98,6 +98,9 @@ import { completeModulePermissions } from "../shared/permissions";
 import type { SyncedAsset } from "../shared/assets";
  import { alias } from "drizzle-orm/pg-core";
  
+/** Chamado com os nomes do solicitante e do responsável resolvidos (tela de detalhe). */
+export type TicketWithNames = Ticket & { requesterName: string | null; assigneeName: string | null };
+
 /** Chamado na ficha do equipamento. */
 export type AssetTicket = {
   id: string; code: string; title: string; status: string;
@@ -148,6 +151,7 @@ export interface IStorage {
 
   // Tickets
   getTicket(id: string): Promise<Ticket | undefined>;
+  getTicketWithNames(id: string): Promise<TicketWithNames | undefined>;
   getTickets(filters?: TicketFilters): Promise<Ticket[]>;
   createTicket(ticket: InsertTicket): Promise<Ticket>;
   updateTicket(id: string, data: Partial<Ticket>): Promise<Ticket | undefined>;
