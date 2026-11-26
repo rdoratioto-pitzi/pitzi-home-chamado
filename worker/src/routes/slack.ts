@@ -115,7 +115,9 @@ slack.post("/api/slack/commands", async (c) => {
   if (!person.ok) return c.json(ephemeral(person.message));
   const tecnico = isTechnician(person.user);
   const groups = await activeGroups(storage, person.user.tenantId ?? null);
-  // Abrir em nome de outra pessoa é coisa de técnico: para quem é Usuário nem o palpite vale.
+  // Qualquer pessoa abre chamado em nome de outra — quem recebe o pedido nem sempre é técnico.
+  // O palpite continua só para técnico: quem é Usuário quase sempre abre o próprio chamado, e
+  // vir marcado com o colega que falou antes no canal faria o chamado nascer no nome errado.
   const sugerido = tecnico && hint ? hint.slackUserId : null;
 
   const view = buildTicketModal({
@@ -124,7 +126,7 @@ slack.post("/api/slack/commands", async (c) => {
     description: text,
     groups,
     showImpact: tecnico,
-    showRequester: tecnico,
+    showRequester: true,
     initialRequesterSlackId: sugerido ?? slackUserId,
     context: sugerido
       ? `Solicitante sugerido: <@${sugerido}>, a última pessoa que falou aqui. Troque no campo abaixo se não for.`
@@ -411,7 +413,7 @@ async function handleShortcut(c: Context<AppEnv>, token: string, payload: any, a
         description: starterText,
         groups: await activeGroups(storage, requester.user.tenantId ?? null),
         showImpact: isTechnician(clicker.user),
-        showRequester: isTechnician(clicker.user),
+        showRequester: true,
         initialRequesterSlackId: authorSlackId,
         context: `Solicitante: *${requester.user.name}* (${sameAuthor ? "você" : conversation ? "quem começou a conversa" : "autor da mensagem"})\n${whatGoes}`,
       }),
@@ -690,8 +692,9 @@ async function createFromSlack(
     return;
   }
   const clickerUser = clicker ? (clicker.ok ? clicker.user : null) : requester.user;
-  if (!clickerUser || !sameTenant(clickerUser.tenantId, requester.user.tenantId) ||
-      (meta.clickerSlackId !== requesterSlackId && !isTechnician(clickerUser))) return;
+  // Abrir em nome de outra pessoa vale para qualquer um; o que continua valendo é o tenant.
+  if (!clickerUser || !sameTenant(clickerUser.tenantId, requester.user.tenantId)) return;
+  const emNomeDeOutro = meta.clickerSlackId !== requesterSlackId;
   // Gravidade: só técnico/admin escolhe; Usuário fica com "Médio" (mesma regra do formulário).
   const impact = clickerUser && isTechnician(clickerUser) && values.impact ? values.impact : DEFAULT_SLACK_IMPACT;
 
@@ -713,7 +716,8 @@ async function createFromSlack(
   }, {
     code: "",
     title: values.title,
-    description: fromSlack?.html ?? plainTextToHtml(values.description),
+    description: (fromSlack?.html ?? plainTextToHtml(values.description)) +
+      (emNomeDeOutro ? plainTextToHtml(`Aberto no Slack por ${clickerUser.name} em nome de ${requester.user.name}.`) : ""),
     category: values.category,
     type: values.type,
     impact,
