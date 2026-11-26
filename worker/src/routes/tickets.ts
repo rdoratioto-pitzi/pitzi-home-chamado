@@ -210,7 +210,10 @@ tickets.get("/api/tickets", async (c) => {
 tickets.get("/api/tickets/:id", async (c) => {
   const user = c.get("user");
   const storage = getStorage(c.get("db"));
-  const ticket = await storage.getTicket(c.req.param("id"));
+  // getTicketWithNames, não getTicket: a tela de detalhe mostra Solicitante e Responsável pelo
+  // nome. O Express já fazia o join; aqui ficou de fora e os dois campos apareciam vazios
+  // ("N/A" e "Não atribuído") em produção, mesmo com o chamado tendo dono.
+  const ticket = await storage.getTicketWithNames(c.req.param("id"));
   if (!ticket || !sameTenant(ticket.tenantId, user.tenantId)) return c.json({ error: "Ticket not found" }, 404);
   if (!(await ticketCommentAccess(storage, user, ticket)).allowed) {
     return c.json({ error: "Ticket not found" }, 404);
