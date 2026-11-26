@@ -3,7 +3,7 @@
 Três formas de abrir chamado pelo Slack:
 
 - **`/chamado [texto]`** em qualquer canal ou DM: abre uma janela com Título, Descrição,
-  Grupo e Tipo (técnicos e admins também escolhem a Gravidade). O solicitante é quem digitou.
+  Grupo e Tipo (técnicos e admins também escolhem a Gravidade e o **Solicitante**).
   O comando do Slack só recebe o texto digitado — não sabe em qual thread a pessoa estava —,
   então ele **não** leva conversa; para isso use os atalhos de mensagem abaixo.
 - **Criar chamado** (menu ⋯ da mensagem → *Conectar-se a apps* / *Mais ações*): cria na hora,
@@ -24,6 +24,25 @@ A confirmação e os botões Assumir, Em atendimento, Resolver e Ver chamado fic
 app não estiver no canal, a confirmação (com o link) vai por **DM** para quem clicou, com a
 dica de convidar o app. As ações validam conta ativa, módulo chamados, workspace, tenant e
 acesso ao chamado.
+
+**Solicitante sugerido:** quem digita `/chamado` quase nunca é quem está com o problema. Para
+técnicos e admins a janela traz um campo **Solicitante** já marcado com a última pessoa que
+falou no canal (bots e avisos de entrada não contam, e só vale conversa das últimas 2 horas),
+com uma linha dizendo de onde veio o palpite. Trocar é um clique; deixar em branco abre o
+chamado no nome de quem digitou. Quem é **Usuário** não vê o campo e continua abrindo só em
+nome próprio — a regra é a mesma do formulário e é conferida de novo no envio.
+
+O palpite depende do app conseguir ler o canal (`channels:history` / `groups:history`), então:
+
+| Onde | Sugere? |
+|---|---|
+| Canal onde o app foi convidado | sim, a última pessoa que falou |
+| Canal onde o app **não** está | não — o Slack recusa a leitura; escolha no campo |
+| DM entre duas pessoas | não — o bot não é membro e nem enxerga quem é o outro lado |
+
+Não sugerir não é erro: a janela abre do mesmo jeito, com quem digitou marcado. O palpite também
+é conferido antes de aparecer (conta ativa, módulo chamados, domínio liberado) e **não cria
+cadastro** — a conta só nasce quando o chamado é realmente aberto em nome da pessoa.
 
 A pessoa é reconhecida pelo e-mail do perfil do Slack. Quem ainda não tem cadastro e é de um
 domínio liberado (`ALLOWED_GOOGLE_DOMAINS`, hoje `pitzi.com.br`) entra como **Usuário**, igual

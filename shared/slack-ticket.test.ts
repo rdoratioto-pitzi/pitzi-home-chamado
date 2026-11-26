@@ -4,6 +4,7 @@ import {
   firstLine,
   parseModalMetadata,
   parseTicketModal,
+  pickRequesterSlackId,
   plainTextToHtml,
   slackTextToPlain,
   generateSlackTicketTitle,
@@ -69,6 +70,33 @@ describe("janela de abertura", () => {
     expect(parseModalMetadata(usuario.private_metadata)).toEqual(metadata);
   });
 
+  it("Solicitante só aparece para quem pode escolher, já marcado no palpite", () => {
+    const base = { metadata, title: "t", description: "d", groups, showImpact: true };
+    const sem = buildTicketModal(base);
+    const com = buildTicketModal({ ...base, showRequester: true, initialRequesterSlackId: "U9" });
+    const ids = (v: any) => v.blocks.map((b: any) => b.block_id).filter(Boolean);
+    expect(ids(sem)).not.toContain("solicitante");
+    expect(ids(com)).toEqual(["titulo", "descricao", "solicitante", "grupo", "tipo", "gravidade"]);
+    const campo: any = com.blocks.find((b: any) => b.block_id === "solicitante");
+    expect(campo.optional).toBe(true);
+    expect(campo.element.type).toBe("users_select");
+    expect(campo.element.initial_user).toBe("U9");
+  });
+
+  it("sem palpite, o seletor abre sem ninguém marcado", () => {
+    const v = buildTicketModal({ metadata, title: "t", description: "d", groups, showImpact: true, showRequester: true, initialRequesterSlackId: null });
+    const campo: any = v.blocks.find((b: any) => b.block_id === "solicitante");
+    expect(campo.element.initial_user).toBeUndefined();
+  });
+
+  it("lê o solicitante escolhido na janela", () => {
+    const values = parseTicketModal({
+      state: { values: { solicitante: { valor: { selected_user: "U7" } } } },
+    });
+    expect(values.requesterSlackId).toBe("U7");
+    expect(parseTicketModal({ state: { values: { solicitante: { valor: {} } } } }).requesterSlackId).toBeNull();
+  });
+
   it("lê os valores enviados", () => {
     const values = parseTicketModal({
       state: {
@@ -80,7 +108,7 @@ describe("janela de abertura", () => {
         },
       },
     });
-    expect(values).toEqual({ title: "Impressora", description: "não imprime", category: "sap", type: "bug", impact: null });
+    expect(values).toEqual({ title: "Impressora", description: "não imprime", category: "sap", type: "bug", impact: null, requesterSlackId: null });
     expect(parseModalMetadata("lixo")).toBeNull();
   });
 });
@@ -161,5 +189,46 @@ describe("conversa do Slack", () => {
   it("explica o que falta quando não dá para ler a conversa", () => {
     expect(slackAccessHint("not_in_channel")).toContain("/invite @Chamados Pitzi");
     expect(slackAccessHint("missing_scope")).toContain("channels:history");
+  });
+});
+
+describe("palpite de solicitante", () => {
+  const AGORA = 1_700_000_000_000;
+  const msg = (user: string | undefined, minutosAtras: number, extra: Record<string, unknown> = {}) => ({
+    ts: ((AGORA - minutosAtras * 60_000) / 1000).toFixed(6),
+    ...(user ? { user } : {}),
+    ...extra,
+  });
+
+  it("é a última pessoa que falou, não quem digitou o comando", () => {
+    const palpite = pickRequesterSlackId(
+      [msg("TEC", 1), msg("U2", 3), msg("U3", 40)],
+      "TEC",
+      AGORA,
+    );
+    expect(palpite).toEqual({ slackUserId: "U2", atMs: AGORA - 3 * 60_000 });
+  });
+
+  it("ignora bots, apps e avisos do canal", () => {
+    const palpite = pickRequesterSlackId(
+      [
+        msg("B1", 1, { bot_id: "B0001" }),
+        msg("U5", 2, { subtype: "channel_join" }),
+        msg("U6", 5, { subtype: "file_share" }),
+      ],
+      "TEC",
+      AGORA,
+    );
+    expect(palpite?.slackUserId).toBe("U6");
+  });
+
+  it("conversa velha não vira palpite", () => {
+    expect(pickRequesterSlackId([msg("U2", 200)], "TEC", AGORA)).toBeNull();
+    expect(pickRequesterSlackId([msg("U2", 200)], "TEC", AGORA, 5 * 60 * 60 * 1000)?.slackUserId).toBe("U2");
+  });
+
+  it("sem ninguém além de quem digitou, não há palpite", () => {
+    expect(pickRequesterSlackId([msg("TEC", 1), msg(undefined, 2)], "TEC", AGORA)).toBeNull();
+    expect(pickRequesterSlackId([], "TEC", AGORA)).toBeNull();
   });
 });
