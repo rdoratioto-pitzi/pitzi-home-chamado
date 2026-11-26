@@ -1,7 +1,9 @@
 // worker/src/routes/slack.ts
 //
 // Slack → chamado:
-//  - /chamado [texto]: abre a janela de abertura; o solicitante é quem digitou.
+//  - /chamado [texto]: abre a janela de abertura. O solicitante vem sugerido pela conversa do
+//    canal (última pessoa que falou) e o técnico troca no seletor; quem não é técnico abre
+//    sempre em nome próprio.
 //  - atalho "Criar chamado" (callback transformar_em_chamado): cria na hora. Em thread, leva a
 //    conversa inteira (raiz + respostas) e os anexos; o solicitante é quem começou a conversa.
 //  - atalho "Criar chamado avançado": abre a janela; no envio leva a conversa e os anexos.
@@ -16,7 +18,7 @@ import { getStorage } from "../lib/storage";
 import { mailContext } from "../lib/mailer";
 import { createTicketFor } from "../lib/create-ticket";
 import { notifyPerson, slackApi, isAllowedSlackTeam } from "../lib/slack-api";
-import { resolveSlackPerson } from "../lib/slack-people";
+import { resolveSlackPerson, suggestRequesterFromChannel } from "../lib/slack-people";
 import { fetchSlackThread, importSlackFiles, resolveSlackNames } from "../lib/slack-thread";
 import { sanitizeRichText } from "../lib/sanitize-rich-text";
 import type { Ticket } from "../../../shared/schema";
@@ -103,16 +105,30 @@ slack.post("/api/slack/commands", async (c) => {
   const db = c.get("db");
   const storage = getStorage(db);
 
-  const person = await resolveSlackPerson(db, c.env, slackUserId);
+  const channelId = params.get("channel_id");
+  // O palpite de solicitante roda junto com a identificação de quem digitou: o trigger_id da
+  // janela vale 3 s, e em série as duas chamadas ao Slack comem boa parte desse orçamento.
+  const [person, hint] = await Promise.all([
+    resolveSlackPerson(db, c.env, slackUserId),
+    suggestRequesterFromChannel(db, c.env, channelId, slackUserId),
+  ]);
   if (!person.ok) return c.json(ephemeral(person.message));
+  const tecnico = isTechnician(person.user);
   const groups = await activeGroups(storage, person.user.tenantId ?? null);
+  // Abrir em nome de outra pessoa é coisa de técnico: para quem é Usuário nem o palpite vale.
+  const sugerido = tecnico && hint ? hint.slackUserId : null;
 
   const view = buildTicketModal({
-    metadata: { teamId: params.get("team_id"), mode: "command", clickerSlackId: slackUserId, requesterSlackId: slackUserId, channelId: params.get("channel_id") },
+    metadata: { teamId: params.get("team_id"), mode: "command", clickerSlackId: slackUserId, requesterSlackId: sugerido ?? slackUserId, channelId },
     title: firstLine(text),
     description: text,
     groups,
-    showImpact: isTechnician(person.user),
+    showImpact: tecnico,
+    showRequester: tecnico,
+    initialRequesterSlackId: sugerido ?? slackUserId,
+    context: sugerido
+      ? `Solicitante sugerido: <@${sugerido}>, a última pessoa que falou aqui. Troque no campo abaixo se não for.`
+      : undefined,
   });
   const opened = await slackApi(token, "views.open", { trigger_id: triggerId, view });
   if (!opened.ok) return c.json(ephemeral(`Não consegui abrir a janela do chamado (${opened.error ?? "erro"}). Tente de novo.`));
@@ -395,6 +411,8 @@ async function handleShortcut(c: Context<AppEnv>, token: string, payload: any, a
         description: starterText,
         groups: await activeGroups(storage, requester.user.tenantId ?? null),
         showImpact: isTechnician(clicker.user),
+        showRequester: isTechnician(clicker.user),
+        initialRequesterSlackId: authorSlackId,
         context: `Solicitante: *${requester.user.name}* (${sameAuthor ? "você" : conversation ? "quem começou a conversa" : "autor da mensagem"})\n${whatGoes}`,
       }),
     });
@@ -661,9 +679,11 @@ async function createFromSlack(
 ) {
   const db = c.get("db");
   const storage = getStorage(db);
+  // Quem a janela diz que é o solicitante manda; a metadata guarda só o que veio marcado.
+  const requesterSlackId = values.requesterSlackId || meta.requesterSlackId;
   const [requester, clicker] = await Promise.all([
-    resolveSlackPerson(db, c.env, meta.requesterSlackId),
-    meta.clickerSlackId === meta.requesterSlackId ? Promise.resolve(null) : resolveSlackPerson(db, c.env, meta.clickerSlackId),
+    resolveSlackPerson(db, c.env, requesterSlackId),
+    meta.clickerSlackId === requesterSlackId ? Promise.resolve(null) : resolveSlackPerson(db, c.env, meta.clickerSlackId),
   ]);
   if (!requester.ok) {
     await notifyPerson(token, meta.clickerSlackId, `Não consegui abrir o chamado: ${requester.message}`, meta.channelId);
@@ -671,7 +691,7 @@ async function createFromSlack(
   }
   const clickerUser = clicker ? (clicker.ok ? clicker.user : null) : requester.user;
   if (!clickerUser || !sameTenant(clickerUser.tenantId, requester.user.tenantId) ||
-      (meta.clickerSlackId !== meta.requesterSlackId && !isTechnician(clickerUser))) return;
+      (meta.clickerSlackId !== requesterSlackId && !isTechnician(clickerUser))) return;
   // Gravidade: só técnico/admin escolhe; Usuário fica com "Médio" (mesma regra do formulário).
   const impact = clickerUser && isTechnician(clickerUser) && values.impact ? values.impact : DEFAULT_SLACK_IMPACT;
 

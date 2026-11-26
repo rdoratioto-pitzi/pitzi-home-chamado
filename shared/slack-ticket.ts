@@ -128,6 +128,10 @@ export interface SlackModalOptions {
   groups: readonly { key: string; name: string }[];
   /** Gravidade só aparece para técnicos e admins; quem abre como Usuário fica com "Médio". */
   showImpact: boolean;
+  /** Seletor de solicitante: só técnico/admin abre chamado em nome de outra pessoa. */
+  showRequester?: boolean;
+  /** Pessoa já marcada no seletor — o palpite da conversa, ou quem digitou o comando. */
+  initialRequesterSlackId?: string | null;
   /** Texto de contexto no topo (ex.: "Mensagem de Fulana em #canal"). */
   context?: string;
 }
@@ -157,6 +161,19 @@ export function buildTicketModal(options: SlackModalOptions) {
         ...(options.description ? { initial_value: options.description.slice(0, 3000) } : {}),
       },
     },
+  );
+  if (options.showRequester) {
+    blocks.push({
+      type: "input", block_id: "solicitante", optional: true,
+      label: plain("Solicitante"),
+      hint: plain("Quem pediu. Em branco, o chamado fica no nome de quem abriu."),
+      element: {
+        type: "users_select", action_id: "valor", placeholder: plain("Escolha a pessoa"),
+        ...(options.initialRequesterSlackId ? { initial_user: options.initialRequesterSlackId } : {}),
+      },
+    });
+  }
+  blocks.push(
     {
       type: "input", block_id: "grupo", label: plain("Grupo de atendimento"),
       element: {
@@ -201,6 +218,8 @@ export interface SlackModalSubmission {
   category: string;
   type: string;
   impact: string | null;
+  /** Solicitante escolhido na janela; null quando o campo nem apareceu ou ficou em branco. */
+  requesterSlackId: string | null;
 }
 
 /** Lê os valores da janela enviada (view.state.values). */
@@ -208,12 +227,17 @@ export function parseTicketModal(view: { state?: { values?: Record<string, Recor
   const values = view.state?.values ?? {};
   const text = (block: string) => String(values[block]?.valor?.value ?? "").trim();
   const selected = (block: string) => values[block]?.valor?.selected_option?.value ?? null;
+  const person = (block: string) => {
+    const id = values[block]?.valor?.selected_user;
+    return typeof id === "string" && id ? id : null;
+  };
   return {
     title: text("titulo"),
     description: text("descricao"),
     category: selected("grupo") ?? "",
     type: selected("tipo") ?? TICKET_TYPES[0].value,
     impact: selected("gravidade"),
+    requesterSlackId: person("solicitante"),
   };
 }
 
@@ -252,6 +276,49 @@ export interface SlackThreadMessage {
   text?: string;
   files?: SlackFile[];
   reply_count?: number;
+}
+
+// ─── Palpite de solicitante ───────────────────────────────────────────────────
+//
+// Quem digita /chamado quase nunca é quem está com o problema: o técnico abre o chamado da
+// pessoa que acabou de pedir ajuda ali no canal. O palpite é essa pessoa — a última gente
+// (bot não conta) que falou antes do comando. Como é só palpite, ele vem marcado no seletor
+// da janela e o técnico troca com um clique se estiver errado.
+
+/** Depois disso a última mensagem do canal não é mais "a conversa" que gerou o chamado. */
+export const SLACK_REQUESTER_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/** Subtipos que ainda são alguém falando; o resto (entrou no canal, bot, edição) fica de fora. */
+const HUMAN_SUBTYPES = new Set(["file_share", "thread_broadcast"]);
+
+/** Milissegundos do `ts` do Slack ("1730000000.000100"); NaN vira 0. */
+function tsToMs(ts: string | undefined): number {
+  const n = Number.parseFloat(String(ts ?? ""));
+  return Number.isFinite(n) ? Math.round(n * 1000) : 0;
+}
+
+/**
+ * Quem, na conversa, parece ser o solicitante.
+ *
+ * Devolve null quando não há candidato — canal só com bots, conversa velha, ou o técnico
+ * falando sozinho. Null não é erro: a janela abre com ele mesmo marcado, como era antes.
+ */
+export function pickRequesterSlackId(
+  messages: readonly SlackThreadMessage[],
+  clickerSlackId: string,
+  nowMs: number,
+  windowMs: number = SLACK_REQUESTER_WINDOW_MS,
+): { slackUserId: string; atMs: number } | null {
+  let melhor: { slackUserId: string; atMs: number } | null = null;
+  for (const m of messages) {
+    if (!m.user || m.bot_id) continue;
+    if (m.subtype && !HUMAN_SUBTYPES.has(m.subtype)) continue;
+    if (m.user === clickerSlackId) continue;
+    const atMs = tsToMs(m.ts);
+    if (!atMs || nowMs - atMs > windowMs || atMs > nowMs) continue;
+    if (!melhor || atMs > melhor.atMs) melhor = { slackUserId: m.user, atMs };
+  }
+  return melhor;
 }
 
 /** Até quantos caracteres a conversa entra na descrição do chamado. */

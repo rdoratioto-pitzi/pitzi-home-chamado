@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { users, type User } from "../../../shared/schema";
 import { findOrProvisionGoogleUser } from "../../../server/services/google-login.service";
 import { slackApi } from "./slack-api";
+import { pickRequesterSlackId, type SlackThreadMessage } from "../../../shared/slack-ticket";
 
 export type SlackPersonResult =
   | { ok: true; user: User }
@@ -55,4 +56,52 @@ export async function resolveSlackPerson(
     await db.update(users).set({ slackUserId }).where(eq(users.id, result.user.id));
   }
   return { ok: true, user: { ...result.user, slackUserId } };
+}
+
+/** Quantas mensagens do canal são olhadas para adivinhar o solicitante. */
+const HISTORY_LIMIT = 20;
+
+/**
+ * O palpite pode mesmo ser solicitante? Confere SEM criar cadastro.
+ *
+ * `resolveSlackPerson` provisiona quem ainda não tem conta — correto no envio da janela, errado
+ * aqui: palpite não pode deixar conta nova para trás quando o técnico troca o nome. Sem esta
+ * conferência, um convidado externo falando no canal viraria sugestão e o chamado só quebraria
+ * no envio, com a janela já fechada.
+ */
+async function canBeRequester(
+  db: any,
+  env: { SLACK_BOT_TOKEN?: string; ALLOWED_GOOGLE_DOMAINS?: string },
+  slackUserId: string,
+): Promise<boolean> {
+  const [known] = await db.select().from(users).where(eq(users.slackUserId, slackUserId)).limit(1);
+  if (known) return known.status === "active" && hasModulePermission(known, "chamados");
+  const info = await slackApi(env.SLACK_BOT_TOKEN!, "users.info", { user: slackUserId });
+  if (!info.ok || info.user?.is_bot || info.user?.deleted) return false;
+  const email = String(info.user?.profile?.email ?? "").trim().toLowerCase();
+  if (!email) return false;
+  return allowedDomains(env.ALLOWED_GOOGLE_DOMAINS).includes(email.split("@")[1] ?? "");
+}
+
+/**
+ * Palpite de solicitante a partir da conversa do canal onde o /chamado foi digitado.
+ *
+ * Só funciona onde o app está: em DM entre duas pessoas o bot não é membro e nem enxerga quem
+ * é o outro lado — por isso DM (canal "D...") nem chega a ser consultada. Devolver null não é
+ * falha: a janela abre com quem digitou, e o seletor continua lá para escolher na mão.
+ */
+export async function suggestRequesterFromChannel(
+  db: any,
+  env: { SLACK_BOT_TOKEN?: string; ALLOWED_GOOGLE_DOMAINS?: string },
+  channelId: string | null | undefined,
+  clickerSlackId: string,
+  nowMs: number = Date.now(),
+): Promise<{ slackUserId: string; atMs: number } | null> {
+  const token = env.SLACK_BOT_TOKEN;
+  if (!token || !channelId || channelId.startsWith("D")) return null;
+  const page = await slackApi(token, "conversations.history", { channel: channelId, limit: HISTORY_LIMIT });
+  if (!page.ok) return null;
+  const palpite = pickRequesterSlackId((page.messages ?? []) as SlackThreadMessage[], clickerSlackId, nowMs);
+  if (!palpite) return null;
+  return (await canBeRequester(db, env, palpite.slackUserId)) ? palpite : null;
 }
